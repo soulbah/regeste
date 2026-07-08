@@ -129,3 +129,20 @@
 		@apply font-sans;
 	}
 }
+
+/* Trust-boundary colors (product invariant: Private=green, Assisted=amber, My AI=blue) */
+:root {
+	--mode-private: oklch(0.55 0.14 150);
+	--mode-assisted: oklch(0.65 0.15 75);
+	--mode-myai: oklch(0.55 0.12 245);
+}
+.dark {
+	--mode-private: oklch(0.72 0.14 150);
+	--mode-assisted: oklch(0.78 0.13 80);
+	--mode-myai: oklch(0.7 0.11 245);
+}
+@theme inline {
+	--color-mode-private: var(--mode-private);
+	--color-mode-assisted: var(--mode-assisted);
+	--color-mode-myai: var(--mode-myai);
+}
