@@ -9,7 +9,7 @@ Canonical project state. Read this first; update it (status table + one log line
 | 001  | Foundation (this scaffold)                                             | done        |
 | 002  | Local DB + document pipeline (milestone 0: validate browser perf bets) | done        |
 | 003  | Chat UI shell                                                          | done        |
-| 004  | Private mode (WebLLM/wllama tiers)                                     | not started |
+| 004  | Private mode (WebLLM tiers; wllama WASM fallback deferred)             | done        |
 | 005  | Auth + Assisted endpoint                                               | not started |
 | —    | Open-source launch prep (checklist: docs/internal/OSS-LAUNCH.md)       | later       |
 
@@ -17,5 +17,6 @@ Canonical project state. Read this first; update it (status table + one log line
 
 - 2026-07-08 — Repo scaffolded: SvelteKit + Tailwind v4 + shadcn-svelte (sera preset), Cloudflare adapter + wrangler, drizzle + better-auth + valibot, agent harness (AGENTS.md, hooks, skills, specs).
 - 2026-07-08 — Switched to bun; fixed better-auth 404 (baseURL now derived from request origin) and zod v3/v4 hoisting conflict (direct zod@^4 dep); auth signup/session verified against local D1 through wrangler dev; `bun run verify` + knip green.
+- 2026-07-09 — Spec 004 done: Private mode live — WebLLM in a worker (tier detection WebGPU/f16/memory → Qwen3-1.7B "plus" on this machine, downgrade chain on failure), explicit-consent download card (zero jargon), cached across sessions (ready in ~2 s on reload), grounded generation with numbered excerpts and validated [n] citations (hallucinated markers dropped), Qwen3 <think> blocks hidden/stripped, streamed into the thread with Stop, honest refusal on unsupported questions, one privacy_event per answer (device · 0 bytes). **Milestone-0 bet #2 (small-model citation quality) validated live: every citation pointed at the correct page.** wllama WASM fallback deferred (non-WebGPU devices see an honest "unavailable" state).
 - 2026-07-09 — Spec 003 done: full chat shell — sidebar (recency groups, rename via dialog, delete with cascade), lazy chat creation with auto-title, thread with retrieval-preview turns (real passages + locators, honest empty states), composer with trust-boundary mode selector (honest status lines, all modes disabled until 004/005), documents panel with per-doc enable checkboxes and live ingest states, library page with usage badges and delete warnings, adaptive add popover (upload vs pick-from-library). Verified end-to-end in Chromium.
 - 2026-07-08 — Spec 002 done: SQLite WASM (vec0 + FTS5, opfs-sahpool) in a dedicated worker with versioned local schema; parse (pdf.js/mammoth/md) → structure-aware chunking → transformers.js embeddings (multilingual-e5-small q8) → hybrid RRF search. Verified end-to-end in Chromium: FR semantic queries 112–173 ms, OPFS persistence across reloads, hash dedup, scanned-PDF honest error. **Milestone-0 bets validated.** Gotcha: sqlite-vec-wasm-demo ≥0.1.9 builds are broken — pinned 0.1.7-alpha.2, loaded verbatim from static/vendor (never bundled).
