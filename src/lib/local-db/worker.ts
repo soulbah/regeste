@@ -376,6 +376,103 @@ function documentUsage(documentId: string): number {
 	]) as number;
 }
 
+// ── Citations & privacy events ───────────────────────────────────────────────
+
+function insertCitations(
+	messageId: string,
+	rows: Array<{ chunkId: number; snippet: string; documentName: string; locator: string | null }>
+): void {
+	db.transaction(() => {
+		for (const r of rows) {
+			db.exec({
+				sql: `INSERT INTO citations(id, message_id, chunk_id, snippet, document_name, locator, created_at)
+				      VALUES (?, ?, ?, ?, ?, ?, ?)`,
+				bind: [
+					crypto.randomUUID(),
+					messageId,
+					r.chunkId,
+					r.snippet,
+					r.documentName,
+					r.locator,
+					Date.now()
+				]
+			});
+		}
+	});
+}
+
+export interface CitationRow {
+	messageId: string;
+	chunkId: number | null;
+	snippet: string;
+	documentName: string;
+	locator: string | null;
+}
+
+function listChatCitations(chatId: string): CitationRow[] {
+	return db
+		.selectObjects(
+			`SELECT c.message_id, c.chunk_id, c.snippet, c.document_name, c.locator
+			 FROM citations c JOIN messages m ON m.id = c.message_id
+			 WHERE m.chat_id = ? ORDER BY c.created_at, c.rowid`,
+			[chatId]
+		)
+		.map((r: any) => ({
+			messageId: r.message_id,
+			chunkId: r.chunk_id,
+			snippet: r.snippet,
+			documentName: r.document_name,
+			locator: r.locator
+		}));
+}
+
+function insertPrivacyEvent(e: {
+	chatId: string | null;
+	messageId: string | null;
+	mode: string;
+	destination: string;
+	excerptCount: number;
+	bytesSent: number;
+}): void {
+	db.exec({
+		sql: `INSERT INTO privacy_events(id, chat_id, message_id, mode, destination, excerpt_count, bytes_sent, created_at)
+		      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		bind: [
+			crypto.randomUUID(),
+			e.chatId,
+			e.messageId,
+			e.mode,
+			e.destination,
+			e.excerptCount,
+			e.bytesSent,
+			Date.now()
+		]
+	});
+}
+
+export interface PrivacyEventRow {
+	mode: string;
+	destination: string;
+	excerptCount: number;
+	bytesSent: number;
+	createdAt: number;
+}
+
+function listPrivacyEvents(limit = 100): PrivacyEventRow[] {
+	return db
+		.selectObjects(
+			'SELECT mode, destination, excerpt_count, bytes_sent, created_at FROM privacy_events ORDER BY created_at DESC LIMIT ?',
+			[limit]
+		)
+		.map((r: any) => ({
+			mode: r.mode,
+			destination: r.destination,
+			excerptCount: r.excerpt_count,
+			bytesSent: r.bytes_sent,
+			createdAt: r.created_at
+		}));
+}
+
 const api = {
 	init,
 	getDocumentByHash,
@@ -399,7 +496,11 @@ const api = {
 	setDocumentEnabled,
 	listChatDocuments,
 	listLibrary,
-	documentUsage
+	documentUsage,
+	insertCitations,
+	listChatCitations,
+	insertPrivacyEvent,
+	listPrivacyEvents
 };
 
 export type DbApi = typeof api;
