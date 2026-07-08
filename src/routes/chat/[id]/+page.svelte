@@ -2,11 +2,15 @@
 	import { page } from '$app/state';
 	import * as Resizable from '$lib/components/ui/resizable';
 	import { Skeleton } from '$lib/components/ui/skeleton';
+	import { Button } from '$lib/components/ui/button';
+	import SquareIcon from '@lucide/svelte/icons/square';
 	import Composer from '$lib/components/composer.svelte';
 	import RetrievalTurn from '$lib/components/retrieval-turn.svelte';
+	import PrivateTurn from '$lib/components/private-turn.svelte';
 	import DocumentsPanel from '$lib/components/documents-panel.svelte';
 	import { chatsStore } from '$lib/state/chats.svelte';
 	import { documentsStore } from '$lib/state/documents.svelte';
+	import { llmStore } from '$lib/private-ai/llm.svelte';
 
 	const chatId = $derived(page.params.id!);
 
@@ -62,11 +66,42 @@
 							</div>
 						{:else if message.mode === 'retrieval'}
 							<RetrievalTurn content={message.content} />
+						{:else if message.mode === 'private'}
+							<PrivateTurn
+								content={message.content}
+								citations={chatsStore.citations[message.id] ?? []}
+							/>
 						{:else}
 							<div class="text-sm">{message.content}</div>
 						{/if}
 					{/each}
-					{#if chatsStore.sending}
+					{#if chatsStore.streamingText !== null}
+						<div class="space-y-2">
+							<div class="flex items-center gap-2">
+								<span class="bg-mode-private size-1.5 animate-pulse rounded-full"></span>
+								<span class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
+									{chatsStore.streamingText ? 'Writing…' : 'Reading your documents…'}
+								</span>
+								{#if llmStore.status === 'generating'}
+									<Button
+										variant="ghost"
+										size="sm"
+										class="h-6 gap-1 px-2 font-mono text-[10px] uppercase"
+										onclick={() => chatsStore.stopGeneration()}
+									>
+										<SquareIcon class="size-2.5" /> Stop
+									</Button>
+								{/if}
+							</div>
+							{#if chatsStore.streamingText}
+								<p class="text-sm leading-relaxed whitespace-pre-wrap">
+									{chatsStore.streamingText}
+								</p>
+							{:else}
+								<Skeleton class="h-4 w-2/3" />
+							{/if}
+						</div>
+					{:else if chatsStore.sending}
 						<div class="space-y-2">
 							<Skeleton class="h-4 w-2/3" />
 							<Skeleton class="h-4 w-1/2" />

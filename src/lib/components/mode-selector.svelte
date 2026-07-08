@@ -6,32 +6,64 @@
 	import SparklesIcon from '@lucide/svelte/icons/sparkles';
 	import LinkIcon from '@lucide/svelte/icons/link';
 	import CheckIcon from '@lucide/svelte/icons/check';
+	import { llmStore } from '$lib/private-ai/llm.svelte';
 	import type { ChatMode } from '$lib/types';
 
 	let { mode, onselect }: { mode: ChatMode; onselect: (mode: ChatMode) => void } = $props();
 
 	let open = $state(false);
 
-	// Honest state lines (FEATURES 5bis): the selector is a status surface.
-	// These become dynamic when specs 004/005 land.
-	const modes: Array<{
-		id: ChatMode;
-		label: string;
-		dotClass: string;
-		description: string;
-		status: string | null;
-		disabled: boolean;
-	}> = [
+	$effect(() => {
+		llmStore.init();
+	});
+
+	// Honest state lines (FEATURES 5bis): the selector IS the status surface.
+	// Zero model jargon — sizes and plain language only.
+	const privateStatus = $derived.by(() => {
+		switch (llmStore.status) {
+			case 'detecting':
+				return { line: 'Checking this device…', selectable: false, prepare: false };
+			case 'unavailable':
+				return { line: 'Unavailable on this device', selectable: false, prepare: false };
+			case 'needs-download':
+				return llmStore.prepared
+					? { line: 'Prepared · tap to load', selectable: true, prepare: true }
+					: {
+							line: `One-time download of ${llmStore.downloadLabel}, then works offline`,
+							selectable: true,
+							prepare: true
+						};
+			case 'downloading':
+				return {
+					line: `Preparing private AI… ${Math.round(llmStore.progress * 100)}%`,
+					selectable: true,
+					prepare: false
+				};
+			case 'loading':
+				return { line: 'Loading private AI…', selectable: true, prepare: false };
+			case 'ready':
+			case 'generating':
+				return { line: 'Ready · works offline', selectable: true, prepare: false };
+			case 'error':
+				return {
+					line: llmStore.errorMessage ?? 'Something went wrong',
+					selectable: false,
+					prepare: false
+				};
+		}
+	});
+
+	const modes = $derived([
 		{
-			id: 'private',
+			id: 'private' as ChatMode,
 			label: 'Private',
 			dotClass: 'bg-mode-private',
 			description: 'Everything stays on this device.',
-			status: 'Coming soon — on-device AI is not wired yet',
-			disabled: true
+			status: privateStatus.line,
+			disabled: !privateStatus.selectable
 		},
 		{
-			id: 'assisted',
+			id: 'assisted' as ChatMode,
 			label: 'Assisted',
 			dotClass: 'bg-mode-assisted',
 			description: 'Only relevant excerpts are processed online.',
@@ -39,14 +71,14 @@
 			disabled: true
 		},
 		{
-			id: 'myai',
+			id: 'myai' as ChatMode,
 			label: 'My AI',
 			dotClass: 'bg-mode-myai',
 			description: 'Use your own configured AI provider.',
 			status: 'Not configured',
 			disabled: true
 		}
-	];
+	]);
 
 	const current = $derived(modes.find((m) => m.id === mode) ?? modes[0]);
 </script>
@@ -70,10 +102,14 @@
 					variant="ghost"
 					class="h-auto justify-start gap-3 px-2 py-2 text-left"
 					onclick={() => {
-						if (!m.disabled) {
-							onselect(m.id);
-							open = false;
+						if (m.disabled) return;
+						onselect(m.id);
+						if (m.id === 'private' && privateStatus.prepare) {
+							// Explicit consent click: start the one-time download / load.
+							llmStore.prepare();
+							return; // keep the popover open to show progress
 						}
+						open = false;
 					}}
 				>
 					<span class="mt-0.5 flex size-7 items-center justify-center rounded-md border">
