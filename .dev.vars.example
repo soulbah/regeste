@@ -1,0 +1,2 @@
+# Copy to .dev.vars (gitignored). Agents never edit .dev.vars — owner only.
+BETTER_AUTH_SECRET="dev-only-secret-change-me"

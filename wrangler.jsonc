@@ -1,0 +1,31 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "folio",
+	"main": ".svelte-kit/cloudflare/_worker.js",
+	"compatibility_date": "2026-07-01",
+	"compatibility_flags": ["nodejs_compat"],
+	"assets": {
+		"directory": ".svelte-kit/cloudflare",
+		"binding": "ASSETS"
+	},
+	"observability": {
+		"enabled": true
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "folio-db",
+			// Replace with the real id after `wrangler d1 create folio-db`.
+			// Local dev works without it (miniflare uses .wrangler/state).
+			"database_id": "00000000-0000-0000-0000-000000000000",
+			"migrations_dir": "migrations"
+		}
+	],
+	"ai": {
+		"binding": "AI"
+	}
+	// Enabled by later specs (see docs/FEATURES.md):
+	// "send_email": [{ "name": "EMAIL", "allowed_sender_addresses": ["noreply@example.com"] }],
+	// "ratelimits": [{ "name": "RATE_LIMITER", "namespace_id": "1001", "simple": { "limit": 20, "period": 60 } }],
+	// Secrets (never in this file): wrangler secret put BETTER_AUTH_SECRET / TURNSTILE_SECRET_KEY
+}

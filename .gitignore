@@ -24,4 +24,3 @@ vite.config.ts.timestamp-*
 
 .dev.vars
 .wrangler/
-worker-configuration.d.ts
