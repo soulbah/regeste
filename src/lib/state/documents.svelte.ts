@@ -9,9 +9,15 @@ import type { DbInfo } from '$lib/local-db/worker';
 import { sha256Hex } from '$lib/pipeline/hash';
 import { chunkBlocks } from '$lib/pipeline/chunk';
 import { parseText } from '$lib/pipeline/parse/text';
-import type { EmbedApi, EmbedProgress } from '$lib/pipeline/embed-worker';
-import { EMBEDDING_MODEL } from '$lib/pipeline/embed-worker';
-import type { IngestErrorCode, LocalDocument, ParsedDoc, SearchHit } from '$lib/types';
+import type { EmbedApi } from '$lib/pipeline/embed-worker';
+import { EMBEDDING_MODEL, type EmbedProgress } from '$lib/pipeline/embed-model';
+import type {
+	IngestErrorCode,
+	LibraryDocument,
+	LocalDocument,
+	ParsedDoc,
+	SearchHit
+} from '$lib/types';
 
 let embedApi: Remote<EmbedApi> | null = null;
 function getEmbedWorker(): Remote<EmbedApi> {
@@ -69,6 +75,7 @@ export interface IngestState {
 
 class DocumentsStore {
 	documents = $state<LocalDocument[]>([]);
+	library = $state<LibraryDocument[]>([]);
 	ingests = $state<Record<string, IngestState>>({});
 	dbInfo = $state<DbInfo | null>(null);
 	dbError = $state<string | null>(null);
@@ -81,16 +88,24 @@ class DocumentsStore {
 			const { db, info } = await getLocalDb();
 			this.dbInfo = info;
 			this.documents = await db.listDocuments();
+			this.library = await db.listLibrary();
 		} catch (err) {
 			this.dbError = err instanceof Error ? err.message : String(err);
 		}
+	}
+
+	async refreshLibrary(): Promise<void> {
+		const { db } = await getLocalDb();
+		this.documents = await db.listDocuments();
+		this.library = await db.listLibrary();
 	}
 
 	private setIngest(id: string, state: IngestState): void {
 		this.ingests = { ...this.ingests, [id]: state };
 	}
 
-	async ingest(file: File): Promise<void> {
+	/** Ingest a file; returns the document id (existing one on dedup). */
+	async ingest(file: File): Promise<string> {
 		const { db } = await getLocalDb();
 		const data = await file.arrayBuffer();
 		const hash = await sha256Hex(data);
@@ -98,8 +113,8 @@ class DocumentsStore {
 		const existing = await db.getDocumentByHash(hash);
 		if (existing) {
 			this.setIngest(existing.id, { status: existing.status, phaseProgress: 1, dedup: true });
-			this.documents = await db.listDocuments();
-			return;
+			await this.refreshLibrary();
+			return existing.id;
 		}
 
 		const id = crypto.randomUUID();
@@ -143,8 +158,16 @@ class DocumentsStore {
 			this.setIngest(id, { status: 'error', phaseProgress: 0, error: code });
 			if (code === 'unknown') console.error('[folio] ingest failed:', err);
 		} finally {
-			this.documents = await db.listDocuments();
+			await this.refreshLibrary();
 		}
+		return id;
+	}
+
+	/** Hybrid retrieval over the given documents; returns the hits. */
+	async retrieve(query: string, documentIds: string[] | null = null): Promise<SearchHit[]> {
+		const { db } = await getLocalDb();
+		const { data } = await getEmbedWorker().embed([query.trim()], 'query');
+		return db.search(data, query.trim(), documentIds);
 	}
 
 	async search(query: string, documentIds: string[] | null = null): Promise<void> {
@@ -152,10 +175,8 @@ class DocumentsStore {
 		if (!q) return;
 		this.searching = true;
 		try {
-			const { db } = await getLocalDb();
 			const t0 = performance.now();
-			const { data } = await getEmbedWorker().embed([q], 'query');
-			this.results = await db.search(data, q, documentIds);
+			this.results = await this.retrieve(q, documentIds);
 			this.lastSearchMs = Math.round(performance.now() - t0);
 		} finally {
 			this.searching = false;
@@ -165,7 +186,7 @@ class DocumentsStore {
 	async remove(id: string): Promise<void> {
 		const { db } = await getLocalDb();
 		await db.deleteDocument(id);
-		this.documents = await db.listDocuments();
+		await this.refreshLibrary();
 	}
 }
 

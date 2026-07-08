@@ -58,6 +58,35 @@ export interface SearchHit {
 	score: number;
 }
 
+export type ChatMode = 'private' | 'assisted' | 'myai';
+
+export interface LocalChat {
+	id: string;
+	title: string;
+	mode: ChatMode;
+	privateOnly: boolean;
+	createdAt: number;
+	updatedAt: number;
+}
+
+export interface LocalMessage {
+	id: string;
+	chatId: string;
+	role: 'user' | 'assistant';
+	content: string;
+	/** 'retrieval' marks the transitional passages-only assistant turn (pre-004). */
+	mode: ChatMode | 'retrieval' | null;
+	createdAt: number;
+}
+
+export interface ChatDocument extends LocalDocument {
+	enabled: boolean;
+}
+
+export interface LibraryDocument extends LocalDocument {
+	chatCount: number;
+}
+
 export interface IngestProgress {
 	status: DocumentStatus;
 	/** 0..1 within the current phase (embedding reports real progress). */

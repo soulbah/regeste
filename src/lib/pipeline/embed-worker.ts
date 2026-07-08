@@ -4,19 +4,14 @@
 // downloaded once and cached by the library (Cache API). e5 requires
 // "query: " / "passage: " prefixes — enforced here so callers can't forget.
 
-import { expose, proxy } from 'comlink';
+import { expose } from 'comlink';
 import { pipeline, type FeatureExtractionPipeline } from '@huggingface/transformers';
+import { EMBEDDING_MODEL, type EmbedProgress } from './embed-model';
 
-export const EMBEDDING_MODEL = 'Xenova/multilingual-e5-small';
 const BATCH_SIZE = 16;
 
 let extractorPromise: Promise<FeatureExtractionPipeline> | null = null;
 let device: 'webgpu' | 'wasm' = 'wasm';
-
-export interface EmbedProgress {
-	phase: 'download' | 'embed';
-	progress: number; // 0..1
-}
 
 function getExtractor(onProgress?: (p: EmbedProgress) => void): Promise<FeatureExtractionPipeline> {
 	if (!extractorPromise) {
@@ -66,6 +61,5 @@ async function embed(
 
 const api = { embed };
 export type EmbedApi = typeof api;
-export { proxy };
 
 expose(api);

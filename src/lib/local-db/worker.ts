@@ -6,7 +6,15 @@
 
 import { expose } from 'comlink';
 import { MIGRATIONS } from './schema';
-import type { Chunk, LocalDocument, SearchHit } from '$lib/types';
+import type {
+	ChatDocument,
+	Chunk,
+	LibraryDocument,
+	LocalChat,
+	LocalDocument,
+	LocalMessage,
+	SearchHit
+} from '$lib/types';
 
 // The sqlite build (sqlite3 + vec0 + FTS5) is served verbatim from
 // /vendor/sqlite (copied from the pinned sqlite-vec-wasm-demo package by the
@@ -254,6 +262,120 @@ function countChunks(documentId: string): number {
 	]) as number;
 }
 
+// ── Chats / messages / attachments ──────────────────────────────────────────
+
+function rowToChat(r: any): LocalChat {
+	return {
+		id: r.id,
+		title: r.title,
+		mode: r.mode,
+		privateOnly: !!r.private_only,
+		createdAt: r.created_at,
+		updatedAt: r.updated_at
+	};
+}
+
+function createChat(chat: { id: string; title: string; mode: string }): void {
+	const now = Date.now();
+	db.exec({
+		sql: 'INSERT INTO chats(id, title, mode, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+		bind: [chat.id, chat.title, chat.mode, now, now]
+	});
+}
+
+function listChats(): LocalChat[] {
+	return db.selectObjects('SELECT * FROM chats ORDER BY updated_at DESC').map(rowToChat);
+}
+
+function renameChat(id: string, title: string): void {
+	db.exec({ sql: 'UPDATE chats SET title = ? WHERE id = ?', bind: [title, id] });
+}
+
+function setChatMode(id: string, mode: string): void {
+	db.exec({ sql: 'UPDATE chats SET mode = ? WHERE id = ?', bind: [mode, id] });
+}
+
+function touchChat(id: string): void {
+	db.exec({ sql: 'UPDATE chats SET updated_at = ? WHERE id = ?', bind: [Date.now(), id] });
+}
+
+function deleteChat(id: string): void {
+	db.exec({ sql: 'DELETE FROM chats WHERE id = ?', bind: [id] });
+}
+
+function insertMessage(m: {
+	id: string;
+	chatId: string;
+	role: string;
+	content: string;
+	mode: string | null;
+}): void {
+	db.exec({
+		sql: 'INSERT INTO messages(id, chat_id, role, content, mode, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+		bind: [m.id, m.chatId, m.role, m.content, m.mode, Date.now()]
+	});
+}
+
+function listMessages(chatId: string): LocalMessage[] {
+	return db
+		.selectObjects('SELECT * FROM messages WHERE chat_id = ? ORDER BY created_at, rowid', [chatId])
+		.map((r: any) => ({
+			id: r.id,
+			chatId: r.chat_id,
+			role: r.role,
+			content: r.content,
+			mode: r.mode,
+			createdAt: r.created_at
+		}));
+}
+
+function attachDocument(chatId: string, documentId: string): void {
+	db.exec({
+		sql: 'INSERT OR IGNORE INTO chat_documents(chat_id, document_id, added_at) VALUES (?, ?, ?)',
+		bind: [chatId, documentId, Date.now()]
+	});
+}
+
+function detachDocument(chatId: string, documentId: string): void {
+	db.exec({
+		sql: 'DELETE FROM chat_documents WHERE chat_id = ? AND document_id = ?',
+		bind: [chatId, documentId]
+	});
+}
+
+function setDocumentEnabled(chatId: string, documentId: string, enabled: boolean): void {
+	db.exec({
+		sql: 'UPDATE chat_documents SET enabled = ? WHERE chat_id = ? AND document_id = ?',
+		bind: [enabled ? 1 : 0, chatId, documentId]
+	});
+}
+
+function listChatDocuments(chatId: string): ChatDocument[] {
+	return db
+		.selectObjects(
+			`SELECT d.*, cd.enabled FROM chat_documents cd
+			 JOIN documents d ON d.id = cd.document_id
+			 WHERE cd.chat_id = ? ORDER BY cd.added_at DESC`,
+			[chatId]
+		)
+		.map((r: any) => ({ ...rowToDocument(r), enabled: !!r.enabled }));
+}
+
+function listLibrary(): LibraryDocument[] {
+	return db
+		.selectObjects(
+			`SELECT d.*, (SELECT count(*) FROM chat_documents cd WHERE cd.document_id = d.id) AS chat_count
+			 FROM documents d ORDER BY d.created_at DESC`
+		)
+		.map((r: any) => ({ ...rowToDocument(r), chatCount: r.chat_count }));
+}
+
+function documentUsage(documentId: string): number {
+	return db.selectValue('SELECT count(*) FROM chat_documents WHERE document_id = ?', [
+		documentId
+	]) as number;
+}
+
 const api = {
 	init,
 	getDocumentByHash,
@@ -263,7 +385,21 @@ const api = {
 	deleteDocument,
 	insertChunks,
 	search,
-	countChunks
+	countChunks,
+	createChat,
+	listChats,
+	renameChat,
+	setChatMode,
+	touchChat,
+	deleteChat,
+	insertMessage,
+	listMessages,
+	attachDocument,
+	detachDocument,
+	setDocumentEnabled,
+	listChatDocuments,
+	listLibrary,
+	documentUsage
 };
 
 export type DbApi = typeof api;
