@@ -1,0 +1,52 @@
+{
+	"permissions": {
+		"allow": [
+			"Bash(bun run check:*)",
+			"Bash(bun run lint:*)",
+			"Bash(bun run format:*)",
+			"Bash(bun run test:*)",
+			"Bash(bun run build:*)",
+			"Bash(bun run verify:*)",
+			"Bash(bun run cf:types:*)",
+			"Bash(git status:*)",
+			"Bash(git diff:*)",
+			"Bash(git log:*)"
+		],
+		"deny": ["Read(.dev.vars)", "Read(.env*)"]
+	},
+	"hooks": {
+		"PreToolUse": [
+			{
+				"matcher": "Edit|Write",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/protect-paths.sh"
+					}
+				]
+			}
+		],
+		"PostToolUse": [
+			{
+				"matcher": "Edit|Write",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/format-file.sh"
+					}
+				]
+			}
+		],
+		"Stop": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/stop-verify.sh",
+						"timeout": 300
+					}
+				]
+			}
+		]
+	}
+}
