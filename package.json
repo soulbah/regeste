@@ -74,6 +74,7 @@
 	},
 	"dependencies": {
 		"@huggingface/transformers": "^4.2.0",
+		"@mlc-ai/web-llm": "^0.2.84",
 		"better-auth": "^1.6.23",
 		"comlink": "^4.4.2",
 		"drizzle-orm": "^0.45.2",
