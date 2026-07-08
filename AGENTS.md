@@ -8,13 +8,13 @@ Foundation. The UI shell, browser pipeline and specs are being built incremental
 
 ## Read before working
 
-| You are about to…        | Read first                                                         |
-| ------------------------ | ------------------------------------------------------------------ |
-| Any task                 | `PROGRESS.md` (project state), the active `specs/NNN-*/tasks.md`   |
+| You are about to…        | Read first                                                                                                      |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| Any task                 | `PROGRESS.md` (project state), the active `specs/NNN-*/tasks.md`                                                |
 | Touch product behavior   | `docs/internal/PRD.md`, `docs/internal/FEATURES.md` (frozen feature set + decisions; local-only, not versioned) |
-| Touch stack/architecture | `docs/internal/RESEARCH-2026-07-stack.md`, `docs/constitution.md`           |
-| Touch UI                 | `.claude/rules/ui.md` (shadcn-only rule)                           |
-| Touch server/API/DB      | `.claude/rules/server.md`                                          |
+| Touch stack/architecture | `docs/internal/RESEARCH-2026-07-stack.md`, `docs/constitution.md`                                               |
+| Touch UI                 | `.claude/rules/ui.md` (shadcn-only rule)                                                                        |
+| Touch server/API/DB      | `.claude/rules/server.md`                                                                                       |
 
 ## Commands
 
