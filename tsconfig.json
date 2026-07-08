@@ -1,0 +1,34 @@
+{
+	"extends": "./.svelte-kit/tsconfig.json",
+	"compilerOptions": {
+		"rewriteRelativeImportExtensions": true,
+		"allowJs": true,
+		"checkJs": true,
+		"esModuleInterop": true,
+		"forceConsistentCasingInFileNames": true,
+		"resolveJsonModule": true,
+		"skipLibCheck": true,
+		"sourceMap": true,
+		"strict": true,
+		"moduleResolution": "bundler",
+		"types": ["./worker-configuration.d.ts"]
+	},
+	// Overrides the generated exclude (extends replaces, not merges): keep its entries
+	// and additionally ignore build artifacts so `check` passes after `build`.
+	"exclude": [
+		"node_modules/**",
+		".svelte-kit/output/**",
+		".svelte-kit/cloudflare/**",
+		"src/service-worker.js",
+		"src/service-worker/**/*.js",
+		"src/service-worker.ts",
+		"src/service-worker/**/*.ts",
+		"src/service-worker.d.ts",
+		"src/service-worker/**/*.d.ts"
+	]
+	// Path aliases are handled by https://svelte.dev/docs/kit/configuration#alias
+	// except $lib which is handled by https://svelte.dev/docs/kit/configuration#files
+	//
+	// To make changes to top-level options such as include and exclude, we recommend extending
+	// the generated config; see https://svelte.dev/docs/kit/configuration#typescript
+}

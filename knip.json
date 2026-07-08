@@ -1,0 +1,26 @@
+{
+	"$schema": "https://unpkg.com/knip@6/schema.json",
+	"ignore": [
+		"src/lib/components/ui/**",
+		"src/lib/hooks/**",
+		"src/lib/utils.ts",
+		"src/lib/index.ts",
+		"src/lib/auth-client.ts"
+	],
+	"ignoreDependencies": [
+		"@cloudflare/vitest-pool-workers",
+		"@internationalized/date",
+		"@lucide/svelte",
+		"bits-ui",
+		"clsx",
+		"formsnap",
+		"mode-watcher",
+		"paneforge",
+		"svelte-sonner",
+		"sveltekit-superforms",
+		"tailwind-merge",
+		"tailwind-variants",
+		"valibot",
+		"zod"
+	]
+}
