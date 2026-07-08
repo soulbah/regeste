@@ -27,3 +27,6 @@ vite.config.ts.timestamp-*
 
 # Internal product docs (never published — strategy, roadmap, competitive analysis)
 docs/internal/
+
+# Vendored at install time from pinned packages (see package.json "vendor")
+static/vendor/

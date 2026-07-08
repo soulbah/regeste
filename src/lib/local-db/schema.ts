@@ -1,0 +1,100 @@
+// Versioned migrations for the LOCAL browser database (OPFS). Applied in order
+// by the db worker; the current version lives in the meta table. Append-only:
+// never edit an entry that has shipped — add a new one.
+//
+// Privacy invariant: this schema exists in the user's browser only. It is the
+// ONLY place where documents, chats, chunks and embeddings are ever stored.
+
+export const EMBEDDING_DIMS = 384;
+
+export const MIGRATIONS: string[] = [
+	// v1 — initial schema
+	`
+	CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+
+	CREATE TABLE documents (
+		id TEXT PRIMARY KEY,
+		hash TEXT NOT NULL UNIQUE,
+		name TEXT NOT NULL,
+		mime TEXT NOT NULL,
+		size INTEGER NOT NULL,
+		pages INTEGER,
+		status TEXT NOT NULL DEFAULT 'received',
+		error TEXT,
+		embedding_model TEXT,
+		created_at INTEGER NOT NULL,
+		updated_at INTEGER NOT NULL
+	);
+
+	CREATE TABLE document_versions (
+		id TEXT PRIMARY KEY,
+		document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+		hash TEXT NOT NULL,
+		created_at INTEGER NOT NULL
+	);
+
+	CREATE TABLE chats (
+		id TEXT PRIMARY KEY,
+		title TEXT NOT NULL,
+		mode TEXT NOT NULL DEFAULT 'private',
+		private_only INTEGER NOT NULL DEFAULT 0,
+		created_at INTEGER NOT NULL,
+		updated_at INTEGER NOT NULL
+	);
+
+	CREATE TABLE messages (
+		id TEXT PRIMARY KEY,
+		chat_id TEXT NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+		role TEXT NOT NULL,
+		content TEXT NOT NULL,
+		mode TEXT,
+		created_at INTEGER NOT NULL
+	);
+
+	CREATE TABLE chat_documents (
+		chat_id TEXT NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+		document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+		enabled INTEGER NOT NULL DEFAULT 1,
+		added_at INTEGER NOT NULL,
+		PRIMARY KEY (chat_id, document_id)
+	);
+
+	CREATE TABLE chunks (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+		seq INTEGER NOT NULL,
+		text TEXT NOT NULL,
+		page INTEGER,
+		heading_path TEXT,
+		para_index INTEGER,
+		char_start INTEGER NOT NULL,
+		char_end INTEGER NOT NULL
+	);
+	CREATE INDEX idx_chunks_document ON chunks(document_id);
+
+	CREATE VIRTUAL TABLE chunks_fts USING fts5(text, content='chunks', content_rowid='id');
+
+	CREATE VIRTUAL TABLE chunks_vec USING vec0(embedding float[${EMBEDDING_DIMS}]);
+
+	CREATE TABLE citations (
+		id TEXT PRIMARY KEY,
+		message_id TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+		chunk_id INTEGER,
+		snippet TEXT NOT NULL,
+		document_name TEXT NOT NULL,
+		locator TEXT,
+		created_at INTEGER NOT NULL
+	);
+
+	CREATE TABLE privacy_events (
+		id TEXT PRIMARY KEY,
+		chat_id TEXT,
+		message_id TEXT,
+		mode TEXT NOT NULL,
+		destination TEXT NOT NULL,
+		excerpt_count INTEGER NOT NULL DEFAULT 0,
+		bytes_sent INTEGER NOT NULL DEFAULT 0,
+		created_at INTEGER NOT NULL
+	);
+	`
+];

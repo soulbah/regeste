@@ -12,7 +12,7 @@
 		"dev": "vite dev",
 		"build": "vite build",
 		"preview": "bun run build && wrangler dev",
-		"prepare": "svelte-kit sync || echo ''",
+		"prepare": "svelte-kit sync && bun run vendor || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"lint": "prettier --check . && eslint .",
@@ -25,7 +25,8 @@
 		"db:migrate:remote": "wrangler d1 migrations apply folio-db --remote",
 		"cf:types": "wrangler types && sed -i '' 's#typeof import(\"./.svelte-kit/cloudflare/_worker\")#unknown#' worker-configuration.d.ts",
 		"deploy": "bun run build && wrangler deploy",
-		"knip": "knip"
+		"knip": "knip",
+		"vendor": "mkdir -p static/vendor/sqlite && cp node_modules/sqlite-vec-wasm-demo/sqlite3.mjs node_modules/sqlite-vec-wasm-demo/sqlite3.wasm static/vendor/sqlite/"
 	},
 	"devDependencies": {
 		"@cloudflare/vitest-pool-workers": "^0.18.2",
@@ -72,8 +73,13 @@
 		"wrangler": "^4.107.1"
 	},
 	"dependencies": {
+		"@huggingface/transformers": "^4.2.0",
 		"better-auth": "^1.6.23",
+		"comlink": "^4.4.2",
 		"drizzle-orm": "^0.45.2",
+		"mammoth": "^1.12.0",
+		"pdfjs-dist": "^6.1.200",
+		"sqlite-vec-wasm-demo": "0.1.7-alpha.2",
 		"valibot": "^1.4.2",
 		"zod": "^4"
 	},

@@ -17,6 +17,13 @@ export default defineConfig({
 			adapter: adapter()
 		})
 	],
+	worker: {
+		format: 'es'
+	},
+	optimizeDeps: {
+		// Pre-bundling breaks these packages' runtime asset resolution (wasm/onnx).
+		exclude: ['sqlite-vec-wasm-demo', '@huggingface/transformers', 'pdfjs-dist']
+	},
 	test: {
 		expect: { requireAssertions: true },
 		projects: [
