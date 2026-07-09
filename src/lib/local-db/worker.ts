@@ -145,14 +145,14 @@ function setDocumentStatus(
 
 function deleteDocument(id: string): void {
 	db.transaction(() => {
-		const ids = db
-			.selectObjects('SELECT id FROM chunks WHERE document_id = ?', [id])
-			.map((r: any) => r.id);
-		for (const chunkId of ids) {
-			db.exec({ sql: 'DELETE FROM chunks_vec WHERE rowid = ?', bind: [chunkId] });
+		// Real chunk text in the FTS delete: with a dummy value the terms would
+		// stay physically indexed — deleted documents must not linger on disk.
+		const rows = db.selectObjects('SELECT id, text FROM chunks WHERE document_id = ?', [id]);
+		for (const r of rows) {
+			db.exec({ sql: 'DELETE FROM chunks_vec WHERE rowid = ?', bind: [r.id] });
 			db.exec({
-				sql: "INSERT INTO chunks_fts(chunks_fts, rowid, text) VALUES('delete', ?, '')",
-				bind: [chunkId]
+				sql: "INSERT INTO chunks_fts(chunks_fts, rowid, text) VALUES('delete', ?, ?)",
+				bind: [r.id, r.text]
 			});
 		}
 		db.exec({ sql: 'DELETE FROM chunks WHERE document_id = ?', bind: [id] });
@@ -307,6 +307,7 @@ function rowToChat(r: any): LocalChat {
 		title: r.title,
 		mode: r.mode,
 		privateOnly: !!r.private_only,
+		myaiModel: r.myai_model ?? null,
 		createdAt: r.created_at,
 		updatedAt: r.updated_at
 	};
@@ -332,12 +333,47 @@ function setChatMode(id: string, mode: string): void {
 	db.exec({ sql: 'UPDATE chats SET mode = ? WHERE id = ?', bind: [mode, id] });
 }
 
+function setChatMyaiModel(id: string, model: string | null): void {
+	db.exec({ sql: 'UPDATE chats SET myai_model = ? WHERE id = ?', bind: [model, id] });
+}
+
+// ── Settings (meta table, 'setting:' prefix keeps schema_version untouched) ──
+
+function getSetting(key: string): string | null {
+	return (
+		(db.selectValue('SELECT value FROM meta WHERE key = ?', [`setting:${key}`]) as
+			string | undefined) ?? null
+	);
+}
+
+function setSetting(key: string, value: string | null): void {
+	if (value === null) {
+		db.exec({ sql: 'DELETE FROM meta WHERE key = ?', bind: [`setting:${key}`] });
+		return;
+	}
+	db.exec({
+		sql: 'INSERT INTO meta(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+		bind: [`setting:${key}`, value]
+	});
+}
+
 function touchChat(id: string): void {
 	db.exec({ sql: 'UPDATE chats SET updated_at = ? WHERE id = ?', bind: [Date.now(), id] });
 }
 
 function deleteChat(id: string): void {
-	db.exec({ sql: 'DELETE FROM chats WHERE id = ?', bind: [id] });
+	db.transaction(() => {
+		// External-content FTS5 rows must be deleted explicitly (with the original
+		// text, so the terms really leave the index) before the source rows.
+		const rows = db.selectObjects('SELECT rowid, content FROM messages WHERE chat_id = ?', [id]);
+		for (const r of rows) {
+			db.exec({
+				sql: "INSERT INTO messages_fts(messages_fts, rowid, content) VALUES('delete', ?, ?)",
+				bind: [r.rowid, r.content]
+			});
+		}
+		db.exec({ sql: 'DELETE FROM chats WHERE id = ?', bind: [id] });
+	});
 }
 
 function insertMessage(m: {
@@ -350,6 +386,13 @@ function insertMessage(m: {
 	db.exec({
 		sql: 'INSERT INTO messages(id, chat_id, role, content, mode, created_at) VALUES (?, ?, ?, ?, ?, ?)',
 		bind: [m.id, m.chatId, m.role, m.content, m.mode, Date.now()]
+	});
+	// External-content FTS must mirror the messages table 1:1 (retrieval-preview
+	// rows are filtered at query time, in searchAll).
+	const rowid = db.selectValue('SELECT last_insert_rowid()') as number;
+	db.exec({
+		sql: 'INSERT INTO messages_fts(rowid, content) VALUES (?, ?)',
+		bind: [rowid, m.content]
 	});
 }
 
@@ -411,6 +454,60 @@ function documentUsage(documentId: string): number {
 	return db.selectValue('SELECT count(*) FROM chat_documents WHERE document_id = ?', [
 		documentId
 	]) as number;
+}
+
+// ── Universal search (spec 008): FTS over messages + document chunks ────────
+
+export interface SearchAllResult {
+	chats: Array<{ chatId: string; title: string; snippet: string }>;
+	documents: Array<{
+		chunkId: number;
+		documentId: string;
+		name: string;
+		snippet: string;
+		page: number | null;
+		headingPath: string | null;
+	}>;
+}
+
+function searchAll(query: string, limit = 8): SearchAllResult {
+	const fts = toFtsQuery(query);
+	const chatRows = db.selectObjects(
+		`SELECT c.id AS chat_id, c.title, snippet(messages_fts, 0, '', '', '…', 12) AS snip
+		 FROM messages_fts
+		 JOIN messages m ON m.rowid = messages_fts.rowid
+		 JOIN chats c ON c.id = m.chat_id
+		 WHERE messages_fts MATCH ? AND (m.mode IS NULL OR m.mode != 'retrieval')
+		 ORDER BY rank LIMIT 24`,
+		[fts]
+	);
+	const seenChats = new Set<string>();
+	const chats: SearchAllResult['chats'] = [];
+	for (const r of chatRows) {
+		if (seenChats.has(r.chat_id)) continue;
+		seenChats.add(r.chat_id);
+		chats.push({ chatId: r.chat_id, title: r.title, snippet: r.snip });
+		if (chats.length >= limit) break;
+	}
+	const documents = db
+		.selectObjects(
+			`SELECT ch.id AS chunk_id, ch.document_id, d.name, ch.page, ch.heading_path,
+			        snippet(chunks_fts, 0, '', '', '…', 12) AS snip
+			 FROM chunks_fts
+			 JOIN chunks ch ON ch.id = chunks_fts.rowid
+			 JOIN documents d ON d.id = ch.document_id
+			 WHERE chunks_fts MATCH ? AND d.status = 'ready' ORDER BY rank LIMIT ?`,
+			[fts, limit]
+		)
+		.map((r: any) => ({
+			chunkId: r.chunk_id,
+			documentId: r.document_id,
+			name: r.name,
+			snippet: r.snip,
+			page: r.page,
+			headingPath: r.heading_path
+		}));
+	return { chats, documents };
 }
 
 // ── Citations & privacy events ───────────────────────────────────────────────
@@ -519,6 +616,21 @@ function listChatPrivacyEvents(chatId: string): MessagePrivacyRow[] {
 		}));
 }
 
+export interface PrivacySummaryRow {
+	destination: string;
+	requests: number;
+	bytes: number;
+}
+
+function privacySummary(): PrivacySummaryRow[] {
+	return db
+		.selectObjects(
+			`SELECT destination, count(*) AS requests, COALESCE(sum(bytes_sent), 0) AS bytes
+			 FROM privacy_events GROUP BY destination ORDER BY bytes DESC, requests DESC`
+		)
+		.map((r: any) => ({ destination: r.destination, requests: r.requests, bytes: r.bytes }));
+}
+
 function listPrivacyEvents(limit = 100): PrivacyEventRow[] {
 	return db
 		.selectObjects(
@@ -550,6 +662,9 @@ const api = {
 	listChats,
 	renameChat,
 	setChatMode,
+	setChatMyaiModel,
+	getSetting,
+	setSetting,
 	touchChat,
 	deleteChat,
 	insertMessage,
@@ -564,7 +679,9 @@ const api = {
 	listChatCitations,
 	insertPrivacyEvent,
 	listPrivacyEvents,
-	listChatPrivacyEvents
+	listChatPrivacyEvents,
+	privacySummary,
+	searchAll
 };
 
 export type DbApi = typeof api;

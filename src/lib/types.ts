@@ -65,6 +65,8 @@ export interface LocalChat {
 	title: string;
 	mode: ChatMode;
 	privateOnly: boolean;
+	/** Model id for My AI mode, chosen in the mode selector (spec 007). */
+	myaiModel: string | null;
 	createdAt: number;
 	updatedAt: number;
 }

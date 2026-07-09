@@ -13,7 +13,9 @@
 		onmodeselect,
 		onupload,
 		onattach,
-		libraryEmpty
+		libraryEmpty,
+		myaiModel = null,
+		onmyaimodel
 	}: {
 		mode: ChatMode;
 		disabled?: boolean;
@@ -22,6 +24,8 @@
 		onupload: (files: File[]) => void;
 		onattach: (documentId: string) => void;
 		libraryEmpty: boolean;
+		myaiModel?: string | null;
+		onmyaimodel?: (model: string) => void;
 	} = $props();
 
 	let text = $state('');
@@ -48,7 +52,7 @@
 	/>
 	<div class="mt-2 flex items-center gap-2">
 		<AddDocuments {libraryEmpty} {onupload} {onattach} />
-		<ModeSelector {mode} onselect={onmodeselect} />
+		<ModeSelector {mode} onselect={onmodeselect} {myaiModel} {onmyaimodel} />
 		<div class="flex-1"></div>
 		<Button size="icon" class="rounded-full" onclick={submit} disabled={disabled || !text.trim()}>
 			<ArrowUpIcon class="size-4" />

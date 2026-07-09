@@ -14,9 +14,15 @@
 	}: {
 		content: string;
 		citations?: CitationRow[];
-		mode?: 'private' | 'assisted';
+		mode?: 'private' | 'assisted' | 'myai';
 		meta?: string | null;
 	} = $props();
+
+	const dotClass = {
+		private: 'bg-mode-private',
+		assisted: 'bg-mode-assisted',
+		myai: 'bg-mode-myai'
+	} as const;
 
 	// Split "text [1] more [2]" into segments; markers become citation chips.
 	const segments = $derived.by(() => {
@@ -44,11 +50,11 @@
 
 <div class="space-y-3">
 	<div class="flex items-center gap-2">
-		<span
-			class="size-1.5 rounded-full {mode === 'private' ? 'bg-mode-private' : 'bg-mode-assisted'}"
-		></span>
+		<span class="size-1.5 rounded-full {dotClass[mode]}"></span>
 		<span class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
-			{mode === 'private' ? 'Folio · nothing left this device' : (meta ?? 'Folio · Assisted')}
+			{mode === 'private'
+				? 'Folio · nothing left this device'
+				: (meta ?? (mode === 'assisted' ? 'Folio · Assisted' : 'Folio · My AI'))}
 		</span>
 	</div>
 	<p class="text-sm leading-relaxed whitespace-pre-wrap">

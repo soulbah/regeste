@@ -4,6 +4,7 @@
 import { getLocalDb } from '$lib/local-db/client';
 import type { CitationRow, MessagePrivacyRow } from '$lib/local-db/worker';
 import { documentsStore } from './documents.svelte';
+import { myaiStore, endpointHost, type ChatMessage } from './myai.svelte';
 import { llmStore } from '$lib/private-ai/llm.svelte';
 import {
 	SYSTEM_PROMPT,
@@ -95,6 +96,12 @@ class ChatsStore {
 		await this.refresh();
 	}
 
+	async setMyaiModel(chatId: string, model: string): Promise<void> {
+		const { db } = await getLocalDb();
+		await db.setChatMyaiModel(chatId, model);
+		await this.refresh();
+	}
+
 	async attach(chatId: string, documentId: string): Promise<void> {
 		const { db } = await getLocalDb();
 		await db.attachDocument(chatId, documentId);
@@ -157,6 +164,12 @@ class ChatsStore {
 
 			if (chat?.mode === 'private' && llmStore.status === 'ready') {
 				await this.generatePrivate(chatId, question, hits, enabledDocs.length);
+			} else if (
+				chat?.mode === 'myai' &&
+				myaiStore.baseUrl &&
+				(chat.myaiModel || myaiStore.defaultModel)
+			) {
+				await this.generateMyAi(chat, question, hits, enabledDocs.length);
 			} else {
 				await db.insertMessage({
 					id: crypto.randomUUID(),
@@ -249,7 +262,94 @@ class ChatsStore {
 		await this.loadCitations(chatId);
 	}
 
+	/**
+	 * My AI send: user content leaves the device toward the USER'S OWN endpoint
+	 * — same grounded prompt as Private, egress logged with the real destination.
+	 */
+	private async generateMyAi(
+		chat: LocalChat,
+		question: string,
+		hits: SearchHit[],
+		documentCount: number
+	): Promise<void> {
+		const { db } = await getLocalDb();
+		const model = chat.myaiModel ?? myaiStore.defaultModel!;
+		// First My AI message in this chat pins the model on the chat (5bis).
+		if (!chat.myaiModel) await db.setChatMyaiModel(chat.id, model);
+
+		this.streamingText = '';
+		const grounded = documentCount > 0;
+		const messages: ChatMessage[] = grounded
+			? [
+					{ role: 'system', content: SYSTEM_PROMPT },
+					{ role: 'user', content: buildUserPrompt(question, hits) }
+				]
+			: [
+					{
+						role: 'system',
+						content:
+							'You are a concise assistant. The user attached no documents: answer from general knowledge and say so briefly.'
+					},
+					{ role: 'user', content: question }
+				];
+		const bytesSent = messages.reduce((n, m) => n + new TextEncoder().encode(m.content).length, 0);
+
+		let streamRaw = '';
+		let failed: string | null = null;
+		try {
+			await myaiStore.generate(model, messages, (delta) => {
+				streamRaw += delta;
+				this.streamingText = isThinking(streamRaw) ? '' : stripThink(streamRaw);
+			});
+		} catch (err) {
+			console.error('[folio] my-ai generation failed:', err);
+			if (!streamRaw.trim()) {
+				failed =
+					'Could not reach your AI endpoint — check that it is running, the URL, and its CORS settings.';
+			}
+		}
+		const raw = stripThink(streamRaw);
+
+		const { text: cleaned, citations } = failed
+			? { text: failed, citations: [] }
+			: grounded
+				? resolveCitations(raw.trim() || '(generation stopped)', hits)
+				: { text: raw.trim() || '(generation stopped)', citations: [] };
+
+		const messageId = crypto.randomUUID();
+		await db.insertMessage({
+			id: messageId,
+			chatId: chat.id,
+			role: 'assistant',
+			content: cleaned,
+			mode: 'myai'
+		});
+		if (citations.length) {
+			await db.insertCitations(
+				messageId,
+				citations.map((c) => ({
+					chunkId: c.hit.chunkId,
+					snippet: c.hit.text.slice(0, 240),
+					documentName: c.hit.documentName,
+					locator: c.hit.page ? `page ${c.hit.page}` : (c.hit.headingPath ?? null)
+				}))
+			);
+		}
+		if (!failed) {
+			await db.insertPrivacyEvent({
+				chatId: chat.id,
+				messageId,
+				mode: 'myai',
+				destination: endpointHost(myaiStore.baseUrl!),
+				excerptCount: grounded ? hits.length : 0,
+				bytesSent
+			});
+		}
+		await this.loadCitations(chat.id);
+	}
+
 	async stopGeneration(): Promise<void> {
+		myaiStore.stop();
 		await llmStore.stop();
 	}
 

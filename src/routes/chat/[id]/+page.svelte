@@ -13,6 +13,7 @@
 	import { chatsStore } from '$lib/state/chats.svelte';
 	import { documentsStore } from '$lib/state/documents.svelte';
 	import { viewerStore } from '$lib/state/viewer.svelte';
+	import { myaiStore } from '$lib/state/myai.svelte';
 	import { llmStore } from '$lib/private-ai/llm.svelte';
 
 	async function handleSend(text: string) {
@@ -83,14 +84,14 @@
 							</div>
 						{:else if message.mode === 'retrieval'}
 							<RetrievalTurn content={message.content} />
-						{:else if message.mode === 'private' || message.mode === 'assisted'}
+						{:else if message.mode === 'private' || message.mode === 'assisted' || message.mode === 'myai'}
 							{@const ev = chatsStore.privacyByMessage[message.id]}
 							<PrivateTurn
 								content={message.content}
 								citations={chatsStore.citations[message.id] ?? []}
 								mode={message.mode}
-								meta={ev && message.mode === 'assisted'
-									? `${ev.excerptCount} excerpt${ev.excerptCount === 1 ? '' : 's'} · ${(ev.bytesSent / 1024).toFixed(1)} KB · Cloud AI`
+								meta={ev && message.mode !== 'private'
+									? `${ev.excerptCount} excerpt${ev.excerptCount === 1 ? '' : 's'} · ${(ev.bytesSent / 1024).toFixed(1)} KB · ${message.mode === 'assisted' ? 'Cloud AI' : ev.destination}`
 									: null}
 							/>
 						{:else}
@@ -108,11 +109,15 @@
 					{#if chatsStore.streamingText !== null}
 						<div class="space-y-2">
 							<div class="flex items-center gap-2">
-								<span class="bg-mode-private size-1.5 animate-pulse rounded-full"></span>
+								<span
+									class="{chatsStore.activeChat?.mode === 'myai'
+										? 'bg-mode-myai'
+										: 'bg-mode-private'} size-1.5 animate-pulse rounded-full"
+								></span>
 								<span class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
 									{chatsStore.streamingText ? 'Writing…' : 'Reading your documents…'}
 								</span>
-								{#if llmStore.status === 'generating'}
+								{#if llmStore.status === 'generating' || myaiStore.generating}
 									<Button
 										variant="ghost"
 										size="sm"
@@ -149,6 +154,8 @@
 					onupload={handleUpload}
 					onattach={(docId) => chatsStore.attach(chatId, docId)}
 					libraryEmpty={documentsStore.library.length === 0}
+					myaiModel={chatsStore.activeChat?.myaiModel ?? null}
+					onmyaimodel={(m) => chatsStore.setMyaiModel(chatId, m)}
 				/>
 			</div>
 		</div>

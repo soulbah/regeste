@@ -96,5 +96,29 @@ export const MIGRATIONS: string[] = [
 		bytes_sent INTEGER NOT NULL DEFAULT 0,
 		created_at INTEGER NOT NULL
 	);
+	`,
+
+	// v2 — My AI: per-chat model (spec 007)
+	`
+	ALTER TABLE chats ADD COLUMN myai_model TEXT;
+	`,
+
+	// v3 — universal search: message content in FTS5 (spec 008).
+	// Retrieval-preview turns store JSON, not prose — excluded here and at insert time.
+	`
+	CREATE VIRTUAL TABLE messages_fts USING fts5(content, content='messages', content_rowid='rowid');
+	INSERT INTO messages_fts(rowid, content)
+		SELECT rowid, content FROM messages WHERE mode IS NULL OR mode != 'retrieval';
+	`,
+
+	// v4 — repair + resync FTS indexes. Early builds issued FTS5 'delete'
+	// commands with dummy content, which corrupts an external-content index
+	// (SQLITE_CORRUPT_VTAB on the next MATCH). 'rebuild' regenerates both
+	// indexes from their content tables; external-content FTS must mirror the
+	// content table 1:1, so retrieval-preview rows are indexed too and filtered
+	// at query time instead of insert time.
+	`
+	INSERT INTO chunks_fts(chunks_fts) VALUES('rebuild');
+	INSERT INTO messages_fts(messages_fts) VALUES('rebuild');
 	`
 ];
