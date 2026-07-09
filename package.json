@@ -24,7 +24,7 @@
 		"db:migrate:local": "wrangler d1 migrations apply folio-db --local",
 		"db:migrate:remote": "wrangler d1 migrations apply folio-db --remote",
 		"cf:types": "wrangler types && sed -i '' 's#typeof import(\"./.svelte-kit/cloudflare/_worker\")#unknown#' worker-configuration.d.ts",
-		"deploy": "bun run build && wrangler deploy",
+		"deploy": "bun run build && bunx wrangler@4.106.0 deploy",
 		"knip": "knip",
 		"vendor": "mkdir -p static/vendor/sqlite && cp node_modules/sqlite-vec-wasm-demo/sqlite3.mjs node_modules/sqlite-vec-wasm-demo/sqlite3.wasm static/vendor/sqlite/"
 	},
