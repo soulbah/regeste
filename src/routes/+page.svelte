@@ -17,11 +17,11 @@
 		await chatsStore.send(id, text);
 	}
 
-	async function handleUpload(files: FileList) {
+	async function handleUpload(files: File[]) {
 		const id = await chatsStore.create(mode);
 		await chatsStore.open(id);
 		goto(resolve(`/chat/${id}`));
-		for (const file of Array.from(files)) {
+		for (const file of files) {
 			const docId = await documentsStore.ingest(file);
 			await chatsStore.attach(id, docId);
 		}

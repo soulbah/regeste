@@ -19,7 +19,7 @@
 		disabled?: boolean;
 		onsend: (text: string) => void;
 		onmodeselect: (mode: ChatMode) => void;
-		onupload: (files: FileList) => void;
+		onupload: (files: File[]) => void;
 		onattach: (documentId: string) => void;
 		libraryEmpty: boolean;
 	} = $props();

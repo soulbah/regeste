@@ -9,8 +9,10 @@
 	import PrivateTurn from '$lib/components/private-turn.svelte';
 	import PresendPanel from '$lib/components/presend-panel.svelte';
 	import DocumentsPanel from '$lib/components/documents-panel.svelte';
+	import ViewerPanel from '$lib/components/viewer-panel.svelte';
 	import { chatsStore } from '$lib/state/chats.svelte';
 	import { documentsStore } from '$lib/state/documents.svelte';
+	import { viewerStore } from '$lib/state/viewer.svelte';
 	import { llmStore } from '$lib/private-ai/llm.svelte';
 
 	async function handleSend(text: string) {
@@ -30,10 +32,11 @@
 
 	$effect(() => {
 		chatsStore.open(chatId);
+		viewerStore.close();
 	});
 
-	async function handleUpload(files: FileList) {
-		for (const file of Array.from(files)) {
+	async function handleUpload(files: File[]) {
+		for (const file of files) {
 			const docId = await documentsStore.ingest(file);
 			await chatsStore.attach(chatId, docId);
 		}
@@ -154,6 +157,8 @@
 	<Resizable.Pane defaultSize={28} minSize={18} class="hidden md:block">
 		{#if reviewing}
 			<PresendPanel />
+		{:else if viewerStore.isOpen}
+			<ViewerPanel />
 		{:else}
 			<DocumentsPanel {chatId} />
 		{/if}

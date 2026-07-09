@@ -14,7 +14,7 @@
 		onattach
 	}: {
 		libraryEmpty: boolean;
-		onupload: (files: FileList) => void;
+		onupload: (files: File[]) => void;
 		onattach: (documentId: string) => void;
 	} = $props();
 
@@ -35,8 +35,11 @@
 	accept=".pdf,.docx,.md,.markdown,.txt"
 	class="hidden"
 	onchange={(e) => {
-		if (e.currentTarget.files?.length) onupload(e.currentTarget.files);
+		// Copy before resetting: input.files is live and value = '' empties it
+		// out from under the async upload handler.
+		const files = Array.from(e.currentTarget.files ?? []);
 		e.currentTarget.value = '';
+		if (files.length) onupload(files);
 	}}
 />
 

@@ -14,10 +14,9 @@
 	let fileInput = $state<HTMLInputElement | null>(null);
 	let deleteTarget = $state<LibraryDocument | null>(null);
 
-	async function handleFiles(files: FileList | null) {
-		if (!files) return;
+	async function handleFiles(files: File[]) {
 		// Library upload = global only (no chat attach).
-		for (const file of Array.from(files)) {
+		for (const file of files) {
 			await documentsStore.ingest(file);
 		}
 	}
@@ -62,8 +61,10 @@
 				accept=".pdf,.docx,.md,.markdown,.txt"
 				class="hidden"
 				onchange={(e) => {
-					handleFiles(e.currentTarget.files);
+					// Copy before resetting: input.files is live and value = '' empties it.
+					const files = Array.from(e.currentTarget.files ?? []);
 					e.currentTarget.value = '';
+					handleFiles(files);
 				}}
 			/>
 		</div>
