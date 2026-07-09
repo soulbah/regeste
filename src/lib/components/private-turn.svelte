@@ -1,7 +1,11 @@
 <script lang="ts">
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import * as Tooltip from '$lib/components/ui/tooltip';
+	import CopyIcon from '@lucide/svelte/icons/copy';
+	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
+	import CheckIcon from '@lucide/svelte/icons/check';
 	import { SvelteSet } from 'svelte/reactivity';
 	import type { CitationRow } from '$lib/local-db/worker';
 	import { viewerStore } from '$lib/state/viewer.svelte';
@@ -10,13 +14,32 @@
 		content,
 		citations = [],
 		mode = 'private',
-		meta = null
+		meta = null,
+		onregenerate = null
 	}: {
 		content: string;
 		citations?: CitationRow[];
 		mode?: 'private' | 'assisted' | 'myai';
 		meta?: string | null;
+		/** C2 — present on the last answer only. */
+		onregenerate?: (() => void) | null;
 	} = $props();
+
+	let copied = $state(false);
+
+	async function copy(withSources: boolean) {
+		let text = content.replace(/\[(\d{1,2})\]/g, withSources ? '[$1]' : '');
+		if (withSources && citations.length) {
+			text +=
+				'\n\nSources:\n' +
+				citations
+					.map((c, i) => `[${i + 1}] ${c.documentName}${c.locator ? ` · ${c.locator}` : ''}`)
+					.join('\n');
+		}
+		await navigator.clipboard.writeText(text.trim());
+		copied = true;
+		setTimeout(() => (copied = false), 1500);
+	}
 
 	const dotClass = {
 		private: 'bg-mode-private',
@@ -89,6 +112,38 @@
 			{/if}
 		{/each}
 	</p>
+	<div class="flex items-center gap-1">
+		<DropdownMenu.Root>
+			<DropdownMenu.Trigger>
+				{#snippet child({ props })}
+					<Button
+						{...props}
+						variant="ghost"
+						size="sm"
+						class="text-muted-foreground h-6 gap-1 px-2 font-mono text-[10px] uppercase"
+					>
+						{#if copied}<CheckIcon class="size-3" /> Copied{:else}<CopyIcon class="size-3" /> Copy{/if}
+					</Button>
+				{/snippet}
+			</DropdownMenu.Trigger>
+			<DropdownMenu.Content align="start">
+				<DropdownMenu.Item onclick={() => copy(false)}>Copy text</DropdownMenu.Item>
+				<DropdownMenu.Item onclick={() => copy(true)} disabled={!citations.length}>
+					Copy with sources
+				</DropdownMenu.Item>
+			</DropdownMenu.Content>
+		</DropdownMenu.Root>
+		{#if onregenerate}
+			<Button
+				variant="ghost"
+				size="sm"
+				class="text-muted-foreground h-6 gap-1 px-2 font-mono text-[10px] uppercase"
+				onclick={onregenerate}
+			>
+				<RefreshCwIcon class="size-3" /> Regenerate
+			</Button>
+		{/if}
+	</div>
 	{#if uniqueCitations.length}
 		<div class="space-y-0.5 border-t pt-2">
 			{#each uniqueCitations as c, i (i)}

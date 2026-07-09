@@ -9,6 +9,8 @@
 	import AppSidebar from '$lib/components/app-sidebar.svelte';
 	import CommandPalette from '$lib/components/command-palette.svelte';
 	import ViewerPanel from '$lib/components/viewer-panel.svelte';
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { SvelteMap } from 'svelte/reactivity';
 	import { documentsStore } from '$lib/state/documents.svelte';
@@ -72,6 +74,23 @@
 		if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
 			e.preventDefault();
 			searchStore.toggle();
+			return;
+		}
+		// C10 — ⇧⌘O new chat; "/" focuses the composer (outside inputs).
+		if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'o') {
+			e.preventDefault();
+			goto(resolve('/'));
+			return;
+		}
+		const target = e.target as HTMLElement;
+		const typing =
+			target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable;
+		if (e.key === '/' && !typing && !e.metaKey && !e.ctrlKey && !e.altKey) {
+			const composer = document.querySelector<HTMLTextAreaElement>('textarea');
+			if (composer) {
+				e.preventDefault();
+				composer.focus();
+			}
 		}
 	}}
 />

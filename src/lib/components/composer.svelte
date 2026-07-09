@@ -51,6 +51,14 @@
 				submit();
 			}
 		}}
+		onpaste={(e) => {
+			// C7 — pasting a file attaches it like the paperclip.
+			const files = Array.from(e.clipboardData?.files ?? []);
+			if (files.length) {
+				e.preventDefault();
+				onupload(files);
+			}
+		}}
 	/>
 	<div class="mt-2 flex items-center gap-2">
 		<AddDocuments {libraryEmpty} {onupload} {onattach} />

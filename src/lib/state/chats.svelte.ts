@@ -115,6 +115,82 @@ class ChatsStore {
 		await this.refresh();
 	}
 
+	async setPinned(chatId: string, pinned: boolean): Promise<void> {
+		const { db } = await getLocalDb();
+		await db.setChatPinned(chatId, pinned);
+		await this.refresh();
+	}
+
+	/** C2 — replace the last answer: same question, fresh retrieval + generation. */
+	async regenerate(chatId: string): Promise<void> {
+		if (this.sending) return;
+		const last = this.messages[this.messages.length - 1];
+		const question = [...this.messages].reverse().find((m) => m.role === 'user')?.content;
+		if (!last || last.role !== 'assistant' || !question) return;
+		this.sending = true;
+		try {
+			const { db } = await getLocalDb();
+			await db.deleteMessage(last.id);
+			this.messages = await db.listMessages(chatId);
+			const enabledDocs = this.chatDocuments.filter((d) => d.enabled && d.status === 'ready');
+			const hits = enabledDocs.length
+				? await documentsStore.retrieve(
+						question,
+						enabledDocs.map((d) => d.id)
+					)
+				: [];
+			await this.answer(chatId, question, hits, enabledDocs.length);
+			await db.touchChat(chatId);
+			this.messages = await db.listMessages(chatId);
+			await this.refresh();
+		} finally {
+			this.sending = false;
+			this.streamingText = null;
+		}
+	}
+
+	/** C2 — edit the last question: the old exchange is replaced entirely. */
+	async editLast(chatId: string, newText: string): Promise<void> {
+		if (this.sending || !newText.trim()) return;
+		const { db } = await getLocalDb();
+		const lastUser = [...this.messages].reverse().find((m) => m.role === 'user');
+		if (!lastUser) return;
+		for (const m of [...this.messages].reverse()) {
+			await db.deleteMessage(m.id);
+			if (m.id === lastUser.id) break;
+		}
+		this.messages = await db.listMessages(chatId);
+		await this.send(chatId, newText);
+	}
+
+	/** C4 — the chat as a portable Markdown document. */
+	async exportMarkdown(chatId: string): Promise<string> {
+		const { db } = await getLocalDb();
+		const chat = this.chats.find((c) => c.id === chatId);
+		const messages = await db.listMessages(chatId);
+		const rows = await db.listChatCitations(chatId);
+		const citationsByMessage: Record<string, CitationRow[]> = {};
+		for (const row of rows) (citationsByMessage[row.messageId] ??= []).push(row);
+
+		const lines: string[] = [`# ${chat?.title ?? 'Chat'}`, ''];
+		for (const m of messages) {
+			if (m.mode === 'retrieval') continue;
+			lines.push(m.role === 'user' ? `## You` : `## Folio`);
+			lines.push('');
+			lines.push(m.content);
+			const cites = citationsByMessage[m.id];
+			if (cites?.length) {
+				lines.push('');
+				lines.push('Sources:');
+				for (const c of cites) {
+					lines.push(`- ${c.documentName}${c.locator ? ` · ${c.locator}` : ''}`);
+				}
+			}
+			lines.push('');
+		}
+		return lines.join('\n');
+	}
+
 	async attach(chatId: string, documentId: string): Promise<void> {
 		const { db } = await getLocalDb();
 		await db.attachDocument(chatId, documentId);
@@ -175,30 +251,42 @@ class ChatsStore {
 				);
 			}
 
-			if (chat?.mode === 'private' && llmStore.status === 'ready') {
-				await this.generatePrivate(chatId, question, hits, enabledDocs.length);
-			} else if (
-				chat?.mode === 'myai' &&
-				!chat.privateOnly &&
-				myaiStore.baseUrl &&
-				(chat.myaiModel || myaiStore.defaultModel)
-			) {
-				await this.generateMyAi(chat, question, hits, enabledDocs.length);
-			} else {
-				await db.insertMessage({
-					id: crypto.randomUUID(),
-					chatId,
-					role: 'assistant',
-					content: JSON.stringify({ hits, documentCount: enabledDocs.length }),
-					mode: 'retrieval'
-				});
-			}
+			await this.answer(chatId, question, hits, enabledDocs.length);
 			await db.touchChat(chatId);
 			this.messages = await db.listMessages(chatId);
 			await this.refresh();
 		} finally {
 			this.sending = false;
 			this.streamingText = null;
+		}
+	}
+
+	/** Route a question to the chat's mode (shared by send/regenerate). */
+	private async answer(
+		chatId: string,
+		question: string,
+		hits: SearchHit[],
+		documentCount: number
+	): Promise<void> {
+		const { db } = await getLocalDb();
+		const chat = this.chats.find((c) => c.id === chatId);
+		if (chat?.mode === 'private' && llmStore.status === 'ready') {
+			await this.generatePrivate(chatId, question, hits, documentCount);
+		} else if (
+			chat?.mode === 'myai' &&
+			!chat.privateOnly &&
+			myaiStore.baseUrl &&
+			(chat.myaiModel || myaiStore.defaultModel)
+		) {
+			await this.generateMyAi(chat, question, hits, documentCount);
+		} else {
+			await db.insertMessage({
+				id: crypto.randomUUID(),
+				chatId,
+				role: 'assistant',
+				content: JSON.stringify({ hits, documentCount }),
+				mode: 'retrieval'
+			});
 		}
 	}
 

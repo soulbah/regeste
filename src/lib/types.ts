@@ -67,6 +67,8 @@ export interface LocalChat {
 	privateOnly: boolean;
 	/** Model id for My AI mode, chosen in the mode selector (spec 007). */
 	myaiModel: string | null;
+	/** C6 — pinned chats group at the top of the sidebar. */
+	pinned: boolean;
 	createdAt: number;
 	updatedAt: number;
 }

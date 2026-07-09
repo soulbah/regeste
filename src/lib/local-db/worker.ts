@@ -309,6 +309,7 @@ function rowToChat(r: any): LocalChat {
 		mode: r.mode,
 		privateOnly: !!r.private_only,
 		myaiModel: r.myai_model ?? null,
+		pinned: !!r.pinned,
 		createdAt: r.created_at,
 		updatedAt: r.updated_at
 	};
@@ -336,6 +337,38 @@ function setChatMode(id: string, mode: string): void {
 
 function setChatMyaiModel(id: string, model: string | null): void {
 	db.exec({ sql: 'UPDATE chats SET myai_model = ? WHERE id = ?', bind: [model, id] });
+}
+
+function setChatPinned(id: string, pinned: boolean): void {
+	db.exec({ sql: 'UPDATE chats SET pinned = ? WHERE id = ?', bind: [pinned ? 1 : 0, id] });
+}
+
+/** Delete one message (C2 regenerate/edit): FTS row first, then the row. */
+function deleteMessage(id: string): void {
+	db.transaction(() => {
+		const rows = db.selectObjects('SELECT rowid, content FROM messages WHERE id = ?', [id]);
+		for (const r of rows) {
+			db.exec({
+				sql: "INSERT INTO messages_fts(messages_fts, rowid, content) VALUES('delete', ?, ?)",
+				bind: [r.rowid, r.content]
+			});
+		}
+		db.exec({ sql: 'DELETE FROM messages WHERE id = ?', bind: [id] });
+	});
+}
+
+/** C8/C9: distinct section headings across the given ready documents. */
+function documentHeadings(documentIds: string[], limit = 12): string[] {
+	if (!documentIds.length) return [];
+	const placeholders = documentIds.map(() => '?').join(',');
+	return db
+		.selectObjects(
+			`SELECT DISTINCT heading_path FROM chunks
+			 WHERE document_id IN (${placeholders}) AND heading_path IS NOT NULL AND heading_path != ''
+			 ORDER BY id LIMIT ?`,
+			[...documentIds, limit]
+		)
+		.map((r: any) => r.heading_path as string);
 }
 
 // ── Settings (meta table, 'setting:' prefix keeps schema_version untouched) ──
@@ -731,6 +764,9 @@ const api = {
 	renameChat,
 	setChatMode,
 	setChatMyaiModel,
+	setChatPinned,
+	deleteMessage,
+	documentHeadings,
 	getSetting,
 	setSetting,
 	touchChat,

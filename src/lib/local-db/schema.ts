@@ -120,5 +120,10 @@ export const MIGRATIONS: string[] = [
 	`
 	INSERT INTO chunks_fts(chunks_fts) VALUES('rebuild');
 	INSERT INTO messages_fts(messages_fts) VALUES('rebuild');
+	`,
+
+	// v5 — pinned chats (spec 010, C6)
+	`
+	ALTER TABLE chats ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;
 	`
 ];

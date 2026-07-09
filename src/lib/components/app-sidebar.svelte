@@ -33,21 +33,39 @@
 	const groups = $derived.by(() => {
 		const now = Date.now();
 		const day = 24 * 60 * 60 * 1000;
+		const pinned: LocalChat[] = [];
 		const today: LocalChat[] = [];
 		const yesterday: LocalChat[] = [];
 		const previous: LocalChat[] = [];
 		for (const chat of chatsStore.chats) {
+			if (chat.pinned) {
+				pinned.push(chat);
+				continue;
+			}
 			const age = now - chat.updatedAt;
 			if (age < day) today.push(chat);
 			else if (age < 2 * day) yesterday.push(chat);
 			else previous.push(chat);
 		}
 		return [
+			{ label: 'Pinned', chats: pinned },
 			{ label: 'Today', chats: today },
 			{ label: 'Yesterday', chats: yesterday },
 			{ label: 'Previous', chats: previous }
 		].filter((g) => g.chats.length);
 	});
+
+	/** C4 — download the chat as Markdown. */
+	async function exportChat(chat: LocalChat) {
+		const md = await chatsStore.exportMarkdown(chat.id);
+		const blob = new Blob([md], { type: 'text/markdown' });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = `${chat.title.replace(/[^\p{L}\p{N} _-]/gu, '').trim() || 'chat'}.md`;
+		a.click();
+		URL.revokeObjectURL(url);
+	}
 
 	async function confirmDelete() {
 		if (!deleteTarget) return;
@@ -141,6 +159,9 @@
 										{/snippet}
 									</DropdownMenu.Trigger>
 									<DropdownMenu.Content side="right" align="start">
+										<DropdownMenu.Item onclick={() => chatsStore.setPinned(chat.id, !chat.pinned)}>
+											{chat.pinned ? 'Unpin' : 'Pin'}
+										</DropdownMenu.Item>
 										<DropdownMenu.Item
 											onclick={() => {
 												renameValue = chat.title;
@@ -148,6 +169,9 @@
 											}}
 										>
 											Rename
+										</DropdownMenu.Item>
+										<DropdownMenu.Item onclick={() => exportChat(chat)}>
+											Export as Markdown
 										</DropdownMenu.Item>
 										<DropdownMenu.Item
 											class="text-destructive"
