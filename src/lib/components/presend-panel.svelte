@@ -6,6 +6,7 @@
 	import { ScrollArea } from '$lib/components/ui/scroll-area';
 	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
 	import { chatsStore } from '$lib/state/chats.svelte';
+	import { settingsStore } from '$lib/state/settings.svelte';
 	import { isWeakMatch } from '$lib/pipeline/relevance';
 	import type { SearchHit } from '$lib/types';
 
@@ -86,6 +87,20 @@
 	</ScrollArea>
 
 	<div class="space-y-3 border-t p-4">
+		{#if !settingsStore.assistedConsented}
+			<!-- R6: shown exactly once per device — the first time data would leave. -->
+			<div class="space-y-2 rounded-md border p-3">
+				<p class="text-sm font-medium">First time anything leaves this device</p>
+				<p class="text-muted-foreground text-xs">
+					Until now, everything happened locally. Sending this will transmit your question and the
+					checked excerpts — nothing else, and never your files — to the Assisted service. It
+					answers and forgets; nothing is stored or logged.
+				</p>
+				<Button variant="outline" size="sm" onclick={() => settingsStore.acknowledgeAssisted()}>
+					I understand — continue
+				</Button>
+			</div>
+		{/if}
 		<div
 			class="text-muted-foreground flex items-center justify-between font-mono text-[10px] tracking-widest uppercase"
 		>
@@ -106,7 +121,7 @@
 			</Button>
 			<Button
 				class="flex-1"
-				disabled={selected.length === 0}
+				disabled={selected.length === 0 || !settingsStore.assistedConsented}
 				onclick={() => chatsStore.confirmAssisted(selected)}
 			>
 				Send

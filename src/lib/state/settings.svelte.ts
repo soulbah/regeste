@@ -12,6 +12,8 @@ export interface StorageStatus {
 class SettingsStore {
 	/** T2 — when true, guardedFetch refuses every outgoing request. */
 	forceOffline = $state(false);
+	/** R6 — the one-time "data leaves this device" acknowledgment. */
+	assistedConsented = $state(false);
 	storage = $state<StorageStatus | null>(null);
 	wiping = $state(false);
 
@@ -22,7 +24,14 @@ class SettingsStore {
 		this.loaded = true;
 		const { db } = await getLocalDb();
 		this.forceOffline = (await db.getSetting('force_offline')) === '1';
+		this.assistedConsented = (await db.getSetting('assisted_consented')) === '1';
 		await this.refreshStorage();
+	}
+
+	async acknowledgeAssisted(): Promise<void> {
+		this.assistedConsented = true;
+		const { db } = await getLocalDb();
+		await db.setSetting('assisted_consented', '1');
 	}
 
 	async refreshStorage(): Promise<void> {

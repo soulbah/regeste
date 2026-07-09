@@ -3,12 +3,36 @@
 	import { resolve } from '$app/paths';
 	import { toast } from 'svelte-sonner';
 	import FileIcon from '@lucide/svelte/icons/file';
+	import SparklesIcon from '@lucide/svelte/icons/sparkles';
+	import { Button } from '$lib/components/ui/button';
 	import Composer from '$lib/components/composer.svelte';
+	import { DEMO_SAMPLES } from '$lib/demo/samples';
 	import { chatsStore } from '$lib/state/chats.svelte';
 	import { documentsStore } from '$lib/state/documents.svelte';
 	import type { ChatMode } from '$lib/types';
 
 	let mode = $state<ChatMode>('private');
+	let demoStarting = $state(false);
+
+	/** O1 — one click: a chat with the bundled fictional contracts. */
+	async function startDemo() {
+		if (demoStarting) return;
+		demoStarting = true;
+		try {
+			const id = await chatsStore.create(mode);
+			await chatsStore.rename(id, 'Demo — sample contract');
+			await chatsStore.open(id);
+			goto(resolve(`/chat/${id}`));
+			for (const sample of DEMO_SAMPLES) {
+				const docId = await documentsStore.ingest(
+					new File([sample.content], sample.name, { type: 'text/markdown' })
+				);
+				await chatsStore.attach(id, docId);
+			}
+		} finally {
+			demoStarting = false;
+		}
+	}
 
 	// Lazy chat creation: the chat row is born on the first action.
 	async function handleSend(text: string) {
@@ -69,6 +93,13 @@
 		</p>
 		<p class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
 			Your files stay on this device · PDF and Word documents
+		</p>
+		<Button variant="outline" class="gap-2" disabled={demoStarting} onclick={startDemo}>
+			<SparklesIcon class="size-4" />
+			{demoStarting ? 'Preparing the demo…' : 'Try with a sample contract'}
+		</Button>
+		<p class="text-muted-foreground max-w-sm text-center text-xs">
+			Proof, not promises: prepare Private mode, turn off Wi-Fi, and ask again — it keeps working.
 		</p>
 	</div>
 
