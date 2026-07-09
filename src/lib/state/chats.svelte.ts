@@ -2,7 +2,7 @@
 // retrieval-only "answer" (real generation lands in specs 004/005).
 
 import { getLocalDb } from '$lib/local-db/client';
-import type { CitationRow } from '$lib/local-db/worker';
+import type { CitationRow, MessagePrivacyRow } from '$lib/local-db/worker';
 import { documentsStore } from './documents.svelte';
 import { llmStore } from '$lib/private-ai/llm.svelte';
 import {
@@ -29,9 +29,12 @@ class ChatsStore {
 	messages = $state<LocalMessage[]>([]);
 	chatDocuments = $state<ChatDocument[]>([]);
 	citations = $state<Record<string, CitationRow[]>>({});
+	privacyByMessage = $state<Record<string, MessagePrivacyRow>>({});
 	sending = $state(false);
 	/** Non-null while a Private answer streams in. */
 	streamingText = $state<string | null>(null);
+	/** Assisted send awaiting review in the right panel (FEATURES 5ter). */
+	pendingAssisted = $state<{ chatId: string; question: string; hits: SearchHit[] } | null>(null);
 
 	activeChat = $derived(this.chats.find((c) => c.id === this.activeChatId) ?? null);
 
@@ -54,6 +57,8 @@ class ChatsStore {
 		const byMessage: Record<string, CitationRow[]> = {};
 		for (const row of rows) (byMessage[row.messageId] ??= []).push(row);
 		this.citations = byMessage;
+		const events = await db.listChatPrivacyEvents(chatId);
+		this.privacyByMessage = Object.fromEntries(events.map((e) => [e.messageId, e]));
 	}
 
 	close(): void {
@@ -246,6 +251,162 @@ class ChatsStore {
 
 	async stopGeneration(): Promise<void> {
 		await llmStore.stop();
+	}
+
+	/** Retrieval over the active chat's enabled documents (assisted preview). */
+	async retrieveForActive(question: string): Promise<SearchHit[]> {
+		const enabledDocs = this.chatDocuments.filter((d) => d.enabled && d.status === 'ready');
+		if (!enabledDocs.length) return [];
+		return documentsStore.retrieve(
+			question,
+			enabledDocs.map((d) => d.id)
+		);
+	}
+
+	/** Stage an assisted send for review in the right panel. */
+	async stageAssisted(chatId: string, question: string): Promise<'staged' | 'no-excerpts'> {
+		const hits = await this.retrieveForActive(question);
+		if (!hits.length) return 'no-excerpts';
+		this.pendingAssisted = { chatId, question, hits };
+		return 'staged';
+	}
+
+	async confirmAssisted(selected: SearchHit[]): Promise<void> {
+		const pending = this.pendingAssisted;
+		if (!pending) return;
+		this.pendingAssisted = null;
+		await this.sendAssisted(pending.chatId, pending.question, selected);
+	}
+
+	cancelAssisted(): void {
+		this.pendingAssisted = null;
+	}
+
+	/**
+	 * Assisted send: the ONLY code path where user content leaves the device —
+	 * the question plus the excerpts the user confirmed in the preview.
+	 */
+	async sendAssisted(chatId: string, question: string, selected: SearchHit[]): Promise<void> {
+		if (this.sending) return;
+		this.sending = true;
+		try {
+			const { db } = await getLocalDb();
+			const chat = this.chats.find((c) => c.id === chatId);
+			if (chat && chat.title === 'New chat' && this.messages.length === 0) {
+				await db.renameChat(chatId, titleFromMessage(question));
+			}
+			await db.insertMessage({
+				id: crypto.randomUUID(),
+				chatId,
+				role: 'user',
+				content: question,
+				mode: null
+			});
+			this.messages = await db.listMessages(chatId);
+			this.streamingText = '';
+
+			const excerpts = selected.map((h) => ({
+				text: h.text,
+				label: `${h.documentName}${h.page ? ` · page ${h.page}` : h.headingPath ? ` · ${h.headingPath}` : ''}`
+			}));
+			const bytesSent =
+				new TextEncoder().encode(question).length +
+				excerpts.reduce((n, e) => n + new TextEncoder().encode(e.text).length, 0);
+
+			let raw = '';
+			let failed: string | null = null;
+			try {
+				const res = await fetch('/api/assisted', {
+					method: 'POST',
+					headers: { 'content-type': 'application/json' },
+					body: JSON.stringify({ question, excerpts })
+				});
+				if (!res.ok) {
+					failed =
+						res.status === 429
+							? 'Monthly Assisted quota reached — it resets next month.'
+							: res.status === 401
+								? 'Sign in to use Assisted mode.'
+								: 'The Assisted service is unavailable right now.';
+				} else {
+					raw = ((await res.json()) as { answer: string }).answer;
+				}
+			} catch {
+				failed = 'Could not reach the Assisted service — check your connection.';
+			}
+
+			const { text: cleaned, citations } = failed
+				? { text: failed, citations: [] }
+				: resolveCitations(stripThink(raw).trim() || '(empty answer)', selected);
+
+			const messageId = crypto.randomUUID();
+			await db.insertMessage({
+				id: messageId,
+				chatId,
+				role: 'assistant',
+				content: cleaned,
+				mode: 'assisted'
+			});
+			if (citations.length) {
+				await db.insertCitations(
+					messageId,
+					citations.map((c) => ({
+						chunkId: c.hit.chunkId,
+						snippet: c.hit.text.slice(0, 240),
+						documentName: c.hit.documentName,
+						locator: c.hit.page ? `page ${c.hit.page}` : (c.hit.headingPath ?? null)
+					}))
+				);
+			}
+			if (!failed) {
+				await db.insertPrivacyEvent({
+					chatId,
+					messageId,
+					mode: 'assisted',
+					destination: 'cloud',
+					excerptCount: excerpts.length,
+					bytesSent
+				});
+			}
+			await db.touchChat(chatId);
+			this.messages = await db.listMessages(chatId);
+			await this.loadCitations(chatId);
+			await this.refresh();
+		} finally {
+			this.sending = false;
+			this.streamingText = null;
+		}
+	}
+
+	/** Parse a Workers AI SSE stream, accumulating deltas into streamingText. */
+	private async consumeSse(body: ReadableStream<Uint8Array>): Promise<string> {
+		const reader = body.getReader();
+		const decoder = new TextDecoder();
+		let buffer = '';
+		let full = '';
+		for (;;) {
+			const { done, value } = await reader.read();
+			if (done) break;
+			buffer += decoder.decode(value, { stream: true });
+			const lines = buffer.split('\n');
+			buffer = lines.pop() ?? '';
+			for (const line of lines) {
+				if (!line.startsWith('data:')) continue;
+				const payload = line.slice(5).trim();
+				if (!payload || payload === '[DONE]') continue;
+				try {
+					const obj = JSON.parse(payload);
+					const delta: string = obj.response ?? obj.choices?.[0]?.delta?.content ?? '';
+					if (delta) {
+						full += delta;
+						this.streamingText = isThinking(full) ? '' : stripThink(full);
+					}
+				} catch {
+					// partial JSON split across chunks — ignored, next line completes it
+				}
+			}
+		}
+		return full;
 	}
 }
 

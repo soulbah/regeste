@@ -458,6 +458,30 @@ export interface PrivacyEventRow {
 	createdAt: number;
 }
 
+export interface MessagePrivacyRow {
+	messageId: string;
+	mode: string;
+	destination: string;
+	excerptCount: number;
+	bytesSent: number;
+}
+
+function listChatPrivacyEvents(chatId: string): MessagePrivacyRow[] {
+	return db
+		.selectObjects(
+			`SELECT message_id, mode, destination, excerpt_count, bytes_sent
+			 FROM privacy_events WHERE chat_id = ? AND message_id IS NOT NULL`,
+			[chatId]
+		)
+		.map((r: any) => ({
+			messageId: r.message_id,
+			mode: r.mode,
+			destination: r.destination,
+			excerptCount: r.excerpt_count,
+			bytesSent: r.bytes_sent
+		}));
+}
+
 function listPrivacyEvents(limit = 100): PrivacyEventRow[] {
 	return db
 		.selectObjects(
@@ -500,7 +524,8 @@ const api = {
 	insertCitations,
 	listChatCitations,
 	insertPrivacyEvent,
-	listPrivacyEvents
+	listPrivacyEvents,
+	listChatPrivacyEvents
 };
 
 export type DbApi = typeof api;
