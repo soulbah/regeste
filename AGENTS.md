@@ -48,7 +48,7 @@ Never batch-check tasks you did not verify. Never claim done with a failing or s
 
 - Never invent an API, import or package name. Check `package.json` before importing; check the actual file before referencing an export.
 - Read a file before editing it. Read neighboring code before writing new code — match its idioms.
-- Library APIs: trust the installed version's types/docs over memory. Cloudflare APIs move fast — check https://developers.cloudflare.com/llms.txt (and the product's `llms-full.txt`) before citing limits, bindings or model names.
+- Library APIs: trust the installed version's types/docs over memory. **When in doubt about any library/API behavior, fetch the official docs BEFORE coding** (owner rule). Cloudflare APIs move fast — check https://developers.cloudflare.com/llms.txt (and the product's `llms-full.txt`) before citing limits, bindings or model names.
 - Cloudflare-first: before adding any external service or dependency for infra concerns, check if Cloudflare has it (see `docs/constitution.md`).
 - Uncertain about product behavior? Add `[NEEDS CLARIFICATION: question]` to the spec and stop that thread — never guess on user-visible behavior.
 
@@ -60,6 +60,8 @@ Never batch-check tasks you did not verify. Never claim done with a failing or s
 - **Secrets**: never write `.env*` / `.dev.vars` (hook-enforced); use `wrangler secret put`.
 - **Migrations**: never edit an applied migration — create a new one (use the `db-migration` skill).
 - **Simplicity**: smallest change that satisfies the spec. No speculative abstractions, no extra deps without need.
+- **Tests: no sugar tests.** A test must protect real logic or a real regression; ceremony coverage is a task failure. When unsure whether a test is necessary, it isn't.
+- **UI work starts from the frontend-design skill + real inspiration research.** Distinctive identity is a product goal — default-looking shadcn output is a task failure. The right contextual panel (not modal dialogs) hosts contextual flows: documents, pre-send review, What AI saw, viewer.
 
 ## Conventions
 
