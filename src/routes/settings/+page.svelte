@@ -11,6 +11,8 @@
 	import { resolve } from '$app/paths';
 	import { getLocalDb } from '$lib/local-db/client';
 	import type { PrivacySummaryRow } from '$lib/local-db/worker';
+	import { llmStore } from '$lib/private-ai/llm.svelte';
+	import { modelsStore } from '$lib/state/models.svelte';
 	import { settingsStore } from '$lib/state/settings.svelte';
 
 	let week = $state<PrivacySummaryRow[]>([]);
@@ -20,6 +22,8 @@
 	$effect(() => {
 		settingsStore.init();
 		settingsStore.refreshStorage();
+		llmStore.init();
+		modelsStore.refresh();
 		(async () => {
 			const { db } = await getLocalDb();
 			week = await db.weekPrivacySummary();
@@ -140,6 +144,67 @@
 							Offline — nothing leaves this device
 						</Badge>
 					{/if}
+				</Card.Content>
+			</Card.Root>
+
+			<Card.Root>
+				<Card.Header>
+					<Card.Title class="text-base">AI models on this device</Card.Title>
+				</Card.Header>
+				<Card.Content class="space-y-3">
+					{#if modelsStore.cached.length === 0}
+						<p class="text-muted-foreground text-sm">
+							{modelsStore.loading ? 'Measuring…' : 'No models downloaded yet.'}
+						</p>
+					{:else}
+						{#each modelsStore.cached as model (model.cacheName)}
+							<div class="flex items-center justify-between gap-3">
+								<div class="min-w-0">
+									<p class="truncate text-sm">{model.label}</p>
+									<p class="text-muted-foreground font-mono text-[10px] uppercase">
+										{model.bytes ? fmtBytes(model.bytes) : `${model.entries} files`}
+									</p>
+								</div>
+								<Button
+									variant="outline"
+									size="sm"
+									onclick={() => modelsStore.remove(model.cacheName)}
+								>
+									Delete
+								</Button>
+							</div>
+						{/each}
+					{/if}
+					<div class="border-t pt-3">
+						<div class="flex items-center justify-between gap-3">
+							<p class="text-muted-foreground text-sm">
+								Test my device — a short private generation measures how fast this machine runs the
+								local AI.
+							</p>
+							<Button
+								variant="outline"
+								size="sm"
+								class="shrink-0"
+								disabled={llmStore.status !== 'ready' || modelsStore.benchmarking}
+								onclick={() => modelsStore.runBenchmark()}
+							>
+								{modelsStore.benchmarking ? 'Testing…' : 'Test my device'}
+							</Button>
+						</div>
+						{#if llmStore.status !== 'ready'}
+							<p class="text-muted-foreground mt-1 text-xs">
+								Prepare the private AI first (mode selector → Private).
+							</p>
+						{/if}
+						{#if modelsStore.benchmark}
+							<p class="mt-2 text-sm">
+								{modelsStore.benchmark.tokensPerSecond} tokens/second —
+								{modelsStore.benchmark.recommendPrivate
+									? 'this device runs Private mode comfortably.'
+									: 'this device is slow for Private mode; Assisted will feel much faster.'}
+							</p>
+						{/if}
+					</div>
 				</Card.Content>
 			</Card.Root>
 

@@ -55,6 +55,15 @@
 
 	const activeModel = $derived(myaiModel ?? myaiStore.defaultModel);
 
+	// M3 — dynamic "Best for this device": justified by capability detection,
+	// never a static "Recommended" (FEATURES §5 UI decision).
+	const bestMode = $derived.by(() => {
+		if (llmStore.status === 'detecting') return null;
+		return llmStore.status === 'unavailable'
+			? { id: 'assisted' as const, reason: 'no GPU access in this browser' }
+			: { id: 'private' as const, reason: 'this device can run the AI locally' };
+	});
+
 	const presetHint = $derived(
 		MYAI_PRESETS.find((p) => normalizeBaseUrl(urlDraft) === p.baseUrl)?.corsHint ?? null
 	);
@@ -201,6 +210,15 @@
 								<span class="size-1.5 rounded-full {m.dotClass}"></span>
 								<span class="text-sm font-medium">{m.label}</span>
 								{#if m.id === mode}<CheckIcon class="size-3.5" />{/if}
+								{#if bestMode?.id === m.id}
+									<Badge
+										variant="secondary"
+										class="ml-auto font-mono text-[9px] tracking-wide uppercase"
+										title={bestMode.reason}
+									>
+										Best for this device
+									</Badge>
+								{/if}
 							</span>
 							<span class="text-muted-foreground block text-xs">{m.description}</span>
 							{#if m.status}
