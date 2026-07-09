@@ -13,6 +13,7 @@
 	import PresendPanel from '$lib/components/presend-panel.svelte';
 	import DocumentsPanel from '$lib/components/documents-panel.svelte';
 	import ViewerPanel from '$lib/components/viewer-panel.svelte';
+	import WhatAiSawPanel from '$lib/components/what-ai-saw-panel.svelte';
 	import { chatsStore } from '$lib/state/chats.svelte';
 	import { documentsStore } from '$lib/state/documents.svelte';
 	import { viewerStore } from '$lib/state/viewer.svelte';
@@ -40,6 +41,7 @@
 	$effect(() => {
 		chatsStore.open(chatId);
 		viewerStore.close();
+		chatsStore.closeWhatAiSaw();
 	});
 
 	async function handleUpload(files: File[]) {
@@ -226,6 +228,8 @@
 								!chatsStore.sending
 									? () => chatsStore.regenerate(chatId)
 									: null}
+								messageId={message.id}
+								excerpts={chatsStore.excerptsByMessage[message.id] ?? []}
 							/>
 						{:else}
 							<div class="text-sm">{message.content}</div>
@@ -312,6 +316,8 @@
 	<Resizable.Pane defaultSize={28} minSize={18} class="hidden md:block">
 		{#if reviewing}
 			<PresendPanel />
+		{:else if chatsStore.waisMessageId}
+			<WhatAiSawPanel />
 		{:else if viewerStore.isOpen}
 			<ViewerPanel />
 		{:else}

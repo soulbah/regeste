@@ -650,6 +650,69 @@ function searchAll(query: string, limit = 8): SearchAllResult {
 	return { chats, documents };
 }
 
+// ── What AI saw (spec 012) ───────────────────────────────────────────────────
+
+export interface MessageExcerptRow {
+	messageId: string;
+	chunkId: number | null;
+	sent: boolean;
+	excluded: boolean;
+	snippet: string;
+	documentName: string;
+	locator: string | null;
+}
+
+function insertMessageExcerpts(
+	messageId: string,
+	rows: Array<{
+		chunkId: number | null;
+		sent: boolean;
+		excluded: boolean;
+		snippet: string;
+		documentName: string;
+		locator: string | null;
+	}>
+): void {
+	db.transaction(() => {
+		for (const r of rows) {
+			db.exec({
+				sql: `INSERT INTO message_excerpts(id, message_id, chunk_id, sent, excluded, snippet, document_name, locator, created_at)
+				      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				bind: [
+					crypto.randomUUID(),
+					messageId,
+					r.chunkId,
+					r.sent ? 1 : 0,
+					r.excluded ? 1 : 0,
+					r.snippet,
+					r.documentName,
+					r.locator,
+					Date.now()
+				]
+			});
+		}
+	});
+}
+
+function listChatMessageExcerpts(chatId: string): MessageExcerptRow[] {
+	return db
+		.selectObjects(
+			`SELECT me.message_id, me.chunk_id, me.sent, me.excluded, me.snippet, me.document_name, me.locator
+			 FROM message_excerpts me JOIN messages m ON m.id = me.message_id
+			 WHERE m.chat_id = ? ORDER BY me.created_at, me.rowid`,
+			[chatId]
+		)
+		.map((r: any) => ({
+			messageId: r.message_id,
+			chunkId: r.chunk_id,
+			sent: !!r.sent,
+			excluded: !!r.excluded,
+			snippet: r.snippet,
+			documentName: r.document_name,
+			locator: r.locator
+		}));
+}
+
 // ── Citations & privacy events ───────────────────────────────────────────────
 
 function insertCitations(
@@ -890,6 +953,8 @@ const api = {
 	documentUsage,
 	insertCitations,
 	listChatCitations,
+	insertMessageExcerpts,
+	listChatMessageExcerpts,
 	insertPrivacyEvent,
 	listPrivacyEvents,
 	listChatPrivacyEvents,

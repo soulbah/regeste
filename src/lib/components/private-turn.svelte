@@ -7,7 +7,8 @@
 	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import { SvelteSet } from 'svelte/reactivity';
-	import type { CitationRow } from '$lib/local-db/worker';
+	import type { CitationRow, MessageExcerptRow } from '$lib/local-db/worker';
+	import { chatsStore } from '$lib/state/chats.svelte';
 	import { viewerStore } from '$lib/state/viewer.svelte';
 
 	let {
@@ -15,7 +16,9 @@
 		citations = [],
 		mode = 'private',
 		meta = null,
-		onregenerate = null
+		onregenerate = null,
+		messageId = null,
+		excerpts = []
 	}: {
 		content: string;
 		citations?: CitationRow[];
@@ -23,7 +26,22 @@
 		meta?: string | null;
 		/** C2 — present on the last answer only. */
 		onregenerate?: (() => void) | null;
+		/** Spec 012 — enables the What-AI-saw click-through. */
+		messageId?: string | null;
+		excerpts?: MessageExcerptRow[];
 	} = $props();
+
+	/** Honest refusal: no citations but passages were retrieved → show them. */
+	const closestSources = $derived(citations.length === 0 ? excerpts.slice(0, 3) : []);
+
+	async function openExcerpt(e: MessageExcerptRow) {
+		if (e.chunkId != null) {
+			await viewerStore.openChunkId(e.chunkId);
+			if (viewerStore.isOpen) return;
+		}
+		viewerStore.target = null;
+		viewerStore.snapshot = { documentName: e.documentName, locator: e.locator, snippet: e.snippet };
+	}
 
 	let copied = $state(false);
 
@@ -74,11 +92,24 @@
 <div class="space-y-3">
 	<div class="flex items-center gap-2">
 		<span class="size-1.5 rounded-full {dotClass[mode]}"></span>
-		<span class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
-			{mode === 'private'
-				? 'Folio · nothing left this device'
-				: (meta ?? (mode === 'assisted' ? 'Folio · Assisted' : 'Folio · My AI'))}
-		</span>
+		{#if messageId}
+			<Button
+				variant="ghost"
+				size="sm"
+				class="text-muted-foreground hover:text-foreground h-auto px-1 py-0 font-mono text-[10px] tracking-widest uppercase underline-offset-2 hover:underline"
+				onclick={() => chatsStore.openWhatAiSaw(messageId!)}
+			>
+				{mode === 'private'
+					? 'Folio · nothing left this device'
+					: (meta ?? (mode === 'assisted' ? 'Folio · Assisted' : 'Folio · My AI'))} · what AI saw →
+			</Button>
+		{:else}
+			<span class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
+				{mode === 'private'
+					? 'Folio · nothing left this device'
+					: (meta ?? (mode === 'assisted' ? 'Folio · Assisted' : 'Folio · My AI'))}
+			</span>
+		{/if}
 	</div>
 	<p class="text-sm leading-relaxed whitespace-pre-wrap">
 		{#each segments as segment, i (i)}
@@ -154,6 +185,22 @@
 					onclick={() => viewerStore.openCitation(c)}
 				>
 					{c.documentName}{c.locator ? ` · ${c.locator}` : ''}
+				</Button>
+			{/each}
+		</div>
+	{:else if closestSources.length}
+		<div class="space-y-0.5 border-t pt-2">
+			<p class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
+				Closest sources — none supported an answer
+			</p>
+			{#each closestSources as e, i (i)}
+				<Button
+					variant="ghost"
+					size="sm"
+					class="text-muted-foreground hover:text-foreground block h-auto w-fit px-1 py-0.5 font-mono text-[10px] font-normal"
+					onclick={() => openExcerpt(e)}
+				>
+					{e.documentName}{e.locator ? ` · ${e.locator}` : ''}
 				</Button>
 			{/each}
 		</div>

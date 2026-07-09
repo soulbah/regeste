@@ -130,5 +130,22 @@ export const MIGRATIONS: string[] = [
 	// v6 — document language (spec 011, D2)
 	`
 	ALTER TABLE documents ADD COLUMN language TEXT;
+	`,
+
+	// v7 — What AI saw (spec 012): per-answer passage snapshots with sent state.
+	// sent: 1 = left the device, 0 = stayed (private mode or user-excluded).
+	`
+	CREATE TABLE message_excerpts (
+		id TEXT PRIMARY KEY,
+		message_id TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+		chunk_id INTEGER,
+		sent INTEGER NOT NULL DEFAULT 0,
+		excluded INTEGER NOT NULL DEFAULT 0,
+		snippet TEXT NOT NULL,
+		document_name TEXT NOT NULL,
+		locator TEXT,
+		created_at INTEGER NOT NULL
+	);
+	CREATE INDEX idx_message_excerpts_message ON message_excerpts(message_id);
 	`
 ];

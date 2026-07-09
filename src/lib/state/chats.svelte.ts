@@ -2,7 +2,7 @@
 // retrieval-only "answer" (real generation lands in specs 004/005).
 
 import { getLocalDb } from '$lib/local-db/client';
-import type { CitationRow, MessagePrivacyRow } from '$lib/local-db/worker';
+import type { CitationRow, MessageExcerptRow, MessagePrivacyRow } from '$lib/local-db/worker';
 import { documentsStore } from './documents.svelte';
 import { guardedFetch, OfflineError } from '$lib/net';
 import { myaiStore, endpointHost, type ChatMessage } from './myai.svelte';
@@ -39,6 +39,10 @@ class ChatsStore {
 	pendingAssisted = $state<{ chatId: string; question: string; hits: SearchHit[] } | null>(null);
 	/** P2 — active chat's egress state (cloud requests + bytes). */
 	chatEgress = $state<{ cloudRequests: number; bytes: number } | null>(null);
+	/** Spec 012 — per-message passage snapshots (what the AI actually saw). */
+	excerptsByMessage = $state<Record<string, MessageExcerptRow[]>>({});
+	/** Spec 012 — message whose "What AI saw" panel is open. */
+	waisMessageId = $state<string | null>(null);
 
 	activeChat = $derived(this.chats.find((c) => c.id === this.activeChatId) ?? null);
 
@@ -64,6 +68,30 @@ class ChatsStore {
 		const events = await db.listChatPrivacyEvents(chatId);
 		this.privacyByMessage = Object.fromEntries(events.map((e) => [e.messageId, e]));
 		this.chatEgress = await db.chatPrivacySummary(chatId);
+		const excerpts = await db.listChatMessageExcerpts(chatId);
+		const byMsg: Record<string, MessageExcerptRow[]> = {};
+		for (const row of excerpts) (byMsg[row.messageId] ??= []).push(row);
+		this.excerptsByMessage = byMsg;
+	}
+
+	openWhatAiSaw(messageId: string): void {
+		this.waisMessageId = messageId;
+	}
+
+	closeWhatAiSaw(): void {
+		this.waisMessageId = null;
+	}
+
+	/** Snapshot rows for message_excerpts from retrieval hits. */
+	private static excerptRows(hits: SearchHit[], sent: boolean, excludedIds: Set<number>) {
+		return hits.map((h) => ({
+			chunkId: h.chunkId,
+			sent: sent && !excludedIds.has(h.chunkId),
+			excluded: excludedIds.has(h.chunkId),
+			snippet: h.text.slice(0, 240),
+			documentName: h.documentName,
+			locator: h.page ? `page ${h.page}` : (h.headingPath ?? null)
+		}));
 	}
 
 	async setPrivateOnly(chatId: string, on: boolean): Promise<void> {
@@ -361,6 +389,9 @@ class ChatsStore {
 			excerptCount: hits.length,
 			bytesSent: 0
 		});
+		if (grounded && hits.length) {
+			await db.insertMessageExcerpts(messageId, ChatsStore.excerptRows(hits, false, new Set()));
+		}
 		await this.loadCitations(chatId);
 	}
 
@@ -448,6 +479,9 @@ class ChatsStore {
 				excerptCount: grounded ? hits.length : 0,
 				bytesSent
 			});
+			if (grounded && hits.length) {
+				await db.insertMessageExcerpts(messageId, ChatsStore.excerptRows(hits, true, new Set()));
+			}
 		}
 		await this.loadCitations(chat.id);
 	}
@@ -479,7 +513,9 @@ class ChatsStore {
 		const pending = this.pendingAssisted;
 		if (!pending) return;
 		this.pendingAssisted = null;
-		await this.sendAssisted(pending.chatId, pending.question, selected);
+		const selectedIds = new Set(selected.map((h) => h.chunkId));
+		const excluded = pending.hits.filter((h) => !selectedIds.has(h.chunkId));
+		await this.sendAssisted(pending.chatId, pending.question, selected, excluded);
 	}
 
 	cancelAssisted(): void {
@@ -490,7 +526,12 @@ class ChatsStore {
 	 * Assisted send: the ONLY code path where user content leaves the device —
 	 * the question plus the excerpts the user confirmed in the preview.
 	 */
-	async sendAssisted(chatId: string, question: string, selected: SearchHit[]): Promise<void> {
+	async sendAssisted(
+		chatId: string,
+		question: string,
+		selected: SearchHit[],
+		excluded: SearchHit[] = []
+	): Promise<void> {
 		if (this.sending) return;
 		this.sending = true;
 		try {
@@ -574,6 +615,11 @@ class ChatsStore {
 					excerptCount: excerpts.length,
 					bytesSent
 				});
+				const all = [...selected, ...excluded];
+				if (all.length) {
+					const excludedIds = new Set(excluded.map((h) => h.chunkId));
+					await db.insertMessageExcerpts(messageId, ChatsStore.excerptRows(all, true, excludedIds));
+				}
 			}
 			await db.touchChat(chatId);
 			this.messages = await db.listMessages(chatId);
