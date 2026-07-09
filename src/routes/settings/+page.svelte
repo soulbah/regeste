@@ -22,6 +22,7 @@
 	$effect(() => {
 		settingsStore.init();
 		settingsStore.refreshStorage();
+		settingsStore.refreshQuota();
 		llmStore.init();
 		modelsStore.refresh();
 		(async () => {
@@ -144,6 +145,40 @@
 							Offline — nothing leaves this device
 						</Badge>
 					{/if}
+				</Card.Content>
+			</Card.Root>
+
+			<Card.Root>
+				<Card.Header>
+					<Card.Title class="text-base">Workspace</Card.Title>
+				</Card.Header>
+				<Card.Content class="space-y-3">
+					<div class="flex items-center justify-between gap-3">
+						<p class="text-muted-foreground text-sm">
+							Export everything — documents, chats, citations and privacy history — as a plain zip
+							you own. Built on this device, sent nowhere.
+						</p>
+						<Button
+							variant="outline"
+							size="sm"
+							class="shrink-0"
+							disabled={settingsStore.exporting}
+							onclick={() => settingsStore.exportWorkspace()}
+						>
+							{settingsStore.exporting ? 'Packing…' : 'Export my workspace'}
+						</Button>
+					</div>
+					<div class="border-t pt-3">
+						{#if settingsStore.quota}
+							<p class="text-sm">
+								Assisted usage this month: {settingsStore.quota.used} / {settingsStore.quota.limit}
+							</p>
+						{:else}
+							<p class="text-muted-foreground text-xs">
+								Assisted usage appears here once you're signed in.
+							</p>
+						{/if}
+					</div>
 				</Card.Content>
 			</Card.Root>
 

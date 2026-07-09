@@ -1,7 +1,11 @@
 // Trust-pack settings (spec 009): force-offline switch, storage status and
 // the panic wipe. All device-local; the offline flag persists in the local DB.
+// Spec 015 adds the workspace export (R1) and the Assisted quota gauge (R5).
 
+import { zipSync, strToU8 } from 'fflate';
 import { getLocalDb } from '$lib/local-db/client';
+import { readOriginal } from '$lib/opfs';
+import { guardedFetch } from '$lib/net';
 
 export interface StorageStatus {
 	usage: number;
@@ -16,6 +20,9 @@ class SettingsStore {
 	assistedConsented = $state(false);
 	storage = $state<StorageStatus | null>(null);
 	wiping = $state(false);
+	exporting = $state(false);
+	/** R5 — this month's Assisted usage; null when signed out/unknown. */
+	quota = $state<{ used: number; limit: number } | null>(null);
 
 	private loaded = false;
 
@@ -32,6 +39,53 @@ class SettingsStore {
 		this.assistedConsented = true;
 		const { db } = await getLocalDb();
 		await db.setSetting('assisted_consented', '1');
+	}
+
+	/** R5 — read-only usage fetch; silent when signed out or offline. */
+	async refreshQuota(): Promise<void> {
+		try {
+			const res = await guardedFetch('/api/quota');
+			this.quota = res.ok ? await res.json() : null;
+		} catch {
+			this.quota = null;
+		}
+	}
+
+	/**
+	 * R1 — export the whole workspace as a plain zip (JSON + original files),
+	 * built client-side. The anti-eviction safety net; encrypted export is V1.1.
+	 */
+	async exportWorkspace(): Promise<void> {
+		if (this.exporting) return;
+		this.exporting = true;
+		try {
+			const { db } = await getLocalDb();
+			const data = (await db.exportData()) as {
+				documents: Array<{ hash: string; name: string }>;
+			} & Record<string, unknown>;
+			const files: Record<string, Uint8Array> = {};
+			const missing: string[] = [];
+			for (const doc of data.documents) {
+				const bytes = await readOriginal(doc.hash);
+				if (bytes) files[`originals/${doc.hash}-${doc.name}`] = new Uint8Array(bytes);
+				else missing.push(doc.name);
+			}
+			files['workspace.json'] = strToU8(
+				JSON.stringify({ ...data, missingOriginals: missing }, null, 2)
+			);
+			const zip = zipSync(files);
+			const arrayBuffer = new ArrayBuffer(zip.byteLength);
+			new Uint8Array(arrayBuffer).set(zip);
+			const blob = new Blob([arrayBuffer], { type: 'application/zip' });
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = `folio-workspace-${new Date().toISOString().slice(0, 10)}.zip`;
+			a.click();
+			URL.revokeObjectURL(url);
+		} finally {
+			this.exporting = false;
+		}
 	}
 
 	async refreshStorage(): Promise<void> {

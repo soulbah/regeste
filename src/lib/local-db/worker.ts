@@ -915,9 +915,31 @@ async function wipeDatabase(): Promise<void> {
 	await poolUtil?.wipeFiles();
 }
 
+/**
+ * R1 (spec 015) — full local dump for the workspace export. Everything the
+ * user owns, minus embeddings/chunks (rebuilt by re-ingesting the originals).
+ */
+function exportData(): Record<string, unknown> {
+	const table = (name: string) => db.selectObjects(`SELECT * FROM ${name}`);
+	return {
+		exportedAt: new Date().toISOString(),
+		version: db.selectValue("SELECT value FROM meta WHERE key = 'schema_version'"),
+		settings: db.selectObjects("SELECT key, value FROM meta WHERE key LIKE 'setting:%'"),
+		documents: table('documents'),
+		documentVersions: table('document_versions'),
+		chats: table('chats'),
+		messages: table('messages'),
+		chatDocuments: table('chat_documents'),
+		citations: table('citations'),
+		messageExcerpts: table('message_excerpts'),
+		privacyEvents: table('privacy_events')
+	};
+}
+
 const api = {
 	init,
 	wipeDatabase,
+	exportData,
 	getDocumentByHash,
 	listDocuments,
 	insertDocument,

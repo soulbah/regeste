@@ -79,6 +79,7 @@
 		"better-auth": "^1.6.23",
 		"comlink": "^4.4.2",
 		"drizzle-orm": "^0.45.2",
+		"fflate": "^0.8.3",
 		"mammoth": "^1.12.0",
 		"pdfjs-dist": "^6.1.200",
 		"sqlite-vec-wasm-demo": "0.1.7-alpha.2",
