@@ -125,5 +125,10 @@ export const MIGRATIONS: string[] = [
 	// v5 — pinned chats (spec 010, C6)
 	`
 	ALTER TABLE chats ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;
+	`,
+
+	// v6 — document language (spec 011, D2)
+	`
+	ALTER TABLE documents ADD COLUMN language TEXT;
 	`
 ];

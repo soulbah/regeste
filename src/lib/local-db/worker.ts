@@ -96,6 +96,7 @@ function rowToDocument(r: any): LocalDocument {
 		status: r.status,
 		error: r.error,
 		embeddingModel: r.embedding_model,
+		language: r.language ?? null,
 		createdAt: r.created_at,
 		updatedAt: r.updated_at
 	};
@@ -128,16 +129,18 @@ function insertDocument(doc: {
 function setDocumentStatus(
 	id: string,
 	status: string,
-	extra?: { error?: string; pages?: number; embeddingModel?: string }
+	extra?: { error?: string; pages?: number; embeddingModel?: string; language?: string }
 ): void {
 	db.exec({
 		sql: `UPDATE documents SET status = ?, error = ?, pages = COALESCE(?, pages),
-		      embedding_model = COALESCE(?, embedding_model), updated_at = ? WHERE id = ?`,
+		      embedding_model = COALESCE(?, embedding_model), language = COALESCE(?, language),
+		      updated_at = ? WHERE id = ?`,
 		bind: [
 			status,
 			extra?.error ?? null,
 			extra?.pages ?? null,
 			extra?.embeddingModel ?? null,
+			extra?.language ?? null,
 			Date.now(),
 			id
 		]
@@ -159,6 +162,109 @@ function deleteDocument(id: string): void {
 		db.exec({ sql: 'DELETE FROM chunks WHERE document_id = ?', bind: [id] });
 		db.exec({ sql: 'DELETE FROM documents WHERE id = ?', bind: [id] });
 	});
+}
+
+/** Remove a document's chunks from all three stores (FTS with real text). */
+function deleteChunks(documentId: string): void {
+	db.transaction(() => {
+		const rows = db.selectObjects('SELECT id, text FROM chunks WHERE document_id = ?', [
+			documentId
+		]);
+		for (const r of rows) {
+			db.exec({ sql: 'DELETE FROM chunks_vec WHERE rowid = ?', bind: [r.id] });
+			db.exec({
+				sql: "INSERT INTO chunks_fts(chunks_fts, rowid, text) VALUES('delete', ?, ?)",
+				bind: [r.id, r.text]
+			});
+		}
+		db.exec({ sql: 'DELETE FROM chunks WHERE document_id = ?', bind: [documentId] });
+	});
+}
+
+/**
+ * Atomic version swap (PRD §5): the new content was fully parsed and embedded
+ * BEFORE this call; here we audit the old version, drop old chunks, update the
+ * document row and insert the new chunks in one transaction.
+ */
+function replaceDocument(
+	id: string,
+	meta: { hash: string; name: string; mime: string; size: number; pages: number | null },
+	chunks: Chunk[],
+	embeddings: Float32Array,
+	dims: number,
+	language: string | null
+): void {
+	db.transaction(() => {
+		const old = db.selectObjects('SELECT hash FROM documents WHERE id = ?', [id])[0];
+		if (old) {
+			db.exec({
+				sql: 'INSERT INTO document_versions(id, document_id, hash, created_at) VALUES (?, ?, ?, ?)',
+				bind: [crypto.randomUUID(), id, old.hash, Date.now()]
+			});
+		}
+		const rows = db.selectObjects('SELECT id, text FROM chunks WHERE document_id = ?', [id]);
+		for (const r of rows) {
+			db.exec({ sql: 'DELETE FROM chunks_vec WHERE rowid = ?', bind: [r.id] });
+			db.exec({
+				sql: "INSERT INTO chunks_fts(chunks_fts, rowid, text) VALUES('delete', ?, ?)",
+				bind: [r.id, r.text]
+			});
+		}
+		db.exec({ sql: 'DELETE FROM chunks WHERE document_id = ?', bind: [id] });
+		db.exec({
+			sql: `UPDATE documents SET hash = ?, name = ?, mime = ?, size = ?, pages = ?,
+			      language = ?, status = 'ready', error = NULL, updated_at = ? WHERE id = ?`,
+			bind: [meta.hash, meta.name, meta.mime, meta.size, meta.pages, language, Date.now(), id]
+		});
+		for (let i = 0; i < chunks.length; i++) {
+			const c = chunks[i];
+			db.exec({
+				sql: `INSERT INTO chunks(document_id, seq, text, page, heading_path, para_index, char_start, char_end)
+				      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+				bind: [id, c.seq, c.text, c.page, c.headingPath, c.paraIndex, c.charStart, c.charEnd]
+			});
+			const rowid = db.selectValue('SELECT last_insert_rowid()') as number;
+			db.exec({ sql: 'INSERT INTO chunks_fts(rowid, text) VALUES (?, ?)', bind: [rowid, c.text] });
+			const vec = embeddings.subarray(i * dims, (i + 1) * dims);
+			db.exec({
+				sql: 'INSERT INTO chunks_vec(rowid, embedding) VALUES (?, ?)',
+				bind: [rowid, new Uint8Array(vec.buffer, vec.byteOffset, vec.byteLength).slice()]
+			});
+		}
+	});
+}
+
+export interface DocumentDetail {
+	chats: Array<{ id: string; title: string }>;
+	egress: Array<{ createdAt: number; destination: string; mode: string }>;
+	versionCount: number;
+}
+
+/** D1 — everything the document sheet shows beyond the row itself. */
+function documentDetail(id: string): DocumentDetail {
+	const chats = db
+		.selectObjects(
+			`SELECT c.id, c.title FROM chat_documents cd JOIN chats c ON c.id = cd.chat_id
+			 WHERE cd.document_id = ? ORDER BY c.updated_at DESC`,
+			[id]
+		)
+		.map((r: any) => ({ id: r.id, title: r.title }));
+	const egress = db
+		.selectObjects(
+			`SELECT DISTINCT pe.created_at, pe.destination, pe.mode
+			 FROM privacy_events pe
+			 JOIN citations c ON c.message_id = pe.message_id
+			 JOIN chunks ch ON ch.id = c.chunk_id
+			 WHERE ch.document_id = ? AND pe.destination != 'device'
+			 ORDER BY pe.created_at DESC LIMIT 20`,
+			[id]
+		)
+		.map((r: any) => ({ createdAt: r.created_at, destination: r.destination, mode: r.mode }));
+	const versionCount = db.selectValue(
+		'SELECT count(*) FROM document_versions WHERE document_id = ?',
+		[id]
+	) as number;
+	return { chats, egress, versionCount };
 }
 
 /** Insert a batch of chunks with their embeddings (Float32Array, concatenated). */
@@ -755,6 +861,9 @@ const api = {
 	setDocumentStatus,
 	deleteDocument,
 	insertChunks,
+	deleteChunks,
+	replaceDocument,
+	documentDetail,
 	search,
 	countChunks,
 	getChunk,

@@ -15,6 +15,8 @@ export interface LocalDocument {
 	status: DocumentStatus;
 	error: IngestErrorCode | null;
 	embeddingModel: string | null;
+	/** D2 — detected document language ('fr' | 'en'), null when undetected. */
+	language: string | null;
 	createdAt: number;
 	updatedAt: number;
 }

@@ -20,6 +20,7 @@
 	import { llmStore } from '$lib/private-ai/llm.svelte';
 	import { getLocalDb } from '$lib/local-db/client';
 	import { suggestionsFromHeadings } from '$lib/suggestions';
+	import { toast } from 'svelte-sonner';
 
 	async function handleSend(text: string) {
 		if (chatsStore.activeChat?.mode === 'assisted') {
@@ -43,8 +44,15 @@
 
 	async function handleUpload(files: File[]) {
 		for (const file of files) {
+			const known = new Set(documentsStore.library.map((d) => d.id));
 			const docId = await documentsStore.ingest(file);
 			await chatsStore.attach(chatId, docId);
+			// FEATURES: chat uploads land in the global library too — say it once.
+			if (!known.has(docId)) {
+				toast.success(`${file.name} added to My documents`, {
+					description: 'Available to every chat, stored on this device.'
+				});
+			}
 		}
 	}
 

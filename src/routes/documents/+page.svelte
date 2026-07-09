@@ -5,14 +5,41 @@
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { Progress } from '$lib/components/ui/progress';
+	import * as Select from '$lib/components/ui/select';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import EllipsisVerticalIcon from '@lucide/svelte/icons/ellipsis-vertical';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
+	import DocumentSheet from '$lib/components/document-sheet.svelte';
 	import { documentsStore } from '$lib/state/documents.svelte';
 	import type { LibraryDocument } from '$lib/types';
 
 	let fileInput = $state<HTMLInputElement | null>(null);
 	let deleteTarget = $state<LibraryDocument | null>(null);
+	let sheetTarget = $state<LibraryDocument | null>(null);
+
+	// F2 — sort + type filter, plain client-side.
+	let sortBy = $state<'recent' | 'name' | 'size'>('recent');
+	let typeFilter = $state<'all' | 'pdf' | 'docx' | 'md' | 'txt'>('all');
+
+	function docType(doc: LibraryDocument): string {
+		const n = doc.name.toLowerCase();
+		if (n.endsWith('.pdf')) return 'pdf';
+		if (n.endsWith('.docx')) return 'docx';
+		if (n.endsWith('.md') || n.endsWith('.markdown')) return 'md';
+		return 'txt';
+	}
+
+	const shown = $derived.by(() => {
+		let docs = documentsStore.library;
+		if (typeFilter !== 'all') docs = docs.filter((d) => docType(d) === typeFilter);
+		return [...docs].sort((a, b) => {
+			if (sortBy === 'name') return a.name.localeCompare(b.name);
+			if (sortBy === 'size') return b.size - a.size;
+			return b.createdAt - a.createdAt;
+		});
+	});
+
+	const sortLabels = { recent: 'Most recent', name: 'Name', size: 'Size' } as const;
 
 	async function handleFiles(files: File[]) {
 		// Library upload = global only (no chat attach).
@@ -69,16 +96,49 @@
 			/>
 		</div>
 
+		<div class="flex items-center gap-2">
+			<Select.Root type="single" bind:value={sortBy}>
+				<Select.Trigger class="h-8 w-40 text-xs">{sortLabels[sortBy]}</Select.Trigger>
+				<Select.Content>
+					<Select.Item value="recent">Most recent</Select.Item>
+					<Select.Item value="name">Name</Select.Item>
+					<Select.Item value="size">Size</Select.Item>
+				</Select.Content>
+			</Select.Root>
+			<div class="flex gap-1">
+				{#each ['all', 'pdf', 'docx', 'md', 'txt'] as t (t)}
+					<Button
+						variant={typeFilter === t ? 'secondary' : 'ghost'}
+						size="sm"
+						class="h-8 px-2 font-mono text-[10px] uppercase"
+						onclick={() => (typeFilter = t as typeof typeFilter)}
+					>
+						{t}
+					</Button>
+				{/each}
+			</div>
+		</div>
+
 		<Card.Root>
 			<Card.Content class="divide-y p-0">
-				{#each documentsStore.library as doc (doc.id)}
+				{#each shown as doc (doc.id)}
 					{@const ingest = documentsStore.ingests[doc.id]}
 					<div class="flex items-center gap-4 px-4 py-3">
 						<FileTextIcon class="text-muted-foreground size-5 shrink-0" />
 						<div class="min-w-0 flex-1">
-							<p class="truncate text-sm font-medium">{doc.name}</p>
+							<Button
+								variant="ghost"
+								class="hover:text-foreground block h-auto w-full justify-start truncate p-0 text-left text-sm font-medium hover:bg-transparent"
+								onclick={() => (sheetTarget = doc)}
+								aria-label="Open details for {doc.name}"
+							>
+								{doc.name}
+							</Button>
 							<p class="text-muted-foreground font-mono text-[10px] uppercase">
 								{(doc.size / 1024).toFixed(0)} KB{doc.pages ? ` · ${doc.pages} pages` : ''}
+								{#if doc.language}
+									· {doc.language}
+								{/if}
 								{#if doc.status === 'ready'}
 									· ready
 								{:else if doc.status === 'error'}
@@ -149,3 +209,5 @@
 		</AlertDialog.Footer>
 	</AlertDialog.Content>
 </AlertDialog.Root>
+
+<DocumentSheet document={sheetTarget} onclose={() => (sheetTarget = null)} />

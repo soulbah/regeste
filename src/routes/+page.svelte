@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { toast } from 'svelte-sonner';
 	import FileIcon from '@lucide/svelte/icons/file';
 	import Composer from '$lib/components/composer.svelte';
 	import { chatsStore } from '$lib/state/chats.svelte';
@@ -22,8 +23,14 @@
 		await chatsStore.open(id);
 		goto(resolve(`/chat/${id}`));
 		for (const file of files) {
+			const known = new Set(documentsStore.library.map((d) => d.id));
 			const docId = await documentsStore.ingest(file);
 			await chatsStore.attach(id, docId);
+			if (!known.has(docId)) {
+				toast.success(`${file.name} added to My documents`, {
+					description: 'Available to every chat, stored on this device.'
+				});
+			}
 		}
 	}
 
