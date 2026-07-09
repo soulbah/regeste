@@ -54,6 +54,17 @@ export const fr: Record<keyof typeof en, string> = {
 	'composer.attachFrom': 'Joindre depuis vos documents',
 	'composer.footer': 'Les réponses citent vos documents',
 
+	// Preset actions (R3)
+	'actions.menu': 'Actions',
+	'actions.summarize': 'Résumer',
+	'actions.summarize.q': 'Résumez les documents joints en quelques phrases.',
+	'actions.dates': 'Dates clés',
+	'actions.dates.q': 'Listez les dates clés des documents, avec ce qui se passe à chacune.',
+	'actions.amounts': 'Montants',
+	'actions.amounts.q': 'Listez chaque montant des documents et ce qu’il couvre.',
+	'actions.obligations': 'Obligations',
+	'actions.obligations.q': 'Listez les obligations de chaque partie selon ces documents.',
+
 	// Add documents popover
 	'addDocs.add': 'Ajouter',
 	'addDocs.title': 'Ajouter à cette conversation',

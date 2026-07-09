@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import ArrowUpIcon from '@lucide/svelte/icons/arrow-up';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
+	import WandIcon from '@lucide/svelte/icons/wand-sparkles';
 	import ModeSelector from './mode-selector.svelte';
 	import AddDocuments from './add-documents.svelte';
 	import { t } from '$lib/i18n/index.svelte';
@@ -19,7 +21,8 @@
 		libraryEmpty,
 		myaiModel = null,
 		onmyaimodel,
-		privateOnly = false
+		privateOnly = false,
+		hasReadyDocs = false
 	}: {
 		mode: ChatMode;
 		disabled?: boolean;
@@ -31,7 +34,16 @@
 		myaiModel?: string | null;
 		onmyaimodel?: (model: string) => void;
 		privateOnly?: boolean;
+		/** R3 — preset actions only make sense with something to act on. */
+		hasReadyDocs?: boolean;
 	} = $props();
+
+	const presetActions = [
+		{ label: 'actions.summarize', question: 'actions.summarize.q' },
+		{ label: 'actions.dates', question: 'actions.dates.q' },
+		{ label: 'actions.amounts', question: 'actions.amounts.q' },
+		{ label: 'actions.obligations', question: 'actions.obligations.q' }
+	] as const;
 
 	let text = $state('');
 
@@ -100,6 +112,25 @@
 	/>
 	<div class="mt-2 flex items-center gap-2">
 		<AddDocuments {libraryEmpty} {onupload} {onattach} />
+		{#if hasReadyDocs}
+			<DropdownMenu.Root>
+				<DropdownMenu.Trigger>
+					{#snippet child({ props })}
+						<Button {...props} variant="outline" size="sm" class="gap-2">
+							<WandIcon class="size-3.5" />
+							{t('actions.menu')}
+						</Button>
+					{/snippet}
+				</DropdownMenu.Trigger>
+				<DropdownMenu.Content align="start" side="top">
+					{#each presetActions as action (action.label)}
+						<DropdownMenu.Item onclick={() => !disabled && onsend(t(action.question))}>
+							{t(action.label)}
+						</DropdownMenu.Item>
+					{/each}
+				</DropdownMenu.Content>
+			</DropdownMenu.Root>
+		{/if}
 		<ModeSelector {mode} onselect={onmodeselect} {myaiModel} {onmyaimodel} {privateOnly} />
 		<div class="flex-1"></div>
 		<Button size="icon" class="rounded-full" onclick={submit} disabled={disabled || !text.trim()}>

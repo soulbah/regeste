@@ -51,6 +51,17 @@ export const en = {
 	'composer.attachFrom': 'Attach from your documents',
 	'composer.footer': 'Answers cite your documents',
 
+	// Preset actions (R3) — read-only templates, sent as normal questions
+	'actions.menu': 'Actions',
+	'actions.summarize': 'Summarize',
+	'actions.summarize.q': 'Summarize the attached documents in a few sentences.',
+	'actions.dates': 'Find key dates',
+	'actions.dates.q': 'List the key dates in the documents, with what happens on each.',
+	'actions.amounts': 'Find amounts',
+	'actions.amounts.q': 'List every amount in the documents and what it covers.',
+	'actions.obligations': 'Find obligations',
+	'actions.obligations.q': 'List the obligations of each party under these documents.',
+
 	// Add documents popover
 	'addDocs.add': 'Add',
 	'addDocs.title': 'Add to this chat',
