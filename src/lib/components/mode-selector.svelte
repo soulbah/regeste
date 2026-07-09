@@ -11,6 +11,7 @@
 	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { t } from '$lib/i18n/index.svelte';
 	import { llmStore } from '$lib/private-ai/llm.svelte';
 	import { sessionStore } from '$lib/state/session.svelte';
 	import { myaiStore, MYAI_PRESETS, normalizeBaseUrl } from '$lib/state/myai.svelte';
@@ -60,8 +61,8 @@
 	const bestMode = $derived.by(() => {
 		if (llmStore.status === 'detecting') return null;
 		return llmStore.status === 'unavailable'
-			? { id: 'assisted' as const, reason: 'no GPU access in this browser' }
-			: { id: 'private' as const, reason: 'this device can run the AI locally' };
+			? { id: 'assisted' as const, reason: t('modes.bestReason.noGpu') }
+			: { id: 'private' as const, reason: t('modes.bestReason.local') };
 	});
 
 	const presetHint = $derived(
@@ -84,31 +85,31 @@
 	const privateStatus = $derived.by(() => {
 		switch (llmStore.status) {
 			case 'detecting':
-				return { line: 'Checking this device…', selectable: false, prepare: false };
+				return { line: t('modes.private.checking'), selectable: false, prepare: false };
 			case 'unavailable':
-				return { line: 'Unavailable on this device', selectable: false, prepare: false };
+				return { line: t('modes.private.unavailable'), selectable: false, prepare: false };
 			case 'needs-download':
 				return llmStore.prepared
-					? { line: 'Prepared · tap to load', selectable: true, prepare: true }
+					? { line: t('modes.private.prepared'), selectable: true, prepare: true }
 					: {
-							line: `One-time download of ${llmStore.downloadLabel}, then works offline`,
+							line: t('modes.private.download', { size: llmStore.downloadLabel }),
 							selectable: true,
 							prepare: true
 						};
 			case 'downloading':
 				return {
-					line: `Preparing private AI… ${Math.round(llmStore.progress * 100)}%`,
+					line: t('modes.private.preparing', { pct: Math.round(llmStore.progress * 100) }),
 					selectable: true,
 					prepare: false
 				};
 			case 'loading':
-				return { line: 'Loading private AI…', selectable: true, prepare: false };
+				return { line: t('modes.private.loading'), selectable: true, prepare: false };
 			case 'ready':
 			case 'generating':
-				return { line: 'Ready · works offline', selectable: true, prepare: false };
+				return { line: t('modes.private.ready'), selectable: true, prepare: false };
 			case 'error':
 				return {
-					line: llmStore.errorMessage ?? 'Something went wrong',
+					line: llmStore.errorMessage ?? t('modes.error'),
 					selectable: false,
 					prepare: false
 				};
@@ -120,7 +121,7 @@
 			id: 'private' as ChatMode,
 			label: 'Private',
 			dotClass: 'bg-mode-private',
-			description: 'Everything stays on this device.',
+			description: t('modes.private.description'),
 			status: privateStatus.line,
 			disabled: !privateStatus.selectable
 		},
@@ -128,28 +129,28 @@
 			id: 'assisted' as ChatMode,
 			label: 'Assisted',
 			dotClass: 'bg-mode-assisted',
-			description: 'Only relevant excerpts are processed online.',
+			description: t('modes.assisted.description'),
 			status: privateOnly
-				? 'Locked · this chat is private-only'
+				? t('modes.locked')
 				: settingsStore.forceOffline
-					? 'Offline mode is on'
+					? t('modes.offlineOn')
 					: sessionStore.user
-						? 'Ready · excerpts only, never full documents'
-						: 'Sign in required',
+						? t('modes.assisted.ready')
+						: t('modes.assisted.signIn'),
 			disabled: privateOnly || settingsStore.forceOffline || !sessionStore.user
 		},
 		{
 			id: 'myai' as ChatMode,
 			label: 'My AI',
 			dotClass: 'bg-mode-myai',
-			description: 'Use your own configured AI provider.',
+			description: t('modes.myai.description'),
 			status: privateOnly
-				? 'Locked · this chat is private-only'
+				? t('modes.locked')
 				: settingsStore.forceOffline
-					? 'Offline mode is on'
+					? t('modes.offlineOn')
 					: myaiStore.baseUrl && activeModel
 						? `${myaiStore.host} · ${activeModel}`
-						: 'Not configured →',
+						: t('modes.myai.notConfigured'),
 			disabled: privateOnly || settingsStore.forceOffline
 		}
 	]);
@@ -169,7 +170,7 @@
 	<Popover.Content class="w-80 p-2" align="start" side="top">
 		{#if view === 'modes'}
 			<p class="text-muted-foreground px-2 pb-2 font-mono text-xs tracking-wide uppercase">
-				Answer generated with
+				{t('modes.title')}
 			</p>
 			<div class="flex flex-col gap-1">
 				{#each modes as m (m.id)}
@@ -216,7 +217,7 @@
 										class="ml-auto font-mono text-[9px] tracking-wide uppercase"
 										title={bestMode.reason}
 									>
-										Best for this device
+										{t('modes.best')}
 									</Badge>
 								{/if}
 							</span>
@@ -237,7 +238,7 @@
 					class="text-muted-foreground mt-1 h-6 w-full justify-start px-2 font-mono text-[10px] tracking-wide uppercase"
 					onclick={openMyaiConfig}
 				>
-					Change My AI endpoint or model…
+					{t('modes.changeMyai')}
 				</Button>
 			{/if}
 			<a
@@ -245,7 +246,7 @@
 				class="text-muted-foreground hover:text-foreground mt-1 block px-2 py-1 font-mono text-[10px] tracking-wide uppercase underline-offset-2 hover:underline"
 				onclick={() => (open = false)}
 			>
-				What leaves the device in each mode →
+				{t('modes.whatLeaves')}
 			</a>
 		{:else}
 			<!-- My AI configuration (A1/A2, FEATURES 5bis): in the popover, never a dialog. -->
@@ -256,12 +257,12 @@
 						size="icon"
 						class="size-6"
 						onclick={() => (view = 'modes')}
-						aria-label="Back to modes"
+						aria-label={t('myai.backAria')}
 					>
 						<ArrowLeftIcon class="size-3.5" />
 					</Button>
 					<p class="text-muted-foreground font-mono text-xs tracking-wide uppercase">
-						My AI · your own endpoint
+						{t('myai.title')}
 					</p>
 				</div>
 				<div class="flex gap-1">
@@ -278,7 +279,7 @@
 				</div>
 				<div class="space-y-1.5">
 					<Label for="myai-url" class="font-mono text-[10px] tracking-wide uppercase">
-						OpenAI-compatible base URL
+						{t('myai.baseUrl')}
 					</Label>
 					<Input
 						id="myai-url"
@@ -289,18 +290,18 @@
 				</div>
 				<div class="space-y-1.5">
 					<Label for="myai-key" class="font-mono text-[10px] tracking-wide uppercase">
-						API key (optional)
+						{t('myai.apiKey')}
 					</Label>
 					<Input
 						id="myai-key"
 						type="password"
 						bind:value={keyDraft}
-						placeholder="none for local servers"
+						placeholder={t('myai.keyPlaceholder')}
 						class="h-8 font-mono text-xs"
 					/>
 				</div>
 				{#if presetHint}
-					<p class="text-muted-foreground text-xs">{presetHint}</p>
+					<p class="text-muted-foreground text-xs">{t(presetHint)}</p>
 				{/if}
 				<Button
 					variant="outline"
@@ -312,18 +313,18 @@
 						await myaiStore.testConnection();
 					}}
 				>
-					{myaiStore.testStatus === 'testing' ? 'Testing…' : 'Test connection'}
+					{myaiStore.testStatus === 'testing' ? t('myai.testing') : t('myai.test')}
 				</Button>
 				{#if myaiStore.testStatus === 'error'}
 					<p class="text-destructive text-xs">{myaiStore.testError}</p>
 				{:else if myaiStore.testStatus === 'ok'}
 					{#if myaiStore.models.length === 0}
 						<p class="text-muted-foreground text-xs">
-							Connected, but the endpoint lists no models.
+							{t('myai.noModels')}
 						</p>
 					{:else}
 						<p class="text-muted-foreground font-mono text-[10px] tracking-wide uppercase">
-							Pick a model
+							{t('myai.pickModel')}
 						</p>
 						<div class="flex max-h-40 flex-col gap-0.5 overflow-y-auto">
 							{#each myaiStore.models as model (model)}
@@ -341,8 +342,7 @@
 					{/if}
 				{/if}
 				<p class="text-muted-foreground text-xs">
-					Requests go straight from this browser to your endpoint — Folio's servers are never
-					involved.
+					{t('myai.direct')}
 				</p>
 			</div>
 		{/if}

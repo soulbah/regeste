@@ -7,6 +7,7 @@
 	import * as Card from '$lib/components/ui/card';
 	import DownloadIcon from '@lucide/svelte/icons/download';
 	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
+	import { t } from '$lib/i18n/index.svelte';
 	import { getLocalDb } from '$lib/local-db/client';
 	import type { PrivacyEventRow, PrivacySummaryRow } from '$lib/local-db/worker';
 
@@ -64,18 +65,19 @@
 	}
 </script>
 
-<svelte:head><title>Privacy Report · Folio</title></svelte:head>
+<svelte:head><title>{t('privacy.title')} · Folio</title></svelte:head>
 
 <div class="flex h-svh flex-col">
 	<header class="flex items-center justify-between border-b px-6 py-3">
 		<div>
-			<h1 class="font-display text-lg tracking-tight">Privacy Report</h1>
+			<h1 class="font-display text-lg tracking-tight">{t('privacy.title')}</h1>
 			<p class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
-				Everything that left this device — or didn't
+				{t('privacy.subtitle')}
 			</p>
 		</div>
 		<Button variant="outline" size="sm" class="gap-2" onclick={exportJson} disabled={!loaded}>
-			<DownloadIcon class="size-3.5" /> Export JSON
+			<DownloadIcon class="size-3.5" />
+			{t('privacy.export')}
 		</Button>
 	</header>
 
@@ -85,11 +87,14 @@
 				<Card.Root>
 					<Card.Content class="flex flex-col items-center gap-3 py-10 text-center">
 						<ShieldCheckIcon class="text-mode-private size-10" />
-						<p class="font-display text-2xl tracking-tight">Nothing has left this device.</p>
+						<p class="font-display text-2xl tracking-tight">{t('privacy.nothing')}</p>
 						<p class="text-muted-foreground max-w-md text-sm">
 							{onDevice
-								? `${onDevice.requests} answer${onDevice.requests === 1 ? '' : 's'} generated entirely on this device — 0 bytes sent anywhere.`
-								: 'Every document, index and conversation is stored locally. This report fills up only if you choose a cloud mode.'}
+								? t('privacy.deviceSummary', {
+										count: onDevice.requests,
+										s: onDevice.requests === 1 ? '' : 's'
+									})
+								: t('privacy.emptyBody')}
 						</p>
 					</Card.Content>
 				</Card.Root>
@@ -103,7 +108,7 @@
 								</p>
 								<p class="font-display mt-1 text-2xl tracking-tight">{fmtBytes(s.bytes)}</p>
 								<p class="text-muted-foreground text-xs">
-									{s.requests} request{s.requests === 1 ? '' : 's'}
+									{t('common.requests', { count: s.requests, s: s.requests === 1 ? '' : 's' })}
 								</p>
 							</Card.Content>
 						</Card.Root>
@@ -112,11 +117,14 @@
 						<Card.Root>
 							<Card.Content class="py-4">
 								<p class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
-									On this device
+									{t('privacy.onDevice')}
 								</p>
 								<p class="font-display mt-1 text-2xl tracking-tight">0 B</p>
 								<p class="text-muted-foreground text-xs">
-									{onDevice.requests} private answer{onDevice.requests === 1 ? '' : 's'}
+									{t('privacy.privateAnswers', {
+										count: onDevice.requests,
+										s: onDevice.requests === 1 ? '' : 's'
+									})}
 								</p>
 							</Card.Content>
 						</Card.Root>
@@ -134,9 +142,12 @@
 								></span>
 								<div class="min-w-0 flex-1">
 									<p class="text-sm">
-										{e.excerptCount} excerpt{e.excerptCount === 1 ? '' : 's'} · {fmtBytes(
-											e.bytesSent
-										)} → {e.destination}
+										{t('privacy.event', {
+											count: e.excerptCount,
+											s: e.excerptCount === 1 ? '' : 's',
+											bytes: fmtBytes(e.bytesSent),
+											dest: e.destination
+										})}
 									</p>
 									<p class="text-muted-foreground font-mono text-[10px] uppercase">
 										{fmtDate(e.createdAt)}

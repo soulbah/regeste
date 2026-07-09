@@ -80,8 +80,12 @@ export interface LocalMessage {
 	chatId: string;
 	role: 'user' | 'assistant';
 	content: string;
-	/** 'retrieval' marks the transitional passages-only assistant turn (pre-004). */
-	mode: ChatMode | 'retrieval' | null;
+	/**
+	 * 'retrieval' marks the transitional passages-only assistant turn (pre-004);
+	 * 'notice' marks system messages (transport failures, aborted generations) —
+	 * rendered distinctly from real answers.
+	 */
+	mode: ChatMode | 'retrieval' | 'notice' | null;
 	createdAt: number;
 }
 

@@ -6,7 +6,9 @@
 	import CopyIcon from '@lucide/svelte/icons/copy';
 	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
 	import CheckIcon from '@lucide/svelte/icons/check';
+	import EyeIcon from '@lucide/svelte/icons/eye';
 	import { SvelteSet } from 'svelte/reactivity';
+	import { t } from '$lib/i18n/index.svelte';
 	import type { CitationRow, MessageExcerptRow } from '$lib/local-db/worker';
 	import { chatsStore } from '$lib/state/chats.svelte';
 	import { viewerStore } from '$lib/state/viewer.svelte';
@@ -92,26 +94,17 @@
 <div class="space-y-3">
 	<div class="flex items-center gap-2">
 		<span class="size-1.5 rounded-full {dotClass[mode]}"></span>
-		{#if messageId}
-			<Button
-				variant="ghost"
-				size="sm"
-				class="text-muted-foreground hover:text-foreground h-auto px-1 py-0 font-mono text-[10px] tracking-widest uppercase underline-offset-2 hover:underline"
-				onclick={() => chatsStore.openWhatAiSaw(messageId!)}
-			>
-				{mode === 'private'
-					? 'Folio · nothing left this device'
-					: (meta ?? (mode === 'assisted' ? 'Folio · Assisted' : 'Folio · My AI'))} · what AI saw →
-			</Button>
-		{:else}
-			<span class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
-				{mode === 'private'
-					? 'Folio · nothing left this device'
-					: (meta ?? (mode === 'assisted' ? 'Folio · Assisted' : 'Folio · My AI'))}
-			</span>
-		{/if}
+		<span class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
+			{mode === 'private'
+				? t('turn.nothingLeft')
+				: (meta ?? (mode === 'assisted' ? t('turn.assisted') : t('turn.myai')))}
+		</span>
 	</div>
-	<p class="text-sm leading-relaxed whitespace-pre-wrap">
+	<p
+		class="text-sm leading-relaxed whitespace-pre-wrap {closestSources.length
+			? 'text-muted-foreground italic'
+			: ''}"
+	>
 		{#each segments as segment, i (i)}
 			{#if segment.type === 'text'}{segment.value}{:else}
 				<Tooltip.Provider>
@@ -153,14 +146,17 @@
 						size="sm"
 						class="text-muted-foreground h-6 gap-1 px-2 font-mono text-[10px] uppercase"
 					>
-						{#if copied}<CheckIcon class="size-3" /> Copied{:else}<CopyIcon class="size-3" /> Copy{/if}
+						{#if copied}<CheckIcon class="size-3" /> {t('turn.copied')}{:else}<CopyIcon
+								class="size-3"
+							/>
+							{t('turn.copy')}{/if}
 					</Button>
 				{/snippet}
 			</DropdownMenu.Trigger>
 			<DropdownMenu.Content align="start">
-				<DropdownMenu.Item onclick={() => copy(false)}>Copy text</DropdownMenu.Item>
+				<DropdownMenu.Item onclick={() => copy(false)}>{t('turn.copyText')}</DropdownMenu.Item>
 				<DropdownMenu.Item onclick={() => copy(true)} disabled={!citations.length}>
-					Copy with sources
+					{t('turn.copyWithSources')}
 				</DropdownMenu.Item>
 			</DropdownMenu.Content>
 		</DropdownMenu.Root>
@@ -171,7 +167,19 @@
 				class="text-muted-foreground h-6 gap-1 px-2 font-mono text-[10px] uppercase"
 				onclick={onregenerate}
 			>
-				<RefreshCwIcon class="size-3" /> Regenerate
+				<RefreshCwIcon class="size-3" />
+				{t('turn.regenerate')}
+			</Button>
+		{/if}
+		{#if messageId}
+			<Button
+				variant="ghost"
+				size="sm"
+				class="text-muted-foreground h-6 gap-1 px-2 font-mono text-[10px] uppercase"
+				onclick={() => chatsStore.openWhatAiSaw(messageId!)}
+			>
+				<EyeIcon class="size-3" />
+				{t('turn.whatAiSaw')}
 			</Button>
 		{/if}
 	</div>
@@ -191,7 +199,7 @@
 	{:else if closestSources.length}
 		<div class="space-y-0.5 border-t pt-2">
 			<p class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
-				Closest sources — none supported an answer
+				{t('turn.closest')}
 			</p>
 			{#each closestSources as e, i (i)}
 				<Button

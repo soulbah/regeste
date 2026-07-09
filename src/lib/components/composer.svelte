@@ -5,6 +5,7 @@
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import ModeSelector from './mode-selector.svelte';
 	import AddDocuments from './add-documents.svelte';
+	import { t } from '$lib/i18n/index.svelte';
 	import { documentsStore } from '$lib/state/documents.svelte';
 	import type { ChatMode } from '$lib/types';
 
@@ -35,10 +36,10 @@
 	let text = $state('');
 
 	function submit() {
-		const t = text.trim();
-		if (!t || disabled) return;
+		const trimmed = text.trim();
+		if (!trimmed || disabled) return;
 		text = '';
-		onsend(t);
+		onsend(trimmed);
 	}
 
 	// `#` inline picker (FEATURES: picker trombone + # inline).
@@ -63,7 +64,7 @@
 			class="bg-popover absolute -top-2 right-3 left-3 z-10 -translate-y-full rounded-md border p-1 shadow-md"
 		>
 			<p class="text-muted-foreground px-2 py-1 font-mono text-[10px] tracking-widest uppercase">
-				Attach from your documents
+				{t('composer.attachFrom')}
 			</p>
 			{#each hashSuggestions as doc (doc.id)}
 				<Button
@@ -80,7 +81,7 @@
 	{/if}
 	<Textarea
 		bind:value={text}
-		placeholder="Ask anything about your documents…"
+		placeholder={t('composer.placeholder')}
 		class="max-h-40 min-h-10 resize-none border-0 bg-transparent p-1 shadow-none focus-visible:ring-0"
 		onkeydown={(e) => {
 			if (e.key === 'Enter' && !e.shiftKey) {
@@ -107,5 +108,5 @@
 	</div>
 </div>
 <p class="text-muted-foreground mt-2 text-center font-mono text-[10px] tracking-widest uppercase">
-	Answers cite your documents
+	{t('composer.footer')}
 </p>

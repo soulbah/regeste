@@ -6,6 +6,7 @@
 	import { Label } from '$lib/components/ui/label';
 	import * as Card from '$lib/components/ui/card';
 	import * as InputOTP from '$lib/components/ui/input-otp';
+	import { t } from '$lib/i18n/index.svelte';
 	import { sessionStore } from '$lib/state/session.svelte';
 
 	let email = $state('');
@@ -33,12 +34,11 @@
 <div class="flex h-svh flex-col items-center justify-center gap-8 px-6">
 	<div class="max-w-sm text-center">
 		<p class="text-muted-foreground mb-3 font-mono text-[10px] tracking-[0.25em] uppercase">
-			Folio · account
+			{t('account.kicker')}
 		</p>
-		<h1 class="font-display text-3xl tracking-tight">One address. One code.</h1>
+		<h1 class="font-display text-3xl tracking-tight">{t('account.headline')}</h1>
 		<p class="text-muted-foreground mt-3 text-sm leading-relaxed">
-			An account unlocks Assisted mode. No password to invent — we send a six-digit code to your
-			email. Your documents and chats stay on this device; signing in uploads nothing.
+			{t('account.body')}
 		</p>
 	</div>
 
@@ -46,18 +46,20 @@
 		<Card.Root class="w-full max-w-sm">
 			<Card.Content class="space-y-4 pt-6 text-center">
 				<p class="text-sm">
-					Signed in as <span class="font-medium">{sessionStore.user.email}</span>
+					{t('account.signedInAs')} <span class="font-medium">{sessionStore.user.email}</span>
 				</p>
-				<Button variant="outline" onclick={() => sessionStore.signOut()}>Sign out</Button>
+				<Button variant="outline" onclick={() => sessionStore.signOut()}>
+					{t('account.signOut')}
+				</Button>
 			</Card.Content>
 		</Card.Root>
 	{:else if sessionStore.otpSentTo}
 		<Card.Root class="w-full max-w-sm">
 			<Card.Content class="space-y-5 pt-6">
 				<div class="space-y-1 text-center">
-					<p class="text-sm font-medium">Enter the code</p>
+					<p class="text-sm font-medium">{t('account.enterCode')}</p>
 					<p class="text-muted-foreground font-mono text-[10px] tracking-wide uppercase">
-						Sent to {sessionStore.otpSentTo} · valid 5 minutes
+						{t('account.sentTo', { email: sessionStore.otpSentTo })}
 					</p>
 				</div>
 				<div class="flex justify-center">
@@ -82,7 +84,7 @@
 				{/if}
 				<div class="flex justify-center gap-2">
 					<Button variant="ghost" size="sm" onclick={() => sessionStore.reset()}>
-						Use another address
+						{t('account.otherAddress')}
 					</Button>
 					<Button
 						variant="ghost"
@@ -90,7 +92,7 @@
 						disabled={sessionStore.sending}
 						onclick={() => sessionStore.sendCode(sessionStore.otpSentTo!)}
 					>
-						Resend code
+						{t('account.resend')}
 					</Button>
 				</div>
 			</Card.Content>
@@ -100,7 +102,7 @@
 			<Card.Content class="pt-6">
 				<form class="space-y-4" onsubmit={requestCode}>
 					<div class="space-y-1.5">
-						<Label for="email">Email</Label>
+						<Label for="email">{t('account.email')}</Label>
 						<Input
 							id="email"
 							type="email"
@@ -117,7 +119,7 @@
 						type="submit"
 						disabled={sessionStore.sending || !email.includes('@')}
 					>
-						{sessionStore.sending ? 'Sending…' : 'Send me a code'}
+						{sessionStore.sending ? t('account.sending') : t('account.sendCode')}
 					</Button>
 				</form>
 			</Card.Content>
@@ -125,6 +127,6 @@
 	{/if}
 
 	<p class="text-muted-foreground font-mono text-[10px] tracking-[0.25em] uppercase">
-		Your files stay on this device
+		{t('account.filesLocal')}
 	</p>
 </div>

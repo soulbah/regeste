@@ -1,6 +1,7 @@
 // Chat state: list, active chat, messages, and the transitional
 // retrieval-only "answer" (real generation lands in specs 004/005).
 
+import { t } from '$lib/i18n/index.svelte';
 import { getLocalDb } from '$lib/local-db/client';
 import type { CitationRow, MessageExcerptRow, MessagePrivacyRow } from '$lib/local-db/worker';
 import { documentsStore } from './documents.svelte';
@@ -355,20 +356,19 @@ class ChatsStore {
 			raw = streamRaw;
 		}
 		raw = stripThink(raw! || streamRaw);
-		// Aborted or failed with nothing produced → keep the thread honest.
-		if (!raw.trim()) raw = '(generation stopped)';
+		// Aborted or failed with nothing produced → an honest system notice.
+		const stopped = !raw.trim();
 
-		const { text: cleaned, citations } = grounded
-			? resolveCitations(raw, hits)
-			: { text: raw, citations: [] };
+		const { text: cleaned, citations } =
+			grounded && !stopped ? resolveCitations(raw, hits) : { text: raw, citations: [] };
 
 		const messageId = crypto.randomUUID();
 		await db.insertMessage({
 			id: messageId,
 			chatId,
 			role: 'assistant',
-			content: cleaned,
-			mode: 'private'
+			content: stopped ? t('notice.stopped') : cleaned,
+			mode: stopped ? 'notice' : 'private'
 		});
 		if (citations.length) {
 			await db.insertCitations(
@@ -437,19 +437,18 @@ class ChatsStore {
 		} catch (err) {
 			if (!(err instanceof OfflineError)) console.error('[folio] my-ai generation failed:', err);
 			if (!streamRaw.trim()) {
-				failed =
-					err instanceof OfflineError
-						? err.message
-						: 'Could not reach your AI endpoint — check that it is running, the URL, and its CORS settings.';
+				failed = err instanceof OfflineError ? err.message : t('notice.myaiUnreachable');
 			}
 		}
 		const raw = stripThink(streamRaw);
+		const stopped = !failed && !raw.trim();
+		const isNotice = !!failed || stopped;
 
-		const { text: cleaned, citations } = failed
-			? { text: failed, citations: [] }
+		const { text: cleaned, citations } = isNotice
+			? { text: failed ?? t('notice.stopped'), citations: [] }
 			: grounded
-				? resolveCitations(raw.trim() || '(generation stopped)', hits)
-				: { text: raw.trim() || '(generation stopped)', citations: [] };
+				? resolveCitations(raw.trim(), hits)
+				: { text: raw.trim(), citations: [] };
 
 		const messageId = crypto.randomUUID();
 		await db.insertMessage({
@@ -457,7 +456,7 @@ class ChatsStore {
 			chatId: chat.id,
 			role: 'assistant',
 			content: cleaned,
-			mode: 'myai'
+			mode: isNotice ? 'notice' : 'myai'
 		});
 		if (citations.length) {
 			await db.insertCitations(
@@ -479,7 +478,7 @@ class ChatsStore {
 				excerptCount: grounded ? hits.length : 0,
 				bytesSent
 			});
-			if (grounded && hits.length) {
+			if (grounded && hits.length && !isNotice) {
 				await db.insertMessageExcerpts(messageId, ChatsStore.excerptRows(hits, true, new Set()));
 			}
 		}
@@ -569,23 +568,20 @@ class ChatsStore {
 				if (!res.ok) {
 					failed =
 						res.status === 429
-							? 'Monthly Assisted quota reached — it resets next month.'
+							? t('notice.quota')
 							: res.status === 401
-								? 'Sign in to use Assisted mode.'
-								: 'The Assisted service is unavailable right now.';
+								? t('notice.signIn')
+								: t('notice.assistedDown');
 				} else {
 					raw = ((await res.json()) as { answer: string }).answer;
 				}
 			} catch (err) {
-				failed =
-					err instanceof OfflineError
-						? err.message
-						: 'Could not reach the Assisted service — check your connection.';
+				failed = err instanceof OfflineError ? err.message : t('notice.assistedUnreachable');
 			}
 
 			const { text: cleaned, citations } = failed
 				? { text: failed, citations: [] }
-				: resolveCitations(stripThink(raw).trim() || '(empty answer)', selected);
+				: resolveCitations(stripThink(raw).trim() || t('notice.stopped'), selected);
 
 			const messageId = crypto.randomUUID();
 			await db.insertMessage({
@@ -593,7 +589,7 @@ class ChatsStore {
 				chatId,
 				role: 'assistant',
 				content: cleaned,
-				mode: 'assisted'
+				mode: failed ? 'notice' : 'assisted'
 			});
 			if (citations.length) {
 				await db.insertCitations(

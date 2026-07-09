@@ -6,6 +6,7 @@
 	import UploadIcon from '@lucide/svelte/icons/upload';
 	import FolderIcon from '@lucide/svelte/icons/folder';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
+	import { t } from '$lib/i18n/index.svelte';
 	import { documentsStore } from '$lib/state/documents.svelte';
 
 	let {
@@ -46,21 +47,23 @@
 {#if libraryEmpty}
 	<!-- Adaptive popover (FEATURES 5bis): empty library → straight to upload. -->
 	<Button variant="outline" size="sm" class="gap-2" onclick={pickFiles}>
-		<PaperclipIcon class="size-3.5" /> Add
+		<PaperclipIcon class="size-3.5" />
+		{t('addDocs.add')}
 	</Button>
 {:else}
 	<Popover.Root bind:open onOpenChange={(o) => !o && (picking = false)}>
 		<Popover.Trigger>
 			{#snippet child({ props })}
 				<Button {...props} variant="outline" size="sm" class="gap-2">
-					<PaperclipIcon class="size-3.5" /> Add
+					<PaperclipIcon class="size-3.5" />
+					{t('addDocs.add')}
 				</Button>
 			{/snippet}
 		</Popover.Trigger>
 		<Popover.Content class="w-80 p-2" align="start" side="top">
 			{#if !picking}
 				<p class="text-muted-foreground px-2 pb-2 font-mono text-xs tracking-wide uppercase">
-					Add to this chat
+					{t('addDocs.title')}
 				</p>
 				<div class="flex flex-col gap-1">
 					<Button
@@ -72,9 +75,9 @@
 							<FolderIcon class="size-3.5" />
 						</span>
 						<span>
-							<span class="block text-sm font-medium">Choose from your documents</span>
+							<span class="block text-sm font-medium">{t('addDocs.choose')}</span>
 							<span class="text-muted-foreground block text-xs">
-								Attach one already in your workspace.
+								{t('addDocs.chooseHint')}
 							</span>
 						</span>
 					</Button>
@@ -87,16 +90,16 @@
 							<UploadIcon class="size-3.5" />
 						</span>
 						<span>
-							<span class="block text-sm font-medium">Upload from this device</span>
+							<span class="block text-sm font-medium">{t('addDocs.upload')}</span>
 							<span class="text-muted-foreground block text-xs">
-								Adds to your workspace and this chat.
+								{t('addDocs.uploadHint')}
 							</span>
 						</span>
 					</Button>
 				</div>
 			{:else}
 				<p class="text-muted-foreground px-2 pb-2 font-mono text-xs tracking-wide uppercase">
-					From your workspace
+					{t('addDocs.fromWorkspace')}
 				</p>
 				<ScrollArea class="max-h-64">
 					<div class="flex flex-col gap-1">
@@ -114,7 +117,9 @@
 								<span class="min-w-0 flex-1">
 									<span class="block truncate text-sm">{doc.name}</span>
 									<span class="text-muted-foreground block font-mono text-[10px] uppercase">
-										{(doc.size / 1024).toFixed(0)} KB{doc.pages ? ` · ${doc.pages} pages` : ''}
+										{(doc.size / 1024).toFixed(0)} KB{doc.pages
+											? ` · ${t('common.pages', { n: doc.pages })}`
+											: ''}
 									</span>
 								</span>
 							</Button>

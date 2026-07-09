@@ -9,6 +9,7 @@
 	import { Label } from '$lib/components/ui/label';
 	import ShieldIcon from '@lucide/svelte/icons/shield';
 	import { resolve } from '$app/paths';
+	import { i18n, t } from '$lib/i18n/index.svelte';
 	import { getLocalDb } from '$lib/local-db/client';
 	import type { PrivacySummaryRow } from '$lib/local-db/worker';
 	import { llmStore } from '$lib/private-ai/llm.svelte';
@@ -20,6 +21,7 @@
 	let wipeArmed = $state(false);
 
 	$effect(() => {
+		i18n.init();
 		settingsStore.init();
 		settingsStore.refreshStorage();
 		settingsStore.refreshQuota();
@@ -40,20 +42,21 @@
 	}
 </script>
 
-<svelte:head><title>Settings · Folio</title></svelte:head>
+<svelte:head><title>{t('settings.title')} · Folio</title></svelte:head>
 
 <div class="flex h-svh flex-col">
 	<header class="flex items-center justify-between border-b px-6 py-3">
 		<div>
-			<h1 class="font-display text-lg tracking-tight">Settings</h1>
+			<h1 class="font-display text-lg tracking-tight">{t('settings.title')}</h1>
 			<p class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
-				Storage · privacy · offline
+				{t('settings.subtitle')}
 			</p>
 		</div>
 		<span
 			class="text-muted-foreground flex items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-[10px] tracking-widest uppercase"
 		>
-			<span class="bg-mode-private size-1.5 rounded-full"></span> Stored locally
+			<span class="bg-mode-private size-1.5 rounded-full"></span>
+			{t('common.storedLocally')}
 		</span>
 	</header>
 
@@ -61,25 +64,27 @@
 		<div class="mx-auto max-w-2xl space-y-6 px-6 py-8">
 			<Card.Root>
 				<Card.Header>
-					<Card.Title class="text-base">Storage on this device</Card.Title>
+					<Card.Title class="text-base">{t('settings.storage.title')}</Card.Title>
 				</Card.Header>
 				<Card.Content class="space-y-3">
 					{#if settingsStore.storage}
 						<p class="text-sm">
-							{fmtBytes(settingsStore.storage.usage)} used
+							{t('settings.storage.used', { used: fmtBytes(settingsStore.storage.usage) })}
 							{#if settingsStore.storage.quota}
-								· {fmtBytes(settingsStore.storage.quota)} available
+								· {t('settings.storage.available', {
+									quota: fmtBytes(settingsStore.storage.quota)
+								})}
 							{/if}
 						</p>
 						{#if settingsStore.storage.persisted}
 							<Badge variant="outline" class="gap-1 text-[10px]">
 								<span class="bg-mode-private size-1.5 rounded-full"></span>
-								Persistent — the browser won't evict your documents
+								{t('settings.storage.persistent')}
 							</Badge>
 						{:else}
 							<div class="space-y-2">
 								<Badge variant="secondary" class="text-[10px]">
-									Not persistent — the browser may evict this data under storage pressure
+									{t('settings.storage.notPersistent')}
 								</Badge>
 								<div>
 									<Button
@@ -87,51 +92,78 @@
 										size="sm"
 										onclick={() => settingsStore.requestPersistence()}
 									>
-										Ask the browser to persist
+										{t('settings.storage.ask')}
 									</Button>
 								</div>
 							</div>
 						{/if}
 					{:else}
-						<p class="text-muted-foreground text-sm">Storage details unavailable.</p>
+						<p class="text-muted-foreground text-sm">{t('settings.storage.unavailable')}</p>
 					{/if}
 				</Card.Content>
 			</Card.Root>
 
 			<Card.Root>
 				<Card.Header>
-					<Card.Title class="text-base">Shared this week</Card.Title>
+					<Card.Title class="text-base">{t('settings.week.title')}</Card.Title>
 				</Card.Header>
 				<Card.Content class="space-y-2">
 					{#if weekEgress.length === 0}
 						<p class="flex items-center gap-2 text-sm">
-							<ShieldIcon class="text-mode-private size-4" /> Nothing left this device in the last 7 days.
+							<ShieldIcon class="text-mode-private size-4" />
+							{t('settings.week.nothing')}
 						</p>
 					{:else}
 						{#each weekEgress as row (row.destination)}
 							<p class="text-sm">
-								<span class="font-mono">{row.destination}</span> — {row.requests}
-								request{row.requests === 1 ? '' : 's'} · {fmtBytes(row.bytes)}
+								<span class="font-mono">{row.destination}</span> — {t('common.requests', {
+									count: row.requests,
+									s: row.requests === 1 ? '' : 's'
+								})} · {fmtBytes(row.bytes)}
 							</p>
 						{/each}
 					{/if}
 					<p class="text-muted-foreground text-xs">
-						Full history in the <a class="underline" href={resolve('/privacy')}>Privacy Report</a>
-						· how each mode works:
-						<a class="underline" href={resolve('/how-it-works')}>data flows</a>
+						{t('settings.week.fullHistory')}
+						<a class="underline" href={resolve('/privacy')}>{t('settings.week.privacyReport')}</a>
+						· {t('settings.week.howEachMode')}
+						<a class="underline" href={resolve('/how-it-works')}>{t('settings.week.dataFlows')}</a>
 					</p>
 				</Card.Content>
 			</Card.Root>
 
 			<Card.Root>
 				<Card.Header>
-					<Card.Title class="text-base">Force offline</Card.Title>
+					<Card.Title class="text-base">{t('settings.language.title')}</Card.Title>
+				</Card.Header>
+				<Card.Content>
+					<div class="flex gap-2">
+						<Button
+							variant={i18n.locale === 'en' ? 'secondary' : 'outline'}
+							size="sm"
+							onclick={() => i18n.setLocale('en')}
+						>
+							English
+						</Button>
+						<Button
+							variant={i18n.locale === 'fr' ? 'secondary' : 'outline'}
+							size="sm"
+							onclick={() => i18n.setLocale('fr')}
+						>
+							Français
+						</Button>
+					</div>
+				</Card.Content>
+			</Card.Root>
+
+			<Card.Root>
+				<Card.Header>
+					<Card.Title class="text-base">{t('settings.offline.title')}</Card.Title>
 				</Card.Header>
 				<Card.Content class="space-y-2">
 					<div class="flex items-center justify-between gap-4">
 						<Label for="force-offline" class="text-sm font-normal">
-							Block every outgoing request. Private mode and your documents keep working; cloud
-							modes and sign-in are refused with a clear message.
+							{t('settings.offline.label')}
 						</Label>
 						<Switch
 							id="force-offline"
@@ -142,7 +174,7 @@
 					{#if settingsStore.forceOffline}
 						<Badge variant="outline" class="gap-1 text-[10px]">
 							<span class="bg-mode-private size-1.5 rounded-full"></span>
-							Offline — nothing leaves this device
+							{t('settings.offline.badge')}
 						</Badge>
 					{/if}
 				</Card.Content>
@@ -150,13 +182,12 @@
 
 			<Card.Root>
 				<Card.Header>
-					<Card.Title class="text-base">Workspace</Card.Title>
+					<Card.Title class="text-base">{t('settings.workspace.title')}</Card.Title>
 				</Card.Header>
 				<Card.Content class="space-y-3">
 					<div class="flex items-center justify-between gap-3">
 						<p class="text-muted-foreground text-sm">
-							Export everything — documents, chats, citations and privacy history — as a plain zip
-							you own. Built on this device, sent nowhere.
+							{t('settings.workspace.exportDesc')}
 						</p>
 						<Button
 							variant="outline"
@@ -165,17 +196,22 @@
 							disabled={settingsStore.exporting}
 							onclick={() => settingsStore.exportWorkspace()}
 						>
-							{settingsStore.exporting ? 'Packing…' : 'Export my workspace'}
+							{settingsStore.exporting
+								? t('settings.workspace.packing')
+								: t('settings.workspace.export')}
 						</Button>
 					</div>
 					<div class="border-t pt-3">
 						{#if settingsStore.quota}
 							<p class="text-sm">
-								Assisted usage this month: {settingsStore.quota.used} / {settingsStore.quota.limit}
+								{t('settings.workspace.quota', {
+									used: settingsStore.quota.used,
+									limit: settingsStore.quota.limit
+								})}
 							</p>
 						{:else}
 							<p class="text-muted-foreground text-xs">
-								Assisted usage appears here once you're signed in.
+								{t('settings.workspace.quotaSignIn')}
 							</p>
 						{/if}
 					</div>
@@ -184,12 +220,12 @@
 
 			<Card.Root>
 				<Card.Header>
-					<Card.Title class="text-base">AI models on this device</Card.Title>
+					<Card.Title class="text-base">{t('settings.models.title')}</Card.Title>
 				</Card.Header>
 				<Card.Content class="space-y-3">
 					{#if modelsStore.cached.length === 0}
 						<p class="text-muted-foreground text-sm">
-							{modelsStore.loading ? 'Measuring…' : 'No models downloaded yet.'}
+							{modelsStore.loading ? t('settings.models.measuring') : t('settings.models.none')}
 						</p>
 					{:else}
 						{#each modelsStore.cached as model (model.cacheName)}
@@ -197,7 +233,9 @@
 								<div class="min-w-0">
 									<p class="truncate text-sm">{model.label}</p>
 									<p class="text-muted-foreground font-mono text-[10px] uppercase">
-										{model.bytes ? fmtBytes(model.bytes) : `${model.entries} files`}
+										{model.bytes
+											? fmtBytes(model.bytes)
+											: t('settings.models.files', { count: model.entries })}
 									</p>
 								</div>
 								<Button
@@ -205,7 +243,7 @@
 									size="sm"
 									onclick={() => modelsStore.remove(model.cacheName)}
 								>
-									Delete
+									{t('settings.models.delete')}
 								</Button>
 							</div>
 						{/each}
@@ -213,8 +251,7 @@
 					<div class="border-t pt-3">
 						<div class="flex items-center justify-between gap-3">
 							<p class="text-muted-foreground text-sm">
-								Test my device — a short private generation measures how fast this machine runs the
-								local AI.
+								{t('settings.models.benchDesc')}
 							</p>
 							<Button
 								variant="outline"
@@ -223,20 +260,22 @@
 								disabled={llmStore.status !== 'ready' || modelsStore.benchmarking}
 								onclick={() => modelsStore.runBenchmark()}
 							>
-								{modelsStore.benchmarking ? 'Testing…' : 'Test my device'}
+								{modelsStore.benchmarking
+									? t('settings.models.testing')
+									: t('settings.models.test')}
 							</Button>
 						</div>
 						{#if llmStore.status !== 'ready'}
 							<p class="text-muted-foreground mt-1 text-xs">
-								Prepare the private AI first (mode selector → Private).
+								{t('settings.models.prepareFirst')}
 							</p>
 						{/if}
 						{#if modelsStore.benchmark}
 							<p class="mt-2 text-sm">
-								{modelsStore.benchmark.tokensPerSecond} tokens/second —
+								{t('settings.models.tps', { tps: modelsStore.benchmark.tokensPerSecond })} —
 								{modelsStore.benchmark.recommendPrivate
-									? 'this device runs Private mode comfortably.'
-									: 'this device is slow for Private mode; Assisted will feel much faster.'}
+									? t('settings.models.comfortable')
+									: t('settings.models.slow')}
 							</p>
 						{/if}
 					</div>
@@ -245,15 +284,14 @@
 
 			<Card.Root class="border-destructive/40">
 				<Card.Header>
-					<Card.Title class="text-base">Delete everything</Card.Title>
+					<Card.Title class="text-base">{t('settings.wipe.title')}</Card.Title>
 				</Card.Header>
 				<Card.Content class="space-y-3">
 					<p class="text-muted-foreground text-sm">
-						Erases all documents, chats, indexes and downloaded AI models from this device. There is
-						no server copy — this cannot be undone.
+						{t('settings.wipe.desc')}
 					</p>
 					<Button variant="destructive" onclick={() => (wipeOpen = true)}>
-						Delete everything on this device
+						{t('settings.wipe.cta')}
 					</Button>
 				</Card.Content>
 			</Card.Root>
@@ -271,20 +309,18 @@
 	<AlertDialog.Content>
 		<AlertDialog.Header>
 			<AlertDialog.Title>
-				{wipeArmed ? 'Last confirmation' : 'Delete everything on this device?'}
+				{wipeArmed ? t('settings.wipe.last') : t('settings.wipe.confirmTitle')}
 			</AlertDialog.Title>
 			<AlertDialog.Description>
 				{#if wipeArmed}
-					This permanently destroys every document, chat, index and downloaded model stored by Folio
-					in this browser. Nothing exists anywhere else. Really delete?
+					{t('settings.wipe.armedBody')}
 				{:else}
-					Documents, chats, search indexes and AI models will be erased from this browser. Your
-					account (if any) survives — it holds no content.
+					{t('settings.wipe.body')}
 				{/if}
 			</AlertDialog.Description>
 		</AlertDialog.Header>
 		<AlertDialog.Footer>
-			<AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
+			<AlertDialog.Cancel>{t('common.cancel')}</AlertDialog.Cancel>
 			{#if wipeArmed}
 				<AlertDialog.Action
 					class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
@@ -294,7 +330,7 @@
 						settingsStore.wipeEverything();
 					}}
 				>
-					{settingsStore.wiping ? 'Erasing…' : 'Yes, erase it all'}
+					{settingsStore.wiping ? t('settings.wipe.erasing') : t('settings.wipe.confirm')}
 				</AlertDialog.Action>
 			{:else}
 				<AlertDialog.Action
@@ -303,7 +339,7 @@
 						wipeArmed = true;
 					}}
 				>
-					Continue
+					{t('settings.wipe.continue')}
 				</AlertDialog.Action>
 			{/if}
 		</AlertDialog.Footer>

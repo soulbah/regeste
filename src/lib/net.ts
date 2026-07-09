@@ -2,11 +2,12 @@
 // outgoing request made by app code. When the switch is on, nothing leaves —
 // the living proof of the local-first promise.
 
+import { t } from '$lib/i18n/index.svelte';
 import { settingsStore } from '$lib/state/settings.svelte';
 
 export class OfflineError extends Error {
 	constructor() {
-		super('Offline mode is on — nothing leaves this device.');
+		super(t('error.offline'));
 		this.name = 'OfflineError';
 	}
 }

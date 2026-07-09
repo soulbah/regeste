@@ -5,6 +5,7 @@
 	import { ScrollArea } from '$lib/components/ui/scroll-area';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Badge } from '$lib/components/ui/badge';
+	import { t } from '$lib/i18n/index.svelte';
 	import { readOriginal } from '$lib/opfs';
 	import { parseByName } from '$lib/pipeline/parse';
 	import type { ViewerChunk } from '$lib/state/viewer.svelte';
@@ -56,9 +57,9 @@
 
 {#if missingOriginal}
 	<div class="flex-1 space-y-3 overflow-y-auto p-4">
-		<Badge variant="secondary" class="text-[10px]">Original file unavailable</Badge>
+		<Badge variant="secondary" class="text-[10px]">{t('viewer.missing')}</Badge>
 		<p class="text-muted-foreground text-xs">
-			The original file could not be read from this device's storage. Here is the indexed passage:
+			{t('viewer.missingBody')}
 		</p>
 		{#if chunk}
 			<div class="rounded-md border p-3">

@@ -7,6 +7,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import Composer from '$lib/components/composer.svelte';
 	import { DEMO_SAMPLES } from '$lib/demo/samples';
+	import { t } from '$lib/i18n/index.svelte';
 	import { chatsStore } from '$lib/state/chats.svelte';
 	import { documentsStore } from '$lib/state/documents.svelte';
 	import type { ChatMode } from '$lib/types';
@@ -20,7 +21,7 @@
 		demoStarting = true;
 		try {
 			const id = await chatsStore.create(mode);
-			await chatsStore.rename(id, 'Demo — sample contract');
+			await chatsStore.rename(id, t('home.demoTitle'));
 			await chatsStore.open(id);
 			goto(resolve(`/chat/${id}`));
 			for (const sample of DEMO_SAMPLES) {
@@ -51,8 +52,8 @@
 			const docId = await documentsStore.ingest(file);
 			await chatsStore.attach(id, docId);
 			if (!known.has(docId)) {
-				toast.success(`${file.name} added to My documents`, {
-					description: 'Available to every chat, stored on this device.'
+				toast.success(t('toast.added', { name: file.name }), {
+					description: t('toast.addedDesc')
 				});
 			}
 		}
@@ -71,35 +72,36 @@
 <div class="flex h-svh flex-col">
 	<header class="flex items-center justify-between border-b px-6 py-3">
 		<div>
-			<h1 class="font-display text-lg tracking-tight">New chat</h1>
+			<h1 class="font-display text-lg tracking-tight">{t('sidebar.newChat')}</h1>
 			<p class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
-				No documents yet
+				{t('home.noDocs')}
 			</p>
 		</div>
 		<span
 			class="text-muted-foreground flex items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-[10px] tracking-widest uppercase"
 		>
-			<span class="bg-mode-private size-1.5 rounded-full"></span> Stored locally
+			<span class="bg-mode-private size-1.5 rounded-full"></span>
+			{t('common.storedLocally')}
 		</span>
 	</header>
 
 	<div class="flex flex-1 flex-col items-center justify-center gap-4 px-6">
 		<FileIcon class="text-muted-foreground size-10" />
 		<h2 class="font-display max-w-md text-center text-3xl tracking-tight">
-			Chat with your private documents.
+			{t('home.headline')}
 		</h2>
 		<p class="text-muted-foreground max-w-sm text-center text-sm">
-			Add documents, ask questions, and see exactly what the AI can access.
+			{t('home.sub')}
 		</p>
 		<p class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
-			Your files stay on this device · PDF and Word documents
+			{t('home.filesLocal')}
 		</p>
 		<Button variant="outline" class="gap-2" disabled={demoStarting} onclick={startDemo}>
 			<SparklesIcon class="size-4" />
-			{demoStarting ? 'Preparing the demo…' : 'Try with a sample contract'}
+			{demoStarting ? t('home.demoPreparing') : t('home.demoCta')}
 		</Button>
 		<p class="text-muted-foreground max-w-sm text-center text-xs">
-			Proof, not promises: prepare Private mode, turn off Wi-Fi, and ask again — it keeps working.
+			{t('home.proof')}
 		</p>
 	</div>
 

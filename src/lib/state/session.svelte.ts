@@ -3,9 +3,8 @@
 // request a code, verify it; unknown emails are registered automatically.
 
 import { authClient } from '$lib/auth-client';
+import { t } from '$lib/i18n/index.svelte';
 import { settingsStore } from './settings.svelte';
-
-const OFFLINE_MSG = 'Offline mode is on — nothing leaves this device.';
 
 interface SessionUser {
 	id: string;
@@ -38,7 +37,7 @@ class SessionStore {
 
 	async sendCode(email: string): Promise<void> {
 		if (settingsStore.forceOffline) {
-			this.error = OFFLINE_MSG;
+			this.error = t('error.offline');
 			return;
 		}
 		this.error = null;
@@ -49,7 +48,7 @@ class SessionStore {
 				type: 'sign-in'
 			});
 			if (error) {
-				this.error = error.message ?? 'Could not send the code';
+				this.error = error.message ?? t('error.sendCode');
 				return;
 			}
 			this.otpSentTo = email;
@@ -61,7 +60,7 @@ class SessionStore {
 	async verifyCode(otp: string): Promise<boolean> {
 		if (!this.otpSentTo) return false;
 		if (settingsStore.forceOffline) {
-			this.error = OFFLINE_MSG;
+			this.error = t('error.offline');
 			return false;
 		}
 		this.error = null;
@@ -69,7 +68,7 @@ class SessionStore {
 		try {
 			const { error } = await authClient.signIn.emailOtp({ email: this.otpSentTo, otp });
 			if (error) {
-				this.error = error.message ?? 'Invalid code';
+				this.error = error.message ?? t('error.invalidCode');
 				return false;
 			}
 			this.otpSentTo = null;

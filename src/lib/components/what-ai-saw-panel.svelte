@@ -5,6 +5,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { ScrollArea } from '$lib/components/ui/scroll-area';
 	import XIcon from '@lucide/svelte/icons/x';
+	import { t } from '$lib/i18n/index.svelte';
 	import { chatsStore } from '$lib/state/chats.svelte';
 	import { viewerStore } from '$lib/state/viewer.svelte';
 	import type { MessageExcerptRow } from '$lib/local-db/worker';
@@ -26,16 +27,16 @@
 		!event
 			? null
 			: event.destination === 'device'
-				? 'this device — nothing sent'
+				? t('wais.device')
 				: event.destination === 'cloud'
-					? 'Cloud AI'
+					? t('common.cloudAi')
 					: event.destination
 	);
 
 	function statusLabel(e: MessageExcerptRow): { label: string; dot: string } {
-		if (e.excluded) return { label: 'Excluded by you', dot: 'bg-mode-private' };
-		if (e.sent) return { label: 'Sent', dot: 'bg-mode-assisted' };
-		return { label: 'Stayed on this device', dot: 'bg-mode-private' };
+		if (e.excluded) return { label: t('wais.excluded'), dot: 'bg-mode-private' };
+		if (e.sent) return { label: t('wais.sent'), dot: 'bg-mode-assisted' };
+		return { label: t('wais.stayed'), dot: 'bg-mode-private' };
 	}
 
 	async function openExcerpt(e: MessageExcerptRow) {
@@ -59,9 +60,9 @@
 <div class="flex h-full flex-col">
 	<div class="flex items-start justify-between gap-2 border-b p-4">
 		<div>
-			<h2 class="font-display text-lg tracking-tight">What AI saw</h2>
+			<h2 class="font-display text-lg tracking-tight">{t('wais.title')}</h2>
 			<p class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
-				For this answer · recorded locally
+				{t('wais.subtitle')}
 			</p>
 		</div>
 		<Button
@@ -69,7 +70,7 @@
 			size="icon"
 			class="size-7 shrink-0"
 			onclick={() => chatsStore.closeWhatAiSaw()}
-			aria-label="Close panel"
+			aria-label={t('wais.closeAria')}
 		>
 			<XIcon class="size-4" />
 		</Button>
@@ -78,7 +79,7 @@
 	{#if question}
 		<div class="border-b px-4 py-3">
 			<p class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
-				Your question
+				{t('presend.question')}
 			</p>
 			<p class="mt-1 text-sm italic">“{question}”</p>
 		</div>
@@ -87,13 +88,16 @@
 	{#if event}
 		<div class="border-b px-4 py-3">
 			<p class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
-				Destination
+				{t('wais.destination')}
 			</p>
 			<p class="mt-1 text-sm">
-				{destinationLabel} · {event.excerptCount} excerpt{event.excerptCount === 1 ? '' : 's'} ·
+				{destinationLabel} · {t('common.excerpts', {
+					count: event.excerptCount,
+					s: event.excerptCount === 1 ? '' : 's'
+				})} ·
 				{event.destination === 'device'
-					? '0 bytes sent'
-					: `${(event.bytesSent / 1024).toFixed(1)} KB sent`}
+					? t('wais.zeroBytes')
+					: t('wais.kbSent', { kb: (event.bytesSent / 1024).toFixed(1) })}
 			</p>
 		</div>
 	{/if}
@@ -104,9 +108,9 @@
 				<p class="text-muted-foreground p-2 text-sm">
 					{event
 						? event.excerptCount === 0
-							? 'No document passages — only your question was involved.'
-							: 'Passage details were not recorded for this older answer.'
-						: 'Nothing recorded for this answer.'}
+							? t('wais.noPassages')
+							: t('wais.notRecorded')
+						: t('wais.nothing')}
 				</p>
 			{:else}
 				{#each excerpts as excerpt, i (i)}
@@ -137,7 +141,7 @@
 	</ScrollArea>
 	<div class="border-t p-3">
 		<Badge variant="outline" class="gap-1 font-mono text-[10px] uppercase">
-			Transparency, not magic — this list is the whole story
+			{t('wais.footer')}
 		</Badge>
 	</div>
 </div>

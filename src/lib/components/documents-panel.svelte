@@ -8,6 +8,7 @@
 	import { Switch } from '$lib/components/ui/switch';
 	import XIcon from '@lucide/svelte/icons/x';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
+	import { t } from '$lib/i18n/index.svelte';
 	import { chatsStore } from '$lib/state/chats.svelte';
 	import { documentsStore } from '$lib/state/documents.svelte';
 	import { viewerStore } from '$lib/state/viewer.svelte';
@@ -15,12 +16,12 @@
 	let { chatId }: { chatId: string } = $props();
 
 	function statusLabel(status: string, error: string | null): string {
-		if (error === 'scanned_pdf') return 'No extractable text — OCR not supported yet';
+		if (error === 'scanned_pdf') return t('status.scanned');
 		if (error) return error;
-		if (status === 'ready') return 'Ready';
-		if (status === 'embedding') return 'Indexing';
-		if (status === 'parsing') return 'Reading';
-		if (status === 'chunking') return 'Splitting';
+		if (status === 'ready') return t('status.ready');
+		if (status === 'embedding') return t('status.indexing');
+		if (status === 'parsing') return t('status.reading');
+		if (status === 'chunking') return t('status.splitting');
 		return status;
 	}
 </script>
@@ -28,15 +29,15 @@
 <div class="flex h-full flex-col">
 	<div class="space-y-3 border-b p-4">
 		<div>
-			<h2 class="font-display text-lg tracking-tight">Documents</h2>
+			<h2 class="font-display text-lg tracking-tight">{t('docs.title')}</h2>
 			<p class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
-				Attached to this chat · stored locally
+				{t('docs.subtitle')}
 			</p>
 		</div>
 		<!-- P7: hard lock — cloud modes are unselectable while this is on. -->
 		<div class="flex items-center justify-between gap-3">
 			<Label for="private-only" class="text-xs font-normal">
-				Private only — never allow cloud modes in this chat
+				{t('docs.privateOnly')}
 			</Label>
 			<Switch
 				id="private-only"
@@ -54,7 +55,7 @@
 						checked={doc.enabled}
 						disabled={doc.status !== 'ready'}
 						onCheckedChange={(v) => chatsStore.toggleDocument(chatId, doc.id, v === true)}
-						aria-label="Use {doc.name} for questions"
+						aria-label={t('docs.useAria', { name: doc.name })}
 					/>
 					<FileTextIcon class="text-muted-foreground mt-0.5 size-4 shrink-0" />
 					<div class="min-w-0 flex-1">
@@ -63,7 +64,7 @@
 								variant="ghost"
 								class="hover:text-foreground block h-auto w-full justify-start truncate p-0 text-left text-sm font-medium hover:bg-transparent"
 								onclick={() => viewerStore.openDocument(doc)}
-								aria-label="Open {doc.name} in the viewer"
+								aria-label={t('docs.openAria', { name: doc.name })}
 							>
 								{doc.name}
 							</Button>
@@ -71,11 +72,14 @@
 							<p class="truncate text-sm font-medium">{doc.name}</p>
 						{/if}
 						<p class="text-muted-foreground font-mono text-[10px] uppercase">
-							{(doc.size / 1024).toFixed(0)} KB{doc.pages ? ` · ${doc.pages} pages` : ''}
+							{(doc.size / 1024).toFixed(0)} KB{doc.pages
+								? ` · ${t('common.pages', { n: doc.pages })}`
+								: ''}
 						</p>
 						{#if doc.status === 'ready'}
 							<Badge variant="outline" class="mt-1 gap-1 text-[10px]">
-								<span class="bg-mode-private size-1.5 rounded-full"></span> Ready
+								<span class="bg-mode-private size-1.5 rounded-full"></span>
+								{t('status.ready')}
 							</Badge>
 						{:else if doc.status === 'error'}
 							<Badge variant="destructive" class="mt-1 text-[10px]">
@@ -95,13 +99,13 @@
 						size="icon"
 						class="size-6 opacity-0 group-hover:opacity-100"
 						onclick={() => chatsStore.detach(chatId, doc.id)}
-						aria-label="Remove {doc.name} from this chat"
+						aria-label={t('docs.removeAria', { name: doc.name })}
 					>
 						<XIcon class="size-3.5" />
 					</Button>
 				</div>
 			{:else}
-				<p class="text-muted-foreground p-4 text-sm">No documents in this chat yet.</p>
+				<p class="text-muted-foreground p-4 text-sm">{t('docs.empty')}</p>
 			{/each}
 		</div>
 	</ScrollArea>

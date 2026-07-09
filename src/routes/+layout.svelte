@@ -13,6 +13,7 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { SvelteMap } from 'svelte/reactivity';
+	import { i18n, t } from '$lib/i18n/index.svelte';
 	import { documentsStore } from '$lib/state/documents.svelte';
 	import { chatsStore } from '$lib/state/chats.svelte';
 	import { searchStore } from '$lib/state/search.svelte';
@@ -27,6 +28,7 @@
 	const onChatRoute = $derived(page.url.pathname.startsWith('/chat/'));
 
 	$effect(() => {
+		i18n.init();
 		documentsStore.init();
 		chatsStore.refresh();
 		// Offline switch loads first so a forced-offline session never phones home.
@@ -44,15 +46,13 @@
 			const prev = prevStatuses.get(doc.id);
 			if (prev && prev !== doc.status && !visibleIds.has(doc.id) && !onDocumentsPage) {
 				if (doc.status === 'ready') {
-					toast.success(`${doc.name} is ready`, {
-						description: 'Indexed locally — your file never left this device.'
+					toast.success(t('toast.ready', { name: doc.name }), {
+						description: t('toast.readyDesc')
 					});
 				} else if (doc.status === 'error') {
-					toast.error(`${doc.name} could not be indexed`, {
+					toast.error(t('toast.failed', { name: doc.name }), {
 						description:
-							doc.error === 'scanned_pdf'
-								? 'No extractable text — OCR is not supported yet.'
-								: 'Something went wrong while reading this file.'
+							doc.error === 'scanned_pdf' ? t('toast.failedScanned') : t('toast.failedGeneric')
 					});
 				}
 			}

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
+	import { t } from '$lib/i18n/index.svelte';
 	import { isWeakMatch } from '$lib/pipeline/relevance';
 	import { viewerStore } from '$lib/state/viewer.svelte';
 	import type { SearchHit } from '$lib/types';
@@ -16,7 +17,7 @@
 	});
 
 	function locator(hit: SearchHit): string {
-		if (hit.page) return `page ${hit.page}`;
+		if (hit.page) return t('common.page', { n: hit.page });
 		if (hit.headingPath) return hit.headingPath;
 		return '';
 	}
@@ -24,19 +25,18 @@
 
 <div class="space-y-2">
 	<Badge variant="outline" class="font-mono text-[10px] tracking-wide uppercase">
-		Retrieval preview — AI answers arrive with Private mode
+		{t('retrieval.badge')}
 	</Badge>
 	{#if parsed.documentCount === 0}
 		<p class="text-muted-foreground text-sm">
-			No documents in this chat — attach one to search it. AI answers from general knowledge will
-			arrive with the AI modes.
+			{t('retrieval.noDocs')}
 		</p>
 	{:else if parsed.hits.length === 0}
-		<p class="text-sm">I couldn't find enough information in the attached documents for this.</p>
+		<p class="text-sm">{t('retrieval.noHits')}</p>
 	{:else}
 		{#if isWeakMatch(parsed.hits)}
 			<p class="text-muted-foreground text-xs">
-				Weak matches — these passages barely relate to the question, an answer may be unreliable.
+				{t('retrieval.weak')}
 			</p>
 		{/if}
 		{#each parsed.hits.slice(0, 4) as hit (hit.chunkId)}
@@ -44,7 +44,7 @@
 				variant="ghost"
 				class="bg-card hover:bg-accent/50 block h-auto w-full rounded-xl border px-4 py-2.5 text-left font-normal whitespace-normal shadow-sm"
 				onclick={() => viewerStore.openHit(hit)}
-				aria-label="Open {hit.documentName} at this passage"
+				aria-label={t('retrieval.openAria', { name: hit.documentName })}
 			>
 				<span class="text-muted-foreground mb-1 block font-mono text-[10px] uppercase">
 					{hit.documentName}{locator(hit) ? ` · ${locator(hit)}` : ''}

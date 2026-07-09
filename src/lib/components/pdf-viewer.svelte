@@ -8,6 +8,7 @@
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
+	import { t } from '$lib/i18n/index.svelte';
 	import { readOriginal } from '$lib/opfs';
 	import { findMatchRange } from '$lib/viewer/match';
 	import type { ViewerChunk } from '$lib/state/viewer.svelte';
@@ -156,9 +157,9 @@
 
 {#if status === 'missing'}
 	<div class="flex-1 space-y-3 overflow-y-auto p-4">
-		<Badge variant="secondary" class="text-[10px]">Original file unavailable</Badge>
+		<Badge variant="secondary" class="text-[10px]">{t('viewer.missing')}</Badge>
 		<p class="text-muted-foreground text-xs">
-			The original PDF could not be read from this device's storage. Here is the indexed passage:
+			{t('viewer.missingPdfBody')}
 		</p>
 		{#if chunk}
 			<div class="rounded-md border p-3">
@@ -201,14 +202,14 @@
 					class="size-7"
 					disabled={pageNum <= 1 || rendering}
 					onclick={() => go(-1)}
-					aria-label="Previous page"
+					aria-label={t('viewer.prevAria')}
 				>
 					<ChevronLeftIcon class="size-4" />
 				</Button>
 				<span class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
-					page {pageNum} / {numPages}
+					{t('viewer.pageOf', { n: pageNum, total: numPages })}
 					{#if chunk?.page && chunk.page !== pageNum}
-						· cited: p.{chunk.page}
+						· {t('viewer.citedPage', { n: chunk.page })}
 					{/if}
 				</span>
 				<Button
@@ -217,7 +218,7 @@
 					class="size-7"
 					disabled={pageNum >= numPages || rendering}
 					onclick={() => go(1)}
-					aria-label="Next page"
+					aria-label={t('viewer.nextAria')}
 				>
 					<ChevronRightIcon class="size-4" />
 				</Button>

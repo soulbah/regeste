@@ -5,6 +5,7 @@
 	import { Separator } from '$lib/components/ui/separator';
 	import * as Sheet from '$lib/components/ui/sheet';
 	import { toast } from 'svelte-sonner';
+	import { t } from '$lib/i18n/index.svelte';
 	import { getLocalDb } from '$lib/local-db/client';
 	import type { DocumentDetail } from '$lib/local-db/worker';
 	import { documentsStore } from '$lib/state/documents.svelte';
@@ -44,15 +45,15 @@
 		const file = files[0];
 		const error = await documentsStore.replace(doc.id, file);
 		if (error) {
-			toast.error(`Could not replace with ${file.name}`, {
+			toast.error(t('sheet.replaceFailed', { name: file.name }), {
 				description:
 					error === 'parse_failed' || error === 'scanned_pdf'
-						? 'No usable text in the new file — the current version stays active.'
-						: 'The current version stays active.'
+						? t('sheet.replaceFailedNoText')
+						: t('sheet.replaceFailedKeep')
 			});
 		} else {
-			toast.success('Document replaced', {
-				description: 'Old citations keep their snapshots.'
+			toast.success(t('sheet.replaced'), {
+				description: t('sheet.replacedDesc')
 			});
 		}
 	}
@@ -64,24 +65,31 @@
 			<Sheet.Header>
 				<Sheet.Title class="truncate pr-6">{live.name}</Sheet.Title>
 				<Sheet.Description>
-					Stored on this device{live.language ? ` · ${live.language.toUpperCase()}` : ''}
+					{t('sheet.stored')}{live.language ? ` · ${live.language.toUpperCase()}` : ''}
 				</Sheet.Description>
 			</Sheet.Header>
 			<div class="space-y-5 px-4 pb-6">
 				<div class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-					<span class="text-muted-foreground">Size</span><span>{fmtBytes(live.size)}</span>
+					<span class="text-muted-foreground">{t('sheet.size')}</span><span
+						>{fmtBytes(live.size)}</span
+					>
 					{#if live.pages}
-						<span class="text-muted-foreground">Pages</span><span>{live.pages}</span>
+						<span class="text-muted-foreground">{t('sheet.pages')}</span><span>{live.pages}</span>
 					{/if}
-					<span class="text-muted-foreground">Indexed</span>
+					<span class="text-muted-foreground">{t('sheet.indexed')}</span>
 					<span>{new Date(live.updatedAt).toLocaleString()}</span>
-					<span class="text-muted-foreground">Embedding model</span>
+					<span class="text-muted-foreground">{t('sheet.model')}</span>
 					<span class="truncate font-mono text-xs leading-6">{live.embeddingModel ?? '—'}</span>
-					<span class="text-muted-foreground">Fingerprint</span>
+					<span class="text-muted-foreground">{t('sheet.fingerprint')}</span>
 					<span class="font-mono text-xs leading-6">{live.hash.slice(0, 16)}…</span>
 					{#if detail?.versionCount}
-						<span class="text-muted-foreground">Replaced</span>
-						<span>{detail.versionCount} time{detail.versionCount === 1 ? '' : 's'}</span>
+						<span class="text-muted-foreground">{t('sheet.replacedLabel')}</span>
+						<span>
+							{t('sheet.times', {
+								count: detail.versionCount,
+								s: detail.versionCount === 1 ? '' : 's'
+							})}
+						</span>
 					{/if}
 				</div>
 
@@ -93,18 +101,22 @@
 
 				<div class="space-y-1.5">
 					<p class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
-						Privacy
+						{t('sheet.privacy')}
 					</p>
 					{#if detail === null}
-						<p class="text-muted-foreground text-xs">Loading…</p>
+						<p class="text-muted-foreground text-xs">{t('sheet.loading')}</p>
 					{:else if detail.egress.length === 0}
 						<Badge variant="outline" class="gap-1 text-[10px]">
-							<span class="bg-mode-private size-1.5 rounded-full"></span> Never sent anywhere
+							<span class="bg-mode-private size-1.5 rounded-full"></span>
+							{t('sheet.neverSent')}
 						</Badge>
 					{:else}
 						{#each detail.egress as e, i (i)}
 							<p class="text-xs">
-								{new Date(e.createdAt).toLocaleString()} — excerpts → {e.destination}
+								{t('sheet.egressLine', {
+									date: new Date(e.createdAt).toLocaleString(),
+									dest: e.destination
+								})}
 							</p>
 						{/each}
 					{/if}
@@ -112,14 +124,14 @@
 
 				<div class="space-y-1.5">
 					<p class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
-						Used in
+						{t('sheet.usedIn')}
 					</p>
 					{#if detail?.chats.length}
 						{#each detail.chats as chat (chat.id)}
 							<p class="truncate text-xs">{chat.title}</p>
 						{/each}
 					{:else}
-						<p class="text-muted-foreground text-xs">No chats yet.</p>
+						<p class="text-muted-foreground text-xs">{t('sheet.noChats')}</p>
 					{/if}
 				</div>
 
@@ -135,7 +147,7 @@
 							onclose();
 						}}
 					>
-						Open
+						{t('sheet.open')}
 					</Button>
 					<Button
 						variant="outline"
@@ -143,10 +155,10 @@
 						disabled={live.status !== 'ready'}
 						onclick={() => documentsStore.reindex(live.id)}
 					>
-						Re-index
+						{t('sheet.reindex')}
 					</Button>
 					<Button variant="outline" size="sm" onclick={() => replaceInput?.click()}>
-						Replace file…
+						{t('sheet.replaceFile')}
 					</Button>
 				</div>
 				<input

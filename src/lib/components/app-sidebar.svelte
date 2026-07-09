@@ -15,6 +15,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
+	import { t } from '$lib/i18n/index.svelte';
 	import { chatsStore } from '$lib/state/chats.svelte';
 	import { searchStore } from '$lib/state/search.svelte';
 	import { sessionStore } from '$lib/state/session.svelte';
@@ -48,10 +49,10 @@
 			else previous.push(chat);
 		}
 		return [
-			{ label: 'Pinned', chats: pinned },
-			{ label: 'Today', chats: today },
-			{ label: 'Yesterday', chats: yesterday },
-			{ label: 'Previous', chats: previous }
+			{ label: t('sidebar.pinned'), chats: pinned },
+			{ label: t('sidebar.today'), chats: today },
+			{ label: t('sidebar.yesterday'), chats: yesterday },
+			{ label: t('sidebar.previous'), chats: previous }
 		].filter((g) => g.chats.length);
 	});
 
@@ -91,7 +92,7 @@
 						<Sidebar.MenuButton>
 							{#snippet child({ props })}
 								<a href={resolve('/')} {...props}>
-									<PlusIcon /> <span>New chat</span>
+									<PlusIcon /> <span>{t('sidebar.newChat')}</span>
 								</a>
 							{/snippet}
 						</Sidebar.MenuButton>
@@ -100,7 +101,7 @@
 						<Sidebar.MenuButton isActive={page.url.pathname === '/documents'}>
 							{#snippet child({ props })}
 								<a href={resolve('/documents')} {...props}>
-									<FolderIcon /> <span>Documents</span>
+									<FolderIcon /> <span>{t('sidebar.documents')}</span>
 								</a>
 							{/snippet}
 						</Sidebar.MenuButton>
@@ -108,7 +109,7 @@
 					<Sidebar.MenuItem>
 						<Sidebar.MenuButton onclick={() => searchStore.toggle()}>
 							<SearchIcon />
-							<span>Search</span>
+							<span>{t('sidebar.search')}</span>
 							<span class="text-muted-foreground ml-auto font-mono text-[10px]">⌘K</span>
 						</Sidebar.MenuButton>
 					</Sidebar.MenuItem>
@@ -116,7 +117,7 @@
 						<Sidebar.MenuButton isActive={page.url.pathname === '/privacy'}>
 							{#snippet child({ props })}
 								<a href={resolve('/privacy')} {...props}>
-									<ShieldIcon /> <span>Privacy Report</span>
+									<ShieldIcon /> <span>{t('sidebar.privacyReport')}</span>
 								</a>
 							{/snippet}
 						</Sidebar.MenuButton>
@@ -125,7 +126,7 @@
 						<Sidebar.MenuButton isActive={page.url.pathname === '/settings'}>
 							{#snippet child({ props })}
 								<a href={resolve('/settings')} {...props}>
-									<SettingsIcon /> <span>Settings</span>
+									<SettingsIcon /> <span>{t('sidebar.settings')}</span>
 								</a>
 							{/snippet}
 						</Sidebar.MenuButton>
@@ -160,7 +161,7 @@
 									</DropdownMenu.Trigger>
 									<DropdownMenu.Content side="right" align="start">
 										<DropdownMenu.Item onclick={() => chatsStore.setPinned(chat.id, !chat.pinned)}>
-											{chat.pinned ? 'Unpin' : 'Pin'}
+											{chat.pinned ? t('sidebar.unpin') : t('sidebar.pin')}
 										</DropdownMenu.Item>
 										<DropdownMenu.Item
 											onclick={() => {
@@ -168,16 +169,16 @@
 												renameTarget = chat;
 											}}
 										>
-											Rename
+											{t('sidebar.rename')}
 										</DropdownMenu.Item>
 										<DropdownMenu.Item onclick={() => exportChat(chat)}>
-											Export as Markdown
+											{t('sidebar.exportMarkdown')}
 										</DropdownMenu.Item>
 										<DropdownMenu.Item
 											class="text-destructive"
 											onclick={() => (deleteTarget = chat)}
 										>
-											Delete
+											{t('common.delete')}
 										</DropdownMenu.Item>
 									</DropdownMenu.Content>
 								</DropdownMenu.Root>
@@ -194,14 +195,16 @@
 			class="hover:bg-accent flex items-center gap-2 rounded-md px-2 py-1.5"
 		>
 			<span class="bg-muted flex size-7 items-center justify-center rounded-full text-xs uppercase">
-				{sessionStore.user ? sessionStore.user.email[0] : 'G'}
+				{sessionStore.user ? sessionStore.user.email[0] : t('sidebar.guest')[0]}
 			</span>
 			<div class="min-w-0">
 				<p class="truncate text-sm font-medium">
-					{sessionStore.user ? sessionStore.user.name || sessionStore.user.email : 'Guest'}
+					{sessionStore.user
+						? sessionStore.user.name || sessionStore.user.email
+						: t('sidebar.guest')}
 				</p>
 				<p class="text-muted-foreground font-mono text-[10px] tracking-wide uppercase">
-					{sessionStore.user ? 'Signed in · files stay local' : 'Local workspace'}
+					{sessionStore.user ? t('sidebar.signedIn') : t('sidebar.localWorkspace')}
 				</p>
 			</div>
 		</a>
@@ -211,7 +214,7 @@
 <Dialog.Root open={renameTarget !== null} onOpenChange={(o) => !o && (renameTarget = null)}>
 	<Dialog.Content class="sm:max-w-sm">
 		<Dialog.Header>
-			<Dialog.Title>Rename chat</Dialog.Title>
+			<Dialog.Title>{t('sidebar.renameTitle')}</Dialog.Title>
 		</Dialog.Header>
 		<form
 			class="space-y-4"
@@ -220,12 +223,12 @@
 				confirmRename();
 			}}
 		>
-			<Input bind:value={renameValue} aria-label="Chat title" />
+			<Input bind:value={renameValue} aria-label={t('sidebar.chatTitleAria')} />
 			<Dialog.Footer>
 				<Button type="button" variant="outline" onclick={() => (renameTarget = null)}>
-					Cancel
+					{t('common.cancel')}
 				</Button>
-				<Button type="submit">Save</Button>
+				<Button type="submit">{t('common.save')}</Button>
 			</Dialog.Footer>
 		</form>
 	</Dialog.Content>
@@ -234,15 +237,14 @@
 <AlertDialog.Root open={deleteTarget !== null} onOpenChange={(o) => !o && (deleteTarget = null)}>
 	<AlertDialog.Content>
 		<AlertDialog.Header>
-			<AlertDialog.Title>Delete this chat?</AlertDialog.Title>
+			<AlertDialog.Title>{t('sidebar.deleteTitle')}</AlertDialog.Title>
 			<AlertDialog.Description>
-				"{deleteTarget?.title}" and its messages will be permanently removed from this device.
-				Documents stay in your library.
+				{t('sidebar.deleteDescription', { title: deleteTarget?.title ?? '' })}
 			</AlertDialog.Description>
 		</AlertDialog.Header>
 		<AlertDialog.Footer>
-			<AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
-			<AlertDialog.Action onclick={confirmDelete}>Delete</AlertDialog.Action>
+			<AlertDialog.Cancel>{t('common.cancel')}</AlertDialog.Cancel>
+			<AlertDialog.Action onclick={confirmDelete}>{t('common.delete')}</AlertDialog.Action>
 		</AlertDialog.Footer>
 	</AlertDialog.Content>
 </AlertDialog.Root>

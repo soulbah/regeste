@@ -15,6 +15,7 @@ Foundation. The UI shell, browser pipeline and specs are being built incremental
 | Touch stack/architecture | `docs/internal/RESEARCH-2026-07-stack.md`, `docs/constitution.md`                                               |
 | Touch UI                 | `.claude/rules/ui.md` (shadcn-only rule)                                                                        |
 | Touch server/API/DB      | `.claude/rules/server.md`                                                                                       |
+| Write user-facing text   | `.claude/rules/copy.md` (human-sounding copy, no AI markers; strings live in `src/lib/i18n/`)                   |
 
 ## Commands
 

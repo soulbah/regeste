@@ -2,6 +2,7 @@
 // LM Studio, vLLM…). The browser talks to it DIRECTLY — no Folio server in
 // the path. Config persists in the local DB settings; the model per chat.
 
+import { t, type MessageKey } from '$lib/i18n/index.svelte';
 import { getLocalDb } from '$lib/local-db/client';
 import { guardedFetch } from '$lib/net';
 
@@ -10,7 +11,7 @@ export interface MyAiPreset {
 	label: string;
 	baseUrl: string;
 	/** Provider-specific CORS help (A1) — the #1 support wall for browser clients. */
-	corsHint: string;
+	corsHint: MessageKey;
 }
 
 export const MYAI_PRESETS: MyAiPreset[] = [
@@ -18,19 +19,19 @@ export const MYAI_PRESETS: MyAiPreset[] = [
 		id: 'ollama',
 		label: 'Ollama',
 		baseUrl: 'http://localhost:11434/v1',
-		corsHint: 'Start Ollama with OLLAMA_ORIGINS set to this site (or *) to allow browser access.'
+		corsHint: 'myai.corsHint.ollama'
 	},
 	{
 		id: 'lmstudio',
 		label: 'LM Studio',
 		baseUrl: 'http://localhost:1234/v1',
-		corsHint: 'In LM Studio, enable CORS in the local server settings before connecting.'
+		corsHint: 'myai.corsHint.lmstudio'
 	},
 	{
 		id: 'vllm',
 		label: 'vLLM',
 		baseUrl: 'http://localhost:8000/v1',
-		corsHint: 'Start vLLM with --allowed-origins including this site (or *).'
+		corsHint: 'myai.corsHint.vllm'
 	}
 ];
 
@@ -121,8 +122,8 @@ class MyAiStore {
 				this.testStatus = 'error';
 				this.testError =
 					res.status === 401 || res.status === 403
-						? 'The endpoint refused the API key.'
-						: `The endpoint answered with an error (${res.status}).`;
+						? t('myai.error.key')
+						: t('myai.error.status', { status: res.status });
 				return;
 			}
 			const body = (await res.json()) as { data?: Array<{ id?: string }> };
@@ -131,8 +132,7 @@ class MyAiStore {
 			if (this.models.length === 1) await this.saveDefaultModel(this.models[0]);
 		} catch {
 			this.testStatus = 'error';
-			this.testError =
-				'Could not reach the endpoint — check the URL, that the server is running, and its CORS settings.';
+			this.testError = t('myai.error.unreachable');
 		}
 	}
 

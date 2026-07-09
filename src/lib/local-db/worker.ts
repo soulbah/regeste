@@ -463,20 +463,6 @@ function deleteMessage(id: string): void {
 	});
 }
 
-/** C8/C9: distinct section headings across the given ready documents. */
-function documentHeadings(documentIds: string[], limit = 12): string[] {
-	if (!documentIds.length) return [];
-	const placeholders = documentIds.map(() => '?').join(',');
-	return db
-		.selectObjects(
-			`SELECT DISTINCT heading_path FROM chunks
-			 WHERE document_id IN (${placeholders}) AND heading_path IS NOT NULL AND heading_path != ''
-			 ORDER BY id LIMIT ?`,
-			[...documentIds, limit]
-		)
-		.map((r: any) => r.heading_path as string);
-}
-
 // ── Settings (meta table, 'setting:' prefix keeps schema_version untouched) ──
 
 function getSetting(key: string): string | null {
@@ -960,7 +946,6 @@ const api = {
 	setChatMyaiModel,
 	setChatPinned,
 	deleteMessage,
-	documentHeadings,
 	getSetting,
 	setSetting,
 	touchChat,

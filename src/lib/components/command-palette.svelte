@@ -9,6 +9,7 @@
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { t } from '$lib/i18n/index.svelte';
 	import { getLocalDb } from '$lib/local-db/client';
 	import type { SearchAllResult } from '$lib/local-db/worker';
 	import { searchStore } from '$lib/state/search.svelte';
@@ -44,13 +45,13 @@
 </script>
 
 <Command.Dialog bind:open={searchStore.open} shouldFilter={false}>
-	<Command.Input placeholder="Search chats, documents, commands…" bind:value={query} />
+	<Command.Input placeholder={t('palette.placeholder')} bind:value={query} />
 	<Command.List>
 		<Command.Empty>
-			{query.trim() ? 'Nothing found on this device.' : 'Type to search everything — locally.'}
+			{query.trim() ? t('palette.noResults') : t('palette.hint')}
 		</Command.Empty>
 		{#if results.chats.length}
-			<Command.Group heading="Chats">
+			<Command.Group heading={t('palette.chats')}>
 				{#each results.chats as hit (hit.chatId)}
 					<Command.Item
 						value={`chat-${hit.chatId}`}
@@ -66,7 +67,7 @@
 			</Command.Group>
 		{/if}
 		{#if results.documents.length}
-			<Command.Group heading="Documents">
+			<Command.Group heading={t('palette.documents')}>
 				{#each results.documents as hit (hit.chunkId)}
 					<Command.Item
 						value={`doc-${hit.chunkId}`}
@@ -76,7 +77,7 @@
 						<span class="min-w-0">
 							<span class="block truncate text-sm">
 								{hit.name}{hit.page
-									? ` · page ${hit.page}`
+									? ` · ${t('common.page', { n: hit.page })}`
 									: hit.headingPath
 										? ` · ${hit.headingPath}`
 										: ''}
@@ -87,15 +88,18 @@
 				{/each}
 			</Command.Group>
 		{/if}
-		<Command.Group heading="Commands">
+		<Command.Group heading={t('palette.commands')}>
 			<Command.Item value="cmd-new-chat" onSelect={() => run(() => goto(resolve('/')))}>
-				<PlusIcon class="size-4" /> New chat
+				<PlusIcon class="size-4" />
+				{t('sidebar.newChat')}
 			</Command.Item>
 			<Command.Item value="cmd-documents" onSelect={() => run(() => goto(resolve('/documents')))}>
-				<FolderIcon class="size-4" /> Documents
+				<FolderIcon class="size-4" />
+				{t('sidebar.documents')}
 			</Command.Item>
 			<Command.Item value="cmd-privacy" onSelect={() => run(() => goto(resolve('/privacy')))}>
-				<ShieldIcon class="size-4" /> Privacy Report
+				<ShieldIcon class="size-4" />
+				{t('sidebar.privacyReport')}
 			</Command.Item>
 		</Command.Group>
 	</Command.List>

@@ -7,6 +7,7 @@
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import PdfViewer from '$lib/components/pdf-viewer.svelte';
 	import TextViewer from '$lib/components/text-viewer.svelte';
+	import { t } from '$lib/i18n/index.svelte';
 	import { viewerStore } from '$lib/state/viewer.svelte';
 	import { isPdf } from '$lib/pipeline/parse';
 
@@ -17,7 +18,7 @@
 		if (snapshot) return snapshot.locator;
 		const chunk = target?.chunk;
 		if (!chunk) return null;
-		return chunk.page ? `page ${chunk.page}` : chunk.headingPath;
+		return chunk.page ? t('common.page', { n: chunk.page }) : chunk.headingPath;
 	});
 </script>
 
@@ -25,10 +26,10 @@
 	<div class="flex items-start justify-between gap-2 border-b p-4">
 		<div class="min-w-0">
 			<h2 class="font-display truncate text-lg tracking-tight">
-				{snapshot?.documentName ?? target?.document.name ?? 'Document'}
+				{snapshot?.documentName ?? target?.document.name ?? t('viewer.document')}
 			</h2>
 			<p class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
-				{locator ? `${locator} · ` : ''}stored on this device
+				{locator ? `${locator} · ` : ''}{t('viewer.stored')}
 			</p>
 		</div>
 		<Button
@@ -36,7 +37,7 @@
 			size="icon"
 			class="size-7 shrink-0"
 			onclick={() => viewerStore.close()}
-			aria-label="Close viewer"
+			aria-label={t('viewer.closeAria')}
 		>
 			<XIcon class="size-4" />
 		</Button>
@@ -44,9 +45,9 @@
 
 	{#if snapshot}
 		<div class="flex-1 space-y-3 overflow-y-auto p-4">
-			<Badge variant="secondary" class="text-[10px]">No longer on this device</Badge>
+			<Badge variant="secondary" class="text-[10px]">{t('viewer.removed')}</Badge>
 			<p class="text-muted-foreground text-xs">
-				This document was removed from your library. The citation kept a snapshot of the passage:
+				{t('viewer.removedBody')}
 			</p>
 			<div class="rounded-md border p-3">
 				<p

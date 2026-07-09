@@ -4,28 +4,29 @@ Canonical project state. Read this first; update it (status table + one log line
 
 ## Roadmap
 
-| Spec | Name                                                                   | Status      |
-| ---- | ---------------------------------------------------------------------- | ----------- |
-| 001  | Foundation (this scaffold)                                             | done        |
-| 002  | Local DB + document pipeline (milestone 0: validate browser perf bets) | done        |
-| 003  | Chat UI shell                                                          | done        |
-| 004  | Private mode (WebLLM tiers; wllama WASM fallback deferred)             | done        |
-| 005  | Auth (OTP) + Assisted endpoint                                         | done        |
-| 006  | Document viewer + citation click-through                               | done        |
-| 007  | My AI mode (own endpoint — fully local, no Cloudflare dependency)      | done        |
-| 008  | Privacy Report + universal search (⌘K over docs and chats)             | done        |
-| 009  | Trust pack (T1/T2/T4/T6 + P2-P4/P7-P9, settings page)                  | done        |
-| 010  | Chat comfort (C2-C4, C6-C10)                                           | done        |
-| 011  | Documents pack (D1/D2/D4, F2, version replace, # picker)               | done        |
-| 012  | What AI saw panel + honest refusal sources                             | done        |
-| 013  | Model management (M1-M3, best-for-device badge)                        | done        |
-| 014  | Onboarding (O1/O2, T3, R6)                                             | done        |
-| 015  | Workspace & settings extras (R1 export, R5 quota gauge)                | done        |
-| 016  | i18n FR/EN (R4)                                                        | not started |
-| —    | Open-source launch prep (checklist: docs/internal/OSS-LAUNCH.md)       | later       |
+| Spec | Name                                                                   | Status |
+| ---- | ---------------------------------------------------------------------- | ------ |
+| 001  | Foundation (this scaffold)                                             | done   |
+| 002  | Local DB + document pipeline (milestone 0: validate browser perf bets) | done   |
+| 003  | Chat UI shell                                                          | done   |
+| 004  | Private mode (WebLLM tiers; wllama WASM fallback deferred)             | done   |
+| 005  | Auth (OTP) + Assisted endpoint                                         | done   |
+| 006  | Document viewer + citation click-through                               | done   |
+| 007  | My AI mode (own endpoint — fully local, no Cloudflare dependency)      | done   |
+| 008  | Privacy Report + universal search (⌘K over docs and chats)             | done   |
+| 009  | Trust pack (T1/T2/T4/T6 + P2-P4/P7-P9, settings page)                  | done   |
+| 010  | Chat comfort (C2-C4, C6-C10)                                           | done   |
+| 011  | Documents pack (D1/D2/D4, F2, version replace, # picker)               | done   |
+| 012  | What AI saw panel + honest refusal sources                             | done   |
+| 013  | Model management (M1-M3, best-for-device badge)                        | done   |
+| 014  | Onboarding (O1/O2, T3, R6)                                             | done   |
+| 015  | Workspace & settings extras (R1 export, R5 quota gauge)                | done   |
+| 016  | i18n FR/EN (R4)                                                        | done   |
+| —    | Open-source launch prep (checklist: docs/internal/OSS-LAUNCH.md)       | later  |
 
 ## Log
 
+- 2026-07-09 — Spec 016 done + owner copy/UX pass. i18n: tiny locale system (`src/lib/i18n/`, EN + FR dictionaries typed against each other, ~340 keys), every app surface wired to `t()`, auto-detection from `navigator.language`, language card in Settings, choice persisted (verified: full FR sweep, persists across reload). **Copy rewritten to read human, not AI**: researched the recognizable AI markers (em-dash connectors, negative parallelisms, rule-of-three, overexplanation, pet words, press-release tone) and swept both dictionaries clean; the rules live in `.claude/rules/copy.md` (referenced from AGENTS.md) so future text follows them. Owner UX decisions applied: question suggestions (C8/C9) removed entirely (broke the design, unclear value); "What AI saw" moved from the meta line to the answer's action row (Copy · Regenerate · What AI saw); system messages (transport failures, aborted generations) now insert as `mode: 'notice'` and render as a bordered info block with a Retry action, and grounded answers without citations render muted/italic with their closest passages, so a refusal or an error can't be mistaken for a sourced answer. Verified end-to-end in Chromium in French against the My AI stub (answer, refusal, notice, panel).
 - 2026-07-09 — Spec 015 done: workspace export (R1) — Settings packs everything the user owns (chats, messages, citations, what-AI-saw records, privacy events, document metadata + every OPFS original; missing originals listed honestly) into a plain zip built client-side with fflate (new tiny dep, justified: only zip need in the app) — the anti-eviction safety net, encrypted version tracked for V1.1. Assisted quota gauge (R5): new read-only session-guarded GET /api/quota + "X / 200 this month" in Settings (verified live against the local D1: 1/200; 401 without session). `bun run verify` green.
 - 2026-07-09 — Spec 014 done: onboarding — "Try with a sample contract" on the empty home creates a demo chat with two bundled fictional contracts (FR + EN) through the normal ingest path (verified: both ready, heading suggestions appear, retrieval hits the samples), how-it-works gains the pipeline schema (document→parse→chunk→embed→index; question→search→passages→mode→cited answer) and the offline-proof block (T3, plus a one-liner on the home page), and R6 gates the very first Assisted send behind a one-time in-panel acknowledgment (Send disabled until acknowledged, persisted per device — verified live). Verified end-to-end in Chromium.
 - 2026-07-09 — Spec 013 done: model management — Settings lists every AI cache on the device with real sizes (verified: embeddings cache 133.6 MB, delete dropped storage 155 → 4 MB and resets Private's prepared state when its weights go), "Test my device" runs a 50-token private generation and reports honest tokens/second with a plain recommendation (button honestly disabled until the engine is ready), and the mode selector shows a dynamic "Best for this device" badge justified by capability detection (Private when WebGPU is there, Assisted otherwise) — never a static Recommended. M2 benchmark not exercised live (needs the 1.2 GB model download); disabled-state path verified instead.
