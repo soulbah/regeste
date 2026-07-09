@@ -31,8 +31,9 @@
 	"devDependencies": {
 		"@cloudflare/vitest-pool-workers": "^0.18.2",
 		"@eslint/js": "^10.0.1",
-		"@fontsource-variable/noto-sans": "^5.2.10",
-		"@fontsource-variable/playfair-display": "^5.2.8",
+		"@fontsource-variable/geist": "^5.2.9",
+		"@fontsource-variable/geist-mono": "^5.2.8",
+		"@fontsource-variable/newsreader": "^5.2.10",
 		"@internationalized/date": "^3.12.2",
 		"@lucide/svelte": "^1.23.0",
 		"@sveltejs/adapter-cloudflare": "^7.2.9",
