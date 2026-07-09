@@ -6,12 +6,18 @@ const signals = (over: Partial<Parameters<typeof pickTier>[0]>) => ({
 	hasF16: true,
 	deviceMemory: 8 as number | null,
 	hardwareConcurrency: 8,
+	isolated: true,
 	...over
 });
 
 describe('pickTier', () => {
-	it('returns null without WebGPU (Private unavailable)', () => {
-		expect(pickTier(signals({ hasWebGpu: false }))).toBeNull();
+	it('falls back to the CPU lite tier without WebGPU when isolated + multicore', () => {
+		expect(pickTier(signals({ hasWebGpu: false }))?.id).toBe('lite');
+	});
+
+	it('returns null without WebGPU when isolation or cores are missing', () => {
+		expect(pickTier(signals({ hasWebGpu: false, isolated: false }))).toBeNull();
+		expect(pickTier(signals({ hasWebGpu: false, hardwareConcurrency: 2 }))).toBeNull();
 	});
 
 	it('uses the f32 variant when shader-f16 is missing', () => {

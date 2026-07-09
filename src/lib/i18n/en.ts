@@ -83,6 +83,8 @@ export const en = {
 	'modes.private.unavailable': 'Unavailable on this device',
 	'modes.private.prepared': 'Prepared · tap to load',
 	'modes.private.download': 'One-time download of {size}, then works offline',
+	'modes.private.downloadLite': 'One-time download of {size} · slower, everything stays here',
+	'modes.private.readyLite': 'Ready · slower on this device, works offline',
 	'modes.private.preparing': 'Preparing private AI… {pct}%',
 	'modes.private.loading': 'Loading private AI…',
 	'modes.private.ready': 'Ready · works offline',

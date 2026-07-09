@@ -57,10 +57,11 @@
 	const activeModel = $derived(myaiModel ?? myaiStore.defaultModel);
 
 	// M3 — dynamic "Best for this device": justified by capability detection,
-	// never a static "Recommended" (FEATURES §5 UI decision).
+	// never a static "Recommended" (FEATURES §5 UI decision). The CPU lite tier
+	// keeps Private possible but slow, so Assisted stays the honest pick there.
 	const bestMode = $derived.by(() => {
 		if (llmStore.status === 'detecting') return null;
-		return llmStore.status === 'unavailable'
+		return llmStore.status === 'unavailable' || llmStore.tier?.id === 'lite'
 			? { id: 'assisted' as const, reason: t('modes.bestReason.noGpu') }
 			: { id: 'private' as const, reason: t('modes.bestReason.local') };
 	});
@@ -92,7 +93,12 @@
 				return llmStore.prepared
 					? { line: t('modes.private.prepared'), selectable: true, prepare: true }
 					: {
-							line: t('modes.private.download', { size: llmStore.downloadLabel }),
+							line: t(
+								llmStore.tier?.id === 'lite'
+									? 'modes.private.downloadLite'
+									: 'modes.private.download',
+								{ size: llmStore.downloadLabel }
+							),
 							selectable: true,
 							prepare: true
 						};
@@ -106,7 +112,11 @@
 				return { line: t('modes.private.loading'), selectable: true, prepare: false };
 			case 'ready':
 			case 'generating':
-				return { line: t('modes.private.ready'), selectable: true, prepare: false };
+				return {
+					line: t(llmStore.tier?.id === 'lite' ? 'modes.private.readyLite' : 'modes.private.ready'),
+					selectable: true,
+					prepare: false
+				};
 			case 'error':
 				return {
 					line: llmStore.errorMessage ?? t('modes.error'),

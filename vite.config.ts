@@ -28,6 +28,21 @@ export default defineConfig({
 	worker: {
 		format: 'es'
 	},
+	server: {
+		// Cross-origin isolation (spec 018): worker scripts are served by vite,
+		// not hooks.server.ts, and COEP blocks a worker whose own response lacks
+		// the headers. Prod equivalent lives in static/_headers.
+		headers: {
+			'Cross-Origin-Opener-Policy': 'same-origin',
+			'Cross-Origin-Embedder-Policy': 'credentialless'
+		}
+	},
+	preview: {
+		headers: {
+			'Cross-Origin-Opener-Policy': 'same-origin',
+			'Cross-Origin-Embedder-Policy': 'credentialless'
+		}
+	},
 	optimizeDeps: {
 		// Pre-bundling breaks these packages' runtime asset resolution (wasm/onnx).
 		exclude: ['sqlite-vec-wasm-demo', '@huggingface/transformers', 'pdfjs-dist']

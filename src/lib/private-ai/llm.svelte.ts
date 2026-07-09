@@ -11,6 +11,7 @@ import { wrap, proxy, type Remote } from 'comlink';
 import { detectTier } from './capability';
 import { downgrade, type Tier } from './tiers';
 import type { LlmApi } from './llm-worker';
+import type { WllamaApi } from './wllama-worker';
 
 const PREPARED_KEY = 'folio:private-prepared-model';
 
@@ -24,13 +25,24 @@ export type PrivateStatus =
 	| 'generating'
 	| 'error';
 
-let api: Remote<LlmApi> | null = null;
-function getWorker(): Remote<LlmApi> {
-	if (!api) {
-		const worker = new Worker(new URL('./llm-worker.ts', import.meta.url), { type: 'module' });
-		api = wrap<LlmApi>(worker);
+// Both engines expose the same load/generate/abort surface.
+let webllmApi: Remote<LlmApi> | null = null;
+let wllamaApi: Remote<WllamaApi> | null = null;
+function getWorker(engine: 'webllm' | 'wllama'): Remote<LlmApi> {
+	if (engine === 'wllama') {
+		if (!wllamaApi) {
+			const worker = new Worker(new URL('./wllama-worker.ts', import.meta.url), {
+				type: 'module'
+			});
+			wllamaApi = wrap<WllamaApi>(worker);
+		}
+		return wllamaApi as unknown as Remote<LlmApi>;
 	}
-	return api;
+	if (!webllmApi) {
+		const worker = new Worker(new URL('./llm-worker.ts', import.meta.url), { type: 'module' });
+		webllmApi = wrap<LlmApi>(worker);
+	}
+	return webllmApi;
 }
 
 class LlmStore {
@@ -61,7 +73,7 @@ class LlmStore {
 		this.status = this.prepared ? 'loading' : 'downloading';
 		this.progress = 0;
 		try {
-			await getWorker().load(
+			await getWorker(this.tier.engine).load(
 				this.tier.model,
 				proxy((p: number) => {
 					this.progress = p;
@@ -90,17 +102,17 @@ class LlmStore {
 		messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
 		onDelta: (delta: string) => void
 	): Promise<string> {
-		if (this.status !== 'ready') throw new Error('private engine not ready');
+		if (this.status !== 'ready' || !this.tier) throw new Error('private engine not ready');
 		this.status = 'generating';
 		try {
-			return await getWorker().generate(messages, proxy(onDelta));
+			return await getWorker(this.tier.engine).generate(messages, proxy(onDelta));
 		} finally {
 			this.status = 'ready';
 		}
 	}
 
 	async stop(): Promise<void> {
-		if (this.status === 'generating') await getWorker().abort();
+		if (this.status === 'generating' && this.tier) await getWorker(this.tier.engine).abort();
 	}
 }
 

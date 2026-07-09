@@ -1,0 +1,7 @@
+# Cross-origin isolation (spec 018): required on every response our origin
+# serves — including bundled worker scripts under /_app — so SharedArrayBuffer
+# (wllama multithreading) is available. Pages get the same headers from
+# hooks.server.ts; this file covers the static assets binding.
+/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: credentialless

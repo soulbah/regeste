@@ -86,6 +86,8 @@ export const fr: Record<keyof typeof en, string> = {
 	'modes.private.unavailable': 'Indisponible sur cet appareil',
 	'modes.private.prepared': 'Préparé · touchez pour charger',
 	'modes.private.download': 'Téléchargement unique de {size}, puis fonctionne hors ligne',
+	'modes.private.downloadLite': 'Téléchargement unique de {size} · plus lent, tout reste ici',
+	'modes.private.readyLite': 'Prêt · plus lent sur cet appareil, fonctionne hors ligne',
 	'modes.private.preparing': "Préparation de l'IA privée… {pct}%",
 	'modes.private.loading': "Chargement de l'IA privée…",
 	'modes.private.ready': 'Prêt · fonctionne hors ligne',

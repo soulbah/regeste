@@ -19,7 +19,8 @@ export async function detectSignals(): Promise<DeviceSignals> {
 		hasWebGpu,
 		hasF16,
 		deviceMemory,
-		hardwareConcurrency: navigator.hardwareConcurrency ?? 4
+		hardwareConcurrency: navigator.hardwareConcurrency ?? 4,
+		isolated: typeof crossOriginIsolated !== 'undefined' && crossOriginIsolated
 	};
 }
 
