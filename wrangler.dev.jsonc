@@ -1,0 +1,27 @@
+// vite dev only (adapter platformProxy.configPath). Identical to
+// wrangler.jsonc MINUS the AI binding: AI always runs remotely and its proxy
+// connection can block dev startup entirely when Cloudflare's remote-bindings
+// service misbehaves (2026-07-09 outage). Assisted is exercised on deploys;
+// locally /api/assisted answers 503. Keep both files in sync otherwise.
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "folio",
+	"main": ".svelte-kit/cloudflare/_worker.js",
+	"compatibility_date": "2026-07-01",
+	"compatibility_flags": ["nodejs_compat"],
+	"assets": {
+		"directory": ".svelte-kit/cloudflare",
+		"binding": "ASSETS"
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "folio-db",
+			"database_id": "4cbf13c2-2570-44ff-a145-1a1b8a2634c0",
+			"migrations_dir": "migrations"
+		}
+	],
+	"vars": {
+		"OTP_DEBUG": "1"
+	}
+}

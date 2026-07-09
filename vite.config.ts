@@ -14,7 +14,15 @@ export default defineConfig({
 					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
 			},
 
-			adapter: adapter()
+			adapter: adapter({
+				platformProxy: {
+					// Dev config = prod config minus the AI binding (see the note in
+					// wrangler.dev.jsonc). Also disable remote bindings entirely: dev
+					// must never depend on Cloudflare's remote-bindings service.
+					configPath: 'wrangler.dev.jsonc',
+					remoteBindings: false
+				}
+			})
 		})
 	],
 	worker: {

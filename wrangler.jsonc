@@ -15,14 +15,18 @@
 		{
 			"binding": "DB",
 			"database_name": "folio-db",
-			// Replace with the real id after `wrangler d1 create folio-db`.
-			// Local dev works without it (miniflare uses .wrangler/state).
-			"database_id": "00000000-0000-0000-0000-000000000000",
+			"database_id": "4cbf13c2-2570-44ff-a145-1a1b8a2634c0",
 			"migrations_dir": "migrations"
 		}
 	],
 	"ai": {
 		"binding": "AI"
+	},
+	"vars": {
+		// Dev-phase only: logs OTP codes to Workers Logs so the deployed app is
+		// testable before Email Service is wired. REMOVE before launch
+		// (tracked in docs/internal/OSS-LAUNCH.md).
+		"OTP_DEBUG": "1"
 	}
 	// Enabled by later specs (see docs/FEATURES.md):
 	// "send_email": [{ "name": "EMAIL", "allowed_sender_addresses": ["noreply@example.com"] }],

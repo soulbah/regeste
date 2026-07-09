@@ -3,9 +3,11 @@
 // Runtime types generated with workerd@1.20260702.1 2026-07-01 nodejs_compat
 interface __BaseEnv_Env {
 	DB: D1Database;
-	AI: Ai;
+	// Optional: absent in local dev (wrangler.dev.jsonc has no AI binding).
+	AI: Ai | undefined;
 	ASSETS: Fetcher;
 	BETTER_AUTH_SECRET: string;
+	OTP_DEBUG: string | undefined;
 }
 declare namespace Cloudflare {
 	interface Env extends __BaseEnv_Env {}
