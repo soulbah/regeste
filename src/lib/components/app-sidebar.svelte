@@ -9,10 +9,13 @@
 	import FolderIcon from '@lucide/svelte/icons/folder';
 	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
 	import FileIcon from '@lucide/svelte/icons/file';
+	import ShieldIcon from '@lucide/svelte/icons/shield';
+	import SearchIcon from '@lucide/svelte/icons/search';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { chatsStore } from '$lib/state/chats.svelte';
+	import { searchStore } from '$lib/state/search.svelte';
 	import { sessionStore } from '$lib/state/session.svelte';
 	import type { LocalChat } from '$lib/types';
 
@@ -79,6 +82,22 @@
 							{#snippet child({ props })}
 								<a href={resolve('/documents')} {...props}>
 									<FolderIcon /> <span>Documents</span>
+								</a>
+							{/snippet}
+						</Sidebar.MenuButton>
+					</Sidebar.MenuItem>
+					<Sidebar.MenuItem>
+						<Sidebar.MenuButton onclick={() => searchStore.toggle()}>
+							<SearchIcon />
+							<span>Search</span>
+							<span class="text-muted-foreground ml-auto font-mono text-[10px]">⌘K</span>
+						</Sidebar.MenuButton>
+					</Sidebar.MenuItem>
+					<Sidebar.MenuItem>
+						<Sidebar.MenuButton isActive={page.url.pathname === '/privacy'}>
+							{#snippet child({ props })}
+								<a href={resolve('/privacy')} {...props}>
+									<ShieldIcon /> <span>Privacy Report</span>
 								</a>
 							{/snippet}
 						</Sidebar.MenuButton>

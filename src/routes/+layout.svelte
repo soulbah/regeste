@@ -5,14 +5,23 @@
 	import { toast } from 'svelte-sonner';
 	import { Toaster } from '$lib/components/ui/sonner';
 	import * as Sidebar from '$lib/components/ui/sidebar';
+	import * as Sheet from '$lib/components/ui/sheet';
 	import AppSidebar from '$lib/components/app-sidebar.svelte';
+	import CommandPalette from '$lib/components/command-palette.svelte';
+	import ViewerPanel from '$lib/components/viewer-panel.svelte';
 	import { page } from '$app/state';
 	import { SvelteMap } from 'svelte/reactivity';
 	import { documentsStore } from '$lib/state/documents.svelte';
 	import { chatsStore } from '$lib/state/chats.svelte';
+	import { searchStore } from '$lib/state/search.svelte';
 	import { sessionStore } from '$lib/state/session.svelte';
+	import { viewerStore } from '$lib/state/viewer.svelte';
 
 	let { children } = $props();
+
+	// Outside a chat, the right pane doesn't exist: ⌘K document results open
+	// the viewer in an overlay sheet instead.
+	const onChatRoute = $derived(page.url.pathname.startsWith('/chat/'));
 
 	$effect(() => {
 		documentsStore.init();
@@ -56,8 +65,27 @@
 
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>
 
+<svelte:window
+	onkeydown={(e) => {
+		if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+			e.preventDefault();
+			searchStore.toggle();
+		}
+	}}
+/>
+
 <ModeWatcher defaultMode="dark" />
 <Toaster position="bottom-right" />
+<CommandPalette />
+
+<Sheet.Root
+	open={viewerStore.isOpen && !onChatRoute}
+	onOpenChange={(o) => !o && viewerStore.close()}
+>
+	<Sheet.Content side="right" class="w-full gap-0 p-0 sm:max-w-md">
+		<ViewerPanel />
+	</Sheet.Content>
+</Sheet.Root>
 
 <Sidebar.Provider>
 	<AppSidebar />

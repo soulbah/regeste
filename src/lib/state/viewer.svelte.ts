@@ -60,6 +60,11 @@ class ViewerStore {
 		};
 	}
 
+	/** From a ⌘K document result: resolve the chunk directly. */
+	async openChunkId(chunkId: number): Promise<void> {
+		await this.resolve(chunkId);
+	}
+
 	/** From the Documents panel: open at the start, nothing highlighted. */
 	openDocument(document: LocalDocument): void {
 		this.snapshot = null;
