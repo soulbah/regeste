@@ -54,7 +54,10 @@
 			pdfjs = await import('pdfjs-dist');
 			const workerUrl = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default;
 			pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
-			loadingTask = pdfjs.getDocument({ data });
+			// useSystemFonts: PDFs relying on the 14 standard fonts (no embed)
+			// otherwise need standardFontDataUrl assets; without it the first
+			// render can stall on a font fetch that never resolves.
+			loadingTask = pdfjs.getDocument({ data, useSystemFonts: true });
 			pdf = await loadingTask.promise;
 			if (cancelled) return;
 			numPages = pdf.numPages;
