@@ -7,12 +7,26 @@
 	import Composer from '$lib/components/composer.svelte';
 	import RetrievalTurn from '$lib/components/retrieval-turn.svelte';
 	import PrivateTurn from '$lib/components/private-turn.svelte';
+	import PresendPanel from '$lib/components/presend-panel.svelte';
 	import DocumentsPanel from '$lib/components/documents-panel.svelte';
 	import { chatsStore } from '$lib/state/chats.svelte';
 	import { documentsStore } from '$lib/state/documents.svelte';
 	import { llmStore } from '$lib/private-ai/llm.svelte';
 
+	async function handleSend(text: string) {
+		if (chatsStore.activeChat?.mode === 'assisted') {
+			// Staging swaps the right panel into review mode (FEATURES 5ter).
+			const result = await chatsStore.stageAssisted(chatId, text);
+			if (result === 'no-excerpts') {
+				await chatsStore.sendAssisted(chatId, text, []);
+			}
+			return;
+		}
+		await chatsStore.send(chatId, text);
+	}
+
 	const chatId = $derived(page.params.id!);
+	const reviewing = $derived(chatsStore.pendingAssisted?.chatId === chatId);
 
 	$effect(() => {
 		chatsStore.open(chatId);
@@ -66,15 +80,28 @@
 							</div>
 						{:else if message.mode === 'retrieval'}
 							<RetrievalTurn content={message.content} />
-						{:else if message.mode === 'private'}
+						{:else if message.mode === 'private' || message.mode === 'assisted'}
+							{@const ev = chatsStore.privacyByMessage[message.id]}
 							<PrivateTurn
 								content={message.content}
 								citations={chatsStore.citations[message.id] ?? []}
+								mode={message.mode}
+								meta={ev && message.mode === 'assisted'
+									? `${ev.excerptCount} excerpt${ev.excerptCount === 1 ? '' : 's'} · ${(ev.bytesSent / 1024).toFixed(1)} KB · Cloud AI`
+									: null}
 							/>
 						{:else}
 							<div class="text-sm">{message.content}</div>
 						{/if}
 					{/each}
+					{#if reviewing}
+						<div class="flex items-center gap-2">
+							<span class="bg-mode-assisted size-1.5 animate-pulse rounded-full"></span>
+							<span class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
+								Waiting for your review — check the panel on the right
+							</span>
+						</div>
+					{/if}
 					{#if chatsStore.streamingText !== null}
 						<div class="space-y-2">
 							<div class="flex items-center gap-2">
@@ -114,7 +141,7 @@
 				<Composer
 					mode={chatsStore.activeChat?.mode ?? 'private'}
 					disabled={chatsStore.sending}
-					onsend={(text) => chatsStore.send(chatId, text)}
+					onsend={handleSend}
 					onmodeselect={(m) => chatsStore.setMode(chatId, m)}
 					onupload={handleUpload}
 					onattach={(docId) => chatsStore.attach(chatId, docId)}
@@ -125,6 +152,10 @@
 	</Resizable.Pane>
 	<Resizable.Handle />
 	<Resizable.Pane defaultSize={28} minSize={18} class="hidden md:block">
-		<DocumentsPanel {chatId} />
+		{#if reviewing}
+			<PresendPanel />
+		{:else}
+			<DocumentsPanel {chatId} />
+		{/if}
 	</Resizable.Pane>
 </Resizable.PaneGroup>

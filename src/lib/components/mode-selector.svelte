@@ -6,7 +6,10 @@
 	import SparklesIcon from '@lucide/svelte/icons/sparkles';
 	import LinkIcon from '@lucide/svelte/icons/link';
 	import CheckIcon from '@lucide/svelte/icons/check';
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { llmStore } from '$lib/private-ai/llm.svelte';
+	import { sessionStore } from '$lib/state/session.svelte';
 	import type { ChatMode } from '$lib/types';
 
 	let { mode, onselect }: { mode: ChatMode; onselect: (mode: ChatMode) => void } = $props();
@@ -67,8 +70,10 @@
 			label: 'Assisted',
 			dotClass: 'bg-mode-assisted',
 			description: 'Only relevant excerpts are processed online.',
-			status: 'Sign in required',
-			disabled: true
+			status: sessionStore.user
+				? 'Ready · excerpts only, never full documents'
+				: 'Sign in required',
+			disabled: !sessionStore.user
 		},
 		{
 			id: 'myai' as ChatMode,
@@ -102,7 +107,14 @@
 					variant="ghost"
 					class="h-auto justify-start gap-3 px-2 py-2 text-left"
 					onclick={() => {
-						if (m.disabled) return;
+						if (m.disabled) {
+							// Locked Assisted is the sign-up funnel: route to the account page.
+							if (m.id === 'assisted' && !sessionStore.user) {
+								open = false;
+								goto(resolve('/account'));
+							}
+							return;
+						}
 						onselect(m.id);
 						if (m.id === 'private' && privateStatus.prepare) {
 							// Explicit consent click: start the one-time download / load.

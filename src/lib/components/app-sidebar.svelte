@@ -13,6 +13,7 @@
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { chatsStore } from '$lib/state/chats.svelte';
+	import { sessionStore } from '$lib/state/session.svelte';
 	import type { LocalChat } from '$lib/types';
 
 	let renameTarget = $state<LocalChat | null>(null);
@@ -135,15 +136,22 @@
 		{/each}
 	</Sidebar.Content>
 	<Sidebar.Footer>
-		<div class="flex items-center gap-2 px-2 py-1.5">
-			<span class="bg-muted flex size-7 items-center justify-center rounded-full text-xs">G</span>
+		<a
+			href={resolve('/account')}
+			class="hover:bg-accent flex items-center gap-2 rounded-md px-2 py-1.5"
+		>
+			<span class="bg-muted flex size-7 items-center justify-center rounded-full text-xs uppercase">
+				{sessionStore.user ? sessionStore.user.email[0] : 'G'}
+			</span>
 			<div class="min-w-0">
-				<p class="text-sm font-medium">Guest</p>
+				<p class="truncate text-sm font-medium">
+					{sessionStore.user ? sessionStore.user.name || sessionStore.user.email : 'Guest'}
+				</p>
 				<p class="text-muted-foreground font-mono text-[10px] tracking-wide uppercase">
-					Local workspace
+					{sessionStore.user ? 'Signed in · files stay local' : 'Local workspace'}
 				</p>
 			</div>
-		</div>
+		</a>
 	</Sidebar.Footer>
 </Sidebar.Root>
 

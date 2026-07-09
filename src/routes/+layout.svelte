@@ -10,12 +10,14 @@
 	import { SvelteMap } from 'svelte/reactivity';
 	import { documentsStore } from '$lib/state/documents.svelte';
 	import { chatsStore } from '$lib/state/chats.svelte';
+	import { sessionStore } from '$lib/state/session.svelte';
 
 	let { children } = $props();
 
 	$effect(() => {
 		documentsStore.init();
 		chatsStore.refresh();
+		sessionStore.refresh();
 	});
 
 	// Feedback rules (FEATURES 5bis): ingestion state lives in the documents
