@@ -13,7 +13,10 @@ import { drizzle } from 'drizzle-orm/d1';
 import { checkAndIncrementQuota } from '$lib/server/quota';
 import type { RequestHandler } from './$types';
 
-const MODEL = '@cf/zai-org/glm-4.7-flash';
+// glm-4.7-flash verified 2026-07-09: correct grounded answers but ~2 min per
+// call (reasoning queue; reasoning_effort/enable_thinking had no effect via
+// the binding). llama-3.3-70b fp8 fast: same quality on grounded FR QA, seconds.
+const MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 
 const BodySchema = v.object({
 	question: v.pipe(v.string(), v.minLength(1), v.maxLength(4000)),
