@@ -15,6 +15,7 @@
 	import { chatsStore } from '$lib/state/chats.svelte';
 	import { searchStore } from '$lib/state/search.svelte';
 	import { sessionStore } from '$lib/state/session.svelte';
+	import { settingsStore } from '$lib/state/settings.svelte';
 	import { viewerStore } from '$lib/state/viewer.svelte';
 
 	let { children } = $props();
@@ -26,7 +27,8 @@
 	$effect(() => {
 		documentsStore.init();
 		chatsStore.refresh();
-		sessionStore.refresh();
+		// Offline switch loads first so a forced-offline session never phones home.
+		settingsStore.init().then(() => sessionStore.refresh());
 	});
 
 	// Feedback rules (FEATURES 5bis): ingestion state lives in the documents

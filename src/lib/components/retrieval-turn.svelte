@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
+	import { isWeakMatch } from '$lib/pipeline/relevance';
 	import { viewerStore } from '$lib/state/viewer.svelte';
 	import type { SearchHit } from '$lib/types';
 
@@ -33,6 +34,11 @@
 	{:else if parsed.hits.length === 0}
 		<p class="text-sm">I couldn't find enough information in the attached documents for this.</p>
 	{:else}
+		{#if isWeakMatch(parsed.hits)}
+			<p class="text-muted-foreground text-xs">
+				Weak matches — these passages barely relate to the question, an answer may be unreliable.
+			</p>
+		{/if}
 		{#each parsed.hits.slice(0, 4) as hit (hit.chunkId)}
 			<Button
 				variant="ghost"

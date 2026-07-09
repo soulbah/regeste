@@ -49,6 +49,8 @@ export interface IngestState {
 class DocumentsStore {
 	documents = $state<LocalDocument[]>([]);
 	library = $state<LibraryDocument[]>([]);
+	/** P3 — documentId → last time excerpts of it left the device. */
+	egress = $state<Record<string, number>>({});
 	ingests = $state<Record<string, IngestState>>({});
 	dbInfo = $state<DbInfo | null>(null);
 	dbError = $state<string | null>(null);
@@ -58,10 +60,9 @@ class DocumentsStore {
 
 	async init(): Promise<void> {
 		try {
-			const { db, info } = await getLocalDb();
+			const { info } = await getLocalDb();
 			this.dbInfo = info;
-			this.documents = await db.listDocuments();
-			this.library = await db.listLibrary();
+			await this.refreshLibrary();
 		} catch (err) {
 			this.dbError = err instanceof Error ? err.message : String(err);
 		}
@@ -71,6 +72,8 @@ class DocumentsStore {
 		const { db } = await getLocalDb();
 		this.documents = await db.listDocuments();
 		this.library = await db.listLibrary();
+		const rows = await db.documentEgress();
+		this.egress = Object.fromEntries(rows.map((r) => [r.documentId, r.lastSentAt]));
 	}
 
 	private setIngest(id: string, state: IngestState): void {

@@ -4,20 +4,29 @@ Canonical project state. Read this first; update it (status table + one log line
 
 ## Roadmap
 
-| Spec | Name                                                                   | Status |
-| ---- | ---------------------------------------------------------------------- | ------ |
-| 001  | Foundation (this scaffold)                                             | done   |
-| 002  | Local DB + document pipeline (milestone 0: validate browser perf bets) | done   |
-| 003  | Chat UI shell                                                          | done   |
-| 004  | Private mode (WebLLM tiers; wllama WASM fallback deferred)             | done   |
-| 005  | Auth (OTP) + Assisted endpoint                                         | done   |
-| 006  | Document viewer + citation click-through                               | done   |
-| 007  | My AI mode (own endpoint — fully local, no Cloudflare dependency)      | done   |
-| 008  | Privacy Report + universal search (⌘K over docs and chats)             | done   |
-| —    | Open-source launch prep (checklist: docs/internal/OSS-LAUNCH.md)       | later  |
+| Spec | Name                                                                   | Status      |
+| ---- | ---------------------------------------------------------------------- | ----------- |
+| 001  | Foundation (this scaffold)                                             | done        |
+| 002  | Local DB + document pipeline (milestone 0: validate browser perf bets) | done        |
+| 003  | Chat UI shell                                                          | done        |
+| 004  | Private mode (WebLLM tiers; wllama WASM fallback deferred)             | done        |
+| 005  | Auth (OTP) + Assisted endpoint                                         | done        |
+| 006  | Document viewer + citation click-through                               | done        |
+| 007  | My AI mode (own endpoint — fully local, no Cloudflare dependency)      | done        |
+| 008  | Privacy Report + universal search (⌘K over docs and chats)             | done        |
+| 009  | Trust pack (T1/T2/T4/T6 + P2-P4/P7-P9, settings page)                  | done        |
+| 010  | Chat comfort (C2-C4, C6-C10)                                           | not started |
+| 011  | Documents pack (D1/D2/D4, F2, version replace, # picker)               | not started |
+| 012  | What AI saw panel + honest refusal sources                             | not started |
+| 013  | Model management (M1-M3, best-for-device badge)                        | not started |
+| 014  | Onboarding (O1/O2, T3, R6)                                             | not started |
+| 015  | Workspace & settings extras (R1 export, R5 quota gauge)                | not started |
+| 016  | i18n FR/EN (R4)                                                        | not started |
+| —    | Open-source launch prep (checklist: docs/internal/OSS-LAUNCH.md)       | later       |
 
 ## Log
 
+- 2026-07-09 — Spec 009 done: trust pack — Settings page (storage status + persist request T6, weekly egress counter P4, force-offline switch T2, double-confirmed panic wipe T1 that closes the SQLite pool via the worker and destroys OPFS/caches — verified: 1 GB → 0 B), static per-mode data-flow page T4 (linked from Settings + mode selector), chat egress badge P2 ("0 bytes sent" → "1 cloud request · 0.9 KB" verified live), per-document "never sent / excerpts sent <date>" badges P3, per-chat private-only lock P7 (panel switch, cloud modes disabled with reason, send guard), weak-match warning P8 (RRF threshold, `pipeline/relevance.ts`) and relevance scores in the pre-send review P9. Force offline verified with zero network entries; offline states surface honestly in the selector and auth. All verified end-to-end in Chromium.
 - 2026-07-09 — Spec 005 CLOSED (owner-requested retest). **The "Cloudflare incident" was in fact a wrangler regression: 4.107.1 hangs forever on `deploy` — even `--dry-run`, clean env, Node 22 or 23 (event loop idle, empty promise). 4.106.0 works; deploy script pinned to `bunx wrangler@4.106.0` until upstream fixes it.** Deployed to https://folio.example.workers.dev and verified: OTP sign-in with code read via `wrangler tail` (remote D1 session), Assisted end-to-end in the browser against `wrangler dev` (real AI binding): pre-send review, excerpt exclusion (1/2 · 0.3 KB sent), streamed grounded answer with valid [1] citations, meta line, citation → viewer; plus API-level checks on workers.dev (401 no session, 400 malformed, quota counter). **Second real finding: glm-4.7-flash takes ~2 min per grounded answer (reasoning; `reasoning_effort`/`enable_thinking` had no effect via the binding) — swapped to `@cf/meta/llama-3.3-70b-instruct-fp8-fast`: same-quality FR answers with correct citations in ~2 s.** Local retest also green: OTP flow, honest 503 without AI binding, sign-out re-locks Assisted. Gotcha (test-env only): pdf.js render pauses in a background/headless tab (rAF frozen) — not a product bug; `useSystemFonts` added to the viewer for PDFs with non-embedded standard fonts.
 - 2026-07-09 — Spec 008 done: Privacy Report page (per-destination totals, egress event list, JSON export, celebratory "Nothing has left this device" empty state) + ⌘K universal search (messages indexed in FTS5, palette searches chats + document passages with snippets, commands New chat / Documents / Privacy Report; document hits open the 006 viewer — in a right Sheet when outside a chat). **Critical fix found during verification: FTS5 external-content deletes were issued with dummy content, physically corrupting the index (SQLITE_CORRUPT_VTAB on the next MATCH) and leaving deleted-document terms on disk.** Deletes now pass the real text, and local migration v4 rebuilds both FTS indexes to repair existing databases. Verified end-to-end in Chromium.
 - 2026-07-09 — Spec 007 done: My AI mode live — endpoint config in the mode popover (Ollama/LM Studio/vLLM presets with CORS hints, test connection listing /v1/models, honest errors), model persisted globally + pinned per chat (local schema v2), grounded streaming via the user's OpenAI-compatible endpoint with validated [n] citations, Stop aborts (partial answer kept honestly), unreachable endpoint → honest thread message, privacy event per answer (destination = endpoint host, real bytes), meta line "N excerpts · X KB · host". Verified end-to-end in Chromium against a local stub (stream, stop, error, config paths).

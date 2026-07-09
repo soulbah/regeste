@@ -4,6 +4,7 @@
 import { getLocalDb } from '$lib/local-db/client';
 import type { CitationRow, MessagePrivacyRow } from '$lib/local-db/worker';
 import { documentsStore } from './documents.svelte';
+import { guardedFetch, OfflineError } from '$lib/net';
 import { myaiStore, endpointHost, type ChatMessage } from './myai.svelte';
 import { llmStore } from '$lib/private-ai/llm.svelte';
 import {
@@ -36,6 +37,8 @@ class ChatsStore {
 	streamingText = $state<string | null>(null);
 	/** Assisted send awaiting review in the right panel (FEATURES 5ter). */
 	pendingAssisted = $state<{ chatId: string; question: string; hits: SearchHit[] } | null>(null);
+	/** P2 — active chat's egress state (cloud requests + bytes). */
+	chatEgress = $state<{ cloudRequests: number; bytes: number } | null>(null);
 
 	activeChat = $derived(this.chats.find((c) => c.id === this.activeChatId) ?? null);
 
@@ -60,6 +63,16 @@ class ChatsStore {
 		this.citations = byMessage;
 		const events = await db.listChatPrivacyEvents(chatId);
 		this.privacyByMessage = Object.fromEntries(events.map((e) => [e.messageId, e]));
+		this.chatEgress = await db.chatPrivacySummary(chatId);
+	}
+
+	async setPrivateOnly(chatId: string, on: boolean): Promise<void> {
+		const { db } = await getLocalDb();
+		await db.setChatPrivateOnly(chatId, on);
+		// A locked chat can't stay on a cloud mode.
+		const chat = this.chats.find((c) => c.id === chatId);
+		if (on && chat && chat.mode !== 'private') await db.setChatMode(chatId, 'private');
+		await this.refresh();
 	}
 
 	close(): void {
@@ -166,6 +179,7 @@ class ChatsStore {
 				await this.generatePrivate(chatId, question, hits, enabledDocs.length);
 			} else if (
 				chat?.mode === 'myai' &&
+				!chat.privateOnly &&
 				myaiStore.baseUrl &&
 				(chat.myaiModel || myaiStore.defaultModel)
 			) {
@@ -302,10 +316,12 @@ class ChatsStore {
 				this.streamingText = isThinking(streamRaw) ? '' : stripThink(streamRaw);
 			});
 		} catch (err) {
-			console.error('[folio] my-ai generation failed:', err);
+			if (!(err instanceof OfflineError)) console.error('[folio] my-ai generation failed:', err);
 			if (!streamRaw.trim()) {
 				failed =
-					'Could not reach your AI endpoint — check that it is running, the URL, and its CORS settings.';
+					err instanceof OfflineError
+						? err.message
+						: 'Could not reach your AI endpoint — check that it is running, the URL, and its CORS settings.';
 			}
 		}
 		const raw = stripThink(streamRaw);
@@ -416,7 +432,7 @@ class ChatsStore {
 			let raw = '';
 			let failed: string | null = null;
 			try {
-				const res = await fetch('/api/assisted', {
+				const res = await guardedFetch('/api/assisted', {
 					method: 'POST',
 					headers: { 'content-type': 'application/json' },
 					body: JSON.stringify({ question, excerpts })
@@ -431,8 +447,11 @@ class ChatsStore {
 				} else {
 					raw = ((await res.json()) as { answer: string }).answer;
 				}
-			} catch {
-				failed = 'Could not reach the Assisted service — check your connection.';
+			} catch (err) {
+				failed =
+					err instanceof OfflineError
+						? err.message
+						: 'Could not reach the Assisted service — check your connection.';
 			}
 
 			const { text: cleaned, citations } = failed

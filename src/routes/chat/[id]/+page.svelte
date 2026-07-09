@@ -66,11 +66,23 @@
 							: 's'}
 					</p>
 				</div>
-				<span
-					class="text-muted-foreground flex items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-[10px] tracking-widest uppercase"
-				>
-					<span class="bg-mode-private size-1.5 rounded-full"></span> Stored locally
-				</span>
+				{#if chatsStore.chatEgress && chatsStore.chatEgress.cloudRequests > 0}
+					<span
+						class="text-muted-foreground flex items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-[10px] tracking-widest uppercase"
+					>
+						<span class="bg-mode-assisted size-1.5 rounded-full"></span>
+						{chatsStore.chatEgress.cloudRequests} cloud request{chatsStore.chatEgress
+							.cloudRequests === 1
+							? ''
+							: 's'} · {(chatsStore.chatEgress.bytes / 1024).toFixed(1)} KB
+					</span>
+				{:else}
+					<span
+						class="text-muted-foreground flex items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-[10px] tracking-widest uppercase"
+					>
+						<span class="bg-mode-private size-1.5 rounded-full"></span> 0 bytes sent
+					</span>
+				{/if}
 			</header>
 
 			<div bind:this={thread} class="flex-1 overflow-y-auto">
@@ -156,6 +168,7 @@
 					libraryEmpty={documentsStore.library.length === 0}
 					myaiModel={chatsStore.activeChat?.myaiModel ?? null}
 					onmyaimodel={(m) => chatsStore.setMyaiModel(chatId, m)}
+					privateOnly={chatsStore.activeChat?.privateOnly ?? false}
 				/>
 			</div>
 		</div>

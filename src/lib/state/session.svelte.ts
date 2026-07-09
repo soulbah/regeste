@@ -3,6 +3,9 @@
 // request a code, verify it; unknown emails are registered automatically.
 
 import { authClient } from '$lib/auth-client';
+import { settingsStore } from './settings.svelte';
+
+const OFFLINE_MSG = 'Offline mode is on — nothing leaves this device.';
 
 interface SessionUser {
 	id: string;
@@ -19,6 +22,10 @@ class SessionStore {
 	sending = $state(false);
 
 	async refresh(): Promise<void> {
+		if (settingsStore.forceOffline) {
+			this.loading = false;
+			return;
+		}
 		try {
 			const { data } = await authClient.getSession();
 			this.user = data?.user
@@ -30,6 +37,10 @@ class SessionStore {
 	}
 
 	async sendCode(email: string): Promise<void> {
+		if (settingsStore.forceOffline) {
+			this.error = OFFLINE_MSG;
+			return;
+		}
 		this.error = null;
 		this.sending = true;
 		try {
@@ -49,6 +60,10 @@ class SessionStore {
 
 	async verifyCode(otp: string): Promise<boolean> {
 		if (!this.otpSentTo) return false;
+		if (settingsStore.forceOffline) {
+			this.error = OFFLINE_MSG;
+			return false;
+		}
 		this.error = null;
 		this.sending = true;
 		try {

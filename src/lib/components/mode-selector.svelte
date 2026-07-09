@@ -14,19 +14,23 @@
 	import { llmStore } from '$lib/private-ai/llm.svelte';
 	import { sessionStore } from '$lib/state/session.svelte';
 	import { myaiStore, MYAI_PRESETS, normalizeBaseUrl } from '$lib/state/myai.svelte';
+	import { settingsStore } from '$lib/state/settings.svelte';
 	import type { ChatMode } from '$lib/types';
 
 	let {
 		mode,
 		onselect,
 		myaiModel = null,
-		onmyaimodel
+		onmyaimodel,
+		privateOnly = false
 	}: {
 		mode: ChatMode;
 		onselect: (mode: ChatMode) => void;
 		/** Active chat's pinned My AI model, when there is a chat. */
 		myaiModel?: string | null;
 		onmyaimodel?: (model: string) => void;
+		/** P7 — cloud modes locked for this chat. */
+		privateOnly?: boolean;
 	} = $props();
 
 	let open = $state(false);
@@ -116,21 +120,28 @@
 			label: 'Assisted',
 			dotClass: 'bg-mode-assisted',
 			description: 'Only relevant excerpts are processed online.',
-			status: sessionStore.user
-				? 'Ready · excerpts only, never full documents'
-				: 'Sign in required',
-			disabled: !sessionStore.user
+			status: privateOnly
+				? 'Locked · this chat is private-only'
+				: settingsStore.forceOffline
+					? 'Offline mode is on'
+					: sessionStore.user
+						? 'Ready · excerpts only, never full documents'
+						: 'Sign in required',
+			disabled: privateOnly || settingsStore.forceOffline || !sessionStore.user
 		},
 		{
 			id: 'myai' as ChatMode,
 			label: 'My AI',
 			dotClass: 'bg-mode-myai',
 			description: 'Use your own configured AI provider.',
-			status:
-				myaiStore.baseUrl && activeModel
-					? `${myaiStore.host} · ${activeModel}`
-					: 'Not configured →',
-			disabled: false
+			status: privateOnly
+				? 'Locked · this chat is private-only'
+				: settingsStore.forceOffline
+					? 'Offline mode is on'
+					: myaiStore.baseUrl && activeModel
+						? `${myaiStore.host} · ${activeModel}`
+						: 'Not configured →',
+			disabled: privateOnly || settingsStore.forceOffline
 		}
 	]);
 
@@ -211,6 +222,13 @@
 					Change My AI endpoint or model…
 				</Button>
 			{/if}
+			<a
+				href={resolve('/how-it-works')}
+				class="text-muted-foreground hover:text-foreground mt-1 block px-2 py-1 font-mono text-[10px] tracking-wide uppercase underline-offset-2 hover:underline"
+				onclick={() => (open = false)}
+			>
+				What leaves the device in each mode →
+			</a>
 		{:else}
 			<!-- My AI configuration (A1/A2, FEATURES 5bis): in the popover, never a dialog. -->
 			<div class="space-y-3 p-1">

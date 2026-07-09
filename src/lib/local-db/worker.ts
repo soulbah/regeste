@@ -28,6 +28,7 @@ const SQLITE_DIST_URL = '/vendor/sqlite/sqlite3.mjs';
 // The sqlite3 WASM API is untyped upstream; keep the anys contained here.
 /* eslint-disable @typescript-eslint/no-explicit-any */
 let db: any;
+let poolUtil: any;
 
 export interface DbInfo {
 	sqliteVersion: string;
@@ -43,7 +44,7 @@ async function init(): Promise<DbInfo> {
 		print: () => {},
 		printErr: (msg: string) => console.error('[sqlite]', msg)
 	});
-	const poolUtil = await sqlite3.installOpfsSAHPoolVfs({ name: 'folio' });
+	poolUtil = await sqlite3.installOpfsSAHPoolVfs({ name: 'folio' });
 	db = new poolUtil.OpfsSAHPoolDb('/folio.db');
 
 	// Feature asserts: this build must ship vec0 + FTS5, and we must be on OPFS.
@@ -631,6 +632,58 @@ function privacySummary(): PrivacySummaryRow[] {
 		.map((r: any) => ({ destination: r.destination, requests: r.requests, bytes: r.bytes }));
 }
 
+/** P2: one chat's egress state — cloud requests and bytes that left. */
+function chatPrivacySummary(chatId: string): { cloudRequests: number; bytes: number } {
+	const r = db.selectObjects(
+		`SELECT count(*) AS n, COALESCE(sum(bytes_sent), 0) AS bytes
+		 FROM privacy_events WHERE chat_id = ? AND destination != 'device'`,
+		[chatId]
+	)[0];
+	return { cloudRequests: r.n, bytes: r.bytes };
+}
+
+export interface DocumentEgressRow {
+	documentId: string;
+	lastSentAt: number;
+}
+
+/**
+ * P3: documents whose excerpts left the device, via the citations of cloud
+ * answers (assisted/myai). Citation-less sends aren't attributable — the badge
+ * is evidence, not accounting.
+ */
+function documentEgress(): DocumentEgressRow[] {
+	return db
+		.selectObjects(
+			`SELECT ch.document_id, max(pe.created_at) AS last_sent
+			 FROM privacy_events pe
+			 JOIN citations c ON c.message_id = pe.message_id
+			 JOIN chunks ch ON ch.id = c.chunk_id
+			 WHERE pe.destination != 'device'
+			 GROUP BY ch.document_id`
+		)
+		.map((r: any) => ({ documentId: r.document_id, lastSentAt: r.last_sent }));
+}
+
+/** P4: last-7-days egress per destination. */
+function weekPrivacySummary(): PrivacySummaryRow[] {
+	const since = Date.now() - 7 * 24 * 60 * 60 * 1000;
+	return db
+		.selectObjects(
+			`SELECT destination, count(*) AS requests, COALESCE(sum(bytes_sent), 0) AS bytes
+			 FROM privacy_events WHERE created_at >= ? GROUP BY destination ORDER BY bytes DESC`,
+			[since]
+		)
+		.map((r: any) => ({ destination: r.destination, requests: r.requests, bytes: r.bytes }));
+}
+
+function setChatPrivateOnly(id: string, privateOnly: boolean): void {
+	db.exec({
+		sql: 'UPDATE chats SET private_only = ? WHERE id = ?',
+		bind: [privateOnly ? 1 : 0, id]
+	});
+}
+
 function listPrivacyEvents(limit = 100): PrivacyEventRow[] {
 	return db
 		.selectObjects(
@@ -646,8 +699,23 @@ function listPrivacyEvents(limit = 100): PrivacyEventRow[] {
 		}));
 }
 
+/**
+ * T1 panic wipe, database half: close the connection and destroy every file
+ * in the SAH pool (the pool holds exclusive OPFS handles, so the main thread
+ * cannot remove them itself).
+ */
+async function wipeDatabase(): Promise<void> {
+	try {
+		db?.close();
+	} catch {
+		// already closed — the pool wipe below is what matters
+	}
+	await poolUtil?.wipeFiles();
+}
+
 const api = {
 	init,
+	wipeDatabase,
 	getDocumentByHash,
 	listDocuments,
 	insertDocument,
@@ -681,6 +749,10 @@ const api = {
 	listPrivacyEvents,
 	listChatPrivacyEvents,
 	privacySummary,
+	chatPrivacySummary,
+	documentEgress,
+	weekPrivacySummary,
+	setChatPrivateOnly,
 	searchAll
 };
 

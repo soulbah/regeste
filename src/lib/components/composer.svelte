@@ -15,7 +15,8 @@
 		onattach,
 		libraryEmpty,
 		myaiModel = null,
-		onmyaimodel
+		onmyaimodel,
+		privateOnly = false
 	}: {
 		mode: ChatMode;
 		disabled?: boolean;
@@ -26,6 +27,7 @@
 		libraryEmpty: boolean;
 		myaiModel?: string | null;
 		onmyaimodel?: (model: string) => void;
+		privateOnly?: boolean;
 	} = $props();
 
 	let text = $state('');
@@ -52,7 +54,7 @@
 	/>
 	<div class="mt-2 flex items-center gap-2">
 		<AddDocuments {libraryEmpty} {onupload} {onattach} />
-		<ModeSelector {mode} onselect={onmodeselect} {myaiModel} {onmyaimodel} />
+		<ModeSelector {mode} onselect={onmodeselect} {myaiModel} {onmyaimodel} {privateOnly} />
 		<div class="flex-1"></div>
 		<Button size="icon" class="rounded-full" onclick={submit} disabled={disabled || !text.trim()}>
 			<ArrowUpIcon class="size-4" />

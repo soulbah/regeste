@@ -11,6 +11,7 @@
 	import FileIcon from '@lucide/svelte/icons/file';
 	import ShieldIcon from '@lucide/svelte/icons/shield';
 	import SearchIcon from '@lucide/svelte/icons/search';
+	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
@@ -98,6 +99,15 @@
 							{#snippet child({ props })}
 								<a href={resolve('/privacy')} {...props}>
 									<ShieldIcon /> <span>Privacy Report</span>
+								</a>
+							{/snippet}
+						</Sidebar.MenuButton>
+					</Sidebar.MenuItem>
+					<Sidebar.MenuItem>
+						<Sidebar.MenuButton isActive={page.url.pathname === '/settings'}>
+							{#snippet child({ props })}
+								<a href={resolve('/settings')} {...props}>
+									<SettingsIcon /> <span>Settings</span>
 								</a>
 							{/snippet}
 						</Sidebar.MenuButton>

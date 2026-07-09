@@ -91,6 +91,17 @@
 								<Progress value={ingest.phaseProgress * 100} class="mt-1.5 h-1" />
 							{/if}
 						</div>
+						{#if documentsStore.egress[doc.id]}
+							<Badge variant="outline" class="gap-1 font-mono text-[10px] uppercase">
+								<span class="bg-mode-assisted size-1.5 rounded-full"></span>
+								Excerpts sent {new Date(documentsStore.egress[doc.id]).toLocaleDateString()}
+							</Badge>
+						{:else}
+							<Badge variant="outline" class="gap-1 font-mono text-[10px] uppercase">
+								<span class="bg-mode-private size-1.5 rounded-full"></span>
+								Never sent
+							</Badge>
+						{/if}
 						<Badge variant="outline">
 							In {doc.chatCount} chat{doc.chatCount === 1 ? '' : 's'}
 						</Badge>

@@ -3,6 +3,7 @@
 // the path. Config persists in the local DB settings; the model per chat.
 
 import { getLocalDb } from '$lib/local-db/client';
+import { guardedFetch } from '$lib/net';
 
 export interface MyAiPreset {
 	id: string;
@@ -115,7 +116,7 @@ class MyAiStore {
 		this.testStatus = 'testing';
 		this.testError = null;
 		try {
-			const res = await fetch(`${this.baseUrl}/models`, { headers: this.headers() });
+			const res = await guardedFetch(`${this.baseUrl}/models`, { headers: this.headers() });
 			if (!res.ok) {
 				this.testStatus = 'error';
 				this.testError =
@@ -148,7 +149,7 @@ class MyAiStore {
 		this.abort = new AbortController();
 		this.generating = true;
 		try {
-			const res = await fetch(`${this.baseUrl}/chat/completions`, {
+			const res = await guardedFetch(`${this.baseUrl}/chat/completions`, {
 				method: 'POST',
 				headers: this.headers(),
 				body: JSON.stringify({ model, messages, stream: true }),

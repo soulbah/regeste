@@ -2,8 +2,10 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import { Checkbox } from '$lib/components/ui/checkbox';
+	import { Label } from '$lib/components/ui/label';
 	import { Progress } from '$lib/components/ui/progress';
 	import { ScrollArea } from '$lib/components/ui/scroll-area';
+	import { Switch } from '$lib/components/ui/switch';
 	import XIcon from '@lucide/svelte/icons/x';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import { chatsStore } from '$lib/state/chats.svelte';
@@ -24,11 +26,24 @@
 </script>
 
 <div class="flex h-full flex-col">
-	<div class="border-b p-4">
-		<h2 class="font-display text-lg tracking-tight">Documents</h2>
-		<p class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
-			Attached to this chat · stored locally
-		</p>
+	<div class="space-y-3 border-b p-4">
+		<div>
+			<h2 class="font-display text-lg tracking-tight">Documents</h2>
+			<p class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
+				Attached to this chat · stored locally
+			</p>
+		</div>
+		<!-- P7: hard lock — cloud modes are unselectable while this is on. -->
+		<div class="flex items-center justify-between gap-3">
+			<Label for="private-only" class="text-xs font-normal">
+				Private only — never allow cloud modes in this chat
+			</Label>
+			<Switch
+				id="private-only"
+				checked={chatsStore.activeChat?.privateOnly ?? false}
+				onCheckedChange={(v) => chatsStore.setPrivateOnly(chatId, v === true)}
+			/>
+		</div>
 	</div>
 	<ScrollArea class="flex-1">
 		<div class="space-y-1 p-2">

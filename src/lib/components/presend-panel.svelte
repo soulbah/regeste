@@ -6,9 +6,11 @@
 	import { ScrollArea } from '$lib/components/ui/scroll-area';
 	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
 	import { chatsStore } from '$lib/state/chats.svelte';
+	import { isWeakMatch } from '$lib/pipeline/relevance';
 	import type { SearchHit } from '$lib/types';
 
 	const pending = $derived(chatsStore.pendingAssisted);
+	const maxScore = $derived(Math.max(...(pending?.hits ?? []).map((h) => h.score), 0));
 
 	let excluded = $state<Record<number, boolean>>({});
 
@@ -49,6 +51,11 @@
 			<p class="text-muted-foreground px-1 font-mono text-[10px] tracking-widest uppercase">
 				Excerpts found in your documents
 			</p>
+			{#if isWeakMatch(pending?.hits ?? [])}
+				<p class="text-muted-foreground px-1 text-xs">
+					Weak matches — these passages barely relate to the question, the answer may be unreliable.
+				</p>
+			{/if}
 			{#each pending?.hits ?? [] as hit (hit.chunkId)}
 				<label
 					class="hover:bg-accent/50 flex items-start gap-3 rounded-md border p-2.5 transition-colors {excluded[
@@ -65,6 +72,9 @@
 					<span class="min-w-0">
 						<span class="text-muted-foreground block font-mono text-[10px] uppercase">
 							{hit.documentName}{locator(hit) ? ` · ${locator(hit)}` : ''}
+							{#if maxScore > 0}
+								· match {Math.round((hit.score / maxScore) * 100)}%
+							{/if}
 						</span>
 						<span class="mt-0.5 block text-xs leading-relaxed">
 							{hit.text.slice(0, 200)}{hit.text.length > 200 ? '…' : ''}
