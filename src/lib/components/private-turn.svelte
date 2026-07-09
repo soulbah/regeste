@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { Badge } from '$lib/components/ui/badge';
+	import { Button } from '$lib/components/ui/button';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { SvelteSet } from 'svelte/reactivity';
 	import type { CitationRow } from '$lib/local-db/worker';
+	import { viewerStore } from '$lib/state/viewer.svelte';
 
 	let {
 		content,
@@ -54,14 +56,17 @@
 			{#if segment.type === 'text'}{segment.value}{:else}
 				<Tooltip.Provider>
 					<Tooltip.Root>
-						<Tooltip.Trigger>
-							{#snippet child({ props })}
-								<sup {...props}>
-									<Badge variant="secondary" class="px-1 py-0 font-mono text-[9px]">
-										{segment.n}
-									</Badge>
-								</sup>
-							{/snippet}
+						<Tooltip.Trigger
+							class="cursor-pointer align-super"
+							onclick={() => {
+								const citation = citations[segment.n - 1];
+								if (citation) viewerStore.openCitation(citation);
+							}}
+							aria-label="Open source {segment.n}"
+						>
+							<Badge variant="secondary" class="px-1 py-0 font-mono text-[9px]">
+								{segment.n}
+							</Badge>
 						</Tooltip.Trigger>
 						<Tooltip.Content class="max-w-72">
 							{#if citations[segment.n - 1]}
@@ -79,11 +84,16 @@
 		{/each}
 	</p>
 	{#if uniqueCitations.length}
-		<div class="space-y-1 border-t pt-2">
+		<div class="space-y-0.5 border-t pt-2">
 			{#each uniqueCitations as c, i (i)}
-				<p class="text-muted-foreground font-mono text-[10px]">
+				<Button
+					variant="ghost"
+					size="sm"
+					class="text-muted-foreground hover:text-foreground block h-auto w-fit px-1 py-0.5 font-mono text-[10px] font-normal"
+					onclick={() => viewerStore.openCitation(c)}
+				>
 					{c.documentName}{c.locator ? ` · ${c.locator}` : ''}
-				</p>
+				</Button>
 			{/each}
 		</div>
 	{/if}

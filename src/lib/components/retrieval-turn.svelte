@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Badge } from '$lib/components/ui/badge';
-	import * as Card from '$lib/components/ui/card';
+	import { Button } from '$lib/components/ui/button';
+	import { viewerStore } from '$lib/state/viewer.svelte';
 	import type { SearchHit } from '$lib/types';
 
 	let { content }: { content: string } = $props();
@@ -33,14 +34,19 @@
 		<p class="text-sm">I couldn't find enough information in the attached documents for this.</p>
 	{:else}
 		{#each parsed.hits.slice(0, 4) as hit (hit.chunkId)}
-			<Card.Root>
-				<Card.Content class="py-2.5">
-					<p class="text-muted-foreground mb-1 font-mono text-[10px] uppercase">
-						{hit.documentName}{locator(hit) ? ` · ${locator(hit)}` : ''}
-					</p>
-					<p class="text-sm">{hit.text.slice(0, 320)}{hit.text.length > 320 ? '…' : ''}</p>
-				</Card.Content>
-			</Card.Root>
+			<Button
+				variant="ghost"
+				class="bg-card hover:bg-accent/50 block h-auto w-full rounded-xl border px-4 py-2.5 text-left font-normal whitespace-normal shadow-sm"
+				onclick={() => viewerStore.openHit(hit)}
+				aria-label="Open {hit.documentName} at this passage"
+			>
+				<span class="text-muted-foreground mb-1 block font-mono text-[10px] uppercase">
+					{hit.documentName}{locator(hit) ? ` · ${locator(hit)}` : ''}
+				</span>
+				<span class="block text-sm">
+					{hit.text.slice(0, 320)}{hit.text.length > 320 ? '…' : ''}
+				</span>
+			</Button>
 		{/each}
 	{/if}
 </div>

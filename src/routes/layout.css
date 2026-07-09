@@ -56,6 +56,9 @@
 	--mode-assisted: oklch(0.602 0.088 75);
 	--mode-myai: oklch(0.55 0.06 245);
 
+	/* Cited-passage marker (viewer highlight) — warm amber, distinct from mode semantics. */
+	--highlight: oklch(0.602 0.088 75);
+
 	--font-sans: 'Geist Variable', ui-sans-serif, system-ui, -apple-system, sans-serif;
 	--font-serif: 'Newsreader Variable', Georgia, 'Times New Roman', serif;
 	--font-mono: 'Geist Mono Variable', ui-monospace, 'SFMono-Regular', monospace;
@@ -119,6 +122,8 @@
 	--mode-assisted: oklch(0.72 0.088 78);
 	--mode-myai: oklch(0.68 0.055 245);
 
+	--highlight: oklch(0.72 0.088 78);
+
 	--shadow-color: 0 0 0;
 	--shadow-2xs: 0 1px 2px 0 rgb(var(--shadow-color) / 0.3);
 	--shadow-xs: 0 1px 3px 0 rgb(var(--shadow-color) / 0.4);
@@ -175,6 +180,7 @@
 	--color-mode-private: var(--mode-private);
 	--color-mode-assisted: var(--mode-assisted);
 	--color-mode-myai: var(--mode-myai);
+	--color-highlight: var(--highlight);
 
 	--font-sans: var(--font-sans);
 	--font-serif: var(--font-serif);

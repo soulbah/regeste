@@ -4,20 +4,21 @@ Canonical project state. Read this first; update it (status table + one log line
 
 ## Roadmap
 
-| Spec | Name                                                                   | Status      |
-| ---- | ---------------------------------------------------------------------- | ----------- |
-| 001  | Foundation (this scaffold)                                             | done        |
-| 002  | Local DB + document pipeline (milestone 0: validate browser perf bets) | done        |
-| 003  | Chat UI shell                                                          | done        |
-| 004  | Private mode (WebLLM tiers; wllama WASM fallback deferred)             | done        |
+| Spec | Name                                                                   | Status                                                          |
+| ---- | ---------------------------------------------------------------------- | --------------------------------------------------------------- |
+| 001  | Foundation (this scaffold)                                             | done                                                            |
+| 002  | Local DB + document pipeline (milestone 0: validate browser perf bets) | done                                                            |
+| 003  | Chat UI shell                                                          | done                                                            |
+| 004  | Private mode (WebLLM tiers; wllama WASM fallback deferred)             | done                                                            |
 | 005  | Auth (OTP) + Assisted endpoint                                         | implemented — deploy verification PARKED (owner-triggered only) |
-| 006  | Document viewer + citation click-through (suggested next)              | not started |
-| 007  | My AI mode (own endpoint — fully local, no Cloudflare dependency)      | not started |
-| 008  | Privacy Report + universal search (⌘K over docs and chats)             | not started |
-| —    | Open-source launch prep (checklist: docs/internal/OSS-LAUNCH.md)       | later       |
+| 006  | Document viewer + citation click-through                               | done                                                            |
+| 007  | My AI mode (own endpoint — fully local, no Cloudflare dependency)      | not started                                                     |
+| 008  | Privacy Report + universal search (⌘K over docs and chats)             | not started                                                     |
+| —    | Open-source launch prep (checklist: docs/internal/OSS-LAUNCH.md)       | later                                                           |
 
 ## Log
 
+- 2026-07-09 — Spec 006 done: document viewer in the right contextual panel — every citation surface is now a click-through (citation chips + source lines, retrieval passage cards, document names). PDF: pdf.js page render fit-to-width with prev/next nav and the passage highlighted via whitespace-normalized item matching (`lib/viewer/match.ts`, unit-tested); DOCX/MD/TXT: OPFS original re-parsed with the ingest parser, heading breadcrumbs, highlighted block scrolled into view. Honest fallbacks: deleted doc → citation snapshot ("no longer on this device"), missing OPFS original → indexed passage text. Zero network in the viewer. Verified end-to-end in Chromium (PDF page 2 highlight 8 rects, MD breadcrumbs + highlight, nav, close, both fallbacks). Bonus fix: file uploads were silently dropped — `input.value = ''` empties the live FileList before the async handler reads it; all upload paths now copy to `File[]` first.
 - 2026-07-08 — Repo scaffolded: SvelteKit + Tailwind v4 + shadcn-svelte (sera preset), Cloudflare adapter + wrangler, drizzle + better-auth + valibot, agent harness (AGENTS.md, hooks, skills, specs).
 - 2026-07-08 — Switched to bun; fixed better-auth 404 (baseURL now derived from request origin) and zod v3/v4 hoisting conflict (direct zod@^4 dep); auth signup/session verified against local D1 through wrangler dev; `bun run verify` + knip green.
 - 2026-07-09 — Spec 005 implemented (OTP auth, /api/assisted with quota, right-panel pre-send review, warm-paper theme) but NOT deploy-verified: Cloudflare long-lived connections (remote-bindings tunnel, deploy upload) hung all evening — likely their incident. Remote D1 is created+migrated, BETTER_AUTH_SECRET is set, build green. **⚠️ PARKED — do NOT retry `bun run deploy` or any Cloudflare network operation unless the owner explicitly asks. The roadmap continues on local-only specs (006+); deploy verification happens when the owner says so.** Checklist when that day comes: `bun run deploy` → on workers.dev: OTP sign-in (code via `wrangler tail`, OTP_DEBUG var), assisted question end-to-end, privacy_event bytes → close spec 005 tasks. Local dev is immune (wrangler.dev.jsonc without the AI binding).

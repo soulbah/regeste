@@ -8,6 +8,7 @@
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import { chatsStore } from '$lib/state/chats.svelte';
 	import { documentsStore } from '$lib/state/documents.svelte';
+	import { viewerStore } from '$lib/state/viewer.svelte';
 
 	let { chatId }: { chatId: string } = $props();
 
@@ -42,7 +43,18 @@
 					/>
 					<FileTextIcon class="text-muted-foreground mt-0.5 size-4 shrink-0" />
 					<div class="min-w-0 flex-1">
-						<p class="truncate text-sm font-medium">{doc.name}</p>
+						{#if doc.status === 'ready'}
+							<Button
+								variant="ghost"
+								class="hover:text-foreground block h-auto w-full justify-start truncate p-0 text-left text-sm font-medium hover:bg-transparent"
+								onclick={() => viewerStore.openDocument(doc)}
+								aria-label="Open {doc.name} in the viewer"
+							>
+								{doc.name}
+							</Button>
+						{:else}
+							<p class="truncate text-sm font-medium">{doc.name}</p>
+						{/if}
 						<p class="text-muted-foreground font-mono text-[10px] uppercase">
 							{(doc.size / 1024).toFixed(0)} KB{doc.pages ? ` · ${doc.pages} pages` : ''}
 						</p>

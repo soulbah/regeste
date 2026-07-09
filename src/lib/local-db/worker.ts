@@ -256,6 +256,43 @@ function search(
 	}));
 }
 
+export interface ChunkWithDocument {
+	chunkId: number;
+	text: string;
+	page: number | null;
+	headingPath: string | null;
+	charStart: number;
+	charEnd: number;
+	document: LocalDocument;
+}
+
+/** Chunk + owning document, for the citation viewer. Null when the chunk is gone. */
+function getChunk(chunkId: number): ChunkWithDocument | null {
+	const rows = db.selectObjects(
+		`SELECT c.id AS chunk_id, c.text AS chunk_text, c.page AS chunk_page,
+		        c.heading_path, c.char_start, c.char_end, d.*
+		 FROM chunks c JOIN documents d ON d.id = c.document_id
+		 WHERE c.id = ?`,
+		[chunkId]
+	);
+	if (!rows.length) return null;
+	const r = rows[0];
+	return {
+		chunkId: r.chunk_id,
+		text: r.chunk_text,
+		page: r.chunk_page,
+		headingPath: r.heading_path,
+		charStart: r.char_start,
+		charEnd: r.char_end,
+		document: rowToDocument(r)
+	};
+}
+
+function getDocument(id: string): LocalDocument | null {
+	const rows = db.selectObjects('SELECT * FROM documents WHERE id = ?', [id]);
+	return rows.length ? rowToDocument(rows[0]) : null;
+}
+
 function countChunks(documentId: string): number {
 	return db.selectValue('SELECT count(*) FROM chunks WHERE document_id = ?', [
 		documentId
@@ -507,6 +544,8 @@ const api = {
 	insertChunks,
 	search,
 	countChunks,
+	getChunk,
+	getDocument,
 	createChat,
 	listChats,
 	renameChat,

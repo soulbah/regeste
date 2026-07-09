@@ -8,16 +8,10 @@ import { getLocalDb } from '$lib/local-db/client';
 import type { DbInfo } from '$lib/local-db/worker';
 import { sha256Hex } from '$lib/pipeline/hash';
 import { chunkBlocks } from '$lib/pipeline/chunk';
-import { parseText } from '$lib/pipeline/parse/text';
+import { parseByName } from '$lib/pipeline/parse';
 import type { EmbedApi } from '$lib/pipeline/embed-worker';
 import { EMBEDDING_MODEL, type EmbedProgress } from '$lib/pipeline/embed-model';
-import type {
-	IngestErrorCode,
-	LibraryDocument,
-	LocalDocument,
-	ParsedDoc,
-	SearchHit
-} from '$lib/types';
+import type { IngestErrorCode, LibraryDocument, LocalDocument, SearchHit } from '$lib/types';
 
 let embedApi: Remote<EmbedApi> | null = null;
 function getEmbedWorker(): Remote<EmbedApi> {
@@ -28,27 +22,6 @@ function getEmbedWorker(): Remote<EmbedApi> {
 		embedApi = wrap<EmbedApi>(worker);
 	}
 	return embedApi;
-}
-
-async function parseFile(file: File, data: ArrayBuffer): Promise<ParsedDoc> {
-	const name = file.name.toLowerCase();
-	if (file.type === 'application/pdf' || name.endsWith('.pdf')) {
-		const { parsePdf } = await import('$lib/pipeline/parse/pdf');
-		return parsePdf(data);
-	}
-	if (name.endsWith('.docx')) {
-		const { parseDocx } = await import('$lib/pipeline/parse/docx');
-		return parseDocx(data);
-	}
-	if (name.endsWith('.md') || name.endsWith('.markdown')) {
-		return parseText(new TextDecoder().decode(data), true);
-	}
-	if (name.endsWith('.txt') || file.type.startsWith('text/')) {
-		return parseText(new TextDecoder().decode(data), false);
-	}
-	throw Object.assign(new Error(`Unsupported format: ${file.name}`), {
-		code: 'unsupported_format' as const
-	});
 }
 
 async function storeOriginal(hash: string, data: ArrayBuffer): Promise<void> {
@@ -127,7 +100,7 @@ class DocumentsStore {
 
 			this.setIngest(id, { status: 'parsing', phaseProgress: 0 });
 			await db.setDocumentStatus(id, 'parsing');
-			const parsed = await parseFile(file, data);
+			const parsed = await parseByName(file.name, file.type, data);
 
 			this.setIngest(id, { status: 'chunking', phaseProgress: 0 });
 			await db.setDocumentStatus(id, 'chunking', { pages: parsed.pages ?? undefined });
