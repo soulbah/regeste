@@ -1,10 +1,9 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import ArrowUpIcon from '@lucide/svelte/icons/arrow-up';
+	import SquareIcon from '@lucide/svelte/icons/square';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
-	import WandIcon from '@lucide/svelte/icons/wand-sparkles';
 	import ModeSelector from './mode-selector.svelte';
 	import AddDocuments from './add-documents.svelte';
 	import { t } from '$lib/i18n/index.svelte';
@@ -22,7 +21,9 @@
 		myaiModel = null,
 		onmyaimodel,
 		privateOnly = false,
-		hasReadyDocs = false
+		hasReadyDocs = false,
+		generating = false,
+		onstop = null
 	}: {
 		mode: ChatMode;
 		disabled?: boolean;
@@ -36,14 +37,10 @@
 		privateOnly?: boolean;
 		/** R3 — preset actions only make sense with something to act on. */
 		hasReadyDocs?: boolean;
+		/** While true the send button becomes Stop (same spot, spec 019). */
+		generating?: boolean;
+		onstop?: (() => void) | null;
 	} = $props();
-
-	const presetActions = [
-		{ label: 'actions.summarize', question: 'actions.summarize.q' },
-		{ label: 'actions.dates', question: 'actions.dates.q' },
-		{ label: 'actions.amounts', question: 'actions.amounts.q' },
-		{ label: 'actions.obligations', question: 'actions.obligations.q' }
-	] as const;
 
 	let text = $state('');
 
@@ -70,12 +67,12 @@
 	}
 </script>
 
-<div class="bg-card relative mx-auto w-full max-w-2xl rounded-xl border p-3 shadow-sm">
+<div class="bg-card relative mx-auto w-full max-w-2xl rounded-[18px] border p-3 shadow-sm">
 	{#if hashSuggestions.length}
 		<div
 			class="bg-popover absolute -top-2 right-3 left-3 z-10 -translate-y-full rounded-md border p-1 shadow-md"
 		>
-			<p class="text-muted-foreground px-2 py-1 font-mono text-[10px] tracking-widest uppercase">
+			<p class="text-muted-foreground px-2 py-1 text-xs font-medium">
 				{t('composer.attachFrom')}
 			</p>
 			{#each hashSuggestions as doc (doc.id)}
@@ -94,7 +91,7 @@
 	<Textarea
 		bind:value={text}
 		placeholder={t('composer.placeholder')}
-		class="max-h-40 min-h-10 resize-none border-0 bg-transparent p-1 shadow-none focus-visible:ring-0"
+		class="max-h-40 min-h-8 resize-none border-0 bg-transparent px-1 py-1 shadow-none focus-visible:ring-0"
 		onkeydown={(e) => {
 			if (e.key === 'Enter' && !e.shiftKey) {
 				e.preventDefault();
@@ -110,34 +107,42 @@
 			}
 		}}
 	/>
-	<div class="mt-2 flex items-center gap-2">
-		<AddDocuments {libraryEmpty} {onupload} {onattach} />
-		{#if hasReadyDocs}
-			<DropdownMenu.Root>
-				<DropdownMenu.Trigger>
-					{#snippet child({ props })}
-						<Button {...props} variant="outline" size="sm" class="gap-2">
-							<WandIcon class="size-3.5" />
-							{t('actions.menu')}
-						</Button>
-					{/snippet}
-				</DropdownMenu.Trigger>
-				<DropdownMenu.Content align="start" side="top">
-					{#each presetActions as action (action.label)}
-						<DropdownMenu.Item onclick={() => !disabled && onsend(t(action.question))}>
-							{t(action.label)}
-						</DropdownMenu.Item>
-					{/each}
-				</DropdownMenu.Content>
-			</DropdownMenu.Root>
-		{/if}
+	<div class="mt-1 flex items-center gap-1">
+		<AddDocuments
+			{libraryEmpty}
+			{onupload}
+			{onattach}
+			{hasReadyDocs}
+			{disabled}
+			onaction={(q) => !disabled && onsend(q)}
+		/>
 		<ModeSelector {mode} onselect={onmodeselect} {myaiModel} {onmyaimodel} {privateOnly} />
 		<div class="flex-1"></div>
-		<Button size="icon" class="rounded-full" onclick={submit} disabled={disabled || !text.trim()}>
-			<ArrowUpIcon class="size-4" />
-		</Button>
+		{#if generating && onstop}
+			<Button
+				size="icon"
+				class="bg-ring hover:bg-ring/90 text-background rounded-[10px]"
+				onclick={onstop}
+				aria-label={t('chat.stop')}
+			>
+				<SquareIcon class="size-3.5 fill-current" />
+			</Button>
+		{:else}
+			<Button
+				size="icon"
+				class="bg-ring hover:bg-ring/90 text-background rounded-[10px] disabled:opacity-40"
+				onclick={submit}
+				disabled={disabled || !text.trim()}
+				aria-label={t('composer.sendAria')}
+			>
+				<ArrowUpIcon class="size-4" />
+			</Button>
+		{/if}
 	</div>
 </div>
-<p class="text-muted-foreground mt-2 text-center font-mono text-[10px] tracking-widest uppercase">
-	{t('composer.footer')}
-</p>
+<div
+	class="text-muted-foreground mx-auto mt-2 flex w-full max-w-2xl items-center justify-between px-3 font-mono text-[10px]"
+>
+	<span>{t('composer.footer')}</span>
+	<span class="hidden sm:inline">{t('composer.enterHint')}</span>
+</div>

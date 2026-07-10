@@ -1,13 +1,10 @@
 <script lang="ts">
 	import * as Popover from '$lib/components/ui/popover';
 	import { Button } from '$lib/components/ui/button';
-	import { Badge } from '$lib/components/ui/badge';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
-	import LockIcon from '@lucide/svelte/icons/lock';
-	import SparklesIcon from '@lucide/svelte/icons/sparkles';
-	import LinkIcon from '@lucide/svelte/icons/link';
 	import CheckIcon from '@lucide/svelte/icons/check';
+	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -126,35 +123,39 @@
 		}
 	});
 
+	// Color signals the exception (spec 019): Private is uncolored, the amber
+	// dot marks the modes that send data off the device. One line per mode:
+	// the blocking/actionable state when there is one, the outcome otherwise
+	// (the ChatGPT/Claude picker recipe — name, one line, check).
 	const modes = $derived([
 		{
 			id: 'private' as ChatMode,
 			label: 'Private',
-			dotClass: 'bg-mode-private',
-			description: t('modes.private.description'),
-			status: privateStatus.line,
+			dotClass: null,
+			line:
+				llmStore.status === 'ready' || llmStore.status === 'generating'
+					? t('modes.private.description')
+					: privateStatus.line,
 			disabled: !privateStatus.selectable
 		},
 		{
 			id: 'assisted' as ChatMode,
 			label: 'Assisted',
 			dotClass: 'bg-mode-assisted',
-			description: t('modes.assisted.description'),
-			status: privateOnly
+			line: privateOnly
 				? t('modes.locked')
 				: settingsStore.forceOffline
 					? t('modes.offlineOn')
 					: sessionStore.user
-						? t('modes.assisted.ready')
+						? t('modes.assisted.description')
 						: t('modes.assisted.signIn'),
 			disabled: privateOnly || settingsStore.forceOffline || !sessionStore.user
 		},
 		{
 			id: 'myai' as ChatMode,
 			label: 'My AI',
-			dotClass: 'bg-mode-myai',
-			description: t('modes.myai.description'),
-			status: privateOnly
+			dotClass: 'bg-mode-assisted',
+			line: privateOnly
 				? t('modes.locked')
 				: settingsStore.forceOffline
 					? t('modes.offlineOn')
@@ -171,22 +172,22 @@
 <Popover.Root bind:open>
 	<Popover.Trigger>
 		{#snippet child({ props })}
-			<Button {...props} variant="outline" size="sm" class="gap-2">
-				<span class="size-2 rounded-full {current.dotClass}"></span>
+			<Button {...props} variant="ghost" size="sm" class="gap-1.5">
+				{#if current.dotClass}
+					<span class="size-2 rounded-full {current.dotClass}"></span>
+				{/if}
 				{current.label}
+				<ChevronDownIcon class="text-muted-foreground size-3.5!" />
 			</Button>
 		{/snippet}
 	</Popover.Trigger>
-	<Popover.Content class="w-80 p-2" align="start" side="top">
+	<Popover.Content class="w-72 p-1" align="start" side="top">
 		{#if view === 'modes'}
-			<p class="text-muted-foreground px-2 pb-2 font-mono text-xs tracking-wide uppercase">
-				{t('modes.title')}
-			</p>
-			<div class="flex flex-col gap-1">
+			<div class="flex flex-col">
 				{#each modes as m (m.id)}
 					<Button
 						variant="ghost"
-						class="h-auto justify-start gap-3 px-2 py-2 text-left"
+						class="h-auto w-full justify-start px-2.5 py-2 text-left"
 						onclick={() => {
 							if (m.disabled) {
 								// Locked Assisted is the sign-up funnel: route to the account page.
@@ -209,55 +210,47 @@
 							open = false;
 						}}
 					>
-						<span class="mt-0.5 flex size-7 items-center justify-center rounded-md border">
-							{#if m.id === 'private'}<LockIcon
-									class="size-3.5"
-								/>{:else if m.id === 'assisted'}<SparklesIcon class="size-3.5" />{:else}<LinkIcon
-									class="size-3.5"
-								/>{/if}
-						</span>
 						<span class="min-w-0 flex-1">
-							<span class="flex items-center gap-2">
-								<span class="size-1.5 rounded-full {m.dotClass}"></span>
+							<span class="flex items-center gap-1.5">
 								<span class="text-sm font-medium">{m.label}</span>
-								{#if m.id === mode}<CheckIcon class="size-3.5" />{/if}
+								{#if m.dotClass}<span class="size-1.5 rounded-full {m.dotClass}"></span>{/if}
 								{#if bestMode?.id === m.id}
-									<Badge
-										variant="secondary"
-										class="ml-auto font-mono text-[9px] tracking-wide uppercase"
-										title={bestMode.reason}
-									>
+									<span class="text-ring text-[10px]" title={bestMode.reason}>
 										{t('modes.best')}
-									</Badge>
+									</span>
 								{/if}
 							</span>
-							<span class="text-muted-foreground block text-xs">{m.description}</span>
-							{#if m.status}
-								<Badge variant="outline" class="mt-1 gap-1 font-mono text-[10px] uppercase">
-									{#if m.id === 'assisted'}<LockIcon class="size-2.5" />{/if}{m.status}
-								</Badge>
-							{/if}
+							<span
+								class="text-muted-foreground block truncate text-xs {m.disabled
+									? 'opacity-70'
+									: ''}"
+							>
+								{m.line}
+							</span>
 						</span>
+						{#if m.id === mode}<CheckIcon class="text-ring ml-2 size-4 shrink-0" />{/if}
 					</Button>
 				{/each}
 			</div>
-			{#if myaiStore.baseUrl && activeModel}
-				<Button
-					variant="ghost"
-					size="sm"
-					class="text-muted-foreground mt-1 h-6 w-full justify-start px-2 font-mono text-[10px] tracking-wide uppercase"
-					onclick={openMyaiConfig}
+			<div class="mt-1 border-t pt-1">
+				{#if myaiStore.baseUrl && activeModel}
+					<Button
+						variant="ghost"
+						size="sm"
+						class="text-muted-foreground h-7 w-full justify-start px-2.5 text-xs font-normal"
+						onclick={openMyaiConfig}
+					>
+						{t('modes.changeMyai')}
+					</Button>
+				{/if}
+				<a
+					href={resolve('/how-it-works')}
+					class="text-muted-foreground hover:text-foreground block px-2.5 py-1.5 text-xs underline-offset-2 hover:underline"
+					onclick={() => (open = false)}
 				>
-					{t('modes.changeMyai')}
-				</Button>
-			{/if}
-			<a
-				href={resolve('/how-it-works')}
-				class="text-muted-foreground hover:text-foreground mt-1 block px-2 py-1 font-mono text-[10px] tracking-wide uppercase underline-offset-2 hover:underline"
-				onclick={() => (open = false)}
-			>
-				{t('modes.whatLeaves')}
-			</a>
+					{t('modes.whatLeaves')}
+				</a>
+			</div>
 		{:else}
 			<!-- My AI configuration (A1/A2, FEATURES 5bis): in the popover, never a dialog. -->
 			<div class="space-y-3 p-1">

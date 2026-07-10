@@ -107,7 +107,7 @@
 						<p class="text-muted-foreground text-xs">{t('sheet.loading')}</p>
 					{:else if detail.egress.length === 0}
 						<Badge variant="outline" class="gap-1 text-[10px]">
-							<span class="bg-mode-private size-1.5 rounded-full"></span>
+							<span class="bg-ring size-1.5 rounded-full"></span>
 							{t('sheet.neverSent')}
 						</Badge>
 					{:else}

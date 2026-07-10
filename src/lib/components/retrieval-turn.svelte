@@ -24,7 +24,7 @@
 </script>
 
 <div class="space-y-2">
-	<Badge variant="outline" class="font-mono text-[10px] tracking-wide uppercase">
+	<Badge variant="secondary" class="text-[10px]">
 		{t('retrieval.badge')}
 	</Badge>
 	{#if parsed.documentCount === 0}
@@ -42,11 +42,11 @@
 		{#each parsed.hits.slice(0, 4) as hit (hit.chunkId)}
 			<Button
 				variant="ghost"
-				class="bg-card hover:bg-accent/50 block h-auto w-full rounded-xl border px-4 py-2.5 text-left font-normal whitespace-normal shadow-sm"
+				class="bg-card hover:bg-accent/50 block h-auto w-full rounded-lg border px-4 py-2.5 text-left font-normal whitespace-normal shadow-xs"
 				onclick={() => viewerStore.openHit(hit)}
 				aria-label={t('retrieval.openAria', { name: hit.documentName })}
 			>
-				<span class="text-muted-foreground mb-1 block font-mono text-[10px] uppercase">
+				<span class="text-muted-foreground mb-1 block font-mono text-[10px]">
 					{hit.documentName}{locator(hit) ? ` · ${locator(hit)}` : ''}
 				</span>
 				<span class="block text-sm">

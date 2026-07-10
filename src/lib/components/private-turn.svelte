@@ -1,13 +1,13 @@
 <script lang="ts">
-	import { Badge } from '$lib/components/ui/badge';
+	// AI answer turn (spec 019): sources strip above the prose (grounding shown
+	// before reading), superscript citation chips with a hover preview, one
+	// footer line (meta left, actions right). Refusals read as straight prose.
 	import { Button } from '$lib/components/ui/button';
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import CopyIcon from '@lucide/svelte/icons/copy';
 	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import EyeIcon from '@lucide/svelte/icons/eye';
-	import { SvelteSet } from 'svelte/reactivity';
 	import { t } from '$lib/i18n/index.svelte';
 	import type { CitationRow, MessageExcerptRow } from '$lib/local-db/worker';
 	import { chatsStore } from '$lib/state/chats.svelte';
@@ -47,9 +47,10 @@
 
 	let copied = $state(false);
 
-	async function copy(withSources: boolean) {
-		let text = content.replace(/\[(\d{1,2})\]/g, withSources ? '[$1]' : '');
-		if (withSources && citations.length) {
+	/** One-click copy, sources included when the answer has them. */
+	async function copy() {
+		let text = content;
+		if (citations.length) {
 			text +=
 				'\n\nSources:\n' +
 				citations
@@ -60,12 +61,6 @@
 		copied = true;
 		setTimeout(() => (copied = false), 1500);
 	}
-
-	const dotClass = {
-		private: 'bg-mode-private',
-		assisted: 'bg-mode-assisted',
-		myai: 'bg-mode-myai'
-	} as const;
 
 	// Split "text [1] more [2]" into segments; markers become citation chips.
 	const segments = $derived.by(() => {
@@ -80,46 +75,70 @@
 		return out;
 	});
 
-	const uniqueCitations = $derived.by(() => {
-		const seen = new SvelteSet<string>();
-		return citations.filter((c) => {
-			const key = `${c.documentName}|${c.locator}`;
-			if (seen.has(key)) return false;
-			seen.add(key);
-			return true;
-		});
-	});
+	// Sources strip: 1:1 with chip numbers, capped at 3 + "+N" (Perplexity model).
+	const STRIP_CAP = 3;
+	let stripExpanded = $state(false);
+	const stripSources = $derived(stripExpanded ? citations : citations.slice(0, STRIP_CAP));
+
+	const modeLabel = { private: 'Private', assisted: 'Assisted', myai: 'My AI' } as const;
+	const metaLine = $derived(
+		mode === 'private'
+			? t('turn.privateMeta', { count: excerpts.length, s: excerpts.length === 1 ? '' : 's' })
+			: meta
+				? `${modeLabel[mode]} · ${meta}`
+				: modeLabel[mode]
+	);
 </script>
 
-<div class="space-y-3">
-	<div class="flex items-center gap-2">
-		<span class="size-1.5 rounded-full {dotClass[mode]}"></span>
-		<span class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
-			{mode === 'private'
-				? t('turn.nothingLeft')
-				: (meta ?? (mode === 'assisted' ? t('turn.assisted') : t('turn.myai')))}
-		</span>
-	</div>
-	<p
-		class="text-sm leading-relaxed whitespace-pre-wrap {closestSources.length
-			? 'text-muted-foreground italic'
-			: ''}"
-	>
+<div class="space-y-2">
+	{#if citations.length}
+		<div class="flex flex-wrap items-center gap-1.5">
+			{#each stripSources as c, i (i)}
+				<Button
+					variant="outline"
+					size="xs"
+					class="bg-card hover:border-ring/40 h-7 gap-1.5 rounded-lg px-2 font-normal normal-case"
+					onclick={() => viewerStore.openCitation(c)}
+				>
+					<span class="text-accent-foreground font-mono text-[10px] font-semibold">{i + 1}</span>
+					<span class="max-w-40 truncate">{c.documentName}</span>
+					{#if c.locator}
+						<span class="text-muted-foreground max-w-28 truncate font-mono text-[10px]">
+							{c.locator}
+						</span>
+					{/if}
+				</Button>
+			{/each}
+			{#if citations.length > STRIP_CAP}
+				<Button
+					variant="outline"
+					size="xs"
+					class="bg-card hover:border-ring/40 text-muted-foreground h-7 rounded-lg px-2 font-mono text-[10px] font-normal"
+					aria-expanded={stripExpanded}
+					onclick={() => (stripExpanded = !stripExpanded)}
+				>
+					{stripExpanded
+						? t('turn.sourcesLess')
+						: t('turn.sourcesMore', { count: citations.length - STRIP_CAP })}
+				</Button>
+			{/if}
+		</div>
+	{/if}
+
+	<p class="text-sm leading-relaxed whitespace-pre-wrap">
 		{#each segments as segment, i (i)}
 			{#if segment.type === 'text'}{segment.value}{:else}
-				<Tooltip.Provider>
+				<Tooltip.Provider delayDuration={600}>
 					<Tooltip.Root>
 						<Tooltip.Trigger
-							class="cursor-pointer align-super"
+							class="bg-accent text-accent-foreground focus-visible:ring-ring mx-0.5 inline-flex h-4 min-w-4 cursor-pointer items-center justify-center rounded-[5px] px-1 align-super font-mono text-[10px] font-semibold focus-visible:ring-2 focus-visible:outline-none"
 							onclick={() => {
 								const citation = citations[segment.n - 1];
 								if (citation) viewerStore.openCitation(citation);
 							}}
-							aria-label="Open source {segment.n}"
+							aria-label={t('turn.openSourceAria', { n: segment.n })}
 						>
-							<Badge variant="secondary" class="px-1 py-0 font-mono text-[9px]">
-								{segment.n}
-							</Badge>
+							{segment.n}
 						</Tooltip.Trigger>
 						<Tooltip.Content class="max-w-72">
 							{#if citations[segment.n - 1]}
@@ -136,76 +155,15 @@
 			{/if}
 		{/each}
 	</p>
-	<div class="flex items-center gap-1">
-		<DropdownMenu.Root>
-			<DropdownMenu.Trigger>
-				{#snippet child({ props })}
-					<Button
-						{...props}
-						variant="ghost"
-						size="sm"
-						class="text-muted-foreground h-6 gap-1 px-2 font-mono text-[10px] uppercase"
-					>
-						{#if copied}<CheckIcon class="size-3" /> {t('turn.copied')}{:else}<CopyIcon
-								class="size-3"
-							/>
-							{t('turn.copy')}{/if}
-					</Button>
-				{/snippet}
-			</DropdownMenu.Trigger>
-			<DropdownMenu.Content align="start">
-				<DropdownMenu.Item onclick={() => copy(false)}>{t('turn.copyText')}</DropdownMenu.Item>
-				<DropdownMenu.Item onclick={() => copy(true)} disabled={!citations.length}>
-					{t('turn.copyWithSources')}
-				</DropdownMenu.Item>
-			</DropdownMenu.Content>
-		</DropdownMenu.Root>
-		{#if onregenerate}
-			<Button
-				variant="ghost"
-				size="sm"
-				class="text-muted-foreground h-6 gap-1 px-2 font-mono text-[10px] uppercase"
-				onclick={onregenerate}
-			>
-				<RefreshCwIcon class="size-3" />
-				{t('turn.regenerate')}
-			</Button>
-		{/if}
-		{#if messageId}
-			<Button
-				variant="ghost"
-				size="sm"
-				class="text-muted-foreground h-6 gap-1 px-2 font-mono text-[10px] uppercase"
-				onclick={() => chatsStore.openWhatAiSaw(messageId!)}
-			>
-				<EyeIcon class="size-3" />
-				{t('turn.whatAiSaw')}
-			</Button>
-		{/if}
-	</div>
-	{#if uniqueCitations.length}
+
+	{#if closestSources.length}
 		<div class="space-y-0.5 border-t pt-2">
-			{#each uniqueCitations as c, i (i)}
-				<Button
-					variant="ghost"
-					size="sm"
-					class="text-muted-foreground hover:text-foreground block h-auto w-fit px-1 py-0.5 font-mono text-[10px] font-normal"
-					onclick={() => viewerStore.openCitation(c)}
-				>
-					{c.documentName}{c.locator ? ` · ${c.locator}` : ''}
-				</Button>
-			{/each}
-		</div>
-	{:else if closestSources.length}
-		<div class="space-y-0.5 border-t pt-2">
-			<p class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
-				{t('turn.closest')}
-			</p>
+			<p class="text-muted-foreground text-xs">{t('turn.closest')}</p>
 			{#each closestSources as e, i (i)}
 				<Button
 					variant="ghost"
 					size="sm"
-					class="text-muted-foreground hover:text-foreground block h-auto w-fit px-1 py-0.5 font-mono text-[10px] font-normal"
+					class="text-muted-foreground hover:text-foreground block h-auto w-fit px-1 py-0.5 font-mono text-[11px] font-normal"
 					onclick={() => openExcerpt(e)}
 				>
 					{e.documentName}{e.locator ? ` · ${e.locator}` : ''}
@@ -213,4 +171,59 @@
 			{/each}
 		</div>
 	{/if}
+
+	<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+		<span class="text-muted-foreground font-mono text-[10px]">{metaLine}</span>
+		<span class="flex items-center gap-0.5">
+			<Tooltip.Provider delayDuration={400}>
+				<Tooltip.Root>
+					<Tooltip.Trigger>
+						{#snippet child({ props })}
+							<Button
+								{...props}
+								variant="ghost"
+								size="icon-xs"
+								class="text-muted-foreground size-7"
+								onclick={copy}
+								aria-label={t('turn.copyAria')}
+							>
+								{#if copied}<CheckIcon />{:else}<CopyIcon />{/if}
+							</Button>
+						{/snippet}
+					</Tooltip.Trigger>
+					<Tooltip.Content>{copied ? t('turn.copied') : t('turn.copy')}</Tooltip.Content>
+				</Tooltip.Root>
+				{#if onregenerate}
+					<Tooltip.Root>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<Button
+									{...props}
+									variant="ghost"
+									size="icon-xs"
+									class="text-muted-foreground size-7"
+									onclick={onregenerate}
+									aria-label={t('turn.regenerate')}
+								>
+									<RefreshCwIcon />
+								</Button>
+							{/snippet}
+						</Tooltip.Trigger>
+						<Tooltip.Content>{t('turn.regenerate')}</Tooltip.Content>
+					</Tooltip.Root>
+				{/if}
+			</Tooltip.Provider>
+			{#if messageId}
+				<Button
+					variant="ghost"
+					size="sm"
+					class="text-muted-foreground h-7 gap-1.5 px-2 text-xs"
+					onclick={() => chatsStore.openWhatAiSaw(messageId!)}
+				>
+					<EyeIcon class="size-3.5!" />
+					{t('turn.whatAiSaw')}
+				</Button>
+			{/if}
+		</span>
+	</div>
 </div>

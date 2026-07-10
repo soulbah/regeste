@@ -8,7 +8,7 @@
 	const modes = $derived([
 		{
 			name: 'Private',
-			dot: 'bg-mode-private',
+			dot: 'bg-ring',
 			leaves: t('hiw.private.leaves'),
 			stays: t('hiw.private.stays'),
 			server: t('hiw.private.server')
@@ -22,7 +22,7 @@
 		},
 		{
 			name: 'My AI',
-			dot: 'bg-mode-myai',
+			dot: 'bg-mode-assisted',
 			leaves: t('hiw.myai.leaves'),
 			stays: t('hiw.myai.stays'),
 			server: t('hiw.myai.server')
@@ -84,7 +84,7 @@
 						<span class="bg-accent rounded-md px-2 py-1">{step}</span>
 					{/each}
 					<Badge variant="outline" class="ml-1 gap-1 font-mono text-[10px] uppercase">
-						<span class="bg-mode-private size-1.5 rounded-full"></span>
+						<span class="bg-ring size-1.5 rounded-full"></span>
 						{t('hiw.allBrowser')}
 					</Badge>
 				</div>

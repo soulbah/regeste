@@ -79,7 +79,7 @@
 						</p>
 						{#if settingsStore.storage.persisted}
 							<Badge variant="outline" class="gap-1 text-[10px]">
-								<span class="bg-mode-private size-1.5 rounded-full"></span>
+								<span class="bg-ring size-1.5 rounded-full"></span>
 								{t('settings.storage.persistent')}
 							</Badge>
 						{:else}
@@ -111,7 +111,7 @@
 				<Card.Content class="space-y-2">
 					{#if weekEgress.length === 0}
 						<p class="flex items-center gap-2 text-sm">
-							<ShieldIcon class="text-mode-private size-4" />
+							<ShieldIcon class="text-ring size-4" />
 							{t('settings.week.nothing')}
 						</p>
 					{:else}
@@ -193,7 +193,7 @@
 					</div>
 					{#if settingsStore.forceOffline}
 						<Badge variant="outline" class="gap-1 text-[10px]">
-							<span class="bg-mode-private size-1.5 rounded-full"></span>
+							<span class="bg-ring size-1.5 rounded-full"></span>
 							{t('settings.offline.badge')}
 						</Badge>
 					{/if}

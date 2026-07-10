@@ -88,7 +88,7 @@
 			{#if loaded && egress.length === 0}
 				<Card.Root>
 					<Card.Content class="flex flex-col items-center gap-3 py-10 text-center">
-						<ShieldCheckIcon class="text-mode-private size-10" />
+						<ShieldCheckIcon class="text-ring size-10" />
 						<p class="font-display text-2xl tracking-tight">{t('privacy.nothing')}</p>
 						<p class="text-muted-foreground max-w-md text-sm">
 							{onDevice
@@ -140,7 +140,7 @@
 								<span
 									class="size-1.5 shrink-0 rounded-full {e.mode === 'assisted'
 										? 'bg-mode-assisted'
-										: 'bg-mode-myai'}"
+										: 'bg-mode-assisted'}"
 								></span>
 								<div class="min-w-0 flex-1">
 									<p class="text-sm">

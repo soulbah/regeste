@@ -50,12 +50,9 @@
 	--sidebar-border: oklch(0.8996 0.0082 95);
 	--sidebar-ring: oklch(0.5502 0.0704 155);
 
-	/* Color signals the exception (spec 019): amber marks data leaving the device
-	   (Assisted and My AI); Private is uncolored; green is the brand accent.
-	   --mode-private / --mode-myai are deprecated aliases, removed in phase 3. */
+	/* Color signals the exception (spec 019): amber is the egress signal
+	   (Assisted and My AI); Private is uncolored; green is the brand accent. */
 	--mode-assisted: oklch(0.6404 0.0902 75);
-	--mode-private: var(--ring);
-	--mode-myai: var(--mode-assisted);
 
 	/* Cited-passage marker (viewer highlight) — warm amber: the universal text-marker
 	   convention, exempt from the amber-means-egress rule (badges/indicators only). */
@@ -121,8 +118,6 @@
 	--sidebar-ring: oklch(0.7002 0.0704 158);
 
 	--mode-assisted: oklch(0.7402 0.0852 80);
-	--mode-private: var(--ring);
-	--mode-myai: var(--mode-assisted);
 
 	--highlight: oklch(0.7402 0.0852 80);
 
@@ -182,9 +177,7 @@
 	--color-sidebar-border: var(--sidebar-border);
 	--color-sidebar-ring: var(--sidebar-ring);
 
-	--color-mode-private: var(--mode-private);
 	--color-mode-assisted: var(--mode-assisted);
-	--color-mode-myai: var(--mode-myai);
 	--color-highlight: var(--highlight);
 
 	--font-sans: var(--font-sans);

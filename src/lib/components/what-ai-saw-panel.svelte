@@ -36,9 +36,9 @@
 	);
 
 	function statusLabel(e: MessageExcerptRow): { label: string; dot: string } {
-		if (e.excluded) return { label: t('wais.excluded'), dot: 'bg-mode-private' };
+		if (e.excluded) return { label: t('wais.excluded'), dot: 'bg-ring' };
 		if (e.sent) return { label: t('wais.sent'), dot: 'bg-mode-assisted' };
-		return { label: t('wais.stayed'), dot: 'bg-mode-private' };
+		return { label: t('wais.stayed'), dot: 'bg-ring' };
 	}
 
 	async function openExcerpt(e: MessageExcerptRow) {

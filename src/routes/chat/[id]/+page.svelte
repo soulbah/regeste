@@ -2,14 +2,12 @@
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { MediaQuery } from 'svelte/reactivity';
-	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Resizable from '$lib/components/ui/resizable';
 	import * as Sheet from '$lib/components/ui/sheet';
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Button } from '$lib/components/ui/button';
 	import { Textarea } from '$lib/components/ui/textarea';
-	import SquareIcon from '@lucide/svelte/icons/square';
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import InfoIcon from '@lucide/svelte/icons/info';
 	import PanelRightOpenIcon from '@lucide/svelte/icons/panel-right-open';
@@ -70,19 +68,20 @@
 		thread?.scrollTo({ top: thread.scrollHeight });
 	});
 
-	// C2 — edit the last question.
-	let editOpen = $state(false);
+	// C2 — edit the last question, in place in the bubble (spec 019, no dialog).
+	let editingId = $state<string | null>(null);
 	let editText = $state('');
 	const lastUserId = $derived(
 		[...chatsStore.messages].reverse().find((m) => m.role === 'user')?.id
 	);
 	const lastMessage = $derived(chatsStore.messages[chatsStore.messages.length - 1]);
-	function openEdit() {
-		editText = [...chatsStore.messages].reverse().find((m) => m.role === 'user')?.content ?? '';
-		editOpen = true;
+	function startEdit(messageId: string) {
+		editText = chatsStore.messages.find((m) => m.id === messageId)?.content ?? '';
+		editingId = messageId;
 	}
 	async function confirmEdit() {
-		editOpen = false;
+		if (!editText.trim()) return;
+		editingId = null;
 		await chatsStore.editLast(chatId, editText);
 	}
 
@@ -231,22 +230,48 @@
 				<div class="mx-auto max-w-2xl space-y-6 px-6 py-8">
 					{#each chatsStore.messages as message (message.id)}
 						{#if message.role === 'user'}
-							<div class="group flex items-center justify-end gap-1">
-								{#if message.id === lastUserId && !chatsStore.sending}
-									<Button
-										variant="ghost"
-										size="icon"
-										class="size-6 opacity-0 group-hover:opacity-100"
-										aria-label={t('chat.editAria')}
-										onclick={openEdit}
-									>
-										<PencilIcon class="size-3" />
-									</Button>
-								{/if}
-								<div class="bg-accent max-w-[85%] rounded-xl px-4 py-2.5 text-sm">
-									{message.content}
+							{#if editingId === message.id}
+								<!-- In-place edit (spec 019): the bubble becomes the editor, no dialog. -->
+								<div class="ml-auto w-full max-w-[85%] space-y-2">
+									<Textarea
+										bind:value={editText}
+										class="min-h-16"
+										aria-label={t('chat.editedAria')}
+										onkeydown={(e) => {
+											if (e.key === 'Enter' && !e.shiftKey) {
+												e.preventDefault();
+												confirmEdit();
+											}
+											if (e.key === 'Escape') editingId = null;
+										}}
+									/>
+									<div class="flex justify-end gap-2">
+										<Button variant="ghost" size="sm" onclick={() => (editingId = null)}>
+											{t('common.cancel')}
+										</Button>
+										<Button size="sm" disabled={!editText.trim()} onclick={confirmEdit}>
+											{t('chat.resend')}
+										</Button>
+									</div>
 								</div>
-							</div>
+							{:else}
+								<div class="group flex items-center justify-end gap-1">
+									{#if message.id === lastUserId && !chatsStore.sending}
+										<Button
+											variant="ghost"
+											size="icon"
+											class="size-6 opacity-0 group-hover:opacity-100"
+											aria-label={t('chat.editAria')}
+											onclick={() => startEdit(message.id)}
+										>
+											<PencilIcon class="size-3" />
+										</Button>
+									{/if}
+									<div class="bg-muted max-w-[85%] rounded-2xl rounded-br-md px-4 py-2.5 text-sm">
+										{message.content}
+									</div>
+								</div>
+							{/if}
 						{:else if message.mode === 'retrieval'}
 							<RetrievalTurn content={message.content} />
 						{:else if message.mode === 'notice'}
@@ -296,7 +321,7 @@
 					{#if reviewing}
 						<div class="flex items-center gap-2">
 							<span class="bg-mode-assisted size-1.5 animate-pulse rounded-full"></span>
-							<span class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
+							<span class="text-muted-foreground font-mono text-[10px]">
 								{t('chat.reviewing')}
 							</span>
 						</div>
@@ -304,25 +329,10 @@
 					{#if chatsStore.streamingText !== null}
 						<div class="space-y-2">
 							<div class="flex items-center gap-2">
-								<span
-									class="{chatsStore.activeChat?.mode === 'myai'
-										? 'bg-mode-myai'
-										: 'bg-mode-private'} size-1.5 animate-pulse rounded-full"
-								></span>
-								<span class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
+								<span class="bg-ring size-1.5 animate-pulse rounded-full"></span>
+								<span class="text-muted-foreground font-mono text-[10px]">
 									{chatsStore.streamingText ? t('chat.writing') : t('chat.reading')}
 								</span>
-								{#if llmStore.status === 'generating' || myaiStore.generating}
-									<Button
-										variant="ghost"
-										size="sm"
-										class="h-6 gap-1 px-2 font-mono text-[10px] uppercase"
-										onclick={() => chatsStore.stopGeneration()}
-									>
-										<SquareIcon class="size-2.5" />
-										{t('chat.stop')}
-									</Button>
-								{/if}
 							</div>
 							{#if chatsStore.streamingText}
 								<p class="text-sm leading-relaxed whitespace-pre-wrap">
@@ -345,6 +355,8 @@
 				<Composer
 					mode={chatsStore.activeChat?.mode ?? 'private'}
 					disabled={chatsStore.sending}
+					generating={llmStore.status === 'generating' || myaiStore.generating}
+					onstop={() => chatsStore.stopGeneration()}
 					onsend={handleSend}
 					onmodeselect={(m) => chatsStore.setMode(chatId, m)}
 					onupload={handleUpload}
@@ -400,27 +412,3 @@
 		</Sheet.Content>
 	</Sheet.Root>
 {/if}
-
-<Dialog.Root bind:open={editOpen}>
-	<Dialog.Content class="sm:max-w-md">
-		<Dialog.Header>
-			<Dialog.Title>{t('chat.editTitle')}</Dialog.Title>
-			<Dialog.Description>{t('chat.editDescription')}</Dialog.Description>
-		</Dialog.Header>
-		<form
-			class="space-y-4"
-			onsubmit={(e) => {
-				e.preventDefault();
-				confirmEdit();
-			}}
-		>
-			<Textarea bind:value={editText} class="min-h-24" aria-label={t('chat.editedAria')} />
-			<Dialog.Footer>
-				<Button type="button" variant="outline" onclick={() => (editOpen = false)}>
-					{t('common.cancel')}
-				</Button>
-				<Button type="submit" disabled={!editText.trim()}>{t('chat.resend')}</Button>
-			</Dialog.Footer>
-		</form>
-	</Dialog.Content>
-</Dialog.Root>
