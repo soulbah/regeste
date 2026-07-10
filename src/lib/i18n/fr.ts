@@ -234,7 +234,7 @@ export const fr: Record<keyof typeof en, string> = {
 	// Documents page
 	'docsPage.count': '{count} dans votre espace de travail',
 	'docsPage.intro':
-		'Chaque document ajouté à Folio vit ici et reste sur cet appareil. Ajoutez-en un à une discussion pour commencer à poser des questions dessus.',
+		'Vos documents restent sur cet appareil. Joignez-en un à une discussion pour poser vos questions.',
 	'docsPage.add': 'Ajouter des documents',
 	'docsPage.sortRecent': 'Plus récents',
 	'docsPage.sortName': 'Nom',

@@ -224,8 +224,7 @@ export const en = {
 
 	// Documents page
 	'docsPage.count': '{count} in your workspace',
-	'docsPage.intro':
-		"Every document you've added to Folio lives here and stays on this device. Add one to a chat to start asking questions about it.",
+	'docsPage.intro': 'Your documents stay on this device. Attach one to a chat to ask questions.',
 	'docsPage.add': 'Add documents',
 	'docsPage.sortRecent': 'Most recent',
 	'docsPage.sortName': 'Name',
