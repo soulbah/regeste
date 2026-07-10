@@ -62,13 +62,16 @@
 				{/snippet}
 			</DropdownMenu.Trigger>
 			<DropdownMenu.Content side="top" align="start" class="w-60">
-				<DropdownMenu.Label class="font-normal">
-					<span class="grid leading-tight">
-						<span class="truncate text-sm font-medium">{identity.name}</span>
-						<span class="text-muted-foreground truncate text-xs">{identity.line}</span>
-					</span>
-				</DropdownMenu.Label>
-				<DropdownMenu.Separator />
+				<!-- Signed out there is no identity worth repeating: skip the header. -->
+				{#if sessionStore.user}
+					<DropdownMenu.Label class="font-normal">
+						<span class="grid leading-tight">
+							<span class="truncate text-sm font-medium">{identity.name}</span>
+							<span class="text-muted-foreground truncate text-xs">{identity.line}</span>
+						</span>
+					</DropdownMenu.Label>
+					<DropdownMenu.Separator />
+				{/if}
 				<DropdownMenu.Sub>
 					<DropdownMenu.SubTrigger>
 						<SunMoonIcon class="text-muted-foreground" />
