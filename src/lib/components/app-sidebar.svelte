@@ -1,6 +1,7 @@
 <script lang="ts">
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import * as Tooltip from '$lib/components/ui/tooltip';
+	import NavUser from '$lib/components/nav-user.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -15,16 +16,13 @@
 	import DownloadIcon from '@lucide/svelte/icons/download';
 	import Trash2Icon from '@lucide/svelte/icons/trash-2';
 	import FileIcon from '@lucide/svelte/icons/file';
-	import ShieldIcon from '@lucide/svelte/icons/shield';
 	import SearchIcon from '@lucide/svelte/icons/search';
-	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { t } from '$lib/i18n/index.svelte';
 	import { chatsStore } from '$lib/state/chats.svelte';
 	import { searchStore } from '$lib/state/search.svelte';
-	import { sessionStore } from '$lib/state/session.svelte';
 	import type { LocalChat } from '$lib/types';
 
 	let renameTarget = $state<LocalChat | null>(null);
@@ -159,30 +157,6 @@
 					<span class="text-muted-foreground ml-auto font-mono text-[10px]">⌘K</span>
 				</Sidebar.MenuButton>
 			</Sidebar.MenuItem>
-			<Sidebar.MenuItem>
-				<Sidebar.MenuButton
-					tooltipContent={t('sidebar.privacyReport')}
-					isActive={page.url.pathname === '/chat/privacy'}
-				>
-					{#snippet child({ props })}
-						<a href={resolve('/chat/privacy')} {...props}>
-							<ShieldIcon /> <span>{t('sidebar.privacyReport')}</span>
-						</a>
-					{/snippet}
-				</Sidebar.MenuButton>
-			</Sidebar.MenuItem>
-			<Sidebar.MenuItem>
-				<Sidebar.MenuButton
-					tooltipContent={t('sidebar.settings')}
-					isActive={page.url.pathname === '/chat/settings'}
-				>
-					{#snippet child({ props })}
-						<a href={resolve('/chat/settings')} {...props}>
-							<SettingsIcon /> <span>{t('sidebar.settings')}</span>
-						</a>
-					{/snippet}
-				</Sidebar.MenuButton>
-			</Sidebar.MenuItem>
 		</Sidebar.Menu>
 	</Sidebar.Header>
 	<Sidebar.Content>
@@ -256,28 +230,7 @@
 		{/each}
 	</Sidebar.Content>
 	<Sidebar.Footer>
-		<a
-			href={resolve('/chat/account')}
-			class="hover:bg-foreground/7 flex items-center gap-2 rounded-md px-2 py-1.5 group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:hover:bg-transparent"
-		>
-			<!-- Rail: the avatar simply reads larger than the nav glyphs (Claude),
-			     no hover chrome around it. -->
-			<span
-				class="bg-muted flex size-7 shrink-0 items-center justify-center rounded-full text-xs uppercase group-data-[collapsible=icon]:size-8"
-			>
-				{sessionStore.user ? sessionStore.user.email[0] : t('sidebar.guest')[0]}
-			</span>
-			<div class="min-w-0 group-data-[collapsible=icon]:hidden">
-				<p class="truncate text-sm font-medium">
-					{sessionStore.user
-						? sessionStore.user.name || sessionStore.user.email
-						: t('sidebar.guest')}
-				</p>
-				{#if !sessionStore.user}
-					<p class="text-muted-foreground truncate text-xs">{t('sidebar.localWorkspace')}</p>
-				{/if}
-			</div>
-		</a>
+		<NavUser />
 	</Sidebar.Footer>
 </Sidebar.Root>
 

@@ -23,6 +23,10 @@ class SettingsStore {
 	exporting = $state(false);
 	/** R5 — this month's Assisted usage; null when signed out/unknown. */
 	quota = $state<{ used: number; limit: number } | null>(null);
+	/** Spec 021 — dyslexia-friendly reading treatment for answer prose. */
+	readingFont = $state<'default' | 'dyslexic'>('default');
+	/** Spec 021 — mode applied to newly created chats. */
+	defaultMode = $state<'private' | 'assisted' | 'myai'>('private');
 
 	private loaded = false;
 
@@ -32,7 +36,23 @@ class SettingsStore {
 		const { db } = await getLocalDb();
 		this.forceOffline = (await db.getSetting('force_offline')) === '1';
 		this.assistedConsented = (await db.getSetting('assisted_consented')) === '1';
+		const font = await db.getSetting('reading_font');
+		if (font === 'dyslexic') this.readingFont = 'dyslexic';
+		const mode = await db.getSetting('default_mode');
+		if (mode === 'assisted' || mode === 'myai') this.defaultMode = mode;
 		await this.refreshStorage();
+	}
+
+	async setReadingFont(font: 'default' | 'dyslexic'): Promise<void> {
+		this.readingFont = font;
+		const { db } = await getLocalDb();
+		await db.setSetting('reading_font', font === 'default' ? null : font);
+	}
+
+	async setDefaultMode(mode: 'private' | 'assisted' | 'myai'): Promise<void> {
+		this.defaultMode = mode;
+		const { db } = await getLocalDb();
+		await db.setSetting('default_mode', mode === 'private' ? null : mode);
 	}
 
 	async acknowledgeAssisted(): Promise<void> {

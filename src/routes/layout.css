@@ -82,6 +82,12 @@
 		0 18px 44px -8px rgb(var(--shadow-color) / 0.15), 0 2px 6px -2px rgb(var(--shadow-color) / 0.06);
 	--shadow-2xl: 0 28px 64px -12px rgb(var(--shadow-color) / 0.26);
 
+	/* Spec 021 — reading treatment for answer prose; the dyslexic variant
+	   widens tracking, word gaps and leading (evidence-based, no font swap). */
+	--reading-tracking: 0em;
+	--reading-word: 0em;
+	--reading-leading: 1.625;
+
 	--tracking-normal: 0em;
 	--spacing: 0.25rem;
 }
@@ -230,4 +236,10 @@
 	h3 {
 		@apply font-display tracking-tight;
 	}
+}
+
+html[data-reading='dyslexic'] {
+	--reading-tracking: 0.015em;
+	--reading-word: 0.16em;
+	--reading-leading: 1.9;
 }

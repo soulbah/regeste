@@ -136,7 +136,9 @@
 		</div>
 	{/if}
 
-	<p class="text-sm leading-relaxed whitespace-pre-wrap">
+	<p
+		class="text-sm whitespace-pre-wrap leading-(--reading-leading) tracking-(--reading-tracking) [word-spacing:var(--reading-word)]"
+	>
 		{#each segments as segment, i (i)}
 			{#if segment.type === 'text'}{segment.value}{:else}
 				<Tooltip.Provider delayDuration={600}>

@@ -10,9 +10,15 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import { chatsStore } from '$lib/state/chats.svelte';
 	import { documentsStore } from '$lib/state/documents.svelte';
+	import { settingsStore } from '$lib/state/settings.svelte';
 	import type { ChatMode } from '$lib/types';
 
 	let mode = $state<ChatMode>('private');
+	let modeTouched = false;
+	// Spec 021 — the default-mode setting seeds the selector until touched.
+	$effect(() => {
+		if (!modeTouched) mode = settingsStore.defaultMode;
+	});
 	let demoStarting = $state(false);
 
 	/** O1 — one click: a chat with the bundled fictional contracts. */
@@ -93,7 +99,10 @@
 		<Composer
 			{mode}
 			onsend={handleSend}
-			onmodeselect={(m) => (mode = m)}
+			onmodeselect={(m) => {
+				modeTouched = true;
+				mode = m;
+			}}
 			onupload={handleUpload}
 			onattach={handleAttach}
 			libraryEmpty={documentsStore.library.length === 0}

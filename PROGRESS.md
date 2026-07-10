@@ -26,6 +26,7 @@ Canonical project state. Read this first; update it (status table + one log line
 | 018  | Private Lite — wllama CPU fallback + cross-origin isolation            | done   |
 | 019  | UI refonte — design system v2 (owner-validated report)                 | done   |
 | 020  | Refonte leftovers: /chat/* routes, answer versions, related, quote     | done   |
+| 021  | Account menu, settings modal, 3-tab sidebar, cmd-k v2                  | done   |
 | —    | Landing page at / (root freed by 020); brand/logo; mobile pass         | later  |
 | —    | Open-source launch prep (checklist: docs/internal/OSS-LAUNCH.md)       | later  |
 

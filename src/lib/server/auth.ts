@@ -34,6 +34,10 @@ export function createAuth(env: Env, origin: string) {
 				}
 			})
 		],
+		user: {
+			// Spec 021 — account deletion from Settings; quota rows cascade.
+			deleteUser: { enabled: true }
+		},
 		session: {
 			cookieCache: {
 				enabled: true,

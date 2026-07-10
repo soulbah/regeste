@@ -14,6 +14,7 @@
 
 	let events = $state<PrivacyEventRow[]>([]);
 	let summary = $state<PrivacySummaryRow[]>([]);
+	let week = $state<PrivacySummaryRow[]>([]);
 	let loaded = $state(false);
 
 	$effect(() => {
@@ -21,9 +22,13 @@
 			const { db } = await getLocalDb();
 			events = await db.listPrivacyEvents(1000);
 			summary = await db.privacySummary();
+			week = await db.weekPrivacySummary();
 			loaded = true;
 		})();
 	});
+
+	// Spec 021 — "Shared this week" moved here from Settings (it belongs with the proof).
+	const weekEgress = $derived(week.filter((w) => w.destination !== 'device'));
 
 	const egress = $derived(events.filter((e) => e.destination !== 'device'));
 	const egressSummary = $derived(summary.filter((s) => s.destination !== 'device'));
@@ -85,6 +90,23 @@
 
 	<div class="flex-1 overflow-y-auto">
 		<div class="mx-auto max-w-3xl space-y-6 px-6 py-8">
+			{#if loaded && weekEgress.length > 0}
+				<Card.Root>
+					<Card.Header>
+						<Card.Title class="text-base">{t('settings.week.title')}</Card.Title>
+					</Card.Header>
+					<Card.Content class="space-y-1">
+						{#each weekEgress as row (row.destination)}
+							<p class="text-sm">
+								<span class="font-mono">{row.destination}</span> · {t('common.requests', {
+									count: row.requests,
+									s: row.requests === 1 ? '' : 's'
+								})} · {fmtBytes(row.bytes)}
+							</p>
+						{/each}
+					</Card.Content>
+				</Card.Root>
+			{/if}
 			{#if loaded && egress.length === 0}
 				<Card.Root>
 					<Card.Content class="flex flex-col items-center gap-3 py-10 text-center">

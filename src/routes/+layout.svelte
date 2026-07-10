@@ -8,6 +8,7 @@
 	import * as Sheet from '$lib/components/ui/sheet';
 	import AppSidebar from '$lib/components/app-sidebar.svelte';
 	import CommandPalette from '$lib/components/command-palette.svelte';
+	import SettingsDialog from '$lib/components/settings-dialog.svelte';
 	import ViewerPanel from '$lib/components/viewer-panel.svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -72,6 +73,15 @@
 		}
 	});
 
+	// Spec 021 — reading treatment follows the setting (answer prose only).
+	$effect(() => {
+		if (settingsStore.readingFont === 'dyslexic') {
+			document.documentElement.dataset.reading = 'dyslexic';
+		} else {
+			delete document.documentElement.dataset.reading;
+		}
+	});
+
 	// Keep the active chat's document panel live while ingestion progresses.
 	$effect(() => {
 		void documentsStore.documents;
@@ -110,6 +120,7 @@
 <ModeWatcher defaultMode="system" />
 <Toaster position="bottom-right" />
 <CommandPalette />
+<SettingsDialog />
 
 <Sheet.Root
 	open={viewerStore.isOpen && !onChatRoute}
