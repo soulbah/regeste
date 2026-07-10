@@ -41,6 +41,9 @@
 </script>
 
 {#if !sidebar.isMobile}
+	<!-- A focusable separator with keyboard support is the ARIA window-splitter
+	     pattern; the a11y rules below don't know it. -->
+	<!-- svelte-ignore a11y_no_noninteractive_element_interactions, a11y_no_noninteractive_tabindex -->
 	<div
 		data-slot="sidebar-resize-handle"
 		data-resizing={sidebar.resizing ? '' : undefined}
@@ -55,11 +58,15 @@
 		ondblclick={() => sidebar.resetWidth()}
 		{onkeydown}
 		class={cn(
-			'absolute inset-y-0 -right-1 z-20 hidden w-2 cursor-col-resize touch-none select-none sm:block',
+			'group/resize absolute inset-y-0 -right-1 z-20 hidden w-2 cursor-ew-resize touch-none select-none sm:block',
 			'group-data-[collapsible=icon]:hidden group-data-[collapsible=offcanvas]:hidden',
-			'after:absolute after:inset-y-0 after:right-[3px] after:w-0.5 after:rounded-full after:bg-transparent after:transition-colors after:delay-75',
-			'hover:after:bg-border data-resizing:after:bg-ring data-resizing:after:delay-0',
-			'focus-visible:outline-none focus-visible:after:bg-ring'
+			'focus-visible:outline-none'
 		)}
-	></div>
+	>
+		<!-- Grab pill (claude.ai pattern), shared language with the pane handle:
+		     the pill alone carries the affordance, the zone border stays quiet. -->
+		<div
+			class="bg-muted-foreground/60 absolute top-1/2 left-1/2 h-16 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full opacity-0 transition-opacity delay-75 group-hover/resize:opacity-100 group-focus-visible/resize:opacity-100 group-data-[resizing]/resize:bg-ring group-data-[resizing]/resize:opacity-100"
+		></div>
+	</div>
 {/if}

@@ -478,6 +478,7 @@
 		</div>
 	</Resizable.Pane>
 	<Resizable.Handle
+		withHandle
 		class="hidden lg:flex"
 		ondblclick={() => panelPane?.resize(PANEL_DEFAULT_SIZE)}
 	/>
