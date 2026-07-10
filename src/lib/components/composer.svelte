@@ -24,7 +24,9 @@
 		hasReadyDocs = false,
 		generating = false,
 		onstop = null,
-		followUp = false
+		followUp = false,
+		quote = null,
+		onquoteused = null
 	}: {
 		mode: ChatMode;
 		disabled?: boolean;
@@ -43,9 +45,24 @@
 		onstop?: (() => void) | null;
 		/** After the first exchange the placeholder invites a follow-up. */
 		followUp?: boolean;
+		/** Spec 020 — quote-reply: a selection arrives as a markdown quote. */
+		quote?: string | null;
+		onquoteused?: (() => void) | null;
 	} = $props();
 
 	let text = $state('');
+	let textareaRef = $state<HTMLTextAreaElement | null>(null);
+
+	$effect(() => {
+		if (!quote) return;
+		const quoted = quote
+			.split('\n')
+			.map((l) => `> ${l}`)
+			.join('\n');
+		text = text ? `${quoted}\n\n${text}` : `${quoted}\n\n`;
+		textareaRef?.focus();
+		onquoteused?.();
+	});
 
 	function submit() {
 		const trimmed = text.trim();
@@ -93,6 +110,7 @@
 	{/if}
 	<Textarea
 		bind:value={text}
+		bind:ref={textareaRef}
 		placeholder={t(followUp ? 'composer.followUp' : 'composer.placeholder')}
 		class="max-h-40 min-h-8 resize-none border-0 bg-transparent px-1 py-1 shadow-none focus-visible:ring-0"
 		onkeydown={(e) => {

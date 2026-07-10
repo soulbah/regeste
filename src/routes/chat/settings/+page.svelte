@@ -126,7 +126,9 @@
 					{/if}
 					<p class="text-muted-foreground text-xs">
 						{t('settings.week.fullHistory')}
-						<a class="underline" href={resolve('/privacy')}>{t('settings.week.privacyReport')}</a>
+						<a class="underline" href={resolve('/chat/privacy')}
+							>{t('settings.week.privacyReport')}</a
+						>
 						· {t('settings.week.howEachMode')}
 						<a class="underline" href={resolve('/how-it-works')}>{t('settings.week.dataFlows')}</a>
 					</p>

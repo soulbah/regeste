@@ -73,7 +73,7 @@
 		const wasActive = page.url.pathname.includes(deleteTarget.id);
 		await chatsStore.remove(deleteTarget.id);
 		deleteTarget = null;
-		if (wasActive) goto(resolve('/'));
+		if (wasActive) goto(resolve('/chat'));
 	}
 </script>
 
@@ -85,7 +85,7 @@
 			class="flex items-center justify-between group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-1"
 		>
 			<a
-				href={resolve('/')}
+				href={resolve('/chat')}
 				class="flex min-w-0 items-center gap-2 px-2 py-1.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
 			>
 				<FileIcon class="size-4 shrink-0" />
@@ -99,16 +99,16 @@
 			<Sidebar.MenuItem>
 				<Sidebar.MenuButton>
 					{#snippet child({ props })}
-						<a href={resolve('/')} {...props}>
+						<a href={resolve('/chat')} {...props}>
 							<PlusIcon /> <span>{t('sidebar.newChat')}</span>
 						</a>
 					{/snippet}
 				</Sidebar.MenuButton>
 			</Sidebar.MenuItem>
 			<Sidebar.MenuItem>
-				<Sidebar.MenuButton isActive={page.url.pathname === '/documents'}>
+				<Sidebar.MenuButton isActive={page.url.pathname === '/chat/documents'}>
 					{#snippet child({ props })}
-						<a href={resolve('/documents')} {...props}>
+						<a href={resolve('/chat/documents')} {...props}>
 							<FolderIcon /> <span>{t('sidebar.documents')}</span>
 						</a>
 					{/snippet}
@@ -122,18 +122,18 @@
 				</Sidebar.MenuButton>
 			</Sidebar.MenuItem>
 			<Sidebar.MenuItem>
-				<Sidebar.MenuButton isActive={page.url.pathname === '/privacy'}>
+				<Sidebar.MenuButton isActive={page.url.pathname === '/chat/privacy'}>
 					{#snippet child({ props })}
-						<a href={resolve('/privacy')} {...props}>
+						<a href={resolve('/chat/privacy')} {...props}>
 							<ShieldIcon /> <span>{t('sidebar.privacyReport')}</span>
 						</a>
 					{/snippet}
 				</Sidebar.MenuButton>
 			</Sidebar.MenuItem>
 			<Sidebar.MenuItem>
-				<Sidebar.MenuButton isActive={page.url.pathname === '/settings'}>
+				<Sidebar.MenuButton isActive={page.url.pathname === '/chat/settings'}>
 					{#snippet child({ props })}
-						<a href={resolve('/settings')} {...props}>
+						<a href={resolve('/chat/settings')} {...props}>
 							<SettingsIcon /> <span>{t('sidebar.settings')}</span>
 						</a>
 					{/snippet}
@@ -196,7 +196,7 @@
 	</Sidebar.Content>
 	<Sidebar.Footer>
 		<a
-			href={resolve('/account')}
+			href={resolve('/chat/account')}
 			class="hover:bg-sidebar-accent flex items-center gap-2 rounded-md px-2 py-1.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
 		>
 			<span

@@ -87,6 +87,8 @@ export interface LocalMessage {
 	 */
 	mode: ChatMode | 'retrieval' | 'notice' | null;
 	createdAt: number;
+	/** Spec 020 — versions of one turn share a group (the first answer's id). */
+	versionGroup?: string | null;
 }
 
 export interface ChatDocument extends LocalDocument {

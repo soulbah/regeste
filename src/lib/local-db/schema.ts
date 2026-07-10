@@ -147,5 +147,14 @@ export const MIGRATIONS: string[] = [
 		created_at INTEGER NOT NULL
 	);
 	CREATE INDEX idx_message_excerpts_message ON message_excerpts(message_id);
+	`,
+
+	// v8 — answer versions (spec 020): Try again keeps the previous answer.
+	// version_group ties versions of one turn together (the first message's id);
+	// active marks the displayed one. Existing rows are all active singletons.
+	`
+	ALTER TABLE messages ADD COLUMN version_group TEXT;
+	ALTER TABLE messages ADD COLUMN active INTEGER NOT NULL DEFAULT 1;
+	CREATE INDEX idx_messages_version_group ON messages(version_group);
 	`
 ];

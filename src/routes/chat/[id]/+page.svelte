@@ -12,6 +12,7 @@
 	import InfoIcon from '@lucide/svelte/icons/info';
 	import PanelRightOpenIcon from '@lucide/svelte/icons/panel-right-open';
 	import PanelRightCloseIcon from '@lucide/svelte/icons/panel-right-close';
+	import MessageSquareQuoteIcon from '@lucide/svelte/icons/message-square-quote';
 	import Composer from '$lib/components/composer.svelte';
 	import RetrievalTurn from '$lib/components/retrieval-turn.svelte';
 	import PrivateTurn from '$lib/components/private-turn.svelte';
@@ -125,6 +126,39 @@
 		}
 	});
 
+	// Spec 020 — quote-reply: select answer text → floating button → composer.
+	let quoteButton = $state<{ x: number; y: number; text: string } | null>(null);
+	let pendingQuote = $state<string | null>(null);
+
+	function handleSelection() {
+		const sel = window.getSelection();
+		if (!sel || sel.isCollapsed || !thread) {
+			quoteButton = null;
+			return;
+		}
+		const text = sel.toString().trim();
+		const anchor =
+			sel.anchorNode instanceof Element ? sel.anchorNode : sel.anchorNode?.parentElement;
+		if (!text || text.length < 3 || !anchor?.closest('[data-answer]')) {
+			quoteButton = null;
+			return;
+		}
+		const rect = sel.getRangeAt(0).getBoundingClientRect();
+		const host = thread.getBoundingClientRect();
+		quoteButton = {
+			x: Math.max(8, rect.left - host.left + rect.width / 2 - 36),
+			y: rect.bottom - host.top + thread.scrollTop + 6,
+			text
+		};
+	}
+
+	function applyQuote() {
+		if (!quoteButton) return;
+		pendingQuote = quoteButton.text;
+		quoteButton = null;
+		window.getSelection()?.removeAllRanges();
+	}
+
 	// C7 — drop files anywhere on the thread.
 	let dragging = $state(false);
 	function handleDrop(e: DragEvent) {
@@ -138,6 +172,8 @@
 <svelte:head
 	><title>{chatsStore.activeChat?.title ?? t('chat.fallback')} · Folio</title></svelte:head
 >
+
+<svelte:document onselectionchange={handleSelection} />
 
 <svelte:window
 	onkeydown={(e) => {
@@ -168,7 +204,7 @@
 				</div>
 				<div class="flex shrink-0 items-center gap-2">
 					<a
-						href={resolve('/privacy')}
+						href={resolve('/chat/privacy')}
 						class="focus-visible:ring-ring rounded-full focus-visible:ring-2"
 					>
 						{#if chatsStore.chatEgress && chatsStore.chatEgress.cloudRequests > 0}
@@ -294,26 +330,34 @@
 							</div>
 						{:else if message.mode === 'private' || message.mode === 'assisted' || message.mode === 'myai'}
 							{@const ev = chatsStore.privacyByMessage[message.id]}
-							<PrivateTurn
-								content={message.content}
-								citations={chatsStore.citations[message.id] ?? []}
-								mode={message.mode}
-								meta={ev && message.mode !== 'private'
-									? t('chat.meta', {
-											count: ev.excerptCount,
-											s: ev.excerptCount === 1 ? '' : 's',
-											kb: (ev.bytesSent / 1024).toFixed(1),
-											dest: message.mode === 'assisted' ? t('common.cloudAi') : ev.destination
-										})
-									: null}
-								onregenerate={message.id === lastMessage?.id &&
-								message.mode !== 'assisted' &&
-								!chatsStore.sending
-									? () => chatsStore.regenerate(chatId)
-									: null}
-								messageId={message.id}
-								excerpts={chatsStore.excerptsByMessage[message.id] ?? []}
-							/>
+							<div data-answer>
+								<PrivateTurn
+									content={message.content}
+									citations={chatsStore.citations[message.id] ?? []}
+									mode={message.mode}
+									meta={ev && message.mode !== 'private'
+										? t('chat.meta', {
+												count: ev.excerptCount,
+												s: ev.excerptCount === 1 ? '' : 's',
+												kb: (ev.bytesSent / 1024).toFixed(1),
+												dest: message.mode === 'assisted' ? t('common.cloudAi') : ev.destination
+											})
+										: null}
+									onregenerate={message.id === lastMessage?.id &&
+									message.mode !== 'assisted' &&
+									!chatsStore.sending
+										? () => chatsStore.regenerate(chatId)
+										: null}
+									messageId={message.id}
+									excerpts={chatsStore.excerptsByMessage[message.id] ?? []}
+									versions={message.versionGroup
+										? (chatsStore.versionsByGroup[message.versionGroup] ?? null)
+										: null}
+									onswitchversion={message.versionGroup
+										? (id) => chatsStore.switchVersion(chatId, message.versionGroup!, id)
+										: null}
+								/>
+							</div>
 						{:else}
 							<div class="text-sm">{message.content}</div>
 						{/if}
@@ -348,7 +392,41 @@
 							<Skeleton class="h-4 w-1/2" />
 						</div>
 					{/if}
+					<!-- Spec 020 — related questions: last answer only, max 3, silent absence. -->
+					{#if !chatsStore.sending && chatsStore.related?.chatId === chatId && chatsStore.related.messageId === lastMessage?.id}
+						<div class="border-t pt-2">
+							<p class="text-muted-foreground pb-1 font-mono text-[10px] tracking-wide uppercase">
+								{t('related.title')}
+							</p>
+							<div class="flex flex-col">
+								{#each chatsStore.related.questions as q (q)}
+									<Button
+										variant="ghost"
+										size="sm"
+										class="text-foreground/90 h-auto w-full justify-start px-2 py-1.5 text-left text-sm font-normal whitespace-normal"
+										onclick={() => handleSend(q)}
+									>
+										{q}
+									</Button>
+								{/each}
+							</div>
+						</div>
+					{/if}
 				</div>
+				<!-- Spec 020 — quote-reply: floats over the selection inside an answer. -->
+				{#if quoteButton}
+					<Button
+						size="xs"
+						variant="outline"
+						class="bg-popover absolute z-20 gap-1.5 shadow-md"
+						style="left: {quoteButton.x}px; top: {quoteButton.y}px"
+						onmousedown={(e: MouseEvent) => e.preventDefault()}
+						onclick={applyQuote}
+					>
+						<MessageSquareQuoteIcon class="size-3.5!" />
+						{t('turn.quote')}
+					</Button>
+				{/if}
 			</div>
 
 			<div class="px-6 pb-6">
@@ -356,8 +434,11 @@
 					mode={chatsStore.activeChat?.mode ?? 'private'}
 					disabled={chatsStore.sending}
 					followUp={chatsStore.messages.length > 0}
-					generating={llmStore.status === 'generating' || myaiStore.generating}
+					generating={(llmStore.status === 'generating' || myaiStore.generating) &&
+						chatsStore.streamingText !== null}
 					onstop={() => chatsStore.stopGeneration()}
+					quote={pendingQuote}
+					onquoteused={() => (pendingQuote = null)}
 					onsend={handleSend}
 					onmodeselect={(m) => chatsStore.setMode(chatId, m)}
 					onupload={handleUpload}

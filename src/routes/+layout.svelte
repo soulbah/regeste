@@ -25,7 +25,7 @@
 
 	// Outside a chat, the right pane doesn't exist: ⌘K document results open
 	// the viewer in an overlay sheet instead.
-	const onChatRoute = $derived(page.url.pathname.startsWith('/chat/'));
+	const onChatRoute = $derived(page.route.id === '/chat/[id]');
 
 	$effect(() => {
 		i18n.init();
@@ -41,7 +41,7 @@
 	const prevStatuses = new SvelteMap<string, string>();
 	$effect(() => {
 		const visibleIds = new Set(chatsStore.chatDocuments.map((d) => d.id));
-		const onDocumentsPage = page.url.pathname === '/documents';
+		const onDocumentsPage = page.url.pathname === '/chat/documents';
 		for (const doc of documentsStore.documents) {
 			const prev = prevStatuses.get(doc.id);
 			if (prev && prev !== doc.status && !visibleIds.has(doc.id) && !onDocumentsPage) {
@@ -77,7 +77,7 @@
 		// C10 — ⇧⌘O new chat; "/" focuses the composer (outside inputs).
 		if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'o') {
 			e.preventDefault();
-			goto(resolve('/'));
+			goto(resolve('/chat'));
 			return;
 		}
 		const target = e.target as HTMLElement;

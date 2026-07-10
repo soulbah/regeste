@@ -20,7 +20,7 @@
 	async function verify() {
 		if (otp.length !== 6) return;
 		const ok = await sessionStore.verifyCode(otp);
-		if (ok) goto(resolve('/'));
+		if (ok) goto(resolve('/chat'));
 		else otp = '';
 	}
 

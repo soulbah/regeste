@@ -193,7 +193,7 @@
 								// Locked Assisted is the sign-up funnel: route to the account page.
 								if (m.id === 'assisted' && !sessionStore.user) {
 									open = false;
-									goto(resolve('/account'));
+									goto(resolve('/chat/account'));
 								}
 								return;
 							}

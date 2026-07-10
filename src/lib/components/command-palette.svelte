@@ -89,15 +89,18 @@
 			</Command.Group>
 		{/if}
 		<Command.Group heading={t('palette.commands')}>
-			<Command.Item value="cmd-new-chat" onSelect={() => run(() => goto(resolve('/')))}>
+			<Command.Item value="cmd-new-chat" onSelect={() => run(() => goto(resolve('/chat')))}>
 				<PlusIcon class="size-4" />
 				{t('sidebar.newChat')}
 			</Command.Item>
-			<Command.Item value="cmd-documents" onSelect={() => run(() => goto(resolve('/documents')))}>
+			<Command.Item
+				value="cmd-documents"
+				onSelect={() => run(() => goto(resolve('/chat/documents')))}
+			>
 				<FolderIcon class="size-4" />
 				{t('sidebar.documents')}
 			</Command.Item>
-			<Command.Item value="cmd-privacy" onSelect={() => run(() => goto(resolve('/privacy')))}>
+			<Command.Item value="cmd-privacy" onSelect={() => run(() => goto(resolve('/chat/privacy')))}>
 				<ShieldIcon class="size-4" />
 				{t('sidebar.privacyReport')}
 			</Command.Item>

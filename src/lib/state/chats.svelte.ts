@@ -44,6 +44,10 @@ class ChatsStore {
 	excerptsByMessage = $state<Record<string, MessageExcerptRow[]>>({});
 	/** Spec 012 — message whose "What AI saw" panel is open. */
 	waisMessageId = $state<string | null>(null);
+	/** Spec 020 — follow-up questions under the LAST answer only. */
+	related = $state<{ chatId: string; messageId: string; questions: string[] } | null>(null);
+	/** Spec 020 — answer versions per version group (oldest first). */
+	versionsByGroup = $state<Record<string, string[]>>({});
 
 	activeChat = $derived(this.chats.find((c) => c.id === this.activeChatId) ?? null);
 
@@ -54,6 +58,7 @@ class ChatsStore {
 
 	async open(chatId: string): Promise<void> {
 		this.activeChatId = chatId;
+		if (this.related?.chatId !== chatId) this.related = null;
 		const { db } = await getLocalDb();
 		this.messages = await db.listMessages(chatId);
 		this.chatDocuments = await db.listChatDocuments(chatId);
@@ -73,6 +78,83 @@ class ChatsStore {
 		const byMsg: Record<string, MessageExcerptRow[]> = {};
 		for (const row of excerpts) (byMsg[row.messageId] ??= []).push(row);
 		this.excerptsByMessage = byMsg;
+		const versions = await db.listChatMessageVersions(chatId);
+		const byGroup: Record<string, string[]> = {};
+		for (const v of versions) (byGroup[v.versionGroup] ??= []).push(v.id);
+		this.versionsByGroup = byGroup;
+	}
+
+	/** Spec 020 — display another version of a turn (‹ n/N › nav). */
+	async switchVersion(chatId: string, versionGroup: string, messageId: string): Promise<void> {
+		const { db } = await getLocalDb();
+		await db.activateMessageVersion(versionGroup, messageId);
+		this.messages = await db.listMessages(chatId);
+		await this.loadCitations(chatId);
+	}
+
+	/**
+	 * Spec 020 — related questions, with the arbitrated guardrails: generated
+	 * AFTER the answer (never blocking it), last answer only, max 3, silent
+	 * absence on failure or slowness. Private uses the on-device model;
+	 * My AI reuses the user's own endpoint (the same trust boundary as the
+	 * answer, egress logged). Assisted never gets a second cloud call.
+	 */
+	private async generateRelated(chatId: string): Promise<void> {
+		try {
+			const chat = this.chats.find((c) => c.id === chatId);
+			const last = this.messages[this.messages.length - 1];
+			if (!chat || !last || last.role !== 'assistant') return;
+			if (last.mode !== 'private' && last.mode !== 'myai') return;
+			const question = [...this.messages].reverse().find((m) => m.role === 'user')?.content;
+			if (!question) return;
+
+			const prompt = [
+				{
+					role: 'system' as const,
+					content:
+						'You suggest follow-up questions about documents. Reply with up to 3 short follow-up questions, one per line, no numbering and no other text, in the same language as the conversation.'
+				},
+				{
+					role: 'user' as const,
+					content: `Question: ${question}\n\nAnswer: ${last.content.slice(0, 1500)}`
+				}
+			];
+
+			let raw = '';
+			if (last.mode === 'private' && llmStore.status === 'ready') {
+				raw = await llmStore.generate(prompt, () => {});
+			} else if (last.mode === 'myai' && myaiStore.baseUrl) {
+				const model = chat.myaiModel ?? myaiStore.defaultModel;
+				if (!model) return;
+				await myaiStore.generate(model, prompt, (delta) => {
+					raw += delta;
+				});
+				// Honest egress: the follow-up call is a real second request.
+				const { db } = await getLocalDb();
+				await db.insertPrivacyEvent({
+					chatId,
+					messageId: null,
+					mode: 'myai',
+					destination: myaiStore.host ?? 'endpoint',
+					excerptCount: 0,
+					bytesSent: prompt.reduce((n, m) => n + new TextEncoder().encode(m.content).length, 0)
+				});
+				this.chatEgress = await db.chatPrivacySummary(chatId);
+			} else {
+				return;
+			}
+
+			const questions = stripThink(raw)
+				.split('\n')
+				.map((l) => l.replace(/^[\s\-*\d.)]+/, '').trim())
+				.filter((l) => l.length > 8 && l.length < 160)
+				.slice(0, 3);
+			if (questions.length && this.activeChatId === chatId) {
+				this.related = { chatId, messageId: last.id, questions };
+			}
+		} catch {
+			// Silent absence by design (spec 020): no spinner, no error state.
+		}
 	}
 
 	openWhatAiSaw(messageId: string): void {
@@ -157,9 +239,12 @@ class ChatsStore {
 		const question = [...this.messages].reverse().find((m) => m.role === 'user')?.content;
 		if (!last || last.role !== 'assistant' || !question) return;
 		this.sending = true;
+		this.related = null;
 		try {
 			const { db } = await getLocalDb();
-			await db.deleteMessage(last.id);
+			// Spec 020 — Try again keeps the previous answer as an inactive version.
+			const versionGroup = last.versionGroup ?? last.id;
+			await db.retireMessage(last.id, versionGroup);
 			this.messages = await db.listMessages(chatId);
 			const enabledDocs = this.chatDocuments.filter((d) => d.enabled && d.status === 'ready');
 			const hits = enabledDocs.length
@@ -168,14 +253,16 @@ class ChatsStore {
 						enabledDocs.map((d) => d.id)
 					)
 				: [];
-			await this.answer(chatId, question, hits, enabledDocs.length);
+			await this.answer(chatId, question, hits, enabledDocs.length, versionGroup);
 			await db.touchChat(chatId);
 			this.messages = await db.listMessages(chatId);
 			await this.refresh();
+			await this.loadCitations(chatId);
 		} finally {
 			this.sending = false;
 			this.streamingText = null;
 		}
+		void this.generateRelated(chatId);
 	}
 
 	/** C2 — edit the last question: the old exchange is replaced entirely. */
@@ -256,6 +343,7 @@ class ChatsStore {
 		const question = text.trim();
 		if (!question || this.sending) return;
 		this.sending = true;
+		this.related = null;
 		try {
 			const { db } = await getLocalDb();
 			const chat = this.chats.find((c) => c.id === chatId);
@@ -288,6 +376,7 @@ class ChatsStore {
 			this.sending = false;
 			this.streamingText = null;
 		}
+		void this.generateRelated(chatId);
 	}
 
 	/** Route a question to the chat's mode (shared by send/regenerate). */
@@ -295,26 +384,28 @@ class ChatsStore {
 		chatId: string,
 		question: string,
 		hits: SearchHit[],
-		documentCount: number
+		documentCount: number,
+		versionGroup: string | null = null
 	): Promise<void> {
 		const { db } = await getLocalDb();
 		const chat = this.chats.find((c) => c.id === chatId);
 		if (chat?.mode === 'private' && llmStore.status === 'ready') {
-			await this.generatePrivate(chatId, question, hits, documentCount);
+			await this.generatePrivate(chatId, question, hits, documentCount, versionGroup);
 		} else if (
 			chat?.mode === 'myai' &&
 			!chat.privateOnly &&
 			myaiStore.baseUrl &&
 			(chat.myaiModel || myaiStore.defaultModel)
 		) {
-			await this.generateMyAi(chat, question, hits, documentCount);
+			await this.generateMyAi(chat, question, hits, documentCount, versionGroup);
 		} else {
 			await db.insertMessage({
 				id: crypto.randomUUID(),
 				chatId,
 				role: 'assistant',
 				content: JSON.stringify({ hits, documentCount }),
-				mode: 'retrieval'
+				mode: 'retrieval',
+				versionGroup
 			});
 		}
 	}
@@ -323,7 +414,8 @@ class ChatsStore {
 		chatId: string,
 		question: string,
 		hits: SearchHit[],
-		documentCount: number
+		documentCount: number,
+		versionGroup: string | null = null
 	): Promise<void> {
 		const { db } = await getLocalDb();
 		this.streamingText = '';
@@ -368,7 +460,8 @@ class ChatsStore {
 			chatId,
 			role: 'assistant',
 			content: stopped ? t('notice.stopped') : cleaned,
-			mode: stopped ? 'notice' : 'private'
+			mode: stopped ? 'notice' : 'private',
+			versionGroup
 		});
 		if (citations.length) {
 			await db.insertCitations(
@@ -403,7 +496,8 @@ class ChatsStore {
 		chat: LocalChat,
 		question: string,
 		hits: SearchHit[],
-		documentCount: number
+		documentCount: number,
+		versionGroup: string | null = null
 	): Promise<void> {
 		const { db } = await getLocalDb();
 		const model = chat.myaiModel ?? myaiStore.defaultModel!;
@@ -456,7 +550,8 @@ class ChatsStore {
 			chatId: chat.id,
 			role: 'assistant',
 			content: cleaned,
-			mode: isNotice ? 'notice' : 'myai'
+			mode: isNotice ? 'notice' : 'myai',
+			versionGroup
 		});
 		if (citations.length) {
 			await db.insertCitations(

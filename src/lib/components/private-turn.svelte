@@ -8,6 +8,8 @@
 	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import EyeIcon from '@lucide/svelte/icons/eye';
+	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
+	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import { t } from '$lib/i18n/index.svelte';
 	import type { CitationRow, MessageExcerptRow } from '$lib/local-db/worker';
 	import { chatsStore } from '$lib/state/chats.svelte';
@@ -20,7 +22,9 @@
 		meta = null,
 		onregenerate = null,
 		messageId = null,
-		excerpts = []
+		excerpts = [],
+		versions = null,
+		onswitchversion = null
 	}: {
 		content: string;
 		citations?: CitationRow[];
@@ -31,7 +35,14 @@
 		/** Spec 012 — enables the What-AI-saw click-through. */
 		messageId?: string | null;
 		excerpts?: MessageExcerptRow[];
+		/** Spec 020 — ids of every version of this turn (oldest first). */
+		versions?: string[] | null;
+		onswitchversion?: ((id: string) => void) | null;
 	} = $props();
+
+	// Spec 020 — ‹ n/N › version nav (Try again keeps the previous answer).
+	const versionIndex = $derived(versions && messageId ? versions.indexOf(messageId) : -1);
+	const hasVersions = $derived(!!versions && versions.length > 1 && versionIndex >= 0);
 
 	/** Honest refusal: no citations but passages were retrieved → show them. */
 	const closestSources = $derived(citations.length === 0 ? excerpts.slice(0, 3) : []);
@@ -175,6 +186,33 @@
 	<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
 		<span class="text-muted-foreground font-mono text-[10px]">{metaLine}</span>
 		<span class="flex items-center gap-0.5">
+			{#if hasVersions && versions && onswitchversion}
+				<span class="text-muted-foreground mr-1 flex items-center gap-0.5">
+					<Button
+						variant="ghost"
+						size="icon-xs"
+						class="text-muted-foreground size-6"
+						disabled={versionIndex === 0}
+						aria-label={t('turn.prevVersion')}
+						onclick={() => onswitchversion(versions[versionIndex - 1])}
+					>
+						<ChevronLeftIcon />
+					</Button>
+					<span class="font-mono text-[10px] tabular-nums">
+						{versionIndex + 1}/{versions.length}
+					</span>
+					<Button
+						variant="ghost"
+						size="icon-xs"
+						class="text-muted-foreground size-6"
+						disabled={versionIndex === versions.length - 1}
+						aria-label={t('turn.nextVersion')}
+						onclick={() => onswitchversion(versions[versionIndex + 1])}
+					>
+						<ChevronRightIcon />
+					</Button>
+				</span>
+			{/if}
 			<Tooltip.Provider delayDuration={400}>
 				<Tooltip.Root>
 					<Tooltip.Trigger>

@@ -463,6 +463,66 @@ function deleteMessage(id: string): void {
 	});
 }
 
+// ── Answer versions (spec 020) ──────────────────────────────────────────────
+
+/**
+ * Retire the active answer of a turn before regenerating: it stays on disk as
+ * an inactive version (FTS row removed so search only hits active content).
+ */
+function retireMessage(id: string, versionGroup: string): void {
+	db.transaction(() => {
+		const rows = db.selectObjects('SELECT rowid, content FROM messages WHERE id = ?', [id]);
+		for (const r of rows) {
+			db.exec({
+				sql: "INSERT INTO messages_fts(messages_fts, rowid, content) VALUES('delete', ?, ?)",
+				bind: [r.rowid, r.content]
+			});
+		}
+		db.exec({
+			sql: 'UPDATE messages SET active = 0, version_group = ? WHERE id = ?',
+			bind: [versionGroup, id]
+		});
+	});
+}
+
+/** All versions of every multi-version turn in a chat, oldest first. */
+function listChatMessageVersions(chatId: string): { versionGroup: string; id: string }[] {
+	return db
+		.selectObjects(
+			'SELECT version_group, id FROM messages WHERE chat_id = ? AND version_group IS NOT NULL ORDER BY created_at, rowid',
+			[chatId]
+		)
+		.map((r: any) => ({ versionGroup: r.version_group, id: r.id }));
+}
+
+/** Make one version of a turn the displayed one (FTS follows the active row). */
+function activateMessageVersion(versionGroup: string, id: string): void {
+	db.transaction(() => {
+		const current = db.selectObjects(
+			'SELECT rowid, content FROM messages WHERE version_group = ? AND active = 1',
+			[versionGroup]
+		);
+		for (const r of current) {
+			db.exec({
+				sql: "INSERT INTO messages_fts(messages_fts, rowid, content) VALUES('delete', ?, ?)",
+				bind: [r.rowid, r.content]
+			});
+		}
+		db.exec({
+			sql: 'UPDATE messages SET active = 0 WHERE version_group = ?',
+			bind: [versionGroup]
+		});
+		db.exec({ sql: 'UPDATE messages SET active = 1 WHERE id = ?', bind: [id] });
+		const target = db.selectObjects('SELECT rowid, content FROM messages WHERE id = ?', [id]);
+		for (const r of target) {
+			db.exec({
+				sql: 'INSERT INTO messages_fts(rowid, content) VALUES (?, ?)',
+				bind: [r.rowid, r.content]
+			});
+		}
+	});
+}
+
 // ── Settings (meta table, 'setting:' prefix keeps schema_version untouched) ──
 
 function getSetting(key: string): string | null {
@@ -508,10 +568,11 @@ function insertMessage(m: {
 	role: string;
 	content: string;
 	mode: string | null;
+	versionGroup?: string | null;
 }): void {
 	db.exec({
-		sql: 'INSERT INTO messages(id, chat_id, role, content, mode, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-		bind: [m.id, m.chatId, m.role, m.content, m.mode, Date.now()]
+		sql: 'INSERT INTO messages(id, chat_id, role, content, mode, created_at, version_group, active) VALUES (?, ?, ?, ?, ?, ?, ?, 1)',
+		bind: [m.id, m.chatId, m.role, m.content, m.mode, Date.now(), m.versionGroup ?? null]
 	});
 	// External-content FTS must mirror the messages table 1:1 (retrieval-preview
 	// rows are filtered at query time, in searchAll).
@@ -524,14 +585,18 @@ function insertMessage(m: {
 
 function listMessages(chatId: string): LocalMessage[] {
 	return db
-		.selectObjects('SELECT * FROM messages WHERE chat_id = ? ORDER BY created_at, rowid', [chatId])
+		.selectObjects(
+			'SELECT * FROM messages WHERE chat_id = ? AND active = 1 ORDER BY created_at, rowid',
+			[chatId]
+		)
 		.map((r: any) => ({
 			id: r.id,
 			chatId: r.chat_id,
 			role: r.role,
 			content: r.content,
 			mode: r.mode,
-			createdAt: r.created_at
+			createdAt: r.created_at,
+			versionGroup: r.version_group ?? null
 		}));
 }
 
@@ -946,6 +1011,9 @@ const api = {
 	setChatMyaiModel,
 	setChatPinned,
 	deleteMessage,
+	retireMessage,
+	listChatMessageVersions,
+	activateMessageVersion,
 	getSetting,
 	setSetting,
 	touchChat,
