@@ -350,9 +350,8 @@
 								{@const privateR = modeReadiness('private')}
 								{@const assistedR = modeReadiness('assisted')}
 								{@const myaiR = modeReadiness('myai')}
-								{#snippet stateBadge(r: ReturnType<typeof modeReadiness>, egress: boolean)}
+								{#snippet stateBadge(r: ReturnType<typeof modeReadiness>)}
 									<span class="flex shrink-0 items-center gap-1.5">
-										{#if egress}<span class="bg-mode-assisted size-1.5 rounded-full"></span>{/if}
 										<Badge variant="outline" class="font-mono text-[10px] uppercase">
 											{r.state === 'ready'
 												? t('settings.ai.status.ready')
@@ -381,7 +380,7 @@
 									<section class="bg-background/40 rounded-lg border p-4" data-mode-card="private">
 										<header class="flex items-center justify-between gap-3 pb-1.5">
 											<p class="text-sm font-semibold">Private</p>
-											{@render stateBadge(privateR, false)}
+											{@render stateBadge(privateR)}
 										</header>
 										{#snippet privateModelControl()}
 											{#if privateR.state === 'setup'}
@@ -489,7 +488,7 @@
 									<section class="bg-background/40 rounded-lg border p-4" data-mode-card="assisted">
 										<header class="flex items-center justify-between gap-3 pb-1.5">
 											<p class="text-sm font-semibold">Assisted</p>
-											{@render stateBadge(assistedR, true)}
+											{@render stateBadge(assistedR)}
 										</header>
 										{#snippet assistedControl()}
 											{#if !sessionStore.user}
@@ -530,7 +529,7 @@
 									<section class="bg-background/40 rounded-lg border p-4" data-mode-card="myai">
 										<header class="flex items-center justify-between gap-3 pb-1.5">
 											<p class="text-sm font-semibold">My AI</p>
-											{@render stateBadge(myaiR, true)}
+											{@render stateBadge(myaiR)}
 										</header>
 										<div class="flex gap-1 pb-2">
 											{#each MYAI_PRESETS as preset (preset.id)}

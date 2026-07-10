@@ -70,7 +70,6 @@
 			return {
 				id,
 				label: { private: 'Private', assisted: 'Assisted', myai: 'My AI' }[id],
-				dot: id !== 'private',
 				line:
 					readiness.blockedLine ??
 					(id === 'myai' && readiness.state === 'ready'
@@ -145,9 +144,6 @@
 				size="sm"
 				class="gap-1.5 {current ? '' : 'text-muted-foreground'}"
 			>
-				{#if current?.dot}
-					<span class="bg-mode-assisted size-2 rounded-full"></span>
-				{/if}
 				{current ? current.label : t('modes.choose')}
 				{#if pillProgress !== null}
 					<span class="text-muted-foreground text-xs tabular-nums">· {pillProgress}%</span>
@@ -168,7 +164,6 @@
 					<span class="min-w-0 flex-1">
 						<span class="flex items-center gap-1.5">
 							<span class="text-sm font-medium">{m.label}</span>
-							{#if m.dot}<span class="bg-mode-assisted size-1.5 rounded-full"></span>{/if}
 							{#if bestMode?.id === m.id}
 								<span class="text-ring text-[10px]" title={bestMode.reason}>
 									{t('modes.best')}
