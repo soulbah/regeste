@@ -158,7 +158,7 @@
 	</Sidebar.Header>
 	<Sidebar.Content>
 		{#each groups as group (group.label)}
-			<Sidebar.Group>
+			<Sidebar.Group class="group-data-[collapsible=icon]:hidden">
 				<Sidebar.GroupLabel>{group.label}</Sidebar.GroupLabel>
 				<Sidebar.GroupContent>
 					<Sidebar.Menu>
