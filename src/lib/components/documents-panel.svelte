@@ -44,7 +44,7 @@
 		<div class="space-y-1 p-2">
 			{#each chatsStore.chatDocuments as doc (doc.id)}
 				{@const ingest = documentsStore.ingests[doc.id]}
-				<div class="hover:bg-accent/50 group flex items-start gap-2 rounded-md p-2">
+				<div class="hover:bg-muted/60 group flex items-start gap-2 rounded-md p-2">
 					<Checkbox
 						checked={doc.enabled}
 						disabled={doc.status !== 'ready'}

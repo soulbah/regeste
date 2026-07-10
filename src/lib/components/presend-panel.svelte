@@ -63,7 +63,7 @@
 			{/if}
 			{#each pending?.hits ?? [] as hit (hit.chunkId)}
 				<label
-					class="hover:bg-accent/50 flex items-start gap-3 rounded-md border p-2.5 transition-colors {excluded[
+					class="hover:bg-muted/60 flex items-start gap-3 rounded-md border p-2.5 transition-colors {excluded[
 						hit.chunkId
 					]
 						? 'opacity-40'

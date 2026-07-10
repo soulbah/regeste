@@ -244,7 +244,7 @@
 
 			<div
 				bind:this={thread}
-				class="relative flex-1 overflow-y-auto {dragging ? 'bg-accent/30' : ''}"
+				class="relative flex-1 overflow-y-auto {dragging ? 'bg-muted/50' : ''}"
 				role="region"
 				aria-label={t('chat.threadAria')}
 				ondragover={(e) => {

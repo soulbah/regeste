@@ -8,6 +8,11 @@
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import FolderIcon from '@lucide/svelte/icons/folder';
 	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
+	import PinIcon from '@lucide/svelte/icons/pin';
+	import PinOffIcon from '@lucide/svelte/icons/pin-off';
+	import PencilIcon from '@lucide/svelte/icons/pencil';
+	import DownloadIcon from '@lucide/svelte/icons/download';
+	import Trash2Icon from '@lucide/svelte/icons/trash-2';
 	import FileIcon from '@lucide/svelte/icons/file';
 	import ShieldIcon from '@lucide/svelte/icons/shield';
 	import SearchIcon from '@lucide/svelte/icons/search';
@@ -166,6 +171,9 @@
 									</DropdownMenu.Trigger>
 									<DropdownMenu.Content side="right" align="start">
 										<DropdownMenu.Item onclick={() => chatsStore.setPinned(chat.id, !chat.pinned)}>
+											{#if chat.pinned}<PinOffIcon class="text-muted-foreground" />{:else}<PinIcon
+													class="text-muted-foreground"
+												/>{/if}
 											{chat.pinned ? t('sidebar.unpin') : t('sidebar.pin')}
 										</DropdownMenu.Item>
 										<DropdownMenu.Item
@@ -174,15 +182,15 @@
 												renameTarget = chat;
 											}}
 										>
+											<PencilIcon class="text-muted-foreground" />
 											{t('sidebar.rename')}
 										</DropdownMenu.Item>
 										<DropdownMenu.Item onclick={() => exportChat(chat)}>
+											<DownloadIcon class="text-muted-foreground" />
 											{t('sidebar.exportMarkdown')}
 										</DropdownMenu.Item>
-										<DropdownMenu.Item
-											class="text-destructive"
-											onclick={() => (deleteTarget = chat)}
-										>
+										<DropdownMenu.Item variant="destructive" onclick={() => (deleteTarget = chat)}>
+											<Trash2Icon />
 											{t('common.delete')}
 										</DropdownMenu.Item>
 									</DropdownMenu.Content>

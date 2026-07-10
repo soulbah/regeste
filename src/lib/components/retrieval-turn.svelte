@@ -42,7 +42,7 @@
 		{#each parsed.hits.slice(0, 4) as hit (hit.chunkId)}
 			<Button
 				variant="ghost"
-				class="bg-card hover:bg-accent/50 block h-auto w-full rounded-lg border px-4 py-2.5 text-left font-normal whitespace-normal shadow-xs"
+				class="bg-card hover:bg-muted/60 block h-auto w-full rounded-lg border px-4 py-2.5 text-left font-normal whitespace-normal shadow-xs"
 				onclick={() => viewerStore.openHit(hit)}
 				aria-label={t('retrieval.openAria', { name: hit.documentName })}
 			>
