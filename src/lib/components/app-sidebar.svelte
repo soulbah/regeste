@@ -86,19 +86,29 @@
 	<!-- Fixed top zone (market convention): brand + primary actions never scroll;
 	     only the history below does. -->
 	<Sidebar.Header>
-		<div
-			class="flex items-center justify-between group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-1"
-		>
+		<!-- Expanded: logo left, collapse trigger right. Collapsed rail: the logo
+		     holds the slot and the trigger takes its place on hover (ChatGPT). -->
+		<div class="flex items-center justify-between group-data-[collapsible=icon]:justify-center">
 			<a
 				href={resolve('/chat')}
-				class="flex min-w-0 items-center gap-2 px-2 py-1.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+				class="flex min-w-0 items-center gap-2 px-2 py-1.5 group-data-[collapsible=icon]:hidden"
 			>
 				<FileIcon class="size-4 shrink-0" />
-				<span class="font-display text-lg tracking-tight group-data-[collapsible=icon]:hidden"
-					>Folio</span
-				>
+				<span class="font-display text-lg tracking-tight">Folio</span>
 			</a>
-			<Sidebar.Trigger class="text-sidebar-foreground/70 shrink-0" />
+			<Sidebar.Trigger
+				class="text-sidebar-foreground/70 shrink-0 group-data-[collapsible=icon]:hidden"
+			/>
+			<div class="group/logo relative hidden size-8 group-data-[collapsible=icon]:block">
+				<span
+					class="pointer-events-none absolute inset-0 flex items-center justify-center transition-opacity group-hover/logo:opacity-0"
+				>
+					<FileIcon class="size-4" />
+				</span>
+				<Sidebar.Trigger
+					class="text-sidebar-foreground/70 absolute inset-0 opacity-0 transition-opacity group-hover/logo:opacity-100"
+				/>
+			</div>
 		</div>
 		<Sidebar.Menu>
 			<Sidebar.MenuItem>
