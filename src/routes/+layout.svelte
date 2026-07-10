@@ -124,7 +124,14 @@
 
 <Sidebar.Provider>
 	<AppSidebar />
-	<Sidebar.Inset>
+	<!-- On a chat, the inset stops being a card and becomes a transparent frame:
+	     the conversation and the contextual panel float as their own cards on the
+	     sidebar-coloured workspace. Every other route keeps the single inset card. -->
+	<Sidebar.Inset
+		class={onChatRoute
+			? 'md:overflow-visible md:bg-transparent md:peer-data-[variant=inset]:rounded-none md:peer-data-[variant=inset]:border-0 md:peer-data-[variant=inset]:shadow-none'
+			: undefined}
+	>
 		{@render children()}
 	</Sidebar.Inset>
 </Sidebar.Provider>

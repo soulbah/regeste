@@ -190,7 +190,11 @@
 />
 
 <Resizable.PaneGroup direction="horizontal" class="h-full" autoSaveId="folio-panes">
-	<Resizable.Pane defaultSize={70} minSize={35}>
+	<Resizable.Pane
+		defaultSize={70}
+		minSize={35}
+		class="bg-background overflow-hidden md:rounded-xl md:border md:shadow-sm"
+	>
 		<div class="flex h-full flex-col">
 			<header class="flex h-14 shrink-0 items-center justify-between gap-3 border-b px-4">
 				<div class="flex min-w-0 items-center gap-1">
@@ -477,9 +481,12 @@
 			</div>
 		</div>
 	</Resizable.Pane>
+	<!-- The gutter between the two cards: a transparent 0.5rem lane on the
+	     workspace, same width as the frame around them. Hidden when the panel is
+	     closed so no stray pill floats at the edge. -->
 	<Resizable.Handle
 		withHandle
-		class="hidden lg:flex"
+		class={panelOpen ? 'hidden w-2 bg-transparent lg:flex' : 'hidden'}
 		ondblclick={() => panelPane?.resize(PANEL_DEFAULT_SIZE)}
 	/>
 	<Resizable.Pane
@@ -491,7 +498,12 @@
 		collapsedSize={0}
 		onCollapse={() => (panelOpen = false)}
 		onExpand={() => (panelOpen = true)}
-		class="bg-card/50 hidden lg:block"
+		class={[
+			'bg-card hidden overflow-hidden rounded-xl lg:block',
+			// Collapsed, the pane is 0-wide; without this its borders leave a 2px
+			// sliver pinned to the right frame.
+			panelOpen && 'border shadow-sm'
+		]}
 	>
 		{@render panelContent(hidePanel)}
 	</Resizable.Pane>
