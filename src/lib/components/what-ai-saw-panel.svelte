@@ -4,11 +4,13 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import { ScrollArea } from '$lib/components/ui/scroll-area';
-	import XIcon from '@lucide/svelte/icons/x';
+	import PanelHeader from '$lib/components/panel-header.svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import { chatsStore } from '$lib/state/chats.svelte';
 	import { viewerStore } from '$lib/state/viewer.svelte';
 	import type { MessageExcerptRow } from '$lib/local-db/worker';
+
+	let { onhide = null }: { onhide?: (() => void) | null } = $props();
 
 	const messageId = $derived(chatsStore.waisMessageId);
 	const message = $derived(chatsStore.messages.find((m) => m.id === messageId));
@@ -58,23 +60,12 @@
 </script>
 
 <div class="flex h-full flex-col">
-	<div class="flex items-start justify-between gap-2 border-b p-4">
-		<div>
-			<h2 class="font-display text-lg tracking-tight">{t('wais.title')}</h2>
-			<p class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
-				{t('wais.subtitle')}
-			</p>
-		</div>
-		<Button
-			variant="ghost"
-			size="icon"
-			class="size-7 shrink-0"
-			onclick={() => chatsStore.closeWhatAiSaw()}
-			aria-label={t('wais.closeAria')}
-		>
-			<XIcon class="size-4" />
-		</Button>
-	</div>
+	<PanelHeader
+		title={t('wais.title')}
+		subtitle={t('wais.subtitle')}
+		onback={() => chatsStore.closeWhatAiSaw()}
+		{onhide}
+	/>
 
 	{#if question}
 		<div class="border-b px-4 py-3">

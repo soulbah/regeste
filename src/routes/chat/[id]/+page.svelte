@@ -1,13 +1,18 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { resolve } from '$app/paths';
+	import { MediaQuery } from 'svelte/reactivity';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Resizable from '$lib/components/ui/resizable';
+	import * as Sheet from '$lib/components/ui/sheet';
+	import * as Sidebar from '$lib/components/ui/sidebar';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Button } from '$lib/components/ui/button';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import SquareIcon from '@lucide/svelte/icons/square';
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import InfoIcon from '@lucide/svelte/icons/info';
+	import PanelRightIcon from '@lucide/svelte/icons/panel-right';
 	import Composer from '$lib/components/composer.svelte';
 	import RetrievalTurn from '$lib/components/retrieval-turn.svelte';
 	import PrivateTurn from '$lib/components/private-turn.svelte';
@@ -80,6 +85,46 @@
 		await chatsStore.editLast(chatId, editText);
 	}
 
+	// Right contextual panel (spec 019): inline resizable pane ≥1024px, a right
+	// Sheet below that. Fully closable; the header toggle, ⌘. and any event
+	// needing the panel (citation, review, What AI saw) reopen it.
+	const lgViewport = new MediaQuery('(min-width: 1024px)');
+	const PANEL_DEFAULT_SIZE = 30;
+	let panelPane = $state<{
+		collapse: () => void;
+		expand: () => void;
+		resize: (size: number) => void;
+		isCollapsed: () => boolean;
+	} | null>(null);
+	let panelOpen = $state(true);
+	let panelSheetOpen = $state(false);
+
+	function togglePanel() {
+		if (lgViewport.current) {
+			if (panelPane?.isCollapsed()) panelPane.expand();
+			else panelPane?.collapse();
+		} else {
+			panelSheetOpen = !panelSheetOpen;
+		}
+	}
+
+	function hidePanel() {
+		if (lgViewport.current) panelPane?.collapse();
+		else panelSheetOpen = false;
+	}
+
+	const panelWanted = $derived(
+		reviewing || chatsStore.waisMessageId !== null || viewerStore.isOpen
+	);
+	$effect(() => {
+		if (!panelWanted) return;
+		if (lgViewport.current) {
+			if (panelPane?.isCollapsed()) panelPane.expand();
+		} else {
+			panelSheetOpen = true;
+		}
+	});
+
 	// C7 — drop files anywhere on the thread.
 	let dragging = $state(false);
 	function handleDrop(e: DragEvent) {
@@ -94,40 +139,67 @@
 	><title>{chatsStore.activeChat?.title ?? t('chat.fallback')} · Folio</title></svelte:head
 >
 
-<Resizable.PaneGroup direction="horizontal" class="h-svh">
-	<Resizable.Pane defaultSize={72} minSize={40}>
-		<div class="flex h-svh flex-col">
-			<header class="flex items-center justify-between border-b px-6 py-3">
-				<div>
-					<h1 class="font-display text-lg tracking-tight">
-						{chatsStore.activeChat?.title ?? t('chat.fallback')}
-					</h1>
-					<p class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
-						{t('chat.docCount', {
-							count: chatsStore.chatDocuments.length,
-							s: chatsStore.chatDocuments.length === 1 ? '' : 's'
-						})}
-					</p>
+<svelte:window
+	onkeydown={(e) => {
+		if ((e.metaKey || e.ctrlKey) && e.key === '.') {
+			e.preventDefault();
+			togglePanel();
+		}
+	}}
+/>
+
+<Resizable.PaneGroup direction="horizontal" class="h-full" autoSaveId="folio-panes">
+	<Resizable.Pane defaultSize={70} minSize={35}>
+		<div class="flex h-full flex-col">
+			<header class="flex items-center justify-between gap-3 border-b py-3 pr-4 pl-4">
+				<div class="flex min-w-0 items-center gap-1">
+					<Sidebar.Trigger class="shrink-0" />
+					<div class="min-w-0 px-1">
+						<h1 class="font-display truncate text-lg tracking-tight">
+							{chatsStore.activeChat?.title ?? t('chat.fallback')}
+						</h1>
+						<p class="text-muted-foreground truncate text-xs">
+							{t('chat.docCount', {
+								count: chatsStore.chatDocuments.length,
+								s: chatsStore.chatDocuments.length === 1 ? '' : 's'
+							})}
+						</p>
+					</div>
 				</div>
-				{#if chatsStore.chatEgress && chatsStore.chatEgress.cloudRequests > 0}
-					<span
-						class="text-muted-foreground flex items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-[10px] tracking-widest uppercase"
+				<div class="flex shrink-0 items-center gap-2">
+					<a
+						href={resolve('/privacy')}
+						class="focus-visible:ring-ring rounded-full focus-visible:ring-2"
 					>
-						<span class="bg-mode-assisted size-1.5 rounded-full"></span>
-						{t('chat.cloudRequests', {
-							count: chatsStore.chatEgress.cloudRequests,
-							s: chatsStore.chatEgress.cloudRequests === 1 ? '' : 's',
-							kb: (chatsStore.chatEgress.bytes / 1024).toFixed(1)
-						})}
-					</span>
-				{:else}
-					<span
-						class="text-muted-foreground flex items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-[10px] tracking-widest uppercase"
+						{#if chatsStore.chatEgress && chatsStore.chatEgress.cloudRequests > 0}
+							<span
+								class="bg-mode-assisted/15 text-mode-assisted flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[11px]"
+							>
+								<span class="bg-mode-assisted size-1.5 rounded-full"></span>
+								{t('chat.cloudRequests', {
+									count: chatsStore.chatEgress.cloudRequests,
+									s: chatsStore.chatEgress.cloudRequests === 1 ? '' : 's',
+									kb: (chatsStore.chatEgress.bytes / 1024).toFixed(1)
+								})}
+							</span>
+						{:else}
+							<span
+								class="text-muted-foreground bg-muted flex items-center rounded-full px-2.5 py-1 font-mono text-[11px]"
+							>
+								{t('chat.zeroBytes')}
+							</span>
+						{/if}
+					</a>
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						aria-expanded={lgViewport.current ? panelOpen : panelSheetOpen}
+						aria-label={t('chat.panelToggleAria')}
+						onclick={togglePanel}
 					>
-						<span class="bg-mode-private size-1.5 rounded-full"></span>
-						{t('chat.zeroBytes')}
-					</span>
-				{/if}
+						<PanelRightIcon />
+					</Button>
+				</div>
 			</header>
 
 			<div
@@ -281,19 +353,48 @@
 			</div>
 		</div>
 	</Resizable.Pane>
-	<Resizable.Handle />
-	<Resizable.Pane defaultSize={28} minSize={18} class="hidden md:block">
-		{#if reviewing}
-			<PresendPanel />
-		{:else if chatsStore.waisMessageId}
-			<WhatAiSawPanel />
-		{:else if viewerStore.isOpen}
-			<ViewerPanel />
-		{:else}
-			<DocumentsPanel {chatId} />
-		{/if}
+	<Resizable.Handle
+		class="hidden lg:flex"
+		ondblclick={() => panelPane?.resize(PANEL_DEFAULT_SIZE)}
+	/>
+	<Resizable.Pane
+		bind:this={panelPane}
+		defaultSize={PANEL_DEFAULT_SIZE}
+		minSize={22}
+		maxSize={50}
+		collapsible
+		collapsedSize={0}
+		onCollapse={() => (panelOpen = false)}
+		onExpand={() => (panelOpen = true)}
+		class="bg-card/50 hidden lg:block"
+	>
+		{@render panelContent(hidePanel)}
 	</Resizable.Pane>
 </Resizable.PaneGroup>
+
+{#snippet panelContent(onhide: () => void)}
+	{#if reviewing}
+		<PresendPanel {onhide} />
+	{:else if chatsStore.waisMessageId}
+		<WhatAiSawPanel {onhide} />
+	{:else if viewerStore.isOpen}
+		<ViewerPanel {onhide} />
+	{:else}
+		<DocumentsPanel {chatId} {onhide} />
+	{/if}
+{/snippet}
+
+<!-- Below 1024px the same panel rides a right Sheet over the conversation. -->
+{#if !lgViewport.current}
+	<Sheet.Root bind:open={panelSheetOpen}>
+		<Sheet.Content
+			side="right"
+			class="w-full gap-0 p-0 sm:max-w-md [&>[data-slot=sheet-close]]:hidden"
+		>
+			{@render panelContent(() => (panelSheetOpen = false))}
+		</Sheet.Content>
+	</Sheet.Root>
+{/if}
 
 <Dialog.Root bind:open={editOpen}>
 	<Dialog.Content class="sm:max-w-md">

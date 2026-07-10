@@ -5,11 +5,14 @@
 	import { Checkbox } from '$lib/components/ui/checkbox';
 	import { ScrollArea } from '$lib/components/ui/scroll-area';
 	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
+	import PanelHeader from '$lib/components/panel-header.svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import { chatsStore } from '$lib/state/chats.svelte';
 	import { settingsStore } from '$lib/state/settings.svelte';
 	import { isWeakMatch } from '$lib/pipeline/relevance';
 	import type { SearchHit } from '$lib/types';
+
+	let { onhide = null }: { onhide?: (() => void) | null } = $props();
 
 	const pending = $derived(chatsStore.pendingAssisted);
 	const maxScore = $derived(Math.max(...(pending?.hits ?? []).map((h) => h.score), 0));
@@ -34,12 +37,12 @@
 </script>
 
 <div class="flex h-full flex-col">
-	<div class="border-b p-4">
-		<h2 class="font-display text-lg tracking-tight">{t('presend.title')}</h2>
-		<p class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
-			{t('presend.subtitle')}
-		</p>
-	</div>
+	<PanelHeader
+		title={t('presend.title')}
+		subtitle={t('presend.subtitle')}
+		onback={() => chatsStore.cancelAssisted()}
+		{onhide}
+	/>
 
 	<div class="border-b px-4 py-3">
 		<p class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">

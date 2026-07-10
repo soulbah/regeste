@@ -46,9 +46,7 @@
 			const prev = prevStatuses.get(doc.id);
 			if (prev && prev !== doc.status && !visibleIds.has(doc.id) && !onDocumentsPage) {
 				if (doc.status === 'ready') {
-					toast.success(t('toast.ready', { name: doc.name }), {
-						description: t('toast.readyDesc')
-					});
+					toast.success(t('toast.ready', { name: doc.name }));
 				} else if (doc.status === 'error') {
 					toast.error(t('toast.failed', { name: doc.name }), {
 						description:

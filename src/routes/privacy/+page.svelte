@@ -5,6 +5,7 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
+	import * as Sidebar from '$lib/components/ui/sidebar';
 	import DownloadIcon from '@lucide/svelte/icons/download';
 	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
 	import { t } from '$lib/i18n/index.svelte';
@@ -67,13 +68,14 @@
 
 <svelte:head><title>{t('privacy.title')} · Folio</title></svelte:head>
 
-<div class="flex h-svh flex-col">
-	<header class="flex items-center justify-between border-b px-6 py-3">
-		<div>
-			<h1 class="font-display text-lg tracking-tight">{t('privacy.title')}</h1>
-			<p class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
-				{t('privacy.subtitle')}
-			</p>
+<div class="flex h-full flex-col">
+	<header class="flex items-center justify-between gap-3 border-b py-3 pr-6 pl-4">
+		<div class="flex min-w-0 items-center gap-1">
+			<Sidebar.Trigger class="shrink-0" />
+			<div class="min-w-0 px-1">
+				<h1 class="font-display text-lg tracking-tight">{t('privacy.title')}</h1>
+				<p class="text-muted-foreground text-xs">{t('privacy.subtitle')}</p>
+			</div>
 		</div>
 		<Button variant="outline" size="sm" class="gap-2" onclick={exportJson} disabled={!loaded}>
 			<DownloadIcon class="size-3.5" />

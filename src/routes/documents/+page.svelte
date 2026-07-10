@@ -6,6 +6,7 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { Progress } from '$lib/components/ui/progress';
 	import * as Select from '$lib/components/ui/select';
+	import * as Sidebar from '$lib/components/ui/sidebar';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import EllipsisVerticalIcon from '@lucide/svelte/icons/ellipsis-vertical';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
@@ -62,20 +63,15 @@
 
 <svelte:head><title>{t('docs.title')} · Folio</title></svelte:head>
 
-<div class="flex h-svh flex-col">
-	<header class="flex items-center justify-between border-b px-6 py-3">
-		<div>
+<div class="flex h-full flex-col">
+	<header class="flex items-center gap-1 border-b px-4 py-3">
+		<Sidebar.Trigger class="shrink-0" />
+		<div class="min-w-0 px-1">
 			<h1 class="font-display text-lg tracking-tight">{t('docs.title')}</h1>
-			<p class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
+			<p class="text-muted-foreground text-xs">
 				{t('docsPage.count', { count: documentsStore.library.length })}
 			</p>
 		</div>
-		<span
-			class="text-muted-foreground flex items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-[10px] tracking-widest uppercase"
-		>
-			<span class="bg-mode-private size-1.5 rounded-full"></span>
-			{t('common.storedLocally')}
-		</span>
 	</header>
 
 	<div class="mx-auto w-full max-w-3xl flex-1 space-y-4 overflow-y-auto p-6">
@@ -160,15 +156,13 @@
 							{/if}
 						</div>
 						{#if documentsStore.egress[doc.id]}
-							<Badge variant="outline" class="gap-1 font-mono text-[10px] uppercase">
-								<span class="bg-mode-assisted size-1.5 rounded-full"></span>
+							<Badge variant="working" class="text-[10px]">
 								{t('docsPage.sentOn', {
 									date: new Date(documentsStore.egress[doc.id]).toLocaleDateString()
 								})}
 							</Badge>
 						{:else}
-							<Badge variant="outline" class="gap-1 font-mono text-[10px] uppercase">
-								<span class="bg-mode-private size-1.5 rounded-full"></span>
+							<Badge variant="secondary" class="text-[10px]">
 								{t('docsPage.neverSent')}
 							</Badge>
 						{/if}

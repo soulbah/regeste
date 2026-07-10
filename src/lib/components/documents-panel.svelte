@@ -8,12 +8,13 @@
 	import { Switch } from '$lib/components/ui/switch';
 	import XIcon from '@lucide/svelte/icons/x';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
+	import PanelHeader from '$lib/components/panel-header.svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import { chatsStore } from '$lib/state/chats.svelte';
 	import { documentsStore } from '$lib/state/documents.svelte';
 	import { viewerStore } from '$lib/state/viewer.svelte';
 
-	let { chatId }: { chatId: string } = $props();
+	let { chatId, onhide = null }: { chatId: string; onhide?: (() => void) | null } = $props();
 
 	function statusLabel(status: string, error: string | null): string {
 		if (error === 'scanned_pdf') return t('status.scanned');
@@ -27,24 +28,17 @@
 </script>
 
 <div class="flex h-full flex-col">
-	<div class="space-y-3 border-b p-4">
-		<div>
-			<h2 class="font-display text-lg tracking-tight">{t('docs.title')}</h2>
-			<p class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
-				{t('docs.subtitle')}
-			</p>
-		</div>
-		<!-- P7: hard lock — cloud modes are unselectable while this is on. -->
-		<div class="flex items-center justify-between gap-3">
-			<Label for="private-only" class="text-xs font-normal">
-				{t('docs.privateOnly')}
-			</Label>
-			<Switch
-				id="private-only"
-				checked={chatsStore.activeChat?.privateOnly ?? false}
-				onCheckedChange={(v) => chatsStore.setPrivateOnly(chatId, v === true)}
-			/>
-		</div>
+	<PanelHeader title={t('docs.title')} subtitle={t('docs.subtitle')} {onhide} />
+	<!-- P7: hard lock — cloud modes are unselectable while this is on. -->
+	<div class="flex items-center justify-between gap-3 border-b px-4 py-2.5">
+		<Label for="private-only" class="text-xs font-normal">
+			{t('docs.privateOnly')}
+		</Label>
+		<Switch
+			id="private-only"
+			checked={chatsStore.activeChat?.privateOnly ?? false}
+			onCheckedChange={(v) => chatsStore.setPrivateOnly(chatId, v === true)}
+		/>
 	</div>
 	<ScrollArea class="flex-1">
 		<div class="space-y-1 p-2">
@@ -77,16 +71,14 @@
 								: ''}
 						</p>
 						{#if doc.status === 'ready'}
-							<Badge variant="outline" class="mt-1 gap-1 text-[10px]">
-								<span class="bg-mode-private size-1.5 rounded-full"></span>
-								{t('status.ready')}
-							</Badge>
+							<Badge class="mt-1 text-[10px]">{t('status.ready')}</Badge>
 						{:else if doc.status === 'error'}
 							<Badge variant="destructive" class="mt-1 text-[10px]">
 								{statusLabel(doc.status, doc.error)}
 							</Badge>
 						{:else}
-							<Badge variant="secondary" class="mt-1 text-[10px]">
+							<Badge class="mt-1 gap-1 text-[10px]">
+								<span class="bg-ring size-1.5 animate-pulse rounded-full"></span>
 								{statusLabel(doc.status, doc.error)}…
 							</Badge>
 							{#if ingest && doc.status === 'embedding'}

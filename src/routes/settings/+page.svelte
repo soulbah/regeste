@@ -7,6 +7,7 @@
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { Switch } from '$lib/components/ui/switch';
 	import { Label } from '$lib/components/ui/label';
+	import * as Sidebar from '$lib/components/ui/sidebar';
 	import ShieldIcon from '@lucide/svelte/icons/shield';
 	import { setMode, userPrefersMode } from 'mode-watcher';
 	import { resolve } from '$app/paths';
@@ -51,20 +52,13 @@
 
 <svelte:head><title>{t('settings.title')} · Folio</title></svelte:head>
 
-<div class="flex h-svh flex-col">
-	<header class="flex items-center justify-between border-b px-6 py-3">
-		<div>
+<div class="flex h-full flex-col">
+	<header class="flex items-center gap-1 border-b px-4 py-3">
+		<Sidebar.Trigger class="shrink-0" />
+		<div class="min-w-0 px-1">
 			<h1 class="font-display text-lg tracking-tight">{t('settings.title')}</h1>
-			<p class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
-				{t('settings.subtitle')}
-			</p>
+			<p class="text-muted-foreground text-xs">{t('settings.subtitle')}</p>
 		</div>
-		<span
-			class="text-muted-foreground flex items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-[10px] tracking-widest uppercase"
-		>
-			<span class="bg-mode-private size-1.5 rounded-full"></span>
-			{t('common.storedLocally')}
-		</span>
 	</header>
 
 	<div class="flex-1 overflow-y-auto">

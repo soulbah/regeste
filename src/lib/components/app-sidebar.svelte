@@ -77,69 +77,69 @@
 	}
 </script>
 
-<Sidebar.Root>
+<Sidebar.Root variant="inset" collapsible="icon">
+	<!-- Fixed top zone (market convention): brand + primary actions never scroll;
+	     only the history below does. -->
 	<Sidebar.Header>
-		<a href={resolve('/')} class="flex items-center gap-2 px-2 py-1.5">
-			<FileIcon class="size-4" />
-			<span class="font-display text-lg tracking-tight">Folio</span>
+		<a
+			href={resolve('/')}
+			class="flex items-center gap-2 px-2 py-1.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+		>
+			<FileIcon class="size-4 shrink-0" />
+			<span class="font-display text-lg tracking-tight group-data-[collapsible=icon]:hidden"
+				>Folio</span
+			>
 		</a>
+		<Sidebar.Menu>
+			<Sidebar.MenuItem>
+				<Sidebar.MenuButton>
+					{#snippet child({ props })}
+						<a href={resolve('/')} {...props}>
+							<PlusIcon /> <span>{t('sidebar.newChat')}</span>
+						</a>
+					{/snippet}
+				</Sidebar.MenuButton>
+			</Sidebar.MenuItem>
+			<Sidebar.MenuItem>
+				<Sidebar.MenuButton isActive={page.url.pathname === '/documents'}>
+					{#snippet child({ props })}
+						<a href={resolve('/documents')} {...props}>
+							<FolderIcon /> <span>{t('sidebar.documents')}</span>
+						</a>
+					{/snippet}
+				</Sidebar.MenuButton>
+			</Sidebar.MenuItem>
+			<Sidebar.MenuItem>
+				<Sidebar.MenuButton onclick={() => searchStore.toggle()}>
+					<SearchIcon />
+					<span>{t('sidebar.search')}</span>
+					<span class="text-muted-foreground ml-auto font-mono text-[10px]">⌘K</span>
+				</Sidebar.MenuButton>
+			</Sidebar.MenuItem>
+			<Sidebar.MenuItem>
+				<Sidebar.MenuButton isActive={page.url.pathname === '/privacy'}>
+					{#snippet child({ props })}
+						<a href={resolve('/privacy')} {...props}>
+							<ShieldIcon /> <span>{t('sidebar.privacyReport')}</span>
+						</a>
+					{/snippet}
+				</Sidebar.MenuButton>
+			</Sidebar.MenuItem>
+			<Sidebar.MenuItem>
+				<Sidebar.MenuButton isActive={page.url.pathname === '/settings'}>
+					{#snippet child({ props })}
+						<a href={resolve('/settings')} {...props}>
+							<SettingsIcon /> <span>{t('sidebar.settings')}</span>
+						</a>
+					{/snippet}
+				</Sidebar.MenuButton>
+			</Sidebar.MenuItem>
+		</Sidebar.Menu>
 	</Sidebar.Header>
 	<Sidebar.Content>
-		<Sidebar.Group>
-			<Sidebar.GroupContent>
-				<Sidebar.Menu>
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton>
-							{#snippet child({ props })}
-								<a href={resolve('/')} {...props}>
-									<PlusIcon /> <span>{t('sidebar.newChat')}</span>
-								</a>
-							{/snippet}
-						</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton isActive={page.url.pathname === '/documents'}>
-							{#snippet child({ props })}
-								<a href={resolve('/documents')} {...props}>
-									<FolderIcon /> <span>{t('sidebar.documents')}</span>
-								</a>
-							{/snippet}
-						</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton onclick={() => searchStore.toggle()}>
-							<SearchIcon />
-							<span>{t('sidebar.search')}</span>
-							<span class="text-muted-foreground ml-auto font-mono text-[10px]">⌘K</span>
-						</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton isActive={page.url.pathname === '/privacy'}>
-							{#snippet child({ props })}
-								<a href={resolve('/privacy')} {...props}>
-									<ShieldIcon /> <span>{t('sidebar.privacyReport')}</span>
-								</a>
-							{/snippet}
-						</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton isActive={page.url.pathname === '/settings'}>
-							{#snippet child({ props })}
-								<a href={resolve('/settings')} {...props}>
-									<SettingsIcon /> <span>{t('sidebar.settings')}</span>
-								</a>
-							{/snippet}
-						</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
-				</Sidebar.Menu>
-			</Sidebar.GroupContent>
-		</Sidebar.Group>
-
 		{#each groups as group (group.label)}
 			<Sidebar.Group>
-				<Sidebar.GroupLabel class="font-mono text-[10px] tracking-widest uppercase">
-					{group.label}
-				</Sidebar.GroupLabel>
+				<Sidebar.GroupLabel>{group.label}</Sidebar.GroupLabel>
 				<Sidebar.GroupContent>
 					<Sidebar.Menu>
 						{#each group.chats as chat (chat.id)}
@@ -192,20 +192,22 @@
 	<Sidebar.Footer>
 		<a
 			href={resolve('/account')}
-			class="hover:bg-accent flex items-center gap-2 rounded-md px-2 py-1.5"
+			class="hover:bg-sidebar-accent flex items-center gap-2 rounded-md px-2 py-1.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
 		>
-			<span class="bg-muted flex size-7 items-center justify-center rounded-full text-xs uppercase">
+			<span
+				class="bg-muted flex size-7 shrink-0 items-center justify-center rounded-full text-xs uppercase"
+			>
 				{sessionStore.user ? sessionStore.user.email[0] : t('sidebar.guest')[0]}
 			</span>
-			<div class="min-w-0">
+			<div class="min-w-0 group-data-[collapsible=icon]:hidden">
 				<p class="truncate text-sm font-medium">
 					{sessionStore.user
 						? sessionStore.user.name || sessionStore.user.email
 						: t('sidebar.guest')}
 				</p>
-				<p class="text-muted-foreground font-mono text-[10px] tracking-wide uppercase">
-					{sessionStore.user ? t('sidebar.signedIn') : t('sidebar.localWorkspace')}
-				</p>
+				{#if !sessionStore.user}
+					<p class="text-muted-foreground truncate text-xs">{t('sidebar.localWorkspace')}</p>
+				{/if}
 			</div>
 		</a>
 	</Sidebar.Footer>

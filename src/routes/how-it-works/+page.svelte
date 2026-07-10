@@ -3,6 +3,7 @@
 	// O2/T3 (spec 014): pipeline schema + offline proof.
 	// Plain claims a reader can verify against the open source.
 	import { Badge } from '$lib/components/ui/badge';
+	import * as Sidebar from '$lib/components/ui/sidebar';
 	import { t } from '$lib/i18n/index.svelte';
 	const modes = $derived([
 		{
@@ -31,13 +32,12 @@
 
 <svelte:head><title>{t('hiw.title')} · Folio</title></svelte:head>
 
-<div class="flex h-svh flex-col">
-	<header class="flex items-center justify-between border-b px-6 py-3">
-		<div>
+<div class="flex h-full flex-col">
+	<header class="flex items-center gap-1 border-b px-4 py-3">
+		<Sidebar.Trigger class="shrink-0" />
+		<div class="min-w-0 px-1">
 			<h1 class="font-display text-lg tracking-tight">{t('hiw.title')}</h1>
-			<p class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
-				{t('hiw.subtitle')}
-			</p>
+			<p class="text-muted-foreground text-xs">{t('hiw.subtitle')}</p>
 		</div>
 	</header>
 

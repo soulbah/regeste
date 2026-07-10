@@ -31,7 +31,7 @@
 
 <svelte:head><title>Account · Folio</title></svelte:head>
 
-<div class="flex h-svh flex-col items-center justify-center gap-8 px-6">
+<div class="flex h-full flex-col items-center justify-center gap-8 px-6">
 	<div class="max-w-sm text-center">
 		<p class="text-muted-foreground mb-3 font-mono text-[10px] tracking-[0.25em] uppercase">
 			{t('account.kicker')}
@@ -125,8 +125,4 @@
 			</Card.Content>
 		</Card.Root>
 	{/if}
-
-	<p class="text-muted-foreground font-mono text-[10px] tracking-[0.25em] uppercase">
-		{t('account.filesLocal')}
-	</p>
 </div>

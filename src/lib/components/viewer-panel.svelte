@@ -2,14 +2,15 @@
 	// Document viewer in the right contextual panel (spec 006): the citation
 	// click-through target. Renders from OPFS + local DB only — no network.
 	import { Badge } from '$lib/components/ui/badge';
-	import { Button } from '$lib/components/ui/button';
-	import XIcon from '@lucide/svelte/icons/x';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import PdfViewer from '$lib/components/pdf-viewer.svelte';
 	import TextViewer from '$lib/components/text-viewer.svelte';
+	import PanelHeader from '$lib/components/panel-header.svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import { viewerStore } from '$lib/state/viewer.svelte';
 	import { isPdf } from '$lib/pipeline/parse';
+
+	let { onhide = null }: { onhide?: (() => void) | null } = $props();
 
 	const target = $derived(viewerStore.target);
 	const snapshot = $derived(viewerStore.snapshot);
@@ -23,25 +24,12 @@
 </script>
 
 <div class="flex h-full flex-col">
-	<div class="flex items-start justify-between gap-2 border-b p-4">
-		<div class="min-w-0">
-			<h2 class="font-display truncate text-lg tracking-tight">
-				{snapshot?.documentName ?? target?.document.name ?? t('viewer.document')}
-			</h2>
-			<p class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
-				{locator ? `${locator} · ` : ''}{t('viewer.stored')}
-			</p>
-		</div>
-		<Button
-			variant="ghost"
-			size="icon"
-			class="size-7 shrink-0"
-			onclick={() => viewerStore.close()}
-			aria-label={t('viewer.closeAria')}
-		>
-			<XIcon class="size-4" />
-		</Button>
-	</div>
+	<PanelHeader
+		title={snapshot?.documentName ?? target?.document.name ?? t('viewer.document')}
+		subtitle={locator}
+		onback={() => viewerStore.close()}
+		{onhide}
+	/>
 
 	{#if snapshot}
 		<div class="flex-1 space-y-3 overflow-y-auto p-4">
