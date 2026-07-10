@@ -1,6 +1,7 @@
 <script lang="ts">
 	// The composer's single + menu (spec 019): attach documents and preset
 	// actions live behind one entry point, like the ChatGPT/Claude + button.
+	import { mergeProps } from 'bits-ui';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { Button } from '$lib/components/ui/button';
@@ -60,9 +61,10 @@
 			<Tooltip.Root>
 				<Tooltip.Trigger>
 					{#snippet child({ props: tipProps })}
+						<!-- mergeProps chains the two triggers' handlers; a plain double
+						     spread lets the tooltip's onpointerdown erase the menu's. -->
 						<Button
-							{...menuProps}
-							{...tipProps}
+							{...mergeProps(menuProps, tipProps)}
 							variant="ghost"
 							size="icon-sm"
 							class="text-muted-foreground"

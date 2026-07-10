@@ -87,7 +87,7 @@
 	}
 </script>
 
-<div class="bg-card relative mx-auto w-full max-w-2xl rounded-[18px] border p-3 shadow-sm">
+<div class="bg-card relative mx-auto w-full max-w-3xl rounded-[18px] border p-3 shadow-sm">
 	{#if hashSuggestions.length}
 		<div
 			class="bg-popover absolute -top-2 right-3 left-3 z-10 -translate-y-full rounded-md border p-1 shadow-md"
@@ -179,7 +179,7 @@
 	</div>
 </div>
 <div
-	class="text-muted-foreground mx-auto mt-2 flex w-full max-w-2xl items-center justify-between px-3 font-mono text-[10px]"
+	class="text-muted-foreground mx-auto mt-2 flex w-full max-w-3xl items-center justify-between px-3 font-mono text-[10px]"
 >
 	<span>{t('composer.footer')}</span>
 	<span class="hidden sm:inline">{t('composer.enterHint')}</span>

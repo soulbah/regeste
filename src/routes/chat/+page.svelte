@@ -3,6 +3,7 @@
 	import { resolve } from '$app/paths';
 	import { toast } from 'svelte-sonner';
 	import FileIcon from '@lucide/svelte/icons/file';
+	import ScrollTextIcon from '@lucide/svelte/icons/scroll-text';
 	import { Button } from '$lib/components/ui/button';
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import Composer from '$lib/components/composer.svelte';
@@ -92,6 +93,7 @@
 			{t('home.sub')}
 		</p>
 		<Button variant="outline" class="gap-2" disabled={demoStarting} onclick={startDemo}>
+			<ScrollTextIcon class="text-muted-foreground" />
 			{demoStarting ? t('home.demoPreparing') : t('home.demoCta')}
 		</Button>
 	</div>

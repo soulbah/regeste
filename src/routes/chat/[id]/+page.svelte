@@ -281,7 +281,7 @@
 						</p>
 					</div>
 				{/if}
-				<div class="mx-auto max-w-2xl space-y-6 px-6 py-8">
+				<div class="mx-auto max-w-3xl space-y-6 px-6 py-8">
 					{#each chatsStore.messages as message (message.id)}
 						{#if message.role === 'user'}
 							{#if editingId === message.id}

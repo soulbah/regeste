@@ -156,7 +156,7 @@
 			</Button>
 		{/snippet}
 	</Popover.Trigger>
-	<Popover.Content class="w-72 p-1" align="start" side="top">
+	<Popover.Content class="w-72 gap-0 p-1" align="start" side="top">
 		<div class="flex flex-col">
 			{#each modes as m (m.id)}
 				<Button

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { mergeProps } from 'bits-ui';
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import NavUser from '$lib/components/nav-user.svelte';
@@ -181,8 +182,7 @@
 												<Tooltip.Trigger>
 													{#snippet child({ props: tipProps })}
 														<Sidebar.MenuAction
-															{...menuProps}
-															{...tipProps}
+															{...mergeProps(menuProps, tipProps)}
 															showOnHover
 															aria-label={t('sidebar.chatOptionsAria')}
 														>
