@@ -5,6 +5,7 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import * as Select from '$lib/components/ui/select';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
@@ -352,17 +353,38 @@
 							</div>
 							<Separator />
 							{#snippet benchControl()}
-								<Button
-									variant="outline"
-									size="sm"
-									class="shrink-0"
-									disabled={llmStore.status !== 'ready' || modelsStore.benchmarking}
-									onclick={() => modelsStore.runBenchmark()}
-								>
-									{modelsStore.benchmarking
-										? t('settings.models.testing')
-										: t('settings.models.test')}
-								</Button>
+								{#if llmStore.status !== 'ready'}
+									<!-- Disabled with a reason the row doesn't state: cursor +
+									     tooltip explain instead of a dead button. -->
+									<Tooltip.Provider delayDuration={300}>
+										<Tooltip.Root>
+											<Tooltip.Trigger>
+												{#snippet child({ props })}
+													<span {...props} class="inline-block cursor-not-allowed">
+														<Button variant="outline" size="sm" class="shrink-0" disabled>
+															{t('settings.models.test')}
+														</Button>
+													</span>
+												{/snippet}
+											</Tooltip.Trigger>
+											<Tooltip.Content side="left">
+												{t('settings.models.prepareFirst')}
+											</Tooltip.Content>
+										</Tooltip.Root>
+									</Tooltip.Provider>
+								{:else}
+									<Button
+										variant="outline"
+										size="sm"
+										class="shrink-0"
+										disabled={modelsStore.benchmarking}
+										onclick={() => modelsStore.runBenchmark()}
+									>
+										{modelsStore.benchmarking
+											? t('settings.models.testing')
+											: t('settings.models.test')}
+									</Button>
+								{/if}
 							{/snippet}
 							{@render row(
 								t('settings.models.benchTitle'),
