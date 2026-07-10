@@ -240,7 +240,12 @@ export const fr: Record<keyof typeof en, string> = {
 	'docsPage.sortName': 'Nom',
 	'docsPage.sortSize': 'Taille',
 	'docsPage.filterAll': 'tous',
-	'docsPage.ready': 'prêt',
+	'docsPage.search': 'Filtrer par nom…',
+	'docsPage.emptyTitle': 'Votre bibliothèque est vide',
+	'docsPage.types': 'PDF · Word · Markdown · Texte',
+	'docsPage.added': 'ajouté le {date}',
+	'docsPage.details': 'Détails',
+	'docsPage.noMatch': 'Rien ne correspond à ce filtre.',
 	'docsPage.noText': 'aucun texte extractible',
 	'docsPage.error': 'erreur',
 	'docsPage.sentOn': 'Extraits envoyés le {date}',
@@ -248,8 +253,6 @@ export const fr: Record<keyof typeof en, string> = {
 	'docsPage.inChats': 'Dans {count} discussion{s}',
 	'docsPage.openAria': 'Ouvrir les détails de {name}',
 	'docsPage.deleteFromDevice': 'Supprimer de cet appareil',
-	'docsPage.empty':
-		'Aucun document pour le moment. Ajoutez des fichiers PDF, Word, Markdown ou texte.',
 	'docsPage.deleteTitle': 'Supprimer « {name} » de cet appareil ?',
 	'docsPage.usedIn': 'Ce document est utilisé dans {count} discussion{s}.',
 	'docsPage.deleteBody':
