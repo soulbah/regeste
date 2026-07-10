@@ -95,7 +95,7 @@
 	}}
 />
 
-<ModeWatcher defaultMode="dark" />
+<ModeWatcher defaultMode="system" />
 <Toaster position="bottom-right" />
 <CommandPalette />
 

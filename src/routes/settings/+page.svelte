@@ -8,6 +8,7 @@
 	import { Switch } from '$lib/components/ui/switch';
 	import { Label } from '$lib/components/ui/label';
 	import ShieldIcon from '@lucide/svelte/icons/shield';
+	import { setMode, userPrefersMode } from 'mode-watcher';
 	import { resolve } from '$app/paths';
 	import { i18n, t } from '$lib/i18n/index.svelte';
 	import { getLocalDb } from '$lib/local-db/client';
@@ -15,6 +16,12 @@
 	import { llmStore } from '$lib/private-ai/llm.svelte';
 	import { modelsStore } from '$lib/state/models.svelte';
 	import { settingsStore } from '$lib/state/settings.svelte';
+
+	const modeChoices = [
+		{ mode: 'system', label: 'settings.appearance.system' },
+		{ mode: 'light', label: 'settings.appearance.light' },
+		{ mode: 'dark', label: 'settings.appearance.dark' }
+	] as const;
 
 	let week = $state<PrivacySummaryRow[]>([]);
 	let wipeOpen = $state(false);
@@ -152,6 +159,25 @@
 						>
 							Français
 						</Button>
+					</div>
+				</Card.Content>
+			</Card.Root>
+
+			<Card.Root>
+				<Card.Header>
+					<Card.Title class="text-base">{t('settings.appearance.title')}</Card.Title>
+				</Card.Header>
+				<Card.Content>
+					<div class="flex gap-2">
+						{#each modeChoices as { mode, label } (mode)}
+							<Button
+								variant={userPrefersMode.current === mode ? 'secondary' : 'outline'}
+								size="sm"
+								onclick={() => setMode(mode)}
+							>
+								{t(label)}
+							</Button>
+						{/each}
 					</div>
 				</Card.Content>
 			</Card.Root>

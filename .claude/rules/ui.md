@@ -11,5 +11,5 @@ paths:
 - Own the copied components: adapting variants inside `src/lib/components/ui/*` (via `tailwind-variants`) is the expected way to keep our identity — do it there, once, rather than sprinkling class overrides at call sites.
 - Svelte 5 runes only (`$state`, `$derived`, `$props`, `$effect`). No `export let`, no `$:`, no legacy stores in new code.
 - Shared client state: `.svelte.ts` modules in `src/lib/state/`. Web workers: plain TS in `src/lib/workers/` (runes don't work there), talk to them via Comlink.
-- Trust-boundary colors are a product invariant: Private = green, Assisted = amber, My AI = blue.
+- Color signals the exception (owner decision, spec 019): green is the single brand accent (citations, links, focus, confirmations); amber marks data leaving the device (Assisted and My AI egress indicators); Private is uncolored — never decorate the default state. Colored dots appear only on live states (indexing, active egress), never on static badges. No blue mode color.
 - Text visible to users goes through i18n (once wired) — never hardcode user-facing French/English strings in components.

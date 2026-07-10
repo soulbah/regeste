@@ -2,16 +2,17 @@
 	import { type VariantProps, tv } from 'tailwind-variants';
 
 	export const badgeVariants = tv({
-		base: 'gap-1.5 rounded-none border-0 bg-transparent px-0 py-0 text-[0.625rem] font-semibold tracking-widest uppercase transition-colors has-data-[icon=inline-end]:pr-0 has-data-[icon=inline-start]:pl-0 [&>svg]:size-3! focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive group/badge inline-flex w-fit shrink-0 items-center justify-center overflow-hidden whitespace-nowrap transition-colors focus-visible:ring-[3px] [&>svg]:pointer-events-none',
+		base: 'gap-1.5 rounded-full border-0 px-2.5 py-0.5 text-xs font-medium transition-colors has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 [&>svg]:size-3! focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive group/badge inline-flex w-fit shrink-0 items-center justify-center overflow-hidden whitespace-nowrap focus-visible:ring-[3px] [&>svg]:pointer-events-none',
 		variants: {
 			variant: {
-				default: 'text-foreground [a]:hover:text-foreground/70',
-				secondary: 'text-muted-foreground [a]:hover:text-foreground',
+				default: 'bg-accent text-accent-foreground [a]:hover:bg-accent/80',
+				secondary: 'bg-muted text-muted-foreground [a]:hover:text-foreground',
+				working: 'bg-mode-assisted/15 text-mode-assisted',
 				destructive:
-					'text-destructive [a]:hover:text-destructive/70 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40',
-				outline: 'text-foreground [a]:hover:text-foreground/70',
-				ghost: 'text-muted-foreground hover:text-foreground',
-				link: 'text-foreground underline-offset-4 hover:underline'
+					'bg-destructive/10 text-destructive [a]:hover:bg-destructive/20 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40',
+				outline: 'border-border border bg-transparent text-foreground',
+				ghost: 'bg-transparent px-0 text-muted-foreground hover:text-foreground',
+				link: 'bg-transparent px-0 text-foreground underline-offset-4 hover:underline'
 			}
 		},
 		defaultVariants: {

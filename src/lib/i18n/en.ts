@@ -299,6 +299,10 @@ export const en = {
 	'settings.week.howEachMode': 'how each mode works:',
 	'settings.week.dataFlows': 'data flows',
 	'settings.language.title': 'Language / Langue',
+	'settings.appearance.title': 'Appearance',
+	'settings.appearance.system': 'System',
+	'settings.appearance.light': 'Light',
+	'settings.appearance.dark': 'Dark',
 	'settings.offline.title': 'Force offline',
 	'settings.offline.label':
 		'Block every outgoing request. Private mode and your documents keep working; cloud modes and sign-in are refused with a clear message.',

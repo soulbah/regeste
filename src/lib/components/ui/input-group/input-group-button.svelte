@@ -2,10 +2,10 @@
 	import { tv, type VariantProps } from 'tailwind-variants';
 
 	const inputGroupButtonVariants = tv({
-		base: 'gap-2 rounded-none text-sm flex items-center shadow-none',
+		base: 'gap-2 rounded-md text-sm flex items-center shadow-none',
 		variants: {
 			size: {
-				xs: "h-6 gap-1 rounded-none px-1.5 text-xs [&>svg:not([class*='size-'])]:size-3.5",
+				xs: "h-6 gap-1 rounded-md px-1.5 text-xs [&>svg:not([class*='size-'])]:size-3.5",
 				sm: 'cn-input-group-button-size-sm',
 				'icon-xs': 'size-6 p-0 text-xs has-[>svg]:p-0',
 				'icon-sm': 'size-8 p-0 has-[>svg]:p-0'

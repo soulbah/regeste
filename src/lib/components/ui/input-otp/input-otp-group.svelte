@@ -13,10 +13,7 @@
 <div
 	bind:this={ref}
 	data-slot="input-otp-group"
-	class={cn(
-		'has-aria-invalid:border-b-destructive dark:has-aria-invalid:border-b-destructive/50 gap-1 rounded-none flex items-center',
-		className
-	)}
+	class={cn('gap-1.5 flex items-center', className)}
 	{...restProps}
 >
 	{@render children?.()}

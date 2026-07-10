@@ -2,7 +2,7 @@
 
 Check a task off ONLY after its Done-when commands pass. `[P]` = safe to run in parallel with neighbors.
 
-- [ ] 1. Phase 1 — v2 palette + radius/shadows in layout.css, button/badge variants, theme setting (System/Light/Dark) in Settings, ui.md amendment
+- [x] 1. Phase 1 — v2 palette + radius/shadows in layout.css, button/badge variants, theme setting (System/Light/Dark) in Settings, ui.md amendment
       Done when: `bun run verify` exits 0; both themes sweep clean on every screen; theme choice persists across reload; contrast audit passes (4.5:1 text, 3:1 UI); no mono-uppercase buttons/badges anywhere.
 - [ ] 2. Phase 2 — inset shell, sidebar rail, panel system (resize/close/reopen/persist), header egress pill + toggle, trust de-repetition, responsive Sheet fallback
       Done when: `bun run verify` exits 0; drag/snap/dblclick/⌘./header-toggle/citation-reopen all work on /chat/[id]; sizes persist across reload; `grep -r "storedLocally\|signedIn" src/` has no rendered usage left; panel renders as Sheet at 900px.

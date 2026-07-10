@@ -310,6 +310,10 @@ export const fr: Record<keyof typeof en, string> = {
 	'settings.week.howEachMode': 'fonctionnement de chaque mode :',
 	'settings.week.dataFlows': 'flux de données',
 	'settings.language.title': 'Language / Langue',
+	'settings.appearance.title': 'Apparence',
+	'settings.appearance.system': 'Système',
+	'settings.appearance.light': 'Clair',
+	'settings.appearance.dark': 'Sombre',
 	'settings.offline.title': 'Forcer le hors ligne',
 	'settings.offline.label':
 		'Bloque toute requête sortante. Le mode Private et vos documents continuent de fonctionner ; les modes cloud et la connexion sont refusés avec un message clair.',
