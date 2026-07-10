@@ -16,6 +16,11 @@
 	import DatabaseIcon from '@lucide/svelte/icons/database';
 	import CpuIcon from '@lucide/svelte/icons/cpu';
 	import UserRoundIcon from '@lucide/svelte/icons/user-round';
+	import MonitorIcon from '@lucide/svelte/icons/monitor';
+	import SunIcon from '@lucide/svelte/icons/sun';
+	import MoonIcon from '@lucide/svelte/icons/moon';
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { setMode, userPrefersMode } from 'mode-watcher';
 	import { authClient } from '$lib/auth-client';
 	import { i18n, t } from '$lib/i18n/index.svelte';
@@ -37,9 +42,9 @@
 	] as const;
 
 	const themeChoices = [
-		{ value: 'system', label: 'settings.appearance.system' },
-		{ value: 'light', label: 'settings.appearance.light' },
-		{ value: 'dark', label: 'settings.appearance.dark' }
+		{ value: 'system', label: 'settings.appearance.system', icon: MonitorIcon },
+		{ value: 'light', label: 'settings.appearance.light', icon: SunIcon },
+		{ value: 'dark', label: 'settings.appearance.dark', icon: MoonIcon }
 	] as const;
 
 	const modeLabels = { private: 'Private', assisted: 'Assisted', myai: 'My AI' } as const;
@@ -119,7 +124,7 @@
 {/snippet}
 
 {#snippet segmented(
-	options: readonly { value: string; text: string }[],
+	options: readonly { value: string; text: string; icon?: typeof SunIcon }[],
 	active: string,
 	onpick: (value: string) => void
 )}
@@ -128,16 +133,25 @@
 			<Button
 				variant="ghost"
 				size="xs"
-				class="h-7 rounded-[7px] px-3 {active === opt.value
-					? 'bg-card text-foreground shadow-xs hover:bg-card'
+				class="h-7 gap-1.5 rounded-[7px] px-3 {active === opt.value
+					? 'bg-card dark:bg-foreground/14 hover:bg-card dark:hover:bg-foreground/14 text-foreground shadow-xs'
 					: 'text-muted-foreground'}"
 				aria-pressed={active === opt.value}
 				onclick={() => onpick(opt.value)}
 			>
+				{#if opt.icon}
+					<opt.icon class="size-3.5" />
+				{/if}
 				{opt.text}
 			</Button>
 		{/each}
 	</div>
+{/snippet}
+
+{#snippet kicker(text: string)}
+	<p class="text-muted-foreground/80 text-[11px] font-medium tracking-[0.08em] uppercase">
+		{text}
+	</p>
 {/snippet}
 
 <Dialog.Root bind:open={uiStore.settingsOpen}>
@@ -173,7 +187,7 @@
 					{#if tab === 'general'}
 						{#snippet themeControl()}
 							{@render segmented(
-								themeChoices.map((c) => ({ value: c.value, text: t(c.label) })),
+								themeChoices.map((c) => ({ value: c.value, text: t(c.label), icon: c.icon })),
 								userPrefersMode.current,
 								(v) => setMode(v as 'light' | 'dark' | 'system')
 							)}
@@ -286,7 +300,7 @@
 						{@render row(t('settings.wipe.title'), t('settings.wipe.desc'), wipeControl)}
 					{:else if tab === 'ai'}
 						<div class="py-3.5">
-							<p class="text-sm font-medium">{t('settings.models.title')}</p>
+							{@render kicker(t('settings.models.title'))}
 							{#if modelsStore.cached.length === 0}
 								<p class="text-muted-foreground mt-0.5 text-xs">
 									{modelsStore.loading ? t('settings.models.measuring') : t('settings.models.none')}
@@ -339,15 +353,19 @@
 						</div>
 						<Separator />
 						<div class="space-y-3 py-3.5">
-							<p class="text-sm font-medium">{t('settings.myai.title')}</p>
+							{@render kicker(t('settings.myai.title'))}
 							<div class="space-y-2">
-								<Label for="myai-url" class="text-xs font-normal">{t('myai.baseUrl')}</Label>
+								<Label for="myai-url" class="text-muted-foreground text-xs font-normal">
+									{t('myai.baseUrl')}
+								</Label>
 								<Input
 									id="myai-url"
 									bind:value={urlDraft}
 									placeholder="http://localhost:11434/v1"
 								/>
-								<Label for="myai-key" class="text-xs font-normal">{t('myai.apiKey')}</Label>
+								<Label for="myai-key" class="text-muted-foreground text-xs font-normal">
+									{t('myai.apiKey')}
+								</Label>
 								<Input
 									id="myai-key"
 									type="password"
@@ -437,7 +455,7 @@
 								size="sm"
 								onclick={() => {
 									uiStore.settingsOpen = false;
-									location.assign('/chat/account');
+									goto(resolve('/chat/account'));
 								}}
 							>
 								{t('menu.signIn')}

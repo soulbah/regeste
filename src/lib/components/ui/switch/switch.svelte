@@ -26,6 +26,6 @@
 >
 	<SwitchPrimitive.Thumb
 		data-slot="switch-thumb"
-		class="bg-background dark:data-unchecked:bg-foreground dark:data-checked:bg-primary-foreground group-data-[size=default]/switch:size-3.5 group-data-[size=sm]/switch:size-2.5 data-checked:translate-x-[calc(100%+2px)] data-unchecked:translate-x-0.25 pointer-events-none block ring-0 transition-transform rtl:data-[state=checked]:translate-x-[calc(-100%)]"
+		class="bg-background dark:data-unchecked:bg-foreground dark:data-checked:bg-primary-foreground group-data-[size=default]/switch:size-3.5 group-data-[size=sm]/switch:size-2.5 data-checked:translate-x-[calc(100%+2px)] data-unchecked:translate-x-0.25 pointer-events-none block rounded-full ring-0 transition-transform rtl:data-[state=checked]:translate-x-[calc(-100%)]"
 	/>
 </SwitchPrimitive.Root>
