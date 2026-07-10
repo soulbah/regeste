@@ -27,12 +27,26 @@
 	// the viewer in an overlay sheet instead.
 	const onChatRoute = $derived(page.route.id === '/chat/[id]');
 
+	// A second tab must fail loudly, not silently orphan the database (the OPFS
+	// SAH pool is single-owner; the worker refuses with 'folio-db-busy').
+	let dbBusyShown = false;
+	function guardDb<T>(p: Promise<T>): Promise<T | void> {
+		return p.catch((err) => {
+			if (String(err).includes('folio-db-busy') && !dbBusyShown) {
+				dbBusyShown = true;
+				toast.error(t('app.dbBusy'), { duration: Number.POSITIVE_INFINITY });
+				return;
+			}
+			throw err;
+		});
+	}
+
 	$effect(() => {
 		i18n.init();
-		documentsStore.init();
-		chatsStore.refresh();
+		guardDb(documentsStore.init());
+		guardDb(chatsStore.refresh());
 		// Offline switch loads first so a forced-offline session never phones home.
-		settingsStore.init().then(() => sessionStore.refresh());
+		guardDb(settingsStore.init().then(() => sessionStore.refresh()));
 	});
 
 	// Feedback rules (FEATURES 5bis): ingestion state lives in the documents

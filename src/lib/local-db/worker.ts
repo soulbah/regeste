@@ -38,7 +38,31 @@ export interface DbInfo {
 	schemaVersion: number;
 }
 
+/**
+ * The OPFS SAH pool is NOT multi-context safe: a second tab installing the
+ * pool can re-associate its files and silently orphan the database. One
+ * exclusive Web Lock, held for the worker's lifetime, guarantees a single
+ * owner; later tabs fail fast with 'folio-db-busy' instead of destroying data.
+ */
+async function acquireSingleOwnerLock(): Promise<void> {
+	const acquired = await new Promise<boolean>((resolve) => {
+		navigator.locks
+			.request('folio-db-pool', { ifAvailable: true }, (lock) => {
+				if (!lock) {
+					resolve(false);
+					return;
+				}
+				resolve(true);
+				// Hold until this worker dies with its tab.
+				return new Promise<never>(() => {});
+			})
+			.catch(() => resolve(false));
+	});
+	if (!acquired) throw new Error('folio-db-busy');
+}
+
 async function init(): Promise<DbInfo> {
+	await acquireSingleOwnerLock();
 	const { default: sqlite3InitModule } = await import(/* @vite-ignore */ SQLITE_DIST_URL);
 	const sqlite3 = await sqlite3InitModule({
 		print: () => {},

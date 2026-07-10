@@ -5,6 +5,7 @@
 	import * as Resizable from '$lib/components/ui/resizable';
 	import * as Sheet from '$lib/components/ui/sheet';
 	import * as Sidebar from '$lib/components/ui/sidebar';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Button } from '$lib/components/ui/button';
 	import { Textarea } from '$lib/components/ui/textarea';
@@ -180,6 +181,11 @@
 		if ((e.metaKey || e.ctrlKey) && e.key === '.') {
 			e.preventDefault();
 			togglePanel();
+			return;
+		}
+		// Esc stops generation (spec 019 UX checklist), partial output kept.
+		if (e.key === 'Escape' && (llmStore.status === 'generating' || myaiStore.generating)) {
+			chatsStore.stopGeneration();
 		}
 	}}
 />
@@ -226,19 +232,31 @@
 							</span>
 						{/if}
 					</a>
-					<Button
-						variant="ghost"
-						size="icon-sm"
-						aria-expanded={lgViewport.current ? panelOpen : panelSheetOpen}
-						aria-label={t('chat.panelToggleAria')}
-						onclick={togglePanel}
-					>
-						{#if lgViewport.current ? panelOpen : panelSheetOpen}
-							<PanelRightCloseIcon />
-						{:else}
-							<PanelRightOpenIcon />
-						{/if}
-					</Button>
+					<Tooltip.Root>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<Button
+									{...props}
+									variant="ghost"
+									size="icon-sm"
+									aria-expanded={lgViewport.current ? panelOpen : panelSheetOpen}
+									aria-label={t('chat.panelToggleAria')}
+									onclick={togglePanel}
+								>
+									{#if lgViewport.current ? panelOpen : panelSheetOpen}
+										<PanelRightCloseIcon />
+									{:else}
+										<PanelRightOpenIcon />
+									{/if}
+								</Button>
+							{/snippet}
+						</Tooltip.Trigger>
+						<Tooltip.Content side="bottom">
+							{(lgViewport.current ? panelOpen : panelSheetOpen)
+								? t('chat.panelTip.hide')
+								: t('chat.panelTip.show')}
+						</Tooltip.Content>
+					</Tooltip.Root>
 				</div>
 			</header>
 
