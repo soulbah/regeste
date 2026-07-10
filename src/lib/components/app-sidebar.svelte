@@ -205,7 +205,7 @@
 	<Sidebar.Footer>
 		<a
 			href={resolve('/chat/account')}
-			class="hover:bg-sidebar-accent flex items-center gap-2 rounded-md px-2 py-1.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+			class="hover:bg-foreground/7 flex items-center gap-2 rounded-md px-2 py-1.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
 		>
 			<span
 				class="bg-muted flex size-7 shrink-0 items-center justify-center rounded-full text-xs uppercase"

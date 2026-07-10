@@ -205,6 +205,10 @@
 	* {
 		@apply border-border outline-ring/50;
 	}
+	button:not(:disabled),
+	[role='button']:not([aria-disabled='true']) {
+		cursor: pointer;
+	}
 	html {
 		@apply font-sans;
 	}
