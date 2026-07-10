@@ -53,8 +53,8 @@
 <svelte:head><title>{t('settings.title')} · Folio</title></svelte:head>
 
 <div class="flex h-full flex-col">
-	<header class="flex items-center gap-1 border-b px-4 py-3">
-		<Sidebar.Trigger class="shrink-0" />
+	<header class="flex h-14 shrink-0 items-center gap-1 border-b px-4">
+		<Sidebar.Trigger class="shrink-0 md:hidden" />
 		<div class="min-w-0 px-1">
 			<h1 class="font-display text-lg tracking-tight">{t('settings.title')}</h1>
 			<p class="text-muted-foreground text-xs">{t('settings.subtitle')}</p>

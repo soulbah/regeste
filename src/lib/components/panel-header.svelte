@@ -21,7 +21,7 @@
 	} = $props();
 </script>
 
-<div class="flex items-center gap-1 border-b p-3">
+<div class="flex h-14 shrink-0 items-center gap-1 border-b px-3">
 	{#if onback}
 		<Button
 			variant="ghost"
@@ -34,9 +34,9 @@
 		</Button>
 	{/if}
 	<div class="min-w-0 flex-1 px-1">
-		<h2 class="truncate text-sm font-semibold">{title}</h2>
+		<h2 class="truncate text-sm leading-tight font-semibold">{title}</h2>
 		{#if subtitle}
-			<p class="text-muted-foreground truncate text-xs">{subtitle}</p>
+			<p class="text-muted-foreground truncate text-[11px] leading-tight">{subtitle}</p>
 		{/if}
 	</div>
 	{#if onhide}

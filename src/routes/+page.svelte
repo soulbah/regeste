@@ -70,8 +70,8 @@
 <svelte:head><title>Folio</title></svelte:head>
 
 <div class="flex h-full flex-col">
-	<header class="flex items-center gap-1 border-b px-4 py-3">
-		<Sidebar.Trigger class="shrink-0" />
+	<header class="flex h-14 shrink-0 items-center gap-1 border-b px-4">
+		<Sidebar.Trigger class="shrink-0 md:hidden" />
 		<h1 class="font-display px-1 text-lg tracking-tight">{t('sidebar.newChat')}</h1>
 	</header>
 

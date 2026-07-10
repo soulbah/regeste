@@ -81,15 +81,20 @@
 	<!-- Fixed top zone (market convention): brand + primary actions never scroll;
 	     only the history below does. -->
 	<Sidebar.Header>
-		<a
-			href={resolve('/')}
-			class="flex items-center gap-2 px-2 py-1.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+		<div
+			class="flex items-center justify-between group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-1"
 		>
-			<FileIcon class="size-4 shrink-0" />
-			<span class="font-display text-lg tracking-tight group-data-[collapsible=icon]:hidden"
-				>Folio</span
+			<a
+				href={resolve('/')}
+				class="flex min-w-0 items-center gap-2 px-2 py-1.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
 			>
-		</a>
+				<FileIcon class="size-4 shrink-0" />
+				<span class="font-display text-lg tracking-tight group-data-[collapsible=icon]:hidden"
+					>Folio</span
+				>
+			</a>
+			<Sidebar.Trigger class="text-sidebar-foreground/70 shrink-0" />
+		</div>
 		<Sidebar.Menu>
 			<Sidebar.MenuItem>
 				<Sidebar.MenuButton>

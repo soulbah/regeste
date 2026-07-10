@@ -12,7 +12,8 @@
 	import SquareIcon from '@lucide/svelte/icons/square';
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import InfoIcon from '@lucide/svelte/icons/info';
-	import PanelRightIcon from '@lucide/svelte/icons/panel-right';
+	import PanelRightOpenIcon from '@lucide/svelte/icons/panel-right-open';
+	import PanelRightCloseIcon from '@lucide/svelte/icons/panel-right-close';
 	import Composer from '$lib/components/composer.svelte';
 	import RetrievalTurn from '$lib/components/retrieval-turn.svelte';
 	import PrivateTurn from '$lib/components/private-turn.svelte';
@@ -151,14 +152,14 @@
 <Resizable.PaneGroup direction="horizontal" class="h-full" autoSaveId="folio-panes">
 	<Resizable.Pane defaultSize={70} minSize={35}>
 		<div class="flex h-full flex-col">
-			<header class="flex items-center justify-between gap-3 border-b py-3 pr-4 pl-4">
+			<header class="flex h-14 shrink-0 items-center justify-between gap-3 border-b px-4">
 				<div class="flex min-w-0 items-center gap-1">
-					<Sidebar.Trigger class="shrink-0" />
+					<Sidebar.Trigger class="shrink-0 md:hidden" />
 					<div class="min-w-0 px-1">
-						<h1 class="font-display truncate text-lg tracking-tight">
+						<h1 class="font-display truncate text-base leading-tight tracking-tight">
 							{chatsStore.activeChat?.title ?? t('chat.fallback')}
 						</h1>
-						<p class="text-muted-foreground truncate text-xs">
+						<p class="text-muted-foreground truncate text-[11px] leading-tight">
 							{t('chat.docCount', {
 								count: chatsStore.chatDocuments.length,
 								s: chatsStore.chatDocuments.length === 1 ? '' : 's'
@@ -197,7 +198,11 @@
 						aria-label={t('chat.panelToggleAria')}
 						onclick={togglePanel}
 					>
-						<PanelRightIcon />
+						{#if lgViewport.current ? panelOpen : panelSheetOpen}
+							<PanelRightCloseIcon />
+						{:else}
+							<PanelRightOpenIcon />
+						{/if}
 					</Button>
 				</div>
 			</header>

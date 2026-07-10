@@ -69,9 +69,9 @@
 <svelte:head><title>{t('privacy.title')} · Folio</title></svelte:head>
 
 <div class="flex h-full flex-col">
-	<header class="flex items-center justify-between gap-3 border-b py-3 pr-6 pl-4">
+	<header class="flex h-14 shrink-0 items-center justify-between gap-3 border-b pr-6 pl-4">
 		<div class="flex min-w-0 items-center gap-1">
-			<Sidebar.Trigger class="shrink-0" />
+			<Sidebar.Trigger class="shrink-0 md:hidden" />
 			<div class="min-w-0 px-1">
 				<h1 class="font-display text-lg tracking-tight">{t('privacy.title')}</h1>
 				<p class="text-muted-foreground text-xs">{t('privacy.subtitle')}</p>
