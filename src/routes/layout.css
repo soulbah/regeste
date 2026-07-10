@@ -54,6 +54,11 @@
 	   (Assisted and My AI); Private is uncolored; green is the brand accent. */
 	--mode-assisted: oklch(0.6404 0.0902 75);
 
+	/* Tooltips ride above every surface: ink-on-paper in light, near-black in dark
+	   (the ChatGPT/Claude recipe — never a light bubble on a dark app). */
+	--tooltip: oklch(0.2698 0.0148 95);
+	--tooltip-foreground: oklch(0.9704 0.0058 95);
+
 	/* Cited-passage marker (viewer highlight) — warm amber: the universal text-marker
 	   convention, exempt from the amber-means-egress rule (badges/indicators only). */
 	--highlight: oklch(0.6404 0.0902 75);
@@ -119,6 +124,9 @@
 
 	--mode-assisted: oklch(0.7402 0.0852 80);
 
+	--tooltip: oklch(0.145 0.006 80);
+	--tooltip-foreground: oklch(0.9202 0.0088 95);
+
 	--highlight: oklch(0.7402 0.0852 80);
 
 	/* Dark elevation comes from surface lightness (bg < card < popover);
@@ -178,6 +186,8 @@
 	--color-sidebar-ring: var(--sidebar-ring);
 
 	--color-mode-assisted: var(--mode-assisted);
+	--color-tooltip: var(--tooltip);
+	--color-tooltip-foreground: var(--tooltip-foreground);
 	--color-highlight: var(--highlight);
 
 	--font-sans: var(--font-sans);

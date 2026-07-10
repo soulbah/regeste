@@ -1,5 +1,6 @@
 <script lang="ts">
 	import * as Sidebar from '$lib/components/ui/sidebar';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -88,7 +89,7 @@
 	<Sidebar.Header>
 		<!-- Expanded: logo left, collapse trigger right. Collapsed rail: the logo
 		     holds the slot and the trigger takes its place on hover (ChatGPT). -->
-		<div class="flex items-center justify-between group-data-[collapsible=icon]:justify-start">
+		<div class="flex items-center justify-between group-data-[collapsible=icon]:justify-center">
 			<a
 				href={resolve('/chat')}
 				class="flex min-w-0 items-center gap-2 px-2 py-1.5 group-data-[collapsible=icon]:hidden"
@@ -96,23 +97,39 @@
 				<FileIcon class="size-4 shrink-0" />
 				<span class="font-display text-lg tracking-tight">Folio</span>
 			</a>
-			<Sidebar.Trigger
-				class="text-sidebar-foreground/70 shrink-0 group-data-[collapsible=icon]:hidden"
-			/>
+			<Tooltip.Root>
+				<Tooltip.Trigger>
+					{#snippet child({ props })}
+						<Sidebar.Trigger
+							{...props}
+							class="text-sidebar-foreground/70 shrink-0 group-data-[collapsible=icon]:hidden"
+						/>
+					{/snippet}
+				</Tooltip.Trigger>
+				<Tooltip.Content side="right">{t('sidebar.collapseTip')}</Tooltip.Content>
+			</Tooltip.Root>
 			<div class="group/logo relative hidden size-8 group-data-[collapsible=icon]:block">
 				<span
 					class="pointer-events-none absolute inset-0 flex items-center justify-center transition-opacity group-hover/logo:opacity-0"
 				>
 					<FileIcon class="size-4" />
 				</span>
-				<Sidebar.Trigger
-					class="text-sidebar-foreground/70 absolute inset-0 opacity-0 transition-opacity group-hover/logo:opacity-100"
-				/>
+				<Tooltip.Root>
+					<Tooltip.Trigger>
+						{#snippet child({ props })}
+							<Sidebar.Trigger
+								{...props}
+								class="text-sidebar-foreground/70 absolute inset-0 opacity-0 transition-opacity group-hover/logo:opacity-100"
+							/>
+						{/snippet}
+					</Tooltip.Trigger>
+					<Tooltip.Content side="right">{t('sidebar.expandTip')}</Tooltip.Content>
+				</Tooltip.Root>
 			</div>
 		</div>
 		<Sidebar.Menu>
 			<Sidebar.MenuItem>
-				<Sidebar.MenuButton>
+				<Sidebar.MenuButton tooltipContent={t('sidebar.newChat')}>
 					{#snippet child({ props })}
 						<a href={resolve('/chat')} {...props}>
 							<PlusIcon /> <span>{t('sidebar.newChat')}</span>
@@ -121,7 +138,10 @@
 				</Sidebar.MenuButton>
 			</Sidebar.MenuItem>
 			<Sidebar.MenuItem>
-				<Sidebar.MenuButton isActive={page.url.pathname === '/chat/documents'}>
+				<Sidebar.MenuButton
+					tooltipContent={t('sidebar.documents')}
+					isActive={page.url.pathname === '/chat/documents'}
+				>
 					{#snippet child({ props })}
 						<a href={resolve('/chat/documents')} {...props}>
 							<FolderIcon /> <span>{t('sidebar.documents')}</span>
@@ -130,14 +150,20 @@
 				</Sidebar.MenuButton>
 			</Sidebar.MenuItem>
 			<Sidebar.MenuItem>
-				<Sidebar.MenuButton onclick={() => searchStore.toggle()}>
+				<Sidebar.MenuButton
+					tooltipContent={`${t('sidebar.search')} · ⌘K`}
+					onclick={() => searchStore.toggle()}
+				>
 					<SearchIcon />
 					<span>{t('sidebar.search')}</span>
 					<span class="text-muted-foreground ml-auto font-mono text-[10px]">⌘K</span>
 				</Sidebar.MenuButton>
 			</Sidebar.MenuItem>
 			<Sidebar.MenuItem>
-				<Sidebar.MenuButton isActive={page.url.pathname === '/chat/privacy'}>
+				<Sidebar.MenuButton
+					tooltipContent={t('sidebar.privacyReport')}
+					isActive={page.url.pathname === '/chat/privacy'}
+				>
 					{#snippet child({ props })}
 						<a href={resolve('/chat/privacy')} {...props}>
 							<ShieldIcon /> <span>{t('sidebar.privacyReport')}</span>
@@ -146,7 +172,10 @@
 				</Sidebar.MenuButton>
 			</Sidebar.MenuItem>
 			<Sidebar.MenuItem>
-				<Sidebar.MenuButton isActive={page.url.pathname === '/chat/settings'}>
+				<Sidebar.MenuButton
+					tooltipContent={t('sidebar.settings')}
+					isActive={page.url.pathname === '/chat/settings'}
+				>
 					{#snippet child({ props })}
 						<a href={resolve('/chat/settings')} {...props}>
 							<SettingsIcon /> <span>{t('sidebar.settings')}</span>
@@ -173,10 +202,24 @@
 								</Sidebar.MenuButton>
 								<DropdownMenu.Root>
 									<DropdownMenu.Trigger>
-										{#snippet child({ props })}
-											<Sidebar.MenuAction {...props} showOnHover>
-												<EllipsisIcon />
-											</Sidebar.MenuAction>
+										{#snippet child({ props: menuProps })}
+											<Tooltip.Root>
+												<Tooltip.Trigger>
+													{#snippet child({ props: tipProps })}
+														<Sidebar.MenuAction
+															{...menuProps}
+															{...tipProps}
+															showOnHover
+															aria-label={t('sidebar.chatOptionsAria')}
+														>
+															<EllipsisIcon />
+														</Sidebar.MenuAction>
+													{/snippet}
+												</Tooltip.Trigger>
+												<Tooltip.Content side="right">
+													{t('sidebar.chatOptionsAria')}
+												</Tooltip.Content>
+											</Tooltip.Root>
 										{/snippet}
 									</DropdownMenu.Trigger>
 									<DropdownMenu.Content side="right" align="start">
@@ -215,10 +258,12 @@
 	<Sidebar.Footer>
 		<a
 			href={resolve('/chat/account')}
-			class="hover:bg-foreground/7 flex items-center gap-2 rounded-md px-2 py-1.5 group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0"
+			class="hover:bg-foreground/7 flex items-center gap-2 rounded-md px-2 py-1.5 group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:hover:bg-transparent"
 		>
+			<!-- Rail: the avatar simply reads larger than the nav glyphs (Claude),
+			     no hover chrome around it. -->
 			<span
-				class="bg-muted flex size-7 shrink-0 items-center justify-center rounded-full text-xs uppercase"
+				class="bg-muted flex size-7 shrink-0 items-center justify-center rounded-full text-xs uppercase group-data-[collapsible=icon]:size-8"
 			>
 				{sessionStore.user ? sessionStore.user.email[0] : t('sidebar.guest')[0]}
 			</span>

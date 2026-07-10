@@ -14,7 +14,10 @@
 	bind:this={ref}
 	data-slot="sidebar-footer"
 	data-sidebar="footer"
-	class={cn('gap-2 px-1.5 py-2 flex flex-col', className)}
+	class={cn(
+		'gap-2 px-1.5 py-2 flex flex-col group-data-[collapsible=icon]:items-center',
+		className
+	)}
 	{...restProps}
 >
 	{@render children?.()}

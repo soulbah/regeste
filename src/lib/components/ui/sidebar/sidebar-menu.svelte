@@ -14,7 +14,10 @@
 	bind:this={ref}
 	data-slot="sidebar-menu"
 	data-sidebar="menu"
-	class={cn('gap-0.5 flex w-full min-w-0 flex-col', className)}
+	class={cn(
+		'gap-0.5 flex w-full min-w-0 flex-col group-data-[collapsible=icon]:items-center',
+		className
+	)}
 	{...restProps}
 >
 	{@render children?.()}

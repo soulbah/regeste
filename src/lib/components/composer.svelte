@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import ArrowUpIcon from '@lucide/svelte/icons/arrow-up';
 	import SquareIcon from '@lucide/svelte/icons/square';
@@ -139,26 +140,37 @@
 		/>
 		<ModeSelector {mode} onselect={onmodeselect} {myaiModel} {onmyaimodel} {privateOnly} />
 		<div class="flex-1"></div>
-		{#if generating && onstop}
-			<Button
-				size="icon"
-				class="bg-ring hover:bg-ring/90 text-background rounded-md"
-				onclick={onstop}
-				aria-label={t('chat.stop')}
-			>
-				<SquareIcon class="size-3.5 fill-current" />
-			</Button>
-		{:else}
-			<Button
-				size="icon"
-				class="bg-ring hover:bg-ring/90 text-background rounded-md disabled:opacity-40"
-				onclick={submit}
-				disabled={disabled || !text.trim()}
-				aria-label={t('composer.sendAria')}
-			>
-				<ArrowUpIcon class="size-4" />
-			</Button>
-		{/if}
+		<Tooltip.Root>
+			<Tooltip.Trigger>
+				{#snippet child({ props })}
+					{#if generating && onstop}
+						<Button
+							{...props}
+							size="icon"
+							class="bg-ring hover:bg-ring/90 text-background rounded-md"
+							onclick={onstop}
+							aria-label={t('chat.stop')}
+						>
+							<SquareIcon class="size-3.5 fill-current" />
+						</Button>
+					{:else}
+						<Button
+							{...props}
+							size="icon"
+							class="bg-ring hover:bg-ring/90 text-background rounded-md disabled:opacity-40"
+							onclick={submit}
+							disabled={disabled || !text.trim()}
+							aria-label={t('composer.sendAria')}
+						>
+							<ArrowUpIcon class="size-4" />
+						</Button>
+					{/if}
+				{/snippet}
+			</Tooltip.Trigger>
+			<Tooltip.Content side="top">
+				{generating && onstop ? t('chat.stopTip') : t('composer.sendTip')}
+			</Tooltip.Content>
+		</Tooltip.Root>
 	</div>
 </div>
 <div

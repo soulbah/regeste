@@ -2,6 +2,7 @@
 	// The composer's single + menu (spec 019): attach documents and preset
 	// actions live behind one entry point, like the ChatGPT/Claude + button.
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { Button } from '$lib/components/ui/button';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import UploadIcon from '@lucide/svelte/icons/upload';
@@ -55,16 +56,24 @@
 
 <DropdownMenu.Root>
 	<DropdownMenu.Trigger>
-		{#snippet child({ props })}
-			<Button
-				{...props}
-				variant="ghost"
-				size="icon-sm"
-				class="text-muted-foreground"
-				aria-label={t('addDocs.menuAria')}
-			>
-				<PlusIcon />
-			</Button>
+		{#snippet child({ props: menuProps })}
+			<Tooltip.Root>
+				<Tooltip.Trigger>
+					{#snippet child({ props: tipProps })}
+						<Button
+							{...menuProps}
+							{...tipProps}
+							variant="ghost"
+							size="icon-sm"
+							class="text-muted-foreground"
+							aria-label={t('addDocs.menuAria')}
+						>
+							<PlusIcon />
+						</Button>
+					{/snippet}
+				</Tooltip.Trigger>
+				<Tooltip.Content side="top">{t('addDocs.menuAria')}</Tooltip.Content>
+			</Tooltip.Root>
 		{/snippet}
 	</DropdownMenu.Trigger>
 	<DropdownMenu.Content align="start" side="top" class="w-56">
