@@ -7,6 +7,16 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Disabled controls keep receiving pointer events (cursor + explanatory
+   tooltips, owner rule 2026-07-11) — so hover styles must exclude them. */
+@custom-variant hover {
+	@media (hover: hover) {
+		&:hover:not(:disabled, [data-disabled], [aria-disabled='true']) {
+			@slot;
+		}
+	}
+}
+
 /* =====================================================================
    Folio — Theme v2 (spec 019, tweakcn/shadcn format, Tailwind v4)
    Warm paper aesthetic · ink foreground · one green brand accent ·

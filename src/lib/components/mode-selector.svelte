@@ -1,5 +1,6 @@
 <script lang="ts">
 	import * as Popover from '$lib/components/ui/popover';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
@@ -306,18 +307,28 @@
 				{#if presetHint}
 					<p class="text-muted-foreground text-xs">{t(presetHint)}</p>
 				{/if}
-				<Button
-					variant="outline"
-					size="sm"
-					class="w-full"
-					disabled={!urlDraft.trim() || myaiStore.testStatus === 'testing'}
-					onclick={async () => {
-						await applyEndpointDraft();
-						await myaiStore.testConnection();
-					}}
-				>
-					{myaiStore.testStatus === 'testing' ? t('myai.testing') : t('myai.test')}
-				</Button>
+				<Tooltip.Root>
+					<Tooltip.Trigger class="w-full">
+						{#snippet child({ props })}
+							<Button
+								{...props}
+								variant="outline"
+								size="sm"
+								class="w-full"
+								disabled={!urlDraft.trim() || myaiStore.testStatus === 'testing'}
+								onclick={async () => {
+									await applyEndpointDraft();
+									await myaiStore.testConnection();
+								}}
+							>
+								{myaiStore.testStatus === 'testing' ? t('myai.testing') : t('myai.test')}
+							</Button>
+						{/snippet}
+					</Tooltip.Trigger>
+					{#if !urlDraft.trim()}
+						<Tooltip.Content side="top">{t('disabled.needUrl')}</Tooltip.Content>
+					{/if}
+				</Tooltip.Root>
 				{#if myaiStore.testStatus === 'error'}
 					<p class="text-destructive text-xs">{myaiStore.testError}</p>
 				{:else if myaiStore.testStatus === 'ok'}

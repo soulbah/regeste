@@ -5,6 +5,12 @@ export const en = {
 	// Common
 	'common.cancel': 'Cancel',
 	'common.close': 'Close',
+	'disabled.needUrl': 'Enter the base URL first.',
+	'disabled.emptyMessage': 'Write a message first.',
+	'disabled.indexing': 'This document is still indexing.',
+	'disabled.needEmail': 'Enter a valid email first.',
+	'disabled.selectExcerpts': 'Select at least one excerpt.',
+	'disabled.consentFirst': 'Accept sending excerpts first.',
 	'common.save': 'Save',
 	'common.send': 'Send',
 	'common.continue': 'Continue',

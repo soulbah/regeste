@@ -168,7 +168,11 @@
 				{/snippet}
 			</Tooltip.Trigger>
 			<Tooltip.Content side="top">
-				{generating && onstop ? t('chat.stopTip') : t('composer.sendTip')}
+				{generating && onstop
+					? t('chat.stopTip')
+					: !text.trim()
+						? t('disabled.emptyMessage')
+						: t('composer.sendTip')}
 			</Tooltip.Content>
 		</Tooltip.Root>
 	</div>

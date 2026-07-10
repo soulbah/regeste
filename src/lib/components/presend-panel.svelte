@@ -4,6 +4,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Checkbox } from '$lib/components/ui/checkbox';
 	import { ScrollArea } from '$lib/components/ui/scroll-area';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
 	import PanelHeader from '$lib/components/panel-header.svelte';
 	import { t } from '$lib/i18n/index.svelte';
@@ -126,13 +127,27 @@
 			<Button variant="outline" class="flex-1" onclick={() => chatsStore.cancelAssisted()}>
 				{t('common.cancel')}
 			</Button>
-			<Button
-				class="flex-1"
-				disabled={selected.length === 0 || !settingsStore.assistedConsented}
-				onclick={() => chatsStore.confirmAssisted(selected)}
-			>
-				{t('common.send')}
-			</Button>
+			<Tooltip.Root>
+				<Tooltip.Trigger class="flex-1">
+					{#snippet child({ props })}
+						<Button
+							{...props}
+							class="flex-1"
+							disabled={selected.length === 0 || !settingsStore.assistedConsented}
+							onclick={() => chatsStore.confirmAssisted(selected)}
+						>
+							{t('common.send')}
+						</Button>
+					{/snippet}
+				</Tooltip.Trigger>
+				{#if selected.length === 0 || !settingsStore.assistedConsented}
+					<Tooltip.Content side="top">
+						{!settingsStore.assistedConsented
+							? t('disabled.consentFirst')
+							: t('disabled.selectExcerpts')}
+					</Tooltip.Content>
+				{/if}
+			</Tooltip.Root>
 		</div>
 	</div>
 </div>

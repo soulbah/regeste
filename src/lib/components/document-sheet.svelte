@@ -4,6 +4,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Separator } from '$lib/components/ui/separator';
 	import * as Sheet from '$lib/components/ui/sheet';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { toast } from 'svelte-sonner';
 	import { t } from '$lib/i18n/index.svelte';
 	import { getLocalDb } from '$lib/local-db/client';
@@ -138,25 +139,45 @@
 				<Separator />
 
 				<div class="flex flex-wrap gap-2">
-					<Button
-						variant="outline"
-						size="sm"
-						disabled={live.status !== 'ready'}
-						onclick={() => {
-							viewerStore.openDocument(live);
-							onclose();
-						}}
-					>
-						{t('sheet.open')}
-					</Button>
-					<Button
-						variant="outline"
-						size="sm"
-						disabled={live.status !== 'ready'}
-						onclick={() => documentsStore.reindex(live.id)}
-					>
-						{t('sheet.reindex')}
-					</Button>
+					<Tooltip.Root>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<Button
+									{...props}
+									variant="outline"
+									size="sm"
+									disabled={live.status !== 'ready'}
+									onclick={() => {
+										viewerStore.openDocument(live);
+										onclose();
+									}}
+								>
+									{t('sheet.open')}
+								</Button>
+							{/snippet}
+						</Tooltip.Trigger>
+						{#if live.status !== 'ready'}
+							<Tooltip.Content side="top">{t('disabled.indexing')}</Tooltip.Content>
+						{/if}
+					</Tooltip.Root>
+					<Tooltip.Root>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<Button
+									{...props}
+									variant="outline"
+									size="sm"
+									disabled={live.status !== 'ready'}
+									onclick={() => documentsStore.reindex(live.id)}
+								>
+									{t('sheet.reindex')}
+								</Button>
+							{/snippet}
+						</Tooltip.Trigger>
+						{#if live.status !== 'ready'}
+							<Tooltip.Content side="top">{t('disabled.indexing')}</Tooltip.Content>
+						{/if}
+					</Tooltip.Root>
 					<Button variant="outline" size="sm" onclick={() => replaceInput?.click()}>
 						{t('sheet.replaceFile')}
 					</Button>

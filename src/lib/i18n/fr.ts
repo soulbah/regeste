@@ -8,6 +8,12 @@ export const fr: Record<keyof typeof en, string> = {
 	// Common
 	'common.cancel': 'Annuler',
 	'common.close': 'Fermer',
+	'disabled.needUrl': "Renseignez d'abord l'URL de base.",
+	'disabled.emptyMessage': "Écrivez d'abord un message.",
+	'disabled.indexing': "Ce document est encore en cours d'indexation.",
+	'disabled.needEmail': "Saisissez d'abord un email valide.",
+	'disabled.selectExcerpts': 'Sélectionnez au moins un passage.',
+	'disabled.consentFirst': "Acceptez d'abord l'envoi des passages.",
 	'common.save': 'Enregistrer',
 	'common.send': 'Envoyer',
 	'common.continue': 'Continuer',

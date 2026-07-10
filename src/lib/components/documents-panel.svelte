@@ -2,6 +2,7 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import { Checkbox } from '$lib/components/ui/checkbox';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { Label } from '$lib/components/ui/label';
 	import { Progress } from '$lib/components/ui/progress';
 	import { ScrollArea } from '$lib/components/ui/scroll-area';
@@ -45,12 +46,22 @@
 			{#each chatsStore.chatDocuments as doc (doc.id)}
 				{@const ingest = documentsStore.ingests[doc.id]}
 				<div class="hover:bg-foreground/6 group flex items-start gap-2 rounded-md p-2">
-					<Checkbox
-						checked={doc.enabled}
-						disabled={doc.status !== 'ready'}
-						onCheckedChange={(v) => chatsStore.toggleDocument(chatId, doc.id, v === true)}
-						aria-label={t('docs.useAria', { name: doc.name })}
-					/>
+					<Tooltip.Root>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<Checkbox
+									{...props}
+									checked={doc.enabled}
+									disabled={doc.status !== 'ready'}
+									onCheckedChange={(v) => chatsStore.toggleDocument(chatId, doc.id, v === true)}
+									aria-label={t('docs.useAria', { name: doc.name })}
+								/>
+							{/snippet}
+						</Tooltip.Trigger>
+						{#if doc.status !== 'ready'}
+							<Tooltip.Content side="right">{t('disabled.indexing')}</Tooltip.Content>
+						{/if}
+					</Tooltip.Root>
 					<FileTextIcon class="text-muted-foreground mt-0.5 size-4 shrink-0" />
 					<div class="min-w-0 flex-1">
 						{#if doc.status === 'ready'}

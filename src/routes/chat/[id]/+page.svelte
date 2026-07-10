@@ -303,9 +303,23 @@
 										<Button variant="ghost" size="sm" onclick={() => (editingId = null)}>
 											{t('common.cancel')}
 										</Button>
-										<Button size="sm" disabled={!editText.trim()} onclick={confirmEdit}>
-											{t('chat.resend')}
-										</Button>
+										<Tooltip.Root>
+											<Tooltip.Trigger>
+												{#snippet child({ props })}
+													<Button
+														{...props}
+														size="sm"
+														disabled={!editText.trim()}
+														onclick={confirmEdit}
+													>
+														{t('chat.resend')}
+													</Button>
+												{/snippet}
+											</Tooltip.Trigger>
+											{#if !editText.trim()}
+												<Tooltip.Content side="top">{t('disabled.emptyMessage')}</Tooltip.Content>
+											{/if}
+										</Tooltip.Root>
 									</div>
 								</div>
 							{:else}

@@ -6,6 +6,7 @@
 	import { Label } from '$lib/components/ui/label';
 	import * as Card from '$lib/components/ui/card';
 	import * as InputOTP from '$lib/components/ui/input-otp';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { t } from '$lib/i18n/index.svelte';
 	import { sessionStore } from '$lib/state/session.svelte';
 
@@ -119,13 +120,23 @@
 					{#if sessionStore.error}
 						<p class="text-destructive text-sm">{sessionStore.error}</p>
 					{/if}
-					<Button
-						class="w-full"
-						type="submit"
-						disabled={sessionStore.sending || !email.includes('@')}
-					>
-						{sessionStore.sending ? t('account.sending') : t('account.sendCode')}
-					</Button>
+					<Tooltip.Root>
+						<Tooltip.Trigger class="w-full">
+							{#snippet child({ props })}
+								<Button
+									{...props}
+									class="w-full"
+									type="submit"
+									disabled={sessionStore.sending || !email.includes('@')}
+								>
+									{sessionStore.sending ? t('account.sending') : t('account.sendCode')}
+								</Button>
+							{/snippet}
+						</Tooltip.Trigger>
+						{#if !email.includes('@')}
+							<Tooltip.Content side="top">{t('disabled.needEmail')}</Tooltip.Content>
+						{/if}
+					</Tooltip.Root>
 				</form>
 			</Card.Content>
 		</Card.Root>
