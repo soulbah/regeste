@@ -477,7 +477,6 @@
 					onattach={(docId) => chatsStore.attach(chatId, docId)}
 					libraryEmpty={documentsStore.library.length === 0}
 					myaiModel={chatsStore.activeChat?.myaiModel ?? null}
-					onmyaimodel={(m) => chatsStore.setMyaiModel(chatId, m)}
 					privateOnly={chatsStore.activeChat?.privateOnly ?? false}
 					hasReadyDocs={chatsStore.chatDocuments.some((d) => d.enabled && d.status === 'ready')}
 				/>

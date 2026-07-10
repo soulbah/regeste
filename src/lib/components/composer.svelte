@@ -20,7 +20,6 @@
 		onattach,
 		libraryEmpty,
 		myaiModel = null,
-		onmyaimodel,
 		privateOnly = false,
 		hasReadyDocs = false,
 		generating = false,
@@ -29,7 +28,8 @@
 		quote = null,
 		onquoteused = null
 	}: {
-		mode: ChatMode;
+		/** null = never chosen on this device (spec 022 onboarding). */
+		mode: ChatMode | null;
 		disabled?: boolean;
 		onsend: (text: string) => void;
 		onmodeselect: (mode: ChatMode) => void;
@@ -37,7 +37,6 @@
 		onattach: (documentId: string) => void;
 		libraryEmpty: boolean;
 		myaiModel?: string | null;
-		onmyaimodel?: (model: string) => void;
 		privateOnly?: boolean;
 		/** R3 — preset actions only make sense with something to act on. */
 		hasReadyDocs?: boolean;
@@ -67,7 +66,7 @@
 
 	function submit() {
 		const trimmed = text.trim();
-		if (!trimmed || disabled) return;
+		if (!trimmed || disabled || mode === null) return;
 		text = '';
 		onsend(trimmed);
 	}
@@ -136,9 +135,9 @@
 			{onattach}
 			{hasReadyDocs}
 			{disabled}
-			onaction={(q) => !disabled && onsend(q)}
+			onaction={(q) => !disabled && mode !== null && onsend(q)}
 		/>
-		<ModeSelector {mode} onselect={onmodeselect} {myaiModel} {onmyaimodel} {privateOnly} />
+		<ModeSelector {mode} onselect={onmodeselect} {myaiModel} {privateOnly} />
 		<div class="flex-1"></div>
 		<Tooltip.Root>
 			<Tooltip.Trigger>
@@ -159,7 +158,7 @@
 							size="icon"
 							class="bg-ring hover:bg-ring/90 text-background rounded-md disabled:opacity-40"
 							onclick={submit}
-							disabled={disabled || !text.trim()}
+							disabled={disabled || !text.trim() || mode === null}
 							aria-label={t('composer.sendAria')}
 						>
 							<ArrowUpIcon class="size-4" />
@@ -170,9 +169,11 @@
 			<Tooltip.Content side="top">
 				{generating && onstop
 					? t('chat.stopTip')
-					: !text.trim()
-						? t('disabled.emptyMessage')
-						: t('composer.sendTip')}
+					: mode === null
+						? t('disabled.chooseMode')
+						: !text.trim()
+							? t('disabled.emptyMessage')
+							: t('composer.sendTip')}
 			</Tooltip.Content>
 		</Tooltip.Root>
 	</div>

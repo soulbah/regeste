@@ -25,6 +25,8 @@ class SettingsStore {
 	quota = $state<{ used: number; limit: number } | null>(null);
 	/** Spec 021 — mode applied to newly created chats. */
 	defaultMode = $state<'private' | 'assisted' | 'myai'>('private');
+	/** Spec 022 — false until the user picks a mode for the first time. */
+	modeChosen = $state(false);
 
 	private loaded = false;
 
@@ -36,7 +38,15 @@ class SettingsStore {
 		this.assistedConsented = (await db.getSetting('assisted_consented')) === '1';
 		const mode = await db.getSetting('default_mode');
 		if (mode === 'assisted' || mode === 'myai') this.defaultMode = mode;
+		this.modeChosen = (await db.getSetting('mode_chosen')) === '1';
 		await this.refreshStorage();
+	}
+
+	async markModeChosen(): Promise<void> {
+		if (this.modeChosen) return;
+		this.modeChosen = true;
+		const { db } = await getLocalDb();
+		await db.setSetting('mode_chosen', '1');
 	}
 
 	async setDefaultMode(mode: 'private' | 'assisted' | 'myai'): Promise<void> {

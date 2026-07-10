@@ -13,11 +13,12 @@
 	import { settingsStore } from '$lib/state/settings.svelte';
 	import type { ChatMode } from '$lib/types';
 
-	let mode = $state<ChatMode>('private');
+	// Spec 022 — null until the user has ever chosen a mode on this device;
+	// afterwards the default-mode setting seeds the selector until touched.
+	let mode = $state<ChatMode | null>(null);
 	let modeTouched = false;
-	// Spec 021 — the default-mode setting seeds the selector until touched.
 	$effect(() => {
-		if (!modeTouched) mode = settingsStore.defaultMode;
+		if (!modeTouched) mode = settingsStore.modeChosen ? settingsStore.defaultMode : null;
 	});
 	let demoStarting = $state(false);
 
@@ -26,7 +27,7 @@
 		if (demoStarting) return;
 		demoStarting = true;
 		try {
-			const id = await chatsStore.create(mode);
+			const id = await chatsStore.create(mode ?? 'private');
 			await chatsStore.rename(id, t('home.demoTitle'));
 			await chatsStore.open(id);
 			goto(resolve(`/chat/${id}`));
@@ -43,14 +44,14 @@
 
 	// Lazy chat creation: the chat row is born on the first action.
 	async function handleSend(text: string) {
-		const id = await chatsStore.create(mode);
+		const id = await chatsStore.create(mode ?? 'private');
 		await chatsStore.open(id);
 		goto(resolve(`/chat/${id}`));
 		await chatsStore.send(id, text);
 	}
 
 	async function handleUpload(files: File[]) {
-		const id = await chatsStore.create(mode);
+		const id = await chatsStore.create(mode ?? 'private');
 		await chatsStore.open(id);
 		goto(resolve(`/chat/${id}`));
 		for (const file of files) {
@@ -66,7 +67,7 @@
 	}
 
 	async function handleAttach(documentId: string) {
-		const id = await chatsStore.create(mode);
+		const id = await chatsStore.create(mode ?? 'private');
 		await chatsStore.open(id);
 		goto(resolve(`/chat/${id}`));
 		await chatsStore.attach(id, documentId);

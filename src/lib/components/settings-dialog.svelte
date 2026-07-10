@@ -9,6 +9,7 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
+	import { Progress } from '$lib/components/ui/progress';
 	import { ScrollArea } from '$lib/components/ui/scroll-area';
 	import { Separator } from '$lib/components/ui/separator';
 	import { Switch } from '$lib/components/ui/switch';
@@ -27,8 +28,9 @@
 	import { i18n, t } from '$lib/i18n/index.svelte';
 	import { llmStore } from '$lib/private-ai/llm.svelte';
 	import { chatsStore } from '$lib/state/chats.svelte';
+	import { modeReadiness } from '$lib/state/mode-readiness.svelte';
 	import { modelsStore } from '$lib/state/models.svelte';
-	import { myaiStore } from '$lib/state/myai.svelte';
+	import { myaiStore, MYAI_PRESETS, normalizeBaseUrl } from '$lib/state/myai.svelte';
 	import { sessionStore } from '$lib/state/session.svelte';
 	import { settingsStore } from '$lib/state/settings.svelte';
 	import { uiStore } from '$lib/state/ui.svelte';
@@ -70,6 +72,26 @@
 			myaiStore.init();
 			modelsStore.refresh();
 		}
+	});
+
+	const presetHint = $derived(
+		MYAI_PRESETS.find((p) => normalizeBaseUrl(urlDraft) === p.baseUrl)?.corsHint ?? null
+	);
+
+	// Spec 022 — deep-link: honor the requested tab, then scroll to the mode
+	// card (and focus the URL field for My AI) once the dialog has rendered.
+	$effect(() => {
+		if (!uiStore.settingsOpen) return;
+		tab = uiStore.settingsTab;
+		const focus = uiStore.settingsFocus;
+		if (!focus) return;
+		uiStore.settingsFocus = null;
+		setTimeout(() => {
+			document
+				.querySelector(`[data-mode-card="${focus}"]`)
+				?.scrollIntoView({ block: 'start', behavior: 'instant' });
+			if (focus === 'myai') document.getElementById('settings-myai-url')?.focus();
+		}, 120);
 	});
 
 	async function deleteAllChats() {
@@ -322,157 +344,287 @@
 								{/snippet}
 								{@render row(t('settings.wipe.title'), t('settings.wipe.desc'), wipeControl)}
 							{:else if tab === 'ai'}
-								<div class="py-3.5">
-									{@render kicker(t('settings.models.title'))}
-									{#if modelsStore.cached.length === 0}
-										<p class="text-muted-foreground mt-0.5 text-xs">
-											{modelsStore.loading
-												? t('settings.models.measuring')
-												: t('settings.models.none')}
-										</p>
-									{:else}
-										<div class="mt-2 space-y-2">
-											{#each modelsStore.cached as model (model.cacheName)}
-												<div class="flex items-center justify-between gap-3">
-													<div class="min-w-0">
-														<p class="truncate text-sm">{model.label}</p>
-														<p class="text-muted-foreground font-mono text-[10px]">
-															{model.bytes
-																? fmtBytes(model.bytes)
-																: t('settings.models.files', { count: model.entries })}
-														</p>
-													</div>
-													<Button
-														variant="outline"
-														size="sm"
-														onclick={() => modelsStore.remove(model.cacheName)}
-													>
-														{t('settings.models.delete')}
-													</Button>
+								<!-- Spec 022 — one card per mode, the source of truth for setup. -->
+								{@const privateR = modeReadiness('private')}
+								{@const assistedR = modeReadiness('assisted')}
+								{@const myaiR = modeReadiness('myai')}
+								{#snippet stateBadge(r: ReturnType<typeof modeReadiness>, egress: boolean)}
+									<span class="flex shrink-0 items-center gap-1.5">
+										{#if egress}<span class="bg-mode-assisted size-1.5 rounded-full"></span>{/if}
+										<Badge variant="outline" class="font-mono text-[10px] uppercase">
+											{r.state === 'ready'
+												? t('settings.ai.status.ready')
+												: r.state === 'setup'
+													? t('settings.ai.status.setup')
+													: r.state === 'progress'
+														? t('settings.ai.status.progress', { pct: r.pct })
+														: t('settings.ai.status.blocked')}
+										</Badge>
+									</span>
+								{/snippet}
+								{#snippet useMode(id: 'private' | 'assisted' | 'myai')}
+									<div class="mt-3 flex justify-end">
+										<Button
+											size="sm"
+											onclick={() => {
+												uiStore.requestedMode = id;
+												uiStore.settingsOpen = false;
+											}}
+										>
+											{t('settings.ai.use')}
+										</Button>
+									</div>
+								{/snippet}
+								<div class="space-y-4 py-3.5">
+									<section class="bg-background/40 rounded-lg border p-4" data-mode-card="private">
+										<header class="flex items-center justify-between gap-3 pb-1.5">
+											<p class="text-sm font-semibold">Private</p>
+											{@render stateBadge(privateR, false)}
+										</header>
+										{#snippet privateModelControl()}
+											{#if privateR.state === 'setup'}
+												<Button size="sm" onclick={() => llmStore.prepare()}>
+													{llmStore.prepared
+														? t('settings.ai.load')
+														: `${t('settings.ai.download')} · ${llmStore.downloadLabel}`}
+												</Button>
+											{:else if privateR.state === 'progress' && privateR.pct > 0}
+												<div class="w-32">
+													<Progress value={privateR.pct} />
 												</div>
+											{/if}
+										{/snippet}
+										{@render row(
+											t('settings.ai.model.title'),
+											privateR.blockedLine ??
+												(privateR.state === 'ready'
+													? t(
+															llmStore.tier?.id === 'lite'
+																? 'modes.private.readyLite'
+																: 'modes.private.ready'
+														)
+													: privateR.state === 'progress'
+														? llmStore.status === 'loading'
+															? t('modes.private.loading')
+															: llmStore.status === 'detecting'
+																? t('modes.private.checking')
+																: t('modes.private.preparing', { pct: privateR.pct })
+														: t(
+																llmStore.tier?.id === 'lite'
+																	? 'modes.private.downloadLite'
+																	: 'modes.private.download',
+																{ size: llmStore.downloadLabel }
+															)),
+											privateModelControl
+										)}
+										{#if modelsStore.cached.length > 0}
+											<Separator />
+											<div class="space-y-2 py-3">
+												{@render kicker(t('settings.models.title'))}
+												{#each modelsStore.cached as model (model.cacheName)}
+													<div class="flex items-center justify-between gap-3">
+														<div class="min-w-0">
+															<p class="truncate text-sm">{model.label}</p>
+															<p class="text-muted-foreground font-mono text-[10px]">
+																{model.bytes
+																	? fmtBytes(model.bytes)
+																	: t('settings.models.files', { count: model.entries })}
+															</p>
+														</div>
+														<Button
+															variant="outline"
+															size="sm"
+															onclick={() => modelsStore.remove(model.cacheName)}
+														>
+															{t('settings.models.delete')}
+														</Button>
+													</div>
+												{/each}
+											</div>
+										{/if}
+										<Separator />
+										{#snippet benchControl()}
+											<Tooltip.Root>
+												<Tooltip.Trigger>
+													{#snippet child({ props })}
+														<Button
+															{...props}
+															variant="outline"
+															size="sm"
+															class="shrink-0"
+															disabled={llmStore.status !== 'ready' || modelsStore.benchmarking}
+															onclick={() => modelsStore.runBenchmark()}
+														>
+															{modelsStore.benchmarking
+																? t('settings.models.testing')
+																: t('settings.models.test')}
+														</Button>
+													{/snippet}
+												</Tooltip.Trigger>
+												{#if llmStore.status !== 'ready'}
+													<Tooltip.Content side="left">
+														{t('settings.models.prepareFirst')}
+													</Tooltip.Content>
+												{/if}
+											</Tooltip.Root>
+										{/snippet}
+										{@render row(
+											t('settings.models.benchTitle'),
+											modelsStore.benchmark
+												? `${t('settings.models.tps', { tps: modelsStore.benchmark.tokensPerSecond })} — ${
+														modelsStore.benchmark.recommendPrivate
+															? t('settings.models.comfortable')
+															: t('settings.models.slow')
+													}`
+												: t('settings.models.benchDesc'),
+											benchControl
+										)}
+										{#if privateR.state === 'ready'}
+											{@render useMode('private')}
+										{/if}
+									</section>
+
+									<section class="bg-background/40 rounded-lg border p-4" data-mode-card="assisted">
+										<header class="flex items-center justify-between gap-3 pb-1.5">
+											<p class="text-sm font-semibold">Assisted</p>
+											{@render stateBadge(assistedR, true)}
+										</header>
+										{#snippet assistedControl()}
+											{#if !sessionStore.user}
+												<Button
+													variant="outline"
+													size="sm"
+													onclick={() => {
+														uiStore.pendingActivation = 'assisted';
+														uiStore.settingsOpen = false;
+														goto(resolve('/chat/account'));
+													}}
+												>
+													{t('menu.signIn')}
+												</Button>
+											{/if}
+										{/snippet}
+										{@render row(
+											t('settings.tabs.account'),
+											assistedR.blockedLine ??
+												(sessionStore.user
+													? sessionStore.user.email
+													: t('settings.ai.assisted.none')),
+											assistedControl
+										)}
+										<p class="text-muted-foreground pt-2 text-xs">
+											{settingsStore.quota
+												? t('settings.workspace.quota', {
+														used: settingsStore.quota.used,
+														limit: settingsStore.quota.limit
+													})
+												: t('settings.workspace.quotaSignIn')}
+										</p>
+										{#if assistedR.state === 'ready'}
+											{@render useMode('assisted')}
+										{/if}
+									</section>
+
+									<section class="bg-background/40 rounded-lg border p-4" data-mode-card="myai">
+										<header class="flex items-center justify-between gap-3 pb-1.5">
+											<p class="text-sm font-semibold">My AI</p>
+											{@render stateBadge(myaiR, true)}
+										</header>
+										<div class="flex gap-1 pb-2">
+											{#each MYAI_PRESETS as preset (preset.id)}
+												<Button
+													variant={normalizeBaseUrl(urlDraft) === preset.baseUrl
+														? 'secondary'
+														: 'outline'}
+													size="xs"
+													onclick={() => (urlDraft = preset.baseUrl)}
+												>
+													{preset.label}
+												</Button>
 											{/each}
 										</div>
-									{/if}
-								</div>
-								<Separator />
-								{#snippet benchControl()}
-									<Tooltip.Root>
-										<Tooltip.Trigger>
-											{#snippet child({ props })}
-												<Button
-													{...props}
-													variant="outline"
-													size="sm"
-													class="shrink-0"
-													disabled={llmStore.status !== 'ready' || modelsStore.benchmarking}
-													onclick={() => modelsStore.runBenchmark()}
-												>
-													{modelsStore.benchmarking
-														? t('settings.models.testing')
-														: t('settings.models.test')}
-												</Button>
-											{/snippet}
-										</Tooltip.Trigger>
-										{#if llmStore.status !== 'ready'}
-											<Tooltip.Content side="left">
-												{t('settings.models.prepareFirst')}
-											</Tooltip.Content>
+										{#snippet urlControl()}
+											<Input
+												id="settings-myai-url"
+												bind:value={urlDraft}
+												placeholder="http://localhost:11434/v1"
+												aria-label={t('myai.baseUrl')}
+												class="w-64"
+											/>
+										{/snippet}
+										{@render row(t('myai.baseUrl'), null, urlControl)}
+										<Separator />
+										{#snippet keyControl()}
+											<Input
+												id="settings-myai-key"
+												type="password"
+												bind:value={keyDraft}
+												placeholder={t('myai.keyPlaceholder')}
+												aria-label={t('myai.apiKey')}
+												class="w-64"
+											/>
+										{/snippet}
+										{@render row(t('myai.apiKey'), null, keyControl)}
+										<Separator />
+										{#snippet testControl()}
+											<Tooltip.Root>
+												<Tooltip.Trigger>
+													{#snippet child({ props })}
+														<Button
+															{...props}
+															variant="outline"
+															size="sm"
+															disabled={!urlDraft.trim() || myaiStore.testStatus === 'testing'}
+															onclick={async () => {
+																await myaiStore.saveEndpoint(urlDraft, keyDraft);
+																await myaiStore.testConnection();
+															}}
+														>
+															{myaiStore.testStatus === 'testing'
+																? t('myai.testing')
+																: t('myai.test')}
+														</Button>
+													{/snippet}
+												</Tooltip.Trigger>
+												{#if !urlDraft.trim()}
+													<Tooltip.Content side="left">{t('disabled.needUrl')}</Tooltip.Content>
+												{/if}
+											</Tooltip.Root>
+										{/snippet}
+										{@render row(t('settings.myai.connection'), t('myai.direct'), testControl)}
+										{#if presetHint}
+											<p class="text-muted-foreground -mt-1.5 pb-2 text-xs">{t(presetHint)}</p>
 										{/if}
-									</Tooltip.Root>
-								{/snippet}
-								{@render row(
-									t('settings.models.benchTitle'),
-									modelsStore.benchmark
-										? `${t('settings.models.tps', { tps: modelsStore.benchmark.tokensPerSecond })} — ${
-												modelsStore.benchmark.recommendPrivate
-													? t('settings.models.comfortable')
-													: t('settings.models.slow')
-											}`
-										: t('settings.models.benchDesc'),
-									benchControl
-								)}
-								<div class="pt-4 pb-1">
-									{@render kicker(t('settings.myai.title'))}
-								</div>
-								{#snippet urlControl()}
-									<Input
-										id="settings-myai-url"
-										bind:value={urlDraft}
-										placeholder="http://localhost:11434/v1"
-										aria-label={t('myai.baseUrl')}
-										class="w-64"
-									/>
-								{/snippet}
-								{@render row(t('myai.baseUrl'), null, urlControl)}
-								<Separator />
-								{#snippet keyControl()}
-									<Input
-										id="settings-myai-key"
-										type="password"
-										bind:value={keyDraft}
-										placeholder={t('myai.keyPlaceholder')}
-										aria-label={t('myai.apiKey')}
-										class="w-64"
-									/>
-								{/snippet}
-								{@render row(t('myai.apiKey'), null, keyControl)}
-								<Separator />
-								{#snippet testControl()}
-									<Tooltip.Root>
-										<Tooltip.Trigger>
-											{#snippet child({ props })}
-												<Button
-													{...props}
-													variant="outline"
-													size="sm"
-													disabled={!urlDraft.trim() || myaiStore.testStatus === 'testing'}
-													onclick={() => myaiStore.saveEndpoint(urlDraft, keyDraft)}
-												>
-													{myaiStore.testStatus === 'testing' ? t('myai.testing') : t('myai.test')}
-												</Button>
-											{/snippet}
-										</Tooltip.Trigger>
-										{#if !urlDraft.trim()}
-											<Tooltip.Content side="left">{t('disabled.needUrl')}</Tooltip.Content>
+										{#if myaiStore.testStatus === 'error' && myaiStore.testError}
+											<p class="text-destructive -mt-1.5 pb-2 text-xs">{myaiStore.testError}</p>
+										{:else if myaiStore.testStatus === 'ok' && myaiStore.models.length === 0}
+											<p class="text-muted-foreground -mt-1.5 pb-2 text-xs">{t('myai.noModels')}</p>
 										{/if}
-									</Tooltip.Root>
-								{/snippet}
-								{@render row(t('settings.myai.connection'), t('myai.direct'), testControl)}
-								{#if myaiStore.testStatus === 'error' && myaiStore.testError}
-									<p class="text-destructive -mt-1.5 pb-2 text-xs">{myaiStore.testError}</p>
-								{/if}
-								{#if myaiStore.models.length}
-									<Separator />
-									{#snippet modelControl()}
-										<Select.Root
-											type="single"
-											value={myaiStore.defaultModel ?? undefined}
-											onValueChange={(v) => v && myaiStore.saveDefaultModel(v)}
-										>
-											<Select.Trigger class="w-64">
-												{myaiStore.defaultModel ?? t('myai.pickModel')}
-											</Select.Trigger>
-											<Select.Content>
-												{#each myaiStore.models as m (m)}
-													<Select.Item value={m}>{m}</Select.Item>
-												{/each}
-											</Select.Content>
-										</Select.Root>
-									{/snippet}
-									{@render row(t('settings.myai.model'), null, modelControl)}
-								{/if}
-								<Separator />
-								{#snippet quotaControl()}{/snippet}
-								{@render row(
-									'Assisted',
-									settingsStore.quota
-										? t('settings.workspace.quota', {
-												used: settingsStore.quota.used,
-												limit: settingsStore.quota.limit
-											})
-										: t('settings.workspace.quotaSignIn'),
-									quotaControl
-								)}
+										{#if myaiStore.models.length}
+											<Separator />
+											{#snippet modelControl()}
+												<Select.Root
+													type="single"
+													value={myaiStore.defaultModel ?? undefined}
+													onValueChange={(v) => v && myaiStore.saveDefaultModel(v)}
+												>
+													<Select.Trigger class="w-64">
+														{myaiStore.defaultModel ?? t('myai.pickModel')}
+													</Select.Trigger>
+													<Select.Content>
+														{#each myaiStore.models as m (m)}
+															<Select.Item value={m}>{m}</Select.Item>
+														{/each}
+													</Select.Content>
+												</Select.Root>
+											{/snippet}
+											{@render row(t('settings.myai.model'), null, modelControl)}
+										{/if}
+										{#if myaiR.state === 'ready'}
+											{@render useMode('myai')}
+										{/if}
+									</section>
+								</div>
 							{:else if sessionStore.user}
 								{#snippet signOutControl()}
 									<Button

@@ -220,12 +220,6 @@ class ChatsStore {
 		await this.refresh();
 	}
 
-	async setMyaiModel(chatId: string, model: string): Promise<void> {
-		const { db } = await getLocalDb();
-		await db.setChatMyaiModel(chatId, model);
-		await this.refresh();
-	}
-
 	async setPinned(chatId: string, pinned: boolean): Promise<void> {
 		const { db } = await getLocalDb();
 		await db.setChatPinned(chatId, pinned);

@@ -1,56 +1,44 @@
 <script lang="ts">
+	// Mode picker v3 (spec 022): the picker picks, Settings configures. Three
+	// rows (name, one line, state on the right) and zero configuration UI.
+	// Clicking a mode that needs setup opens the Settings modal on its card;
+	// the pendingActivation watcher selects it once setup completes.
 	import * as Popover from '$lib/components/ui/popover';
-	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
-	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { toast } from 'svelte-sonner';
 	import { t } from '$lib/i18n/index.svelte';
 	import { llmStore } from '$lib/private-ai/llm.svelte';
-	import { sessionStore } from '$lib/state/session.svelte';
-	import { myaiStore, MYAI_PRESETS, normalizeBaseUrl } from '$lib/state/myai.svelte';
+	import { modeReadiness } from '$lib/state/mode-readiness.svelte';
+	import { myaiStore } from '$lib/state/myai.svelte';
 	import { settingsStore } from '$lib/state/settings.svelte';
+	import { uiStore } from '$lib/state/ui.svelte';
 	import type { ChatMode } from '$lib/types';
 
 	let {
 		mode,
 		onselect,
 		myaiModel = null,
-		onmyaimodel,
 		privateOnly = false
 	}: {
-		mode: ChatMode;
+		/** null = never chosen on this device (onboarding placeholder). */
+		mode: ChatMode | null;
 		onselect: (mode: ChatMode) => void;
 		/** Active chat's pinned My AI model, when there is a chat. */
 		myaiModel?: string | null;
-		onmyaimodel?: (model: string) => void;
 		/** P7 — cloud modes locked for this chat. */
 		privateOnly?: boolean;
 	} = $props();
 
 	let open = $state(false);
-	let view = $state<'modes' | 'myai'>('modes');
-	let urlDraft = $state('');
-	let keyDraft = $state('');
 
 	$effect(() => {
 		llmStore.init();
 		myaiStore.init();
 	});
-
-	$effect(() => {
-		if (!open) view = 'modes';
-	});
-
-	function openMyaiConfig() {
-		urlDraft = myaiStore.baseUrl ?? '';
-		keyDraft = myaiStore.apiKey ?? '';
-		view = 'myai';
-	}
 
 	const activeModel = $derived(myaiModel ?? myaiStore.defaultModel);
 
@@ -64,301 +52,168 @@
 			: { id: 'private' as const, reason: t('modes.bestReason.local') };
 	});
 
-	const presetHint = $derived(
-		MYAI_PRESETS.find((p) => normalizeBaseUrl(urlDraft) === p.baseUrl)?.corsHint ?? null
+	const DESCRIPTIONS = {
+		private: 'modes.private.description',
+		assisted: 'modes.assisted.description',
+		myai: 'modes.myai.description'
+	} as const;
+
+	function select(m: ChatMode) {
+		void settingsStore.markModeChosen();
+		onselect(m);
+	}
+
+	// One row per mode: static description, readiness on the right.
+	const modes = $derived(
+		(['private', 'assisted', 'myai'] as const).map((id) => {
+			const readiness = modeReadiness(id, { privateOnly });
+			return {
+				id,
+				label: { private: 'Private', assisted: 'Assisted', myai: 'My AI' }[id],
+				dot: id !== 'private',
+				line:
+					readiness.blockedLine ??
+					(id === 'myai' && readiness.state === 'ready'
+						? `${myaiStore.host} · ${activeModel}`
+						: t(DESCRIPTIONS[id])),
+				readiness
+			};
+		})
 	);
 
-	async function applyEndpointDraft() {
-		await myaiStore.saveEndpoint(urlDraft, keyDraft);
-	}
+	const current = $derived(mode ? modes.find((m) => m.id === mode) : null);
+	// Download progress stays visible from the pill (owner amendment).
+	const pillProgress = $derived(
+		mode === 'private' && current?.readiness.state === 'progress' && current.readiness.pct > 0
+			? current.readiness.pct
+			: null
+	);
 
-	async function chooseModel(model: string) {
-		await myaiStore.saveDefaultModel(model);
-		onmyaimodel?.(model);
-		onselect('myai');
-		open = false;
-	}
-
-	// Honest state lines (FEATURES 5bis): the selector IS the status surface.
-	// Zero model jargon — sizes and plain language only.
-	const privateStatus = $derived.by(() => {
-		switch (llmStore.status) {
-			case 'detecting':
-				return { line: t('modes.private.checking'), selectable: false, prepare: false };
-			case 'unavailable':
-				return { line: t('modes.private.unavailable'), selectable: false, prepare: false };
-			case 'needs-download':
-				return llmStore.prepared
-					? { line: t('modes.private.prepared'), selectable: true, prepare: true }
-					: {
-							line: t(
-								llmStore.tier?.id === 'lite'
-									? 'modes.private.downloadLite'
-									: 'modes.private.download',
-								{ size: llmStore.downloadLabel }
-							),
-							selectable: true,
-							prepare: true
-						};
-			case 'downloading':
-				return {
-					line: t('modes.private.preparing', { pct: Math.round(llmStore.progress * 100) }),
-					selectable: true,
-					prepare: false
-				};
-			case 'loading':
-				return { line: t('modes.private.loading'), selectable: true, prepare: false };
+	function pick(m: (typeof modes)[number]) {
+		switch (m.readiness.state) {
 			case 'ready':
-			case 'generating':
-				return {
-					line: t(llmStore.tier?.id === 'lite' ? 'modes.private.readyLite' : 'modes.private.ready'),
-					selectable: true,
-					prepare: false
-				};
-			case 'error':
-				return {
-					line: llmStore.errorMessage ?? t('modes.error'),
-					selectable: false,
-					prepare: false
-				};
+				select(m.id);
+				open = false;
+				break;
+			case 'setup':
+				// Route to the source of truth; activate once setup completes.
+				uiStore.pendingActivation = m.id;
+				open = false;
+				if (m.id === 'assisted') {
+					// Sign-in has its own page; the watcher picks the mode up on return.
+					goto(resolve('/chat/account'));
+					return;
+				}
+				uiStore.openSettings('ai', m.id);
+				break;
+			default:
+				// progress/blocked rows are inert; the line says why.
+				break;
+		}
+	}
+
+	// Activation handshake: a mode requested from Settings ("Use this mode")
+	// applies immediately; a pending one applies the moment it becomes ready.
+	$effect(() => {
+		const requested = uiStore.requestedMode;
+		if (requested && modeReadiness(requested, { privateOnly }).state === 'ready') {
+			uiStore.requestedMode = null;
+			uiStore.pendingActivation = null;
+			select(requested);
 		}
 	});
-
-	// Color signals the exception (spec 019): Private is uncolored, the amber
-	// dot marks the modes that send data off the device. One line per mode:
-	// the blocking/actionable state when there is one, the outcome otherwise
-	// (the ChatGPT/Claude picker recipe — name, one line, check).
-	const modes = $derived([
-		{
-			id: 'private' as ChatMode,
-			label: 'Private',
-			dotClass: null,
-			line:
-				llmStore.status === 'ready' || llmStore.status === 'generating'
-					? t('modes.private.description')
-					: privateStatus.line,
-			disabled: !privateStatus.selectable
-		},
-		{
-			id: 'assisted' as ChatMode,
-			label: 'Assisted',
-			dotClass: 'bg-mode-assisted',
-			line: privateOnly
-				? t('modes.locked')
-				: settingsStore.forceOffline
-					? t('modes.offlineOn')
-					: sessionStore.user
-						? t('modes.assisted.description')
-						: t('modes.assisted.signIn'),
-			disabled: privateOnly || settingsStore.forceOffline || !sessionStore.user
-		},
-		{
-			id: 'myai' as ChatMode,
-			label: 'My AI',
-			dotClass: 'bg-mode-assisted',
-			line: privateOnly
-				? t('modes.locked')
-				: settingsStore.forceOffline
-					? t('modes.offlineOn')
-					: myaiStore.baseUrl && activeModel
-						? `${myaiStore.host} · ${activeModel}`
-						: t('modes.myai.notConfigured'),
-			disabled: privateOnly || settingsStore.forceOffline
+	$effect(() => {
+		const pending = uiStore.pendingActivation;
+		if (pending && pending !== mode && modeReadiness(pending, { privateOnly }).state === 'ready') {
+			uiStore.pendingActivation = null;
+			select(pending);
+			toast.success(
+				t('modes.activated', {
+					mode: { private: 'Private', assisted: 'Assisted', myai: 'My AI' }[pending]
+				})
+			);
 		}
-	]);
-
-	const current = $derived(modes.find((m) => m.id === mode) ?? modes[0]);
+	});
 </script>
 
 <Popover.Root bind:open>
 	<Popover.Trigger>
 		{#snippet child({ props })}
-			<Button {...props} variant="ghost" size="sm" class="gap-1.5">
-				{#if current.dotClass}
-					<span class="size-2 rounded-full {current.dotClass}"></span>
+			<Button
+				{...props}
+				variant="ghost"
+				size="sm"
+				class="gap-1.5 {current ? '' : 'text-muted-foreground'}"
+			>
+				{#if current?.dot}
+					<span class="bg-mode-assisted size-2 rounded-full"></span>
 				{/if}
-				{current.label}
+				{current ? current.label : t('modes.choose')}
+				{#if pillProgress !== null}
+					<span class="text-muted-foreground text-xs tabular-nums">· {pillProgress}%</span>
+				{/if}
 				<ChevronDownIcon class="text-muted-foreground size-3.5!" />
 			</Button>
 		{/snippet}
 	</Popover.Trigger>
 	<Popover.Content class="w-72 p-1" align="start" side="top">
-		{#if view === 'modes'}
-			<div class="flex flex-col">
-				{#each modes as m (m.id)}
-					<Button
-						variant="ghost"
-						class="h-auto w-full justify-start px-2.5 py-2 text-left"
-						onclick={() => {
-							if (m.disabled) {
-								// Locked Assisted is the sign-up funnel: route to the account page.
-								if (m.id === 'assisted' && !sessionStore.user) {
-									open = false;
-									goto(resolve('/chat/account'));
-								}
-								return;
-							}
-							if (m.id === 'myai' && !(myaiStore.baseUrl && activeModel)) {
-								openMyaiConfig();
-								return;
-							}
-							onselect(m.id);
-							if (m.id === 'private' && privateStatus.prepare) {
-								// Explicit consent click: start the one-time download / load.
-								llmStore.prepare();
-								return; // keep the popover open to show progress
-							}
-							open = false;
-						}}
-					>
-						<span class="min-w-0 flex-1">
-							<span class="flex items-center gap-1.5">
-								<span class="text-sm font-medium">{m.label}</span>
-								{#if m.dotClass}<span class="size-1.5 rounded-full {m.dotClass}"></span>{/if}
-								{#if bestMode?.id === m.id}
-									<span class="text-ring text-[10px]" title={bestMode.reason}>
-										{t('modes.best')}
-									</span>
-								{/if}
-							</span>
-							<span
-								class="text-muted-foreground block truncate text-xs {m.disabled
-									? 'opacity-70'
-									: ''}"
-							>
-								{m.line}
-							</span>
-						</span>
-						{#if m.id === mode}<CheckIcon class="text-ring ml-2 size-4 shrink-0" />{/if}
-					</Button>
-				{/each}
-			</div>
-			<div class="mt-1 border-t pt-1">
-				{#if myaiStore.baseUrl && activeModel}
-					<Button
-						variant="ghost"
-						size="sm"
-						class="text-muted-foreground h-7 w-full justify-start px-2.5 text-xs font-normal"
-						onclick={openMyaiConfig}
-					>
-						{t('modes.changeMyai')}
-					</Button>
-				{/if}
-				<a
-					href={resolve('/how-it-works')}
-					class="text-muted-foreground hover:text-foreground block px-2.5 py-1.5 text-xs underline-offset-2 hover:underline"
-					onclick={() => (open = false)}
+		<div class="flex flex-col">
+			{#each modes as m (m.id)}
+				<Button
+					variant="ghost"
+					class="h-auto w-full justify-start px-2.5 py-2 text-left"
+					disabled={m.readiness.state === 'blocked'}
+					onclick={() => pick(m)}
 				>
-					{t('modes.whatLeaves')}
-				</a>
-			</div>
-		{:else}
-			<!-- My AI configuration (A1/A2, FEATURES 5bis): in the popover, never a dialog. -->
-			<div class="space-y-3 p-1">
-				<div class="flex items-center gap-2">
-					<Button
-						variant="ghost"
-						size="icon"
-						class="size-6"
-						onclick={() => (view = 'modes')}
-						aria-label={t('myai.backAria')}
-					>
-						<ArrowLeftIcon class="size-3.5" />
-					</Button>
-					<p class="text-muted-foreground font-mono text-xs tracking-wide uppercase">
-						{t('myai.title')}
-					</p>
-				</div>
-				<div class="flex gap-1">
-					{#each MYAI_PRESETS as preset (preset.id)}
-						<Button
-							variant={normalizeBaseUrl(urlDraft) === preset.baseUrl ? 'secondary' : 'outline'}
-							size="sm"
-							class="h-7 flex-1 text-xs"
-							onclick={() => (urlDraft = preset.baseUrl)}
-						>
-							{preset.label}
-						</Button>
-					{/each}
-				</div>
-				<div class="space-y-1.5">
-					<Label for="myai-url" class="font-mono text-[10px] tracking-wide uppercase">
-						{t('myai.baseUrl')}
-					</Label>
-					<Input
-						id="myai-url"
-						bind:value={urlDraft}
-						placeholder="http://localhost:11434/v1"
-						class="h-8 font-mono text-xs"
-					/>
-				</div>
-				<div class="space-y-1.5">
-					<Label for="myai-key" class="font-mono text-[10px] tracking-wide uppercase">
-						{t('myai.apiKey')}
-					</Label>
-					<Input
-						id="myai-key"
-						type="password"
-						bind:value={keyDraft}
-						placeholder={t('myai.keyPlaceholder')}
-						class="h-8 font-mono text-xs"
-					/>
-				</div>
-				{#if presetHint}
-					<p class="text-muted-foreground text-xs">{t(presetHint)}</p>
-				{/if}
-				<Tooltip.Root>
-					<Tooltip.Trigger class="w-full">
-						{#snippet child({ props })}
-							<Button
-								{...props}
-								variant="outline"
-								size="sm"
-								class="w-full"
-								disabled={!urlDraft.trim() || myaiStore.testStatus === 'testing'}
-								onclick={async () => {
-									await applyEndpointDraft();
-									await myaiStore.testConnection();
-								}}
-							>
-								{myaiStore.testStatus === 'testing' ? t('myai.testing') : t('myai.test')}
-							</Button>
-						{/snippet}
-					</Tooltip.Trigger>
-					{#if !urlDraft.trim()}
-						<Tooltip.Content side="top">{t('disabled.needUrl')}</Tooltip.Content>
-					{/if}
-				</Tooltip.Root>
-				{#if myaiStore.testStatus === 'error'}
-					<p class="text-destructive text-xs">{myaiStore.testError}</p>
-				{:else if myaiStore.testStatus === 'ok'}
-					{#if myaiStore.models.length === 0}
-						<p class="text-muted-foreground text-xs">
-							{t('myai.noModels')}
-						</p>
-					{:else}
-						<p class="text-muted-foreground font-mono text-[10px] tracking-wide uppercase">
-							{t('myai.pickModel')}
-						</p>
-						<div class="flex max-h-40 flex-col gap-0.5 overflow-y-auto">
-							{#each myaiStore.models as model (model)}
-								<Button
-									variant="ghost"
-									size="sm"
-									class="h-7 justify-start gap-2 font-mono text-xs"
-									onclick={() => chooseModel(model)}
-								>
-									{#if model === activeModel}<CheckIcon class="size-3" />{/if}
-									{model}
-								</Button>
-							{/each}
-						</div>
-					{/if}
-				{/if}
-				<p class="text-muted-foreground text-xs">
-					{t('myai.direct')}
-				</p>
-			</div>
-		{/if}
+					<span class="min-w-0 flex-1">
+						<span class="flex items-center gap-1.5">
+							<span class="text-sm font-medium">{m.label}</span>
+							{#if m.dot}<span class="bg-mode-assisted size-1.5 rounded-full"></span>{/if}
+							{#if bestMode?.id === m.id}
+								<span class="text-ring text-[10px]" title={bestMode.reason}>
+									{t('modes.best')}
+								</span>
+							{/if}
+						</span>
+						<span class="text-muted-foreground block truncate text-xs">
+							{m.line}
+						</span>
+					</span>
+					<span class="ml-2 shrink-0">
+						{#if m.id === mode}
+							<CheckIcon class="text-ring size-4" />
+						{:else if m.readiness.state === 'ready'}
+							<span class="text-muted-foreground text-xs">{t('modes.state.ready')}</span>
+						{:else if m.readiness.state === 'setup'}
+							<span class="text-muted-foreground text-xs">{t(m.readiness.setupKey)} →</span>
+						{:else if m.readiness.state === 'progress'}
+							<span class="text-muted-foreground text-xs tabular-nums">
+								{m.readiness.pct > 0 ? `${m.readiness.pct}%` : '…'}
+							</span>
+						{/if}
+					</span>
+				</Button>
+			{/each}
+		</div>
+		<div class="mt-1 border-t pt-1">
+			<Button
+				variant="ghost"
+				size="sm"
+				class="text-muted-foreground h-7 w-full justify-start px-2.5 text-xs font-normal"
+				onclick={() => {
+					open = false;
+					uiStore.openSettings('ai');
+				}}
+			>
+				{t('modes.aiSettings')}
+			</Button>
+			<a
+				href={resolve('/how-it-works')}
+				class="text-muted-foreground hover:text-foreground block px-2.5 py-1.5 text-xs underline-offset-2 hover:underline"
+				onclick={() => (open = false)}
+			>
+				{t('modes.whatLeaves')}
+			</a>
+		</div>
 	</Popover.Content>
 </Popover.Root>
