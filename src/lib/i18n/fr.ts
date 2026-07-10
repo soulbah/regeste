@@ -7,6 +7,7 @@ import type { en } from './en';
 export const fr: Record<keyof typeof en, string> = {
 	// Common
 	'common.cancel': 'Annuler',
+	'common.close': 'Fermer',
 	'common.save': 'Enregistrer',
 	'common.send': 'Envoyer',
 	'common.continue': 'Continuer',
@@ -328,6 +329,9 @@ export const fr: Record<keyof typeof en, string> = {
 	'settings.deleteChats.cta': 'Supprimer les discussions',
 	'settings.deleteChats.confirmTitle': 'Supprimer toutes les discussions ?',
 	'settings.myai.title': 'Endpoint My AI',
+	'settings.myai.connection': 'Connexion',
+	'settings.myai.model': 'Modèle par défaut',
+	'settings.models.benchTitle': 'Test de vitesse',
 	'settings.account.logoutAll': 'Se déconnecter de tous les appareils',
 	'settings.account.deleteTitle': 'Supprimer le compte',
 	'settings.account.deleteDesc':

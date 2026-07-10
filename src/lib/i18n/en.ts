@@ -4,6 +4,7 @@
 export const en = {
 	// Common
 	'common.cancel': 'Cancel',
+	'common.close': 'Close',
 	'common.save': 'Save',
 	'common.send': 'Send',
 	'common.continue': 'Continue',
@@ -317,6 +318,9 @@ export const en = {
 	'settings.deleteChats.cta': 'Delete all chats',
 	'settings.deleteChats.confirmTitle': 'Delete all chats?',
 	'settings.myai.title': 'My AI endpoint',
+	'settings.myai.connection': 'Connection',
+	'settings.myai.model': 'Default model',
+	'settings.models.benchTitle': 'Speed test',
 	'settings.account.logoutAll': 'Log out of all devices',
 	'settings.account.deleteTitle': 'Delete account',
 	'settings.account.deleteDesc':

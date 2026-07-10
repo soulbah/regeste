@@ -102,7 +102,12 @@
 			<Card.Content class="pt-6">
 				<form class="space-y-4" onsubmit={requestCode}>
 					<div class="space-y-1.5">
-						<Label for="email">{t('account.email')}</Label>
+						<Label
+							for="email"
+							class="text-muted-foreground font-mono text-[10px] tracking-wide uppercase"
+						>
+							{t('account.email')}
+						</Label>
 						<Input
 							id="email"
 							type="email"
