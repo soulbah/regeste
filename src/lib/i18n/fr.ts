@@ -11,7 +11,6 @@ export const fr: Record<keyof typeof en, string> = {
 	'common.send': 'Envoyer',
 	'common.continue': 'Continuer',
 	'common.delete': 'Supprimer',
-	'common.storedLocally': 'Stocké localement',
 	'common.page': 'page {n}',
 	'common.pages': '{n} pages',
 	'common.requests': '{count} requête{s}',
@@ -19,7 +18,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'common.cloudAi': 'IA cloud',
 
 	// Sidebar
-	'sidebar.newChat': 'Nouvelle conversation',
+	'sidebar.newChat': 'Nouvelle discussion',
 	'sidebar.documents': 'Documents',
 	'sidebar.search': 'Rechercher',
 	'sidebar.privacyReport': 'Rapport de confidentialité',
@@ -32,25 +31,25 @@ export const fr: Record<keyof typeof en, string> = {
 	'sidebar.unpin': 'Désépingler',
 	'sidebar.rename': 'Renommer',
 	'sidebar.exportMarkdown': 'Exporter en Markdown',
-	'sidebar.renameTitle': 'Renommer la conversation',
-	'sidebar.chatTitleAria': 'Titre de la conversation',
-	'sidebar.deleteTitle': 'Supprimer cette conversation ?',
+	'sidebar.renameTitle': 'Renommer la discussion',
+	'sidebar.chatTitleAria': 'Titre de la discussion',
+	'sidebar.deleteTitle': 'Supprimer cette discussion ?',
 	'sidebar.deleteDescription':
 		'« {title} » et ses messages seront définitivement supprimés de cet appareil. Les documents restent dans votre bibliothèque.',
 	'sidebar.guest': 'Invité',
-	'sidebar.signedIn': 'Connecté · vos fichiers restent locaux',
 	'sidebar.localWorkspace': 'Espace de travail local',
 
 	// Command palette
-	'palette.placeholder': 'Rechercher conversations, documents, commandes…',
+	'palette.placeholder': 'Rechercher discussions, documents, commandes…',
 	'palette.noResults': 'Rien trouvé sur cet appareil.',
 	'palette.hint': 'Tapez pour chercher partout sur cet appareil.',
-	'palette.chats': 'Conversations',
+	'palette.chats': 'Discussions',
 	'palette.documents': 'Documents',
 	'palette.commands': 'Commandes',
 
 	// Composer
 	'composer.placeholder': 'Posez une question sur vos documents…',
+	'composer.followUp': 'Poser une question de suivi…',
 	'composer.attachFrom': 'Joindre depuis vos documents',
 	'composer.footer': 'Les réponses citent vos documents',
 
@@ -66,13 +65,8 @@ export const fr: Record<keyof typeof en, string> = {
 	'actions.obligations.q': 'Listez les obligations de chaque partie selon ces documents.',
 
 	// Add documents popover
-	'addDocs.add': 'Ajouter',
-	'addDocs.title': 'Ajouter à cette conversation',
 	'addDocs.choose': 'Mes documents',
-	'addDocs.chooseHint': 'Joignez un document déjà dans votre espace de travail.',
 	'addDocs.upload': 'Importer un fichier',
-	'addDocs.uploadHint': 'Ajouté à votre espace de travail et à cette conversation.',
-	'addDocs.fromWorkspace': 'Depuis votre espace de travail',
 
 	// Mode selector
 	'modes.title': 'Réponse générée avec',
@@ -92,7 +86,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'modes.private.loading': "Chargement de l'IA privée…",
 	'modes.private.ready': 'Prêt · fonctionne hors ligne',
 	'modes.error': 'Un problème est survenu',
-	'modes.locked': 'Verrouillé · cette conversation est privée uniquement',
+	'modes.locked': 'Verrouillé · cette discussion est privée uniquement',
 	'modes.offlineOn': 'Le mode hors ligne est activé',
 	'modes.assisted.ready': 'Prêt · extraits uniquement, jamais les documents entiers',
 	'modes.assisted.signIn': 'Connexion requise',
@@ -122,14 +116,16 @@ export const fr: Record<keyof typeof en, string> = {
 	'myai.error.unreachable':
 		"Endpoint injoignable. Vérifiez l'URL, que le serveur tourne, et ses réglages CORS.",
 
-	// Documents panel (in chat)
+	// Sources panel (in chat)
+	'sources.title': 'Sources',
+	'sources.subtitle': 'Jointes à cette discussion',
+	// Documents (library page + shared rows)
 	'docs.title': 'Documents',
-	'docs.subtitle': 'Joints à cette conversation · stockés localement',
-	'docs.privateOnly': 'Privé uniquement : aucun mode cloud dans cette conversation',
+	'docs.privateOnly': 'Privé uniquement : aucun mode cloud dans cette discussion',
 	'docs.useAria': 'Utiliser {name} pour les questions',
 	'docs.openAria': 'Ouvrir {name} dans la visionneuse',
-	'docs.removeAria': 'Retirer {name} de cette conversation',
-	'docs.empty': 'Aucun document dans cette conversation pour le moment.',
+	'docs.removeAria': 'Retirer {name} de cette discussion',
+	'docs.empty': 'Aucun document dans cette discussion pour le moment.',
 
 	// Document ingest statuses
 	'status.ready': 'Prêt',
@@ -156,22 +152,17 @@ export const fr: Record<keyof typeof en, string> = {
 		'Seuls les extraits cochés et votre question sont envoyés. Vos fichiers restent ici.',
 
 	// Answer turn
-	'turn.nothingLeft': "Folio · rien n'a quitté cet appareil",
-	'turn.assisted': 'Folio · Assisted',
-	'turn.myai': 'Folio · My AI',
 	'turn.whatAiSaw': "Ce que l'IA a vu",
 	'turn.openSourceAria': 'Ouvrir la source {n}',
 	'turn.copied': 'Copié',
 	'turn.copy': 'Copier',
-	'turn.copyText': 'Copier le texte',
-	'turn.copyWithSources': 'Copier avec les sources',
-	'turn.regenerate': 'Régénérer',
+	'turn.regenerate': 'Réessayer',
 	'turn.closest': "Passages les plus proches, aucun n'a permis de répondre",
 
 	// Retrieval preview turn
 	'retrieval.badge': 'Aperçu de la recherche · les réponses IA arrivent avec le mode Private',
 	'retrieval.noDocs':
-		'Aucun document dans cette conversation. Joignez-en un pour le consulter ; les réponses de culture générale arrivent avec les modes IA.',
+		'Aucun document dans cette discussion. Joignez-en un pour le consulter ; les réponses de culture générale arrivent avec les modes IA.',
 	'retrieval.noHits':
 		"Je n'ai pas trouvé assez d'informations dans les documents joints pour cela.",
 	'retrieval.weak':
@@ -181,7 +172,6 @@ export const fr: Record<keyof typeof en, string> = {
 	// What AI saw panel
 	'wais.title': "Ce que l'IA a vu",
 	'wais.subtitle': 'Pour cette réponse · enregistré localement',
-	'wais.closeAria': 'Fermer le panneau',
 	'wais.destination': 'Destination',
 	'wais.device': "cet appareil, rien n'a été envoyé",
 	'wais.zeroBytes': '0 octet envoyé',
@@ -197,8 +187,6 @@ export const fr: Record<keyof typeof en, string> = {
 
 	// Viewer panel
 	'viewer.document': 'Document',
-	'viewer.stored': 'stocké sur cet appareil',
-	'viewer.closeAria': 'Fermer la visionneuse',
 	'viewer.removed': 'Plus sur cet appareil',
 	'viewer.removedBody':
 		'Ce document a été supprimé de votre bibliothèque. La citation a conservé un instantané du passage :',
@@ -213,23 +201,20 @@ export const fr: Record<keyof typeof en, string> = {
 	'viewer.citedPage': 'cité : p.{n}',
 
 	// Home (new chat)
-	'home.noDocs': 'Aucun document pour le moment',
 	'home.headline': 'Discutez avec vos documents privés.',
 	'home.sub':
 		"Ajoutez des documents, posez des questions et voyez exactement ce à quoi l'IA peut accéder.",
-	'home.filesLocal': 'Vos fichiers restent sur cet appareil · documents PDF et Word',
 	'home.demoPreparing': 'Préparation de la démo…',
 	'home.demoCta': 'Essayer avec un contrat fictif',
 	'home.demoTitle': 'Démo · contrat fictif',
-	'home.proof': 'Préparez le mode Private, puis coupez le Wi-Fi : tout continue de fonctionner.',
 
 	// Chat page
 	'chat.fallback': 'Conversation',
 	'chat.docCount': '{count} document{s}',
 	'chat.cloudRequests': '{count} requête{s} cloud · {kb} Ko',
 	'chat.zeroBytes': '0 octet envoyé',
-	'chat.threadAria': 'Fil de la conversation',
-	'chat.drop': 'Déposez pour ajouter à cette conversation',
+	'chat.threadAria': 'Fil de la discussion',
+	'chat.drop': 'Déposez pour ajouter à cette discussion',
 	'chat.fromSections': 'Depuis les sections de votre document',
 	'chat.editAria': 'Modifier cette question',
 	'chat.reviewing': 'En attente de votre vérification dans le panneau latéral',
@@ -237,15 +222,13 @@ export const fr: Record<keyof typeof en, string> = {
 	'chat.reading': 'Lecture de vos documents…',
 	'chat.stop': 'Arrêter',
 	'chat.meta': '{count} extrait{s} · {kb} Ko · {dest}',
-	'chat.editTitle': 'Modifier votre question',
-	'chat.editDescription': 'La réponse précédente sera remplacée.',
 	'chat.editedAria': 'Question modifiée',
 	'chat.resend': 'Renvoyer',
 
 	// Documents page
 	'docsPage.count': '{count} dans votre espace de travail',
 	'docsPage.intro':
-		'Chaque document ajouté à Folio vit ici et reste sur cet appareil. Ajoutez-en un à une conversation pour commencer à poser des questions dessus.',
+		'Chaque document ajouté à Folio vit ici et reste sur cet appareil. Ajoutez-en un à une discussion pour commencer à poser des questions dessus.',
 	'docsPage.add': 'Ajouter des documents',
 	'docsPage.sortRecent': 'Plus récents',
 	'docsPage.sortName': 'Nom',
@@ -256,13 +239,13 @@ export const fr: Record<keyof typeof en, string> = {
 	'docsPage.error': 'erreur',
 	'docsPage.sentOn': 'Extraits envoyés le {date}',
 	'docsPage.neverSent': 'Jamais envoyé',
-	'docsPage.inChats': 'Dans {count} conversation{s}',
+	'docsPage.inChats': 'Dans {count} discussion{s}',
 	'docsPage.openAria': 'Ouvrir les détails de {name}',
 	'docsPage.deleteFromDevice': 'Supprimer de cet appareil',
 	'docsPage.empty':
 		'Aucun document pour le moment. Ajoutez des fichiers PDF, Word, Markdown ou texte.',
 	'docsPage.deleteTitle': 'Supprimer « {name} » de cet appareil ?',
-	'docsPage.usedIn': 'Ce document est utilisé dans {count} conversation{s}.',
+	'docsPage.usedIn': 'Ce document est utilisé dans {count} discussion{s}.',
 	'docsPage.deleteBody':
 		'Le fichier, son index et ses embeddings seront définitivement supprimés. Cette action est irréversible.',
 	'docsPage.deleteConfirm': 'Supprimer définitivement',
@@ -280,7 +263,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'sheet.loading': 'Chargement…',
 	'sheet.neverSent': 'Jamais envoyé nulle part',
 	'sheet.usedIn': 'Utilisé dans',
-	'sheet.noChats': 'Aucune conversation pour le moment.',
+	'sheet.noChats': 'Aucune discussion pour le moment.',
 	'sheet.open': 'Ouvrir',
 	'sheet.reindex': 'Réindexer',
 	'sheet.replaceFile': 'Remplacer le fichier…',
@@ -330,7 +313,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'settings.offline.badge': 'Hors ligne · rien ne quitte cet appareil',
 	'settings.workspace.title': 'Espace de travail',
 	'settings.workspace.exportDesc':
-		'Exportez vos documents, conversations, citations et historique de confidentialité dans un simple zip. Construit sur cet appareil, envoyé nulle part.',
+		'Exportez vos documents, discussions, citations et historique de confidentialité dans un simple zip. Construit sur cet appareil, envoyé nulle part.',
 	'settings.workspace.packing': 'Préparation…',
 	'settings.workspace.export': 'Exporter mon espace de travail',
 	'settings.workspace.quota': 'Utilisation Assisted ce mois-ci : {used} / {limit}',
@@ -351,14 +334,14 @@ export const fr: Record<keyof typeof en, string> = {
 		'cet appareil est lent pour le mode Private ; Assisted sera nettement plus rapide.',
 	'settings.wipe.title': 'Tout supprimer',
 	'settings.wipe.desc':
-		"Efface tous les documents, conversations, index et modèles IA de cet appareil. Rien n'existe ailleurs, cette action est donc irréversible.",
+		"Efface tous les documents, discussions, index et modèles IA de cet appareil. Rien n'existe ailleurs, cette action est donc irréversible.",
 	'settings.wipe.cta': 'Tout supprimer sur cet appareil',
 	'settings.wipe.last': 'Dernière confirmation',
 	'settings.wipe.confirmTitle': 'Tout supprimer sur cet appareil ?',
 	'settings.wipe.armedBody':
-		"Ceci détruit définitivement chaque document, conversation, index et modèle téléchargé stocké par Folio dans ce navigateur. Rien n'existe ailleurs. Vraiment supprimer ?",
+		"Ceci détruit définitivement chaque document, discussion, index et modèle téléchargé stocké par Folio dans ce navigateur. Rien n'existe ailleurs. Vraiment supprimer ?",
 	'settings.wipe.body':
-		'Les documents, conversations, index de recherche et modèles IA seront effacés de ce navigateur. Votre compte survit ; il ne contient aucun contenu.',
+		'Les documents, discussions, index de recherche et modèles IA seront effacés de ce navigateur. Votre compte survit ; il ne contient aucun contenu.',
 	'settings.wipe.erasing': 'Effacement…',
 	'settings.wipe.confirm': 'Oui, tout effacer',
 	'settings.wipe.continue': 'Continuer',
@@ -371,7 +354,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'privacy.deviceSummary':
 		'{count} réponse{s} générée{s} entièrement sur cet appareil. 0 octet envoyé.',
 	'privacy.emptyBody':
-		'Chaque document, index et conversation est stocké localement. Ce rapport ne se remplit que si vous choisissez un mode cloud.',
+		'Chaque document, index et discussion est stocké localement. Ce rapport ne se remplit que si vous choisissez un mode cloud.',
 	'privacy.onDevice': 'Sur cet appareil',
 	'privacy.privateAnswers': '{count} réponse{s} privée{s}',
 	'privacy.event': '{count} extrait{s} · {bytes} → {dest}',
@@ -385,17 +368,16 @@ export const fr: Record<keyof typeof en, string> = {
 	'hiw.whatStays': 'Ce qui reste',
 	'hiw.server': 'Le serveur',
 	'hiw.private.leaves': 'Rien. Le modèle tourne dans votre navigateur (téléchargement unique).',
-	'hiw.private.stays':
-		"Documents, index, conversations, le modèle d'IA, vos questions et réponses.",
+	'hiw.private.stays': "Documents, index, discussions, le modèle d'IA, vos questions et réponses.",
 	'hiw.private.server': 'Jamais contacté pour répondre. Aucun compte requis.',
 	'hiw.assisted.leaves':
 		"Votre question et les extraits approuvés à l'étape de vérification. Jamais les documents entiers, jamais les noms de fichiers.",
-	'hiw.assisted.stays': 'Documents, index, conversations. Les extraits que vous excluez.',
+	'hiw.assisted.stays': 'Documents, index, discussions. Les extraits que vous excluez.',
 	'hiw.assisted.server':
 		"Relaie les extraits à l'IA et renvoie la réponse en continu. Stocke votre e-mail, votre offre et un compteur d'utilisation. Ne stocke ni ne journalise jamais de contenu.",
 	'hiw.myai.leaves':
 		"Votre question plus les extraits pertinents, envoyés directement à l'endpoint que vous avez configuré.",
-	'hiw.myai.stays': 'Documents, index, conversations.',
+	'hiw.myai.stays': 'Documents, index, discussions.',
 	'hiw.myai.server':
 		'Les serveurs de Folio ne sont pas impliqués. Le trafic va de votre navigateur à votre endpoint.',
 	'hiw.pipeline': 'Le pipeline',
@@ -422,7 +404,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'account.kicker': 'Folio · compte',
 	'account.headline': 'Une adresse. Un code.',
 	'account.body':
-		'Un compte déverrouille le mode Assisted. Pas de mot de passe : nous envoyons un code à six chiffres à votre adresse e-mail. Vos documents et conversations restent sur cet appareil.',
+		'Un compte déverrouille le mode Assisted. Pas de mot de passe : nous envoyons un code à six chiffres à votre adresse e-mail. Vos documents et discussions restent sur cet appareil.',
 	'account.signedInAs': 'Connecté en tant que',
 	'account.signOut': 'Se déconnecter',
 	'account.enterCode': 'Saisissez le code',
@@ -432,16 +414,14 @@ export const fr: Record<keyof typeof en, string> = {
 	'account.email': 'E-mail',
 	'account.sending': 'Envoi…',
 	'account.sendCode': 'Recevoir un code',
-	'account.filesLocal': 'Vos fichiers restent sur cet appareil',
 
 	// Toasts (layout + uploads)
 	'toast.ready': '{name} est prêt',
-	'toast.readyDesc': "Indexé localement. Votre fichier n'a jamais quitté cet appareil.",
 	'toast.failed': "{name} n'a pas pu être indexé",
 	'toast.failedScanned': "Aucun texte extractible. L'OCR n'est pas encore pris en charge.",
 	'toast.failedGeneric': 'Un problème est survenu pendant la lecture de ce fichier.',
 	'toast.added': '{name} ajouté à Mes documents',
-	'toast.addedDesc': 'Disponible dans chaque conversation, stocké sur cet appareil.',
+	'toast.addedDesc': 'Disponible dans chaque discussion, stocké sur cet appareil.',
 
 	// Errors (stores + net)
 	'error.offline': 'Le mode hors ligne est activé. Rien ne quitte cet appareil.',

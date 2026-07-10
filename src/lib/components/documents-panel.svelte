@@ -28,7 +28,7 @@
 </script>
 
 <div class="flex h-full flex-col">
-	<PanelHeader title={t('docs.title')} subtitle={t('docs.subtitle')} {onhide} />
+	<PanelHeader title={t('sources.title')} subtitle={t('sources.subtitle')} {onhide} />
 	<!-- P7: hard lock — cloud modes are unselectable while this is on. -->
 	<div class="flex items-center justify-between gap-3 border-b px-4 py-2.5">
 		<Label for="private-only" class="text-xs font-normal">

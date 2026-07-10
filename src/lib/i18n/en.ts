@@ -8,7 +8,6 @@ export const en = {
 	'common.send': 'Send',
 	'common.continue': 'Continue',
 	'common.delete': 'Delete',
-	'common.storedLocally': 'Stored locally',
 	'common.page': 'page {n}',
 	'common.pages': '{n} pages',
 	'common.requests': '{count} request{s}',
@@ -35,7 +34,6 @@ export const en = {
 	'sidebar.deleteDescription':
 		'"{title}" and its messages will be permanently removed from this device. Documents stay in your library.',
 	'sidebar.guest': 'Guest',
-	'sidebar.signedIn': 'Signed in · files stay local',
 	'sidebar.localWorkspace': 'Local workspace',
 
 	// Command palette
@@ -48,6 +46,7 @@ export const en = {
 
 	// Composer
 	'composer.placeholder': 'Ask anything about your documents…',
+	'composer.followUp': 'Ask a follow-up…',
 	'composer.attachFrom': 'Attach from your documents',
 	'composer.footer': 'Answers cite your documents',
 
@@ -63,13 +62,8 @@ export const en = {
 	'actions.obligations.q': 'List the obligations of each party under these documents.',
 
 	// Add documents popover
-	'addDocs.add': 'Add',
-	'addDocs.title': 'Add to this chat',
 	'addDocs.choose': 'My documents',
-	'addDocs.chooseHint': 'Attach one already in your workspace.',
 	'addDocs.upload': 'Upload a file',
-	'addDocs.uploadHint': 'Adds to your workspace and this chat.',
-	'addDocs.fromWorkspace': 'From your workspace',
 
 	// Mode selector
 	'modes.title': 'Answer generated with',
@@ -119,9 +113,11 @@ export const en = {
 	'myai.error.unreachable':
 		'Endpoint unreachable. Check the URL, that the server is running, and its CORS settings.',
 
-	// Documents panel (in chat)
+	// Sources panel (in chat)
+	'sources.title': 'Sources',
+	'sources.subtitle': 'Attached to this chat',
+	// Documents (library page + shared rows)
 	'docs.title': 'Documents',
-	'docs.subtitle': 'Attached to this chat · stored locally',
 	'docs.privateOnly': 'Private only: no cloud mode in this chat',
 	'docs.useAria': 'Use {name} for questions',
 	'docs.openAria': 'Open {name} in the viewer',
@@ -151,16 +147,11 @@ export const en = {
 	'presend.footer': 'Only the checked excerpts and your question are sent. Your files stay here.',
 
 	// Answer turn
-	'turn.nothingLeft': 'Folio · nothing left this device',
-	'turn.assisted': 'Folio · Assisted',
-	'turn.myai': 'Folio · My AI',
 	'turn.whatAiSaw': 'What AI saw',
 	'turn.openSourceAria': 'Open source {n}',
 	'turn.copied': 'Copied',
 	'turn.copy': 'Copy',
-	'turn.copyText': 'Copy text',
-	'turn.copyWithSources': 'Copy with sources',
-	'turn.regenerate': 'Regenerate',
+	'turn.regenerate': 'Try again',
 	'turn.closest': 'Closest passages, none supported an answer',
 
 	// Retrieval preview turn
@@ -174,7 +165,6 @@ export const en = {
 	// What AI saw panel
 	'wais.title': 'What AI saw',
 	'wais.subtitle': 'For this answer · recorded locally',
-	'wais.closeAria': 'Close panel',
 	'wais.destination': 'Destination',
 	'wais.device': 'this device, nothing sent',
 	'wais.zeroBytes': '0 bytes sent',
@@ -189,8 +179,6 @@ export const en = {
 
 	// Viewer panel
 	'viewer.document': 'Document',
-	'viewer.stored': 'stored on this device',
-	'viewer.closeAria': 'Close viewer',
 	'viewer.removed': 'No longer on this device',
 	'viewer.removedBody':
 		'This document was removed from your library. The citation kept a snapshot of the passage:',
@@ -205,14 +193,11 @@ export const en = {
 	'viewer.citedPage': 'cited: p.{n}',
 
 	// Home (new chat)
-	'home.noDocs': 'No documents yet',
 	'home.headline': 'Chat with your private documents.',
 	'home.sub': 'Add documents, ask questions, and see exactly what the AI can access.',
-	'home.filesLocal': 'Your files stay on this device · PDF and Word documents',
 	'home.demoPreparing': 'Preparing the demo…',
 	'home.demoCta': 'Try with a sample contract',
 	'home.demoTitle': 'Demo · sample contract',
-	'home.proof': 'Prepare Private mode, then turn off Wi-Fi: it keeps working.',
 
 	// Chat page
 	'chat.fallback': 'Chat',
@@ -228,8 +213,6 @@ export const en = {
 	'chat.reading': 'Reading your documents…',
 	'chat.stop': 'Stop',
 	'chat.meta': '{count} excerpt{s} · {kb} KB · {dest}',
-	'chat.editTitle': 'Edit your question',
-	'chat.editDescription': 'The previous answer will be replaced.',
 	'chat.editedAria': 'Edited question',
 	'chat.resend': 'Resend',
 
@@ -419,11 +402,9 @@ export const en = {
 	'account.email': 'Email',
 	'account.sending': 'Sending…',
 	'account.sendCode': 'Send me a code',
-	'account.filesLocal': 'Your files stay on this device',
 
 	// Toasts (layout + uploads)
 	'toast.ready': '{name} is ready',
-	'toast.readyDesc': 'Indexed locally. Your file never left this device.',
 	'toast.failed': '{name} could not be indexed',
 	'toast.failedScanned': 'No extractable text. OCR is not supported yet.',
 	'toast.failedGeneric': 'Something went wrong while reading this file.',

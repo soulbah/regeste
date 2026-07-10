@@ -23,7 +23,8 @@
 		privateOnly = false,
 		hasReadyDocs = false,
 		generating = false,
-		onstop = null
+		onstop = null,
+		followUp = false
 	}: {
 		mode: ChatMode;
 		disabled?: boolean;
@@ -40,6 +41,8 @@
 		/** While true the send button becomes Stop (same spot, spec 019). */
 		generating?: boolean;
 		onstop?: (() => void) | null;
+		/** After the first exchange the placeholder invites a follow-up. */
+		followUp?: boolean;
 	} = $props();
 
 	let text = $state('');
@@ -90,7 +93,7 @@
 	{/if}
 	<Textarea
 		bind:value={text}
-		placeholder={t('composer.placeholder')}
+		placeholder={t(followUp ? 'composer.followUp' : 'composer.placeholder')}
 		class="max-h-40 min-h-8 resize-none border-0 bg-transparent px-1 py-1 shadow-none focus-visible:ring-0"
 		onkeydown={(e) => {
 			if (e.key === 'Enter' && !e.shiftKey) {

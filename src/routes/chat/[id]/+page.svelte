@@ -355,6 +355,7 @@
 				<Composer
 					mode={chatsStore.activeChat?.mode ?? 'private'}
 					disabled={chatsStore.sending}
+					followUp={chatsStore.messages.length > 0}
 					generating={llmStore.status === 'generating' || myaiStore.generating}
 					onstop={() => chatsStore.stopGeneration()}
 					onsend={handleSend}
