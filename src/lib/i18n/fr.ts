@@ -44,6 +44,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'sidebar.deleteTitle': 'Supprimer cette discussion ?',
 	'sidebar.deleteDescription':
 		'« {title} » et ses messages seront définitivement supprimés de cet appareil. Les documents restent dans votre bibliothèque.',
+	'sidebar.resizeAria': 'Redimensionner la barre latérale',
 	'sidebar.guest': 'Invité',
 	'sidebar.localWorkspace': 'Espace de travail local',
 
@@ -316,10 +317,9 @@ export const fr: Record<keyof typeof en, string> = {
 	'related.title': 'Questions liées',
 	'app.dbBusy': 'Folio est déjà ouvert dans un autre onglet. Fermez-le, puis rechargez celui-ci.',
 	'panel.backAria': 'Revenir aux documents',
-	'panel.hideAria': 'Masquer le panneau',
-	'chat.panelToggleAria': 'Afficher ou masquer le panneau latéral',
-	'chat.panelTip.show': 'Afficher le panneau · ⌘.',
-	'chat.panelTip.hide': 'Masquer le panneau · ⌘.',
+	'panel.hideAria': 'Fermer le panneau',
+	'chat.panelToggleAria': 'Ouvrir le panneau latéral',
+	'chat.panelTip.show': 'Ouvrir le panneau · ⌘.',
 	'chat.stopTip': 'Arrêter · échap',
 	'composer.sendTip': 'Envoyer · ⏎',
 	'sidebar.collapseTip': 'Réduire · ⌘B',
@@ -453,7 +453,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'hiw.step.passages': 'Meilleurs passages',
 	'hiw.step.modes': 'Private / Assisted / My AI',
 	'hiw.step.answer': 'Réponse + citations',
-	'hiw.allBrowser': 'tout dans ce navigateur',
+	'hiw.frame': 'Ce navigateur',
 	'hiw.onlyMode':
 		"Seule l'étape du mode décide si quelque chose part, et seuls Assisted et My AI envoient les passages sélectionnés.",
 	'hiw.proofTitle': 'Vérifiez par vous-même',

@@ -1,12 +1,13 @@
 <script lang="ts">
 	// Constant header of the right contextual panel (spec 019): whatever the
 	// content (Sources, review, What AI saw, viewer), the name sits left and
-	// the hide control sits right, always in the same place. ← goes back to
-	// the default content; » hides the whole panel.
+	// the close control sits right, always in the same place. ← goes back to
+	// the default content; ✕ closes the whole panel — the only close control,
+	// the chat header button only reopens.
 	import { Button } from '$lib/components/ui/button';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
-	import ChevronsRightIcon from '@lucide/svelte/icons/chevrons-right';
+	import XIcon from '@lucide/svelte/icons/x';
 	import { t } from '$lib/i18n/index.svelte';
 
 	let {
@@ -60,7 +61,7 @@
 						onclick={onhide}
 						aria-label={t('panel.hideAria')}
 					>
-						<ChevronsRightIcon />
+						<XIcon />
 					</Button>
 				{/snippet}
 			</Tooltip.Trigger>

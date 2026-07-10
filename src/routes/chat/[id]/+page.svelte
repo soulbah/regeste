@@ -12,7 +12,6 @@
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import InfoIcon from '@lucide/svelte/icons/info';
 	import PanelRightOpenIcon from '@lucide/svelte/icons/panel-right-open';
-	import PanelRightCloseIcon from '@lucide/svelte/icons/panel-right-close';
 	import MessageSquareQuoteIcon from '@lucide/svelte/icons/message-square-quote';
 	import Composer from '$lib/components/composer.svelte';
 	import RetrievalTurn from '$lib/components/retrieval-turn.svelte';
@@ -232,31 +231,26 @@
 							</span>
 						{/if}
 					</a>
-					<Tooltip.Root>
-						<Tooltip.Trigger>
-							{#snippet child({ props })}
-								<Button
-									{...props}
-									variant="ghost"
-									size="icon-sm"
-									aria-expanded={lgViewport.current ? panelOpen : panelSheetOpen}
-									aria-label={t('chat.panelToggleAria')}
-									onclick={togglePanel}
-								>
-									{#if lgViewport.current ? panelOpen : panelSheetOpen}
-										<PanelRightCloseIcon />
-									{:else}
+					<!-- Opens only: once the panel shows, its own ✕ is the sole close control
+					     (standard pattern), so the opener disappears instead of flipping icon. -->
+					{#if !(lgViewport.current ? panelOpen : panelSheetOpen)}
+						<Tooltip.Root>
+							<Tooltip.Trigger>
+								{#snippet child({ props })}
+									<Button
+										{...props}
+										variant="ghost"
+										size="icon-sm"
+										aria-label={t('chat.panelToggleAria')}
+										onclick={togglePanel}
+									>
 										<PanelRightOpenIcon />
-									{/if}
-								</Button>
-							{/snippet}
-						</Tooltip.Trigger>
-						<Tooltip.Content side="bottom">
-							{(lgViewport.current ? panelOpen : panelSheetOpen)
-								? t('chat.panelTip.hide')
-								: t('chat.panelTip.show')}
-						</Tooltip.Content>
-					</Tooltip.Root>
+									</Button>
+								{/snippet}
+							</Tooltip.Trigger>
+							<Tooltip.Content side="bottom">{t('chat.panelTip.show')}</Tooltip.Content>
+						</Tooltip.Root>
+					{/if}
 				</div>
 			</header>
 

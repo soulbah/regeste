@@ -41,6 +41,7 @@ export const en = {
 	'sidebar.deleteTitle': 'Delete this chat?',
 	'sidebar.deleteDescription':
 		'"{title}" and its messages will be permanently removed from this device. Documents stay in your library.',
+	'sidebar.resizeAria': 'Resize the sidebar',
 	'sidebar.guest': 'Guest',
 	'sidebar.localWorkspace': 'Local workspace',
 
@@ -306,10 +307,9 @@ export const en = {
 	'related.title': 'Related',
 	'app.dbBusy': 'Folio is already open in another tab. Close it, then reload this one.',
 	'panel.backAria': 'Back to documents',
-	'panel.hideAria': 'Hide the panel',
-	'chat.panelToggleAria': 'Show or hide the side panel',
-	'chat.panelTip.show': 'Show panel · ⌘.',
-	'chat.panelTip.hide': 'Hide panel · ⌘.',
+	'panel.hideAria': 'Close the panel',
+	'chat.panelToggleAria': 'Open the side panel',
+	'chat.panelTip.show': 'Open panel · ⌘.',
 	'chat.stopTip': 'Stop · esc',
 	'composer.sendTip': 'Send · ⏎',
 	'sidebar.collapseTip': 'Collapse · ⌘B',
@@ -442,7 +442,7 @@ export const en = {
 	'hiw.step.passages': 'Top passages',
 	'hiw.step.modes': 'Private / Assisted / My AI',
 	'hiw.step.answer': 'Answer + citations',
-	'hiw.allBrowser': 'all in this browser',
+	'hiw.frame': 'This browser',
 	'hiw.onlyMode':
 		'Only the mode step decides whether anything leaves, and only Assisted and My AI send the selected passages.',
 	'hiw.proofTitle': 'Check it yourself',

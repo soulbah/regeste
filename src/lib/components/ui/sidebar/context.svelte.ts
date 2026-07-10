@@ -1,6 +1,12 @@
 import { IsMobile } from '$lib/hooks/is-mobile.svelte.js';
 import { getContext, setContext } from 'svelte';
-import { SIDEBAR_KEYBOARD_SHORTCUT } from './constants.js';
+import {
+	SIDEBAR_KEYBOARD_SHORTCUT,
+	SIDEBAR_WIDTH_DEFAULT_PX,
+	SIDEBAR_WIDTH_MAX_PX,
+	SIDEBAR_WIDTH_MIN_PX,
+	SIDEBAR_WIDTH_STORAGE_KEY
+} from './constants.js';
 
 type Getter<T> = () => T;
 
@@ -28,11 +34,36 @@ class SidebarState {
 	#isMobile: IsMobile;
 	state = $derived.by(() => (this.open ? 'expanded' : 'collapsed'));
 
+	// Drag-to-resize (owned adaptation): width in px, persisted across sessions.
+	width = $state(SIDEBAR_WIDTH_DEFAULT_PX);
+	resizing = $state(false);
+
 	constructor(props: SidebarStateProps) {
 		this.setOpen = props.setOpen;
 		this.#isMobile = new IsMobile();
 		this.props = props;
+		if (typeof localStorage !== 'undefined') {
+			const saved = Number(localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY));
+			if (Number.isFinite(saved) && saved > 0) this.width = this.#clampWidth(saved);
+		}
 	}
+
+	#clampWidth(px: number) {
+		return Math.min(SIDEBAR_WIDTH_MAX_PX, Math.max(SIDEBAR_WIDTH_MIN_PX, Math.round(px)));
+	}
+
+	setWidth = (px: number) => {
+		this.width = this.#clampWidth(px);
+	};
+
+	persistWidth = () => {
+		localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(this.width));
+	};
+
+	resetWidth = () => {
+		this.width = SIDEBAR_WIDTH_DEFAULT_PX;
+		this.persistWidth();
+	};
 
 	// Convenience getter for checking if the sidebar is mobile
 	// without this, we would need to use `sidebar.isMobile.current` everywhere

@@ -232,6 +232,7 @@
 	<Sidebar.Footer>
 		<NavUser />
 	</Sidebar.Footer>
+	<Sidebar.ResizeHandle aria-label={t('sidebar.resizeAria')} />
 </Sidebar.Root>
 
 <Dialog.Root open={renameTarget !== null} onOpenChange={(o) => !o && (renameTarget = null)}>
