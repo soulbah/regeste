@@ -142,7 +142,7 @@
 		{#if generating && onstop}
 			<Button
 				size="icon"
-				class="bg-ring hover:bg-ring/90 text-background rounded-[10px]"
+				class="bg-ring hover:bg-ring/90 text-background rounded-md"
 				onclick={onstop}
 				aria-label={t('chat.stop')}
 			>
@@ -151,7 +151,7 @@
 		{:else}
 			<Button
 				size="icon"
-				class="bg-ring hover:bg-ring/90 text-background rounded-[10px] disabled:opacity-40"
+				class="bg-ring hover:bg-ring/90 text-background rounded-md disabled:opacity-40"
 				onclick={submit}
 				disabled={disabled || !text.trim()}
 				aria-label={t('composer.sendAria')}
