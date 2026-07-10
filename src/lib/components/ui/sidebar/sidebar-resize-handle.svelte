@@ -5,11 +5,25 @@
 	// wrapper). Double-click restores the default width. Hidden on mobile and in
 	// the collapsed icon rail. Render it as a direct child of Sidebar.Root.
 	import { cn } from '$lib/utils.js';
+	import { SIDEBAR_WIDTH_MAX_PX, SIDEBAR_WIDTH_MIN_PX } from './constants.js';
 	import { useSidebar } from './context.svelte.js';
 
 	let { 'aria-label': ariaLabel = 'Resize sidebar' }: { 'aria-label'?: string } = $props();
 
 	const sidebar = useSidebar();
+
+	// Splitter cursor standard, mirroring paneforge so both edges feel identical:
+	// col-resize at rest/hover; while dragging the move cursor, degrading to the
+	// one-way arrow at a bound to say which direction is still available.
+	const cursorClass = $derived(
+		!sidebar.resizing
+			? 'cursor-col-resize'
+			: sidebar.width <= SIDEBAR_WIDTH_MIN_PX
+				? 'cursor-e-resize'
+				: sidebar.width >= SIDEBAR_WIDTH_MAX_PX
+					? 'cursor-w-resize'
+					: 'cursor-ew-resize'
+	);
 	let startX = 0;
 	let startWidth = 0;
 
@@ -58,7 +72,8 @@
 		ondblclick={() => sidebar.resetWidth()}
 		{onkeydown}
 		class={cn(
-			'group/resize absolute inset-y-0 -right-1 z-20 hidden w-2 cursor-ew-resize touch-none select-none sm:block',
+			'group/resize absolute inset-y-0 -right-1 z-20 hidden w-2 touch-none select-none sm:block',
+			cursorClass,
 			'group-data-[collapsible=icon]:hidden group-data-[collapsible=offcanvas]:hidden',
 			'focus-visible:outline-none'
 		)}
