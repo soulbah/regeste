@@ -88,7 +88,7 @@
 	<Sidebar.Header>
 		<!-- Expanded: logo left, collapse trigger right. Collapsed rail: the logo
 		     holds the slot and the trigger takes its place on hover (ChatGPT). -->
-		<div class="flex items-center justify-between group-data-[collapsible=icon]:justify-center">
+		<div class="flex items-center justify-between group-data-[collapsible=icon]:justify-start">
 			<a
 				href={resolve('/chat')}
 				class="flex min-w-0 items-center gap-2 px-2 py-1.5 group-data-[collapsible=icon]:hidden"
@@ -215,7 +215,7 @@
 	<Sidebar.Footer>
 		<a
 			href={resolve('/chat/account')}
-			class="hover:bg-foreground/7 flex items-center gap-2 rounded-md px-2 py-1.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+			class="hover:bg-foreground/7 flex items-center gap-2 rounded-md px-2 py-1.5 group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0"
 		>
 			<span
 				class="bg-muted flex size-7 shrink-0 items-center justify-center rounded-full text-xs uppercase"
