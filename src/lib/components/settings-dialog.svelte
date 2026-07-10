@@ -179,14 +179,16 @@
 {/snippet}
 
 <Dialog.Root bind:open={uiStore.settingsOpen}>
-	<Dialog.Content class="gap-0 overflow-hidden p-0 sm:max-w-3xl" showCloseButton={false}>
+	<!-- 880×640 capped at 85svh: the market size for a railed settings modal
+	     (single-column ChatGPT is 680; railed Slack/Notion run 800–1000). -->
+	<Dialog.Content class="gap-0 overflow-hidden p-0 sm:max-w-[55rem]" showCloseButton={false}>
 		<Dialog.Header class="sr-only">
 			<Dialog.Title>{t('settings.title')}</Dialog.Title>
 		</Dialog.Header>
 		<!-- The dialog mounts outside Sidebar.Provider, so it brings its own
 		     tooltip context. -->
 		<Tooltip.Provider delayDuration={300}>
-			<div class="grid h-[540px] max-h-[70svh] grid-cols-[11.5rem_1fr]">
+			<div class="grid h-[640px] max-h-[85svh] grid-cols-[11.5rem_1fr]">
 				<!-- Rail: tinted like the sidebar, iconed tabs, green accent bar on the
 			     active one — the same signature as the ⌘K selection. -->
 				<nav class="bg-sidebar/60 flex flex-col border-r p-2">
