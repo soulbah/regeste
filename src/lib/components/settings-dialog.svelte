@@ -1,7 +1,7 @@
 <script lang="ts">
-	// Settings modal (spec 021): left tab rail, four tabs — the ChatGPT shape.
-	// Replaces the /chat/settings page. Contextual trust flows stay in the right
-	// panel; a settings dialog is the market convention and allowed by ui.md.
+	// Settings modal (spec 021, owner design pass): a tinted rail with iconed
+	// tabs and the green accent bar (the ⌘K signature), and Claude-style rows —
+	// label + description left, control right. Essentials only.
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import * as Select from '$lib/components/ui/select';
@@ -12,6 +12,10 @@
 	import { ScrollArea } from '$lib/components/ui/scroll-area';
 	import { Separator } from '$lib/components/ui/separator';
 	import { Switch } from '$lib/components/ui/switch';
+	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
+	import DatabaseIcon from '@lucide/svelte/icons/database';
+	import CpuIcon from '@lucide/svelte/icons/cpu';
+	import UserRoundIcon from '@lucide/svelte/icons/user-round';
 	import { setMode, userPrefersMode } from 'mode-watcher';
 	import { authClient } from '$lib/auth-client';
 	import { i18n, t } from '$lib/i18n/index.svelte';
@@ -25,17 +29,17 @@
 
 	type Tab = 'general' | 'data' | 'ai' | 'account';
 	let tab = $state<Tab>('general');
-	const tabs: { id: Tab; label: `settings.tabs.${Tab}` }[] = [
-		{ id: 'general', label: 'settings.tabs.general' },
-		{ id: 'data', label: 'settings.tabs.data' },
-		{ id: 'ai', label: 'settings.tabs.ai' },
-		{ id: 'account', label: 'settings.tabs.account' }
-	];
+	const tabs = [
+		{ id: 'general', label: 'settings.tabs.general', icon: SlidersHorizontalIcon },
+		{ id: 'data', label: 'settings.tabs.data', icon: DatabaseIcon },
+		{ id: 'ai', label: 'settings.tabs.ai', icon: CpuIcon },
+		{ id: 'account', label: 'settings.tabs.account', icon: UserRoundIcon }
+	] as const;
 
 	const themeChoices = [
-		{ mode: 'system', label: 'settings.appearance.system' },
-		{ mode: 'light', label: 'settings.appearance.light' },
-		{ mode: 'dark', label: 'settings.appearance.dark' }
+		{ value: 'system', label: 'settings.appearance.system' },
+		{ value: 'light', label: 'settings.appearance.light' },
+		{ value: 'dark', label: 'settings.appearance.dark' }
 	] as const;
 
 	const modeLabels = { private: 'Private', assisted: 'Assisted', myai: 'My AI' } as const;
@@ -100,92 +104,102 @@
 	}
 </script>
 
+{#snippet row(title: string, desc: string | null, control: import('svelte').Snippet)}
+	<div class="flex items-center justify-between gap-6 py-3.5">
+		<div class="min-w-0">
+			<p class="text-sm font-medium">{title}</p>
+			{#if desc}
+				<p class="text-muted-foreground mt-0.5 text-xs leading-relaxed">{desc}</p>
+			{/if}
+		</div>
+		<div class="shrink-0">
+			{@render control()}
+		</div>
+	</div>
+{/snippet}
+
+{#snippet segmented(
+	options: readonly { value: string; text: string }[],
+	active: string,
+	onpick: (value: string) => void
+)}
+	<div class="bg-muted/70 flex gap-0.5 rounded-lg p-0.5">
+		{#each options as opt (opt.value)}
+			<Button
+				variant="ghost"
+				size="xs"
+				class="h-7 rounded-[7px] px-3 {active === opt.value
+					? 'bg-card text-foreground shadow-xs hover:bg-card'
+					: 'text-muted-foreground'}"
+				aria-pressed={active === opt.value}
+				onclick={() => onpick(opt.value)}
+			>
+				{opt.text}
+			</Button>
+		{/each}
+	</div>
+{/snippet}
+
 <Dialog.Root bind:open={uiStore.settingsOpen}>
-	<Dialog.Content class="gap-0 p-0 sm:max-w-3xl">
-		<Dialog.Header class="border-b px-5 py-3.5">
-			<Dialog.Title class="text-base">{t('settings.title')}</Dialog.Title>
+	<Dialog.Content class="gap-0 overflow-hidden p-0 sm:max-w-3xl">
+		<Dialog.Header class="sr-only">
+			<Dialog.Title>{t('settings.title')}</Dialog.Title>
 		</Dialog.Header>
-		<div class="grid h-[540px] max-h-[70svh] grid-cols-[10.5rem_1fr]">
-			<nav class="flex flex-col gap-0.5 border-r p-2">
-				{#each tabs as { id, label } (id)}
-					<Button
-						variant="ghost"
-						size="sm"
-						class="justify-start {tab === id ? 'bg-foreground/7' : 'text-muted-foreground'}"
-						aria-current={tab === id ? 'page' : undefined}
-						onclick={() => (tab = id)}
-					>
-						{t(label)}
-					</Button>
-				{/each}
+		<div class="grid h-[540px] max-h-[70svh] grid-cols-[11.5rem_1fr]">
+			<!-- Rail: tinted like the sidebar, iconed tabs, green accent bar on the
+			     active one — the same signature as the ⌘K selection. -->
+			<nav class="bg-sidebar/60 flex flex-col border-r p-2">
+				<p class="font-display px-3 pt-2 pb-3 text-lg tracking-tight">{t('settings.title')}</p>
+				<div class="flex flex-col gap-0.5">
+					{#each tabs as { id, label, icon: Icon } (id)}
+						<Button
+							variant="ghost"
+							size="sm"
+							class="relative justify-start gap-2.5 {tab === id
+								? 'bg-foreground/7 text-foreground before:bg-ring before:absolute before:top-1/2 before:left-0 before:h-4 before:w-[3px] before:-translate-y-1/2 before:rounded-full'
+								: 'text-muted-foreground'}"
+							aria-current={tab === id ? 'page' : undefined}
+							onclick={() => (tab = id)}
+						>
+							<Icon class="size-4" />
+							{t(label)}
+						</Button>
+					{/each}
+				</div>
+				<p class="text-muted-foreground mt-auto px-3 pb-1 font-mono text-[10px]">Folio</p>
 			</nav>
 			<ScrollArea class="min-h-0">
-				<div class="space-y-6 p-5">
+				<div class="px-6 pt-12 pb-3">
 					{#if tab === 'general'}
-						<section class="space-y-2">
-							<h3 class="text-sm font-semibold">{t('settings.appearance.title')}</h3>
-							<div class="flex gap-2">
-								{#each themeChoices as { mode, label } (mode)}
-									<Button
-										variant={userPrefersMode.current === mode ? 'secondary' : 'outline'}
-										size="sm"
-										onclick={() => setMode(mode)}
-									>
-										{t(label)}
-									</Button>
-								{/each}
-							</div>
-						</section>
+						{#snippet themeControl()}
+							{@render segmented(
+								themeChoices.map((c) => ({ value: c.value, text: t(c.label) })),
+								userPrefersMode.current,
+								(v) => setMode(v as 'light' | 'dark' | 'system')
+							)}
+						{/snippet}
+						{@render row(t('settings.appearance.title'), null, themeControl)}
 						<Separator />
-						<section class="space-y-2">
-							<h3 class="text-sm font-semibold">{t('settings.language.title')}</h3>
-							<div class="flex gap-2">
-								<Button
-									variant={i18n.locale === 'en' ? 'secondary' : 'outline'}
-									size="sm"
-									onclick={() => i18n.setLocale('en')}
-								>
-									English
-								</Button>
-								<Button
-									variant={i18n.locale === 'fr' ? 'secondary' : 'outline'}
-									size="sm"
-									onclick={() => i18n.setLocale('fr')}
-								>
-									Français
-								</Button>
-							</div>
-						</section>
+						{#snippet langControl()}
+							{@render segmented(
+								[
+									{ value: 'en', text: 'English' },
+									{ value: 'fr', text: 'Français' }
+								],
+								i18n.locale,
+								(v) => i18n.setLocale(v as 'en' | 'fr')
+							)}
+						{/snippet}
+						{@render row(t('settings.language.title'), null, langControl)}
 						<Separator />
-						<section class="space-y-2">
-							<h3 class="text-sm font-semibold">{t('settings.font.title')}</h3>
-							<div class="flex gap-2">
-								<Button
-									variant={settingsStore.readingFont === 'default' ? 'secondary' : 'outline'}
-									size="sm"
-									onclick={() => settingsStore.setReadingFont('default')}
-								>
-									{t('settings.font.default')}
-								</Button>
-								<Button
-									variant={settingsStore.readingFont === 'dyslexic' ? 'secondary' : 'outline'}
-									size="sm"
-									onclick={() => settingsStore.setReadingFont('dyslexic')}
-								>
-									{t('settings.font.dyslexic')}
-								</Button>
-							</div>
-						</section>
-						<Separator />
-						<section class="space-y-2">
-							<h3 class="text-sm font-semibold">{t('settings.defaultMode.title')}</h3>
+						{#snippet modeControl()}
 							<Select.Root
 								type="single"
 								value={settingsStore.defaultMode}
 								onValueChange={(v) =>
 									v && settingsStore.setDefaultMode(v as 'private' | 'assisted' | 'myai')}
 							>
-								<Select.Trigger class="w-44">
+								<Select.Trigger class="w-36">
 									{modeLabels[settingsStore.defaultMode]}
 								</Select.Trigger>
 								<Select.Content>
@@ -194,49 +208,42 @@
 									<Select.Item value="myai">My AI</Select.Item>
 								</Select.Content>
 							</Select.Root>
-						</section>
+						{/snippet}
+						{@render row(
+							t('settings.defaultMode.title'),
+							t('modes.private.description'),
+							modeControl
+						)}
 					{:else if tab === 'data'}
-						<section class="space-y-2">
-							<h3 class="text-sm font-semibold">{t('settings.storage.title')}</h3>
-							{#if settingsStore.storage}
-								<p class="text-sm">
-									{t('settings.storage.used', { used: fmtBytes(settingsStore.storage.usage) })}
-									{#if settingsStore.storage.quota}
-										· {t('settings.storage.available', {
-											quota: fmtBytes(settingsStore.storage.quota)
-										})}
-									{/if}
-								</p>
-								{#if settingsStore.storage.persisted}
-									<Badge class="text-[10px]">{t('settings.storage.persistent')}</Badge>
-								{:else}
-									<div class="flex items-center gap-3">
-										<Badge variant="secondary" class="text-[10px]">
-											{t('settings.storage.notPersistent')}
-										</Badge>
-										<Button
-											variant="outline"
-											size="sm"
-											onclick={() => settingsStore.requestPersistence()}
-										>
-											{t('settings.storage.ask')}
-										</Button>
-									</div>
-								{/if}
-							{:else}
-								<p class="text-muted-foreground text-sm">{t('settings.storage.unavailable')}</p>
+						{#snippet storageControl()}
+							{#if settingsStore.storage && !settingsStore.storage.persisted}
+								<Button
+									variant="outline"
+									size="sm"
+									onclick={() => settingsStore.requestPersistence()}
+								>
+									{t('settings.storage.ask')}
+								</Button>
+							{:else if settingsStore.storage?.persisted}
+								<Badge class="text-[10px]">{t('settings.storage.persistent')}</Badge>
 							{/if}
-						</section>
+						{/snippet}
+						{@render row(
+							t('settings.storage.title'),
+							settingsStore.storage
+								? `${t('settings.storage.used', { used: fmtBytes(settingsStore.storage.usage) })}${
+										settingsStore.storage.quota
+											? ` · ${t('settings.storage.available', { quota: fmtBytes(settingsStore.storage.quota) })}`
+											: ''
+									}`
+								: t('settings.storage.unavailable'),
+							storageControl
+						)}
 						<Separator />
-						<section class="flex items-center justify-between gap-4">
-							<div class="min-w-0">
-								<h3 class="text-sm font-semibold">{t('settings.workspace.title')}</h3>
-								<p class="text-muted-foreground text-xs">{t('settings.workspace.exportDesc')}</p>
-							</div>
+						{#snippet exportControl()}
 							<Button
 								variant="outline"
 								size="sm"
-								class="shrink-0"
 								disabled={settingsStore.exporting}
 								onclick={() => settingsStore.exportWorkspace()}
 							>
@@ -244,77 +251,70 @@
 									? t('settings.workspace.packing')
 									: t('settings.workspace.export')}
 							</Button>
-						</section>
+						{/snippet}
+						{@render row(
+							t('settings.workspace.title'),
+							t('settings.workspace.exportDesc'),
+							exportControl
+						)}
 						<Separator />
-						<section class="flex items-center justify-between gap-4">
-							<Label for="force-offline" class="text-sm font-normal">
-								{t('settings.offline.label')}
-							</Label>
+						{#snippet offlineControl()}
 							<Switch
-								id="force-offline"
 								checked={settingsStore.forceOffline}
 								onCheckedChange={(v) => settingsStore.setForceOffline(v === true)}
+								aria-label={t('settings.offline.title')}
 							/>
-						</section>
+						{/snippet}
+						{@render row(t('settings.offline.title'), t('settings.offline.label'), offlineControl)}
 						<Separator />
-						<section class="flex items-center justify-between gap-4">
-							<div class="min-w-0">
-								<h3 class="text-sm font-semibold">{t('settings.deleteChats.title')}</h3>
-								<p class="text-muted-foreground text-xs">{t('settings.deleteChats.desc')}</p>
-							</div>
-							<Button
-								variant="destructive"
-								size="sm"
-								class="shrink-0"
-								onclick={() => (deleteChatsOpen = true)}
-							>
+						{#snippet deleteChatsControl()}
+							<Button variant="destructive" size="sm" onclick={() => (deleteChatsOpen = true)}>
 								{t('settings.deleteChats.cta')}
 							</Button>
-						</section>
+						{/snippet}
+						{@render row(
+							t('settings.deleteChats.title'),
+							t('settings.deleteChats.desc'),
+							deleteChatsControl
+						)}
 						<Separator />
-						<section class="flex items-center justify-between gap-4">
-							<div class="min-w-0">
-								<h3 class="text-sm font-semibold">{t('settings.wipe.title')}</h3>
-								<p class="text-muted-foreground text-xs">{t('settings.wipe.desc')}</p>
-							</div>
-							<Button
-								variant="destructive"
-								size="sm"
-								class="shrink-0"
-								onclick={() => (wipeOpen = true)}
-							>
+						{#snippet wipeControl()}
+							<Button variant="destructive" size="sm" onclick={() => (wipeOpen = true)}>
 								{t('settings.wipe.cta')}
 							</Button>
-						</section>
+						{/snippet}
+						{@render row(t('settings.wipe.title'), t('settings.wipe.desc'), wipeControl)}
 					{:else if tab === 'ai'}
-						<section class="space-y-3">
-							<h3 class="text-sm font-semibold">{t('settings.models.title')}</h3>
+						<div class="py-3.5">
+							<p class="text-sm font-medium">{t('settings.models.title')}</p>
 							{#if modelsStore.cached.length === 0}
-								<p class="text-muted-foreground text-sm">
+								<p class="text-muted-foreground mt-0.5 text-xs">
 									{modelsStore.loading ? t('settings.models.measuring') : t('settings.models.none')}
 								</p>
 							{:else}
-								{#each modelsStore.cached as model (model.cacheName)}
-									<div class="flex items-center justify-between gap-3">
-										<div class="min-w-0">
-											<p class="truncate text-sm">{model.label}</p>
-											<p class="text-muted-foreground font-mono text-[10px]">
-												{model.bytes
-													? fmtBytes(model.bytes)
-													: t('settings.models.files', { count: model.entries })}
-											</p>
+								<div class="mt-2 space-y-2">
+									{#each modelsStore.cached as model (model.cacheName)}
+										<div class="flex items-center justify-between gap-3">
+											<div class="min-w-0">
+												<p class="truncate text-sm">{model.label}</p>
+												<p class="text-muted-foreground font-mono text-[10px]">
+													{model.bytes
+														? fmtBytes(model.bytes)
+														: t('settings.models.files', { count: model.entries })}
+												</p>
+											</div>
+											<Button
+												variant="outline"
+												size="sm"
+												onclick={() => modelsStore.remove(model.cacheName)}
+											>
+												{t('settings.models.delete')}
+											</Button>
 										</div>
-										<Button
-											variant="outline"
-											size="sm"
-											onclick={() => modelsStore.remove(model.cacheName)}
-										>
-											{t('settings.models.delete')}
-										</Button>
-									</div>
-								{/each}
+									{/each}
+								</div>
 							{/if}
-							<div class="flex items-center justify-between gap-3 border-t pt-3">
+							<div class="mt-3 flex items-center justify-between gap-3 border-t pt-3">
 								<p class="text-muted-foreground text-xs">{t('settings.models.benchDesc')}</p>
 								<Button
 									variant="outline"
@@ -329,17 +329,17 @@
 								</Button>
 							</div>
 							{#if modelsStore.benchmark}
-								<p class="text-sm">
+								<p class="mt-2 text-sm">
 									{t('settings.models.tps', { tps: modelsStore.benchmark.tokensPerSecond })} —
 									{modelsStore.benchmark.recommendPrivate
 										? t('settings.models.comfortable')
 										: t('settings.models.slow')}
 								</p>
 							{/if}
-						</section>
+						</div>
 						<Separator />
-						<section class="space-y-3">
-							<h3 class="text-sm font-semibold">{t('settings.myai.title')}</h3>
+						<div class="space-y-3 py-3.5">
+							<p class="text-sm font-medium">{t('settings.myai.title')}</p>
 							<div class="space-y-2">
 								<Label for="myai-url" class="text-xs font-normal">{t('myai.baseUrl')}</Label>
 								<Input
@@ -385,72 +385,65 @@
 								</Select.Root>
 							{/if}
 							<p class="text-muted-foreground text-xs">{t('myai.direct')}</p>
-						</section>
+						</div>
 						<Separator />
-						<section class="space-y-1">
-							<h3 class="text-sm font-semibold">Assisted</h3>
-							{#if settingsStore.quota}
-								<p class="text-sm">
-									{t('settings.workspace.quota', {
+						{#snippet quotaControl()}{/snippet}
+						{@render row(
+							'Assisted',
+							settingsStore.quota
+								? t('settings.workspace.quota', {
 										used: settingsStore.quota.used,
 										limit: settingsStore.quota.limit
-									})}
-								</p>
-							{:else}
-								<p class="text-muted-foreground text-xs">{t('settings.workspace.quotaSignIn')}</p>
-							{/if}
-						</section>
+									})
+								: t('settings.workspace.quotaSignIn'),
+							quotaControl
+						)}
+					{:else if sessionStore.user}
+						{#snippet signOutControl()}
+							<Button
+								variant="outline"
+								size="sm"
+								onclick={async () => {
+									await sessionStore.signOut();
+									await sessionStore.refresh();
+								}}
+							>
+								{t('account.signOut')}
+							</Button>
+						{/snippet}
+						{@render row(t('account.signedInAs'), sessionStore.user.email, signOutControl)}
+						<Separator />
+						{#snippet logoutAllControl()}
+							<Button variant="outline" size="sm" disabled={busy} onclick={logoutAll}>
+								{t('settings.account.logoutAll')}
+							</Button>
+						{/snippet}
+						{@render row(t('settings.account.logoutAll'), null, logoutAllControl)}
+						<Separator />
+						{#snippet deleteAccountControl()}
+							<Button variant="destructive" size="sm" onclick={() => (deleteAccountOpen = true)}>
+								{t('settings.account.deleteCta')}
+							</Button>
+						{/snippet}
+						{@render row(
+							t('settings.account.deleteTitle'),
+							t('settings.account.deleteDesc'),
+							deleteAccountControl
+						)}
 					{:else}
-						<section class="space-y-2">
-							<h3 class="text-sm font-semibold">{t('settings.tabs.account')}</h3>
-							{#if sessionStore.user}
-								<p class="text-sm">{t('account.signedInAs')} {sessionStore.user.email}</p>
-								<div class="flex flex-wrap gap-2 pt-1">
-									<Button
-										variant="outline"
-										size="sm"
-										onclick={async () => {
-											await sessionStore.signOut();
-											await sessionStore.refresh();
-										}}
-									>
-										{t('account.signOut')}
-									</Button>
-									<Button variant="outline" size="sm" disabled={busy} onclick={logoutAll}>
-										{t('settings.account.logoutAll')}
-									</Button>
-								</div>
-								<Separator class="my-4" />
-								<div class="flex items-center justify-between gap-4">
-									<div class="min-w-0">
-										<h3 class="text-sm font-semibold">{t('settings.account.deleteTitle')}</h3>
-										<p class="text-muted-foreground text-xs">
-											{t('settings.account.deleteDesc')}
-										</p>
-									</div>
-									<Button
-										variant="destructive"
-										size="sm"
-										class="shrink-0"
-										onclick={() => (deleteAccountOpen = true)}
-									>
-										{t('settings.account.deleteCta')}
-									</Button>
-								</div>
-							{:else}
-								<p class="text-muted-foreground text-sm">{t('settings.account.guest')}</p>
-								<Button
-									variant="outline"
-									size="sm"
-									onclick={() => {
-										uiStore.settingsOpen = false;
-										location.assign('/chat/account');
-									}}
-								>
-									{t('menu.signIn')}
-								</Button>
-							{/if}
-						</section>
+						{#snippet signInControl()}
+							<Button
+								variant="outline"
+								size="sm"
+								onclick={() => {
+									uiStore.settingsOpen = false;
+									location.assign('/chat/account');
+								}}
+							>
+								{t('menu.signIn')}
+							</Button>
+						{/snippet}
+						{@render row(t('settings.tabs.account'), t('settings.account.guest'), signInControl)}
 					{/if}
 				</div>
 			</ScrollArea>

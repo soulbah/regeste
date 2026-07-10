@@ -281,7 +281,7 @@ export const en = {
 	'settings.week.privacyReport': 'Privacy Report',
 	'settings.week.howEachMode': 'how each mode works:',
 	'settings.week.dataFlows': 'data flows',
-	'settings.language.title': 'Language / Langue',
+	'settings.language.title': 'Language',
 	'addDocs.menuAria': 'Add documents and actions',
 	'composer.enterHint': '⏎ send · ⇧⏎ new line',
 	'composer.sendAria': 'Send',
@@ -310,9 +310,6 @@ export const en = {
 	'settings.tabs.data': 'Data',
 	'settings.tabs.ai': 'AI',
 	'settings.tabs.account': 'Account',
-	'settings.font.title': 'Reading font',
-	'settings.font.default': 'Default',
-	'settings.font.dyslexic': 'Dyslexia-friendly',
 	'settings.defaultMode.title': 'Default mode for new chats',
 	'settings.deleteChats.title': 'Delete all chats',
 	'settings.deleteChats.desc':

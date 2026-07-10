@@ -397,9 +397,7 @@
 								</span>
 							</div>
 							{#if chatsStore.streamingText}
-								<p
-									class="text-sm whitespace-pre-wrap leading-(--reading-leading) tracking-(--reading-tracking) [word-spacing:var(--reading-word)]"
-								>
+								<p class="text-sm leading-relaxed whitespace-pre-wrap">
 									{chatsStore.streamingText}
 								</p>
 							{:else}

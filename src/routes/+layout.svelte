@@ -73,15 +73,6 @@
 		}
 	});
 
-	// Spec 021 — reading treatment follows the setting (answer prose only).
-	$effect(() => {
-		if (settingsStore.readingFont === 'dyslexic') {
-			document.documentElement.dataset.reading = 'dyslexic';
-		} else {
-			delete document.documentElement.dataset.reading;
-		}
-	});
-
 	// Keep the active chat's document panel live while ingestion progresses.
 	$effect(() => {
 		void documentsStore.documents;

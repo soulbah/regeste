@@ -292,7 +292,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'settings.week.privacyReport': 'Rapport de confidentialité',
 	'settings.week.howEachMode': 'fonctionnement de chaque mode :',
 	'settings.week.dataFlows': 'flux de données',
-	'settings.language.title': 'Language / Langue',
+	'settings.language.title': 'Langue',
 	'addDocs.menuAria': 'Ajouter des documents et des actions',
 	'composer.enterHint': '⏎ envoyer · ⇧⏎ à la ligne',
 	'composer.sendAria': 'Envoyer',
@@ -321,9 +321,6 @@ export const fr: Record<keyof typeof en, string> = {
 	'settings.tabs.data': 'Données',
 	'settings.tabs.ai': 'IA',
 	'settings.tabs.account': 'Compte',
-	'settings.font.title': 'Police de lecture',
-	'settings.font.default': 'Par défaut',
-	'settings.font.dyslexic': 'Adaptée à la dyslexie',
 	'settings.defaultMode.title': 'Mode par défaut des nouvelles discussions',
 	'settings.deleteChats.title': 'Supprimer toutes les discussions',
 	'settings.deleteChats.desc':
