@@ -20,6 +20,8 @@
 	import Trash2Icon from '@lucide/svelte/icons/trash-2';
 	import InfoIcon from '@lucide/svelte/icons/info';
 	import DocumentSheet from '$lib/components/document-sheet.svelte';
+	import { dev } from '$app/environment';
+	import { page } from '$app/state';
 	import { t } from '$lib/i18n/index.svelte';
 	import { documentsStore } from '$lib/state/documents.svelte';
 	import type { LibraryDocument } from '$lib/types';
@@ -33,6 +35,44 @@
 	let sortBy = $state<'recent' | 'name' | 'size'>('recent');
 	let typeFilter = $state<'all' | 'pdf' | 'docx' | 'md' | 'txt'>('all');
 
+	// Dev-only display mocks: /chat/documents?mock renders fake rows so the
+	// page can be reviewed without ingesting anything. Display only — the
+	// row actions hit the real (empty) store and do nothing.
+	const MOCK_DOCS: LibraryDocument[] = [
+		mock('contrat-de-bail-2026.pdf', 412_688, 14, 'ready', 3, 8),
+		mock('cgv-fournisseur-cloud.pdf', 189_204, 6, 'ready', 1, 6),
+		mock('accord-de-confidentialite.docx', 48_112, 4, 'ready', 2, 4),
+		mock('notes-reunion-produit-q3.md', 3_920, null, 'ready', 0, 2),
+		mock('facture-cabinet-conseil.pdf', 92_530, 1, 'embedding', 0, 1),
+		mock('politique-teletravail.txt', 2_480, null, 'ready', 1, 0)
+	];
+	function mock(
+		name: string,
+		size: number,
+		pages: number | null,
+		status: LibraryDocument['status'],
+		chatCount: number,
+		daysAgo: number
+	): LibraryDocument {
+		return {
+			id: `mock-${name}`,
+			hash: name,
+			name,
+			mime: '',
+			size,
+			pages,
+			status,
+			error: null,
+			embeddingModel: null,
+			language: 'fr',
+			createdAt: Date.now() - daysAgo * 86_400_000,
+			updatedAt: Date.now(),
+			chatCount
+		};
+	}
+	const useMocks = $derived(dev && page.url.searchParams.has('mock'));
+	const library = $derived(useMocks ? MOCK_DOCS : documentsStore.library);
+
 	function docType(doc: LibraryDocument): 'pdf' | 'docx' | 'md' | 'txt' {
 		const n = doc.name.toLowerCase();
 		if (n.endsWith('.pdf')) return 'pdf';
@@ -42,7 +82,7 @@
 	}
 
 	const shown = $derived.by(() => {
-		let docs = documentsStore.library;
+		let docs = library;
 		if (typeFilter !== 'all') docs = docs.filter((d) => docType(d) === typeFilter);
 		const q = query.trim().toLowerCase();
 		if (q) docs = docs.filter((d) => d.name.toLowerCase().includes(q));
@@ -95,19 +135,20 @@
 		<div class="min-w-0 px-1">
 			<h1 class="font-display text-lg tracking-tight">{t('docs.title')}</h1>
 			<p class="text-muted-foreground text-xs">
-				{t('docsPage.count', { count: documentsStore.library.length })}
+				{t('docsPage.count', { count: library.length })}
 			</p>
 		</div>
 	</header>
 
-	{#if documentsStore.library.length === 0}
+	{#if library.length === 0}
 		<!-- The privacy pitch lives here, said once, where it can still convince. -->
 		<div class="flex flex-1 flex-col items-center justify-center gap-4 px-6 pb-16">
 			<FilesIcon class="text-muted-foreground size-10" />
 			<h2 class="font-display text-2xl tracking-tight">{t('docsPage.emptyTitle')}</h2>
-			<p class="text-muted-foreground max-w-md text-center text-sm">
-				{t('docsPage.intro')}
-			</p>
+			<div class="max-w-md space-y-2 text-center">
+				<p class="text-muted-foreground text-sm">{t('docsPage.intro')}</p>
+				<p class="text-muted-foreground text-sm">{t('docsPage.introAction')}</p>
+			</div>
 			<Button class="gap-2" onclick={() => fileInput?.click()}>
 				<PlusIcon class="size-4" />
 				{t('docsPage.add')}

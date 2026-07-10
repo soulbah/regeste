@@ -224,7 +224,9 @@ export const en = {
 
 	// Documents page
 	'docsPage.count': '{count} in your workspace',
-	'docsPage.intro': 'Your documents stay on this device. Attach one to a chat to ask questions.',
+	'docsPage.intro':
+		'Everything you add is read and indexed right in your browser, and never leaves it. Your library stays searchable at any time, even offline.',
+	'docsPage.introAction': 'Add a document to a chat to start asking questions.',
 	'docsPage.add': 'Add documents',
 	'docsPage.sortRecent': 'Most recent',
 	'docsPage.sortName': 'Name',

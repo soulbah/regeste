@@ -234,7 +234,8 @@ export const fr: Record<keyof typeof en, string> = {
 	// Documents page
 	'docsPage.count': '{count} dans votre espace de travail',
 	'docsPage.intro':
-		'Vos documents restent sur cet appareil. Joignez-en un à une discussion pour poser vos questions.',
+		"Chaque document est lu et indexé dans votre navigateur, rien n'en sort. Votre bibliothèque reste consultable même hors ligne.",
+	'docsPage.introAction': 'Ajoutez un document à une discussion pour poser vos questions.',
 	'docsPage.add': 'Ajouter des documents',
 	'docsPage.sortRecent': 'Plus récents',
 	'docsPage.sortName': 'Nom',
