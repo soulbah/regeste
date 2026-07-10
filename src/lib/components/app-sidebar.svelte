@@ -137,6 +137,16 @@
 			</Sidebar.MenuItem>
 			<Sidebar.MenuItem>
 				<Sidebar.MenuButton
+					tooltipContent={`${t('sidebar.search')} · ⌘K`}
+					onclick={() => searchStore.toggle()}
+				>
+					<SearchIcon />
+					<span>{t('sidebar.search')}</span>
+					<span class="text-muted-foreground ml-auto font-mono text-[10px]">⌘K</span>
+				</Sidebar.MenuButton>
+			</Sidebar.MenuItem>
+			<Sidebar.MenuItem>
+				<Sidebar.MenuButton
 					tooltipContent={t('sidebar.documents')}
 					isActive={page.url.pathname === '/chat/documents'}
 				>
@@ -145,16 +155,6 @@
 							<FolderIcon /> <span>{t('sidebar.documents')}</span>
 						</a>
 					{/snippet}
-				</Sidebar.MenuButton>
-			</Sidebar.MenuItem>
-			<Sidebar.MenuItem>
-				<Sidebar.MenuButton
-					tooltipContent={`${t('sidebar.search')} · ⌘K`}
-					onclick={() => searchStore.toggle()}
-				>
-					<SearchIcon />
-					<span>{t('sidebar.search')}</span>
-					<span class="text-muted-foreground ml-auto font-mono text-[10px]">⌘K</span>
 				</Sidebar.MenuButton>
 			</Sidebar.MenuItem>
 		</Sidebar.Menu>
