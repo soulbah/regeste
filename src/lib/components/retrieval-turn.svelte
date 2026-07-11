@@ -60,10 +60,13 @@
 </script>
 
 <div class="space-y-2">
-	<!-- Matching passages sit on top, as in a real answer where the sources
-	     strip precedes the prose. The notice below stands in for the answer a
-	     ready AI mode would write. -->
+	<!-- The sources sit on top, labelled so the chips explain themselves, as in a
+	     real answer where the sources strip precedes the prose. The notice below
+	     stands in for the answer a ready AI mode would write. -->
 	{#if parsed.hits.length}
+		<p class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
+			{t('retrieval.found')}
+		</p>
 		<div class="flex flex-wrap gap-1.5">
 			{#each parsed.hits.slice(0, 6) as hit (hit.chunkId)}
 				<Tooltip.Provider delayDuration={400}>

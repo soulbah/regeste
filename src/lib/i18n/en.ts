@@ -8,7 +8,7 @@ export const en = {
 	'disabled.chooseMode': 'Choose an AI mode first.',
 	'disabled.needUrl': 'Enter the base URL first.',
 	'disabled.emptyMessage': 'Write a message first.',
-	'disabled.indexing': 'This document is still indexing.',
+	'disabled.indexing': 'This document is still being prepared.',
 	'disabled.needEmail': 'Enter a valid email first.',
 	'disabled.selectExcerpts': 'Select at least one excerpt.',
 	'disabled.consentFirst': 'Accept sending excerpts first.',
@@ -26,7 +26,7 @@ export const en = {
 	'sidebar.newChat': 'New chat',
 	'sidebar.documents': 'Documents',
 	'sidebar.search': 'Search',
-	'sidebar.privacyReport': 'Privacy Report',
+	'sidebar.privacyReport': 'Privacy report',
 	'sidebar.settings': 'Settings',
 	'sidebar.pinned': 'Pinned',
 	'sidebar.today': 'Today',
@@ -79,7 +79,7 @@ export const en = {
 	'modes.assisted.description': 'Only relevant excerpts are processed online.',
 	'modes.myai.description': 'Use your own configured AI provider.',
 	'modes.best': 'Best for this device',
-	'modes.bestReason.noGpu': 'no GPU access in this browser',
+	'modes.bestReason.noGpu': "this browser can't run the AI on your device",
 	'modes.bestReason.local': 'this device can run the AI locally',
 	'modes.private.checking': 'Checking this device…',
 	'modes.private.unavailable': 'Unavailable on this device',
@@ -132,14 +132,14 @@ export const en = {
 
 	// Document ingest statuses
 	'status.ready': 'Ready',
-	'status.indexing': 'Indexing',
+	'status.indexing': 'Preparing',
 	'status.reading': 'Reading',
 	'status.splitting': 'Splitting',
-	'status.scanned': 'No extractable text. OCR is not supported yet',
+	'status.scanned': "This looks like a scanned image, so there's no text to read yet",
 
 	// Pre-send review panel
 	'presend.title': 'Before it leaves',
-	'presend.subtitle': 'Review what the AI will see',
+	'presend.subtitle': 'Review what leaves your device',
 	'presend.question': 'Your question',
 	'presend.excerpts': 'Excerpts found in your documents',
 	'presend.weak': 'These passages barely match the question. The answer may be unreliable.',
@@ -147,34 +147,34 @@ export const en = {
 	'presend.match': 'match {pct}%',
 	'presend.firstTime': 'First time anything leaves this device',
 	'presend.firstTimeBody':
-		'Until now, everything happened locally. Sending this transmits your question and the checked excerpts to the Assisted service, never your files. It answers and forgets; nothing is stored or logged.',
+		'Until now, everything happened on your device. Sending this transmits your question and the checked excerpts to the Assisted service, never your files. You get your answer back, and nothing is stored or logged.',
 	'presend.consent': 'I understand, continue',
 	'presend.count': '{selected}/{total} excerpts · {kb} KB',
 	'presend.footer': 'Only the checked excerpts and your question are sent. Your files stay here.',
 
 	// Answer turn
-	'turn.whatAiSaw': 'What AI saw',
+	'turn.whatAiSaw': 'What the AI received',
 	'turn.openSourceAria': 'Open source {n}',
 	'turn.copied': 'Copied',
 	'turn.copy': 'Copy',
 	'turn.regenerate': 'Try again',
-	'turn.closest': 'Closest passages, none supported an answer',
+	'turn.closest': 'Closest sources, none supported an answer',
 
-	// Retrieval preview turn — the reason line adapts to why no AI answered.
-	'retrieval.reason.download':
-		'Download the on-device model to turn these passages into a written answer.',
-	'retrieval.reason.setup': 'Set up this mode to turn these passages into a written answer.',
-	'retrieval.reason.loading': 'The on-device model is still loading, so try again in a moment.',
-	'retrieval.reason.ready': 'Ask again to get a written answer from these passages.',
-	'retrieval.reason.generic': 'Turn on a ready AI mode to get a written answer.',
-	'retrieval.noDocs':
-		'No documents in this chat. Attach one to search it; AI answers from general knowledge arrive with the AI modes.',
-	'retrieval.noHits': 'No passage in the attached documents matches this closely.',
-	'retrieval.weak': 'These passages barely match the question. An answer may be unreliable.',
-	'retrieval.openAria': 'Open {name} at this passage',
+	// Retrieval preview turn — plain language; the reason adapts to why no answer
+	// was written, and points at the documents (source chips) the user sees.
+	'retrieval.found': 'Found in your documents',
+	'retrieval.reason.download': 'Download the on-device AI for a written answer.',
+	'retrieval.reason.setup': 'Set up this mode for a written answer.',
+	'retrieval.reason.loading': 'The on-device AI is getting ready, try again in a moment.',
+	'retrieval.reason.ready': 'Ask again for a written answer.',
+	'retrieval.reason.generic': 'Turn on an AI mode for a written answer.',
+	'retrieval.noDocs': 'No documents in this chat. Add one to ask questions about it.',
+	'retrieval.noHits': 'Nothing in your documents matches this question.',
+	'retrieval.weak': 'These sources barely match the question. An answer may be unreliable.',
+	'retrieval.openAria': 'Open {name}',
 
 	// What AI saw panel
-	'wais.title': 'What AI saw',
+	'wais.title': 'What the AI received',
 	'wais.subtitle': 'For this answer · recorded locally',
 	'wais.destination': 'Destination',
 	'wais.device': 'this device, nothing sent',
@@ -195,9 +195,9 @@ export const en = {
 		'This document was removed from your library. The citation kept a snapshot of the passage:',
 	'viewer.missing': 'Original file unavailable',
 	'viewer.missingBody':
-		"The original file could not be read from this device's storage. Here is the indexed passage:",
+		"The original file could not be read from this device's storage. Here is the saved passage:",
 	'viewer.missingPdfBody':
-		"The original PDF could not be read from this device's storage. Here is the indexed passage:",
+		"The original PDF could not be read from this device's storage. Here is the saved passage:",
 	'viewer.prevAria': 'Previous page',
 	'viewer.nextAria': 'Next page',
 	'viewer.pageOf': 'page {n} / {total}',
@@ -205,7 +205,7 @@ export const en = {
 
 	// Home (new chat)
 	'home.headline': 'Chat with your private documents.',
-	'home.sub': 'Add documents, ask questions, and see exactly what the AI can access.',
+	'home.sub': 'Add documents, ask questions, and see exactly what gets shared.',
 	'home.demoPreparing': 'Preparing the demo…',
 	'home.demoCta': 'Try with a sample contract',
 	'home.demoTitle': 'Demo · sample contract',
@@ -220,8 +220,8 @@ export const en = {
 	'chat.fromSections': "From your document's sections",
 	'chat.editAria': 'Edit this question',
 	'chat.reviewing': 'Waiting for your review in the side panel',
-	'chat.writing': 'Writing…',
-	'chat.reading': 'Reading your documents…',
+	'chat.writing': 'Preparing your answer…',
+	'chat.reading': 'Searching your documents…',
 	'chat.stop': 'Stop',
 	'chat.meta': '{count} excerpt{s} · {kb} KB · {dest}',
 	'chat.editedAria': 'Edited question',
@@ -230,7 +230,7 @@ export const en = {
 	// Documents page
 	'docsPage.count': '{count} in your workspace',
 	'docsPage.intro':
-		'Everything you add is read and indexed right in your browser, and never leaves it. Your library stays searchable at any time, even offline.',
+		'Everything you add is read right in your browser and never leaves it. Your library stays searchable at any time, even offline.',
 	'docsPage.introAction': 'Add a document to a chat to start asking questions.',
 	'docsPage.add': 'Add documents',
 	'docsPage.sortRecent': 'Most recent',
@@ -253,7 +253,7 @@ export const en = {
 	'docsPage.deleteTitle': 'Delete "{name}" from this device?',
 	'docsPage.usedIn': 'This document is used in {count} chat{s}.',
 	'docsPage.deleteBody':
-		'The file, its index and its embeddings will be permanently removed. This cannot be undone.',
+		'The file and its search data will be permanently removed. This cannot be undone.',
 	'docsPage.deleteConfirm': 'Delete permanently',
 
 	// Document sheet
@@ -261,7 +261,7 @@ export const en = {
 	'sheet.size': 'Size',
 	'sheet.pages': 'Pages',
 	'sheet.indexed': 'Indexed',
-	'sheet.model': 'Embedding model',
+	'sheet.model': 'Indexed with',
 	'sheet.fingerprint': 'Fingerprint',
 	'sheet.replacedLabel': 'Replaced',
 	'sheet.times': '{count} time{s}',
@@ -294,7 +294,7 @@ export const en = {
 	'settings.week.title': 'Shared this week',
 	'settings.week.nothing': 'Nothing left this device in the last 7 days.',
 	'settings.week.fullHistory': 'Full history in the',
-	'settings.week.privacyReport': 'Privacy Report',
+	'settings.week.privacyReport': 'Privacy report',
 	'settings.week.howEachMode': 'how each mode works:',
 	'settings.week.dataFlows': 'data flows',
 	'settings.language.title': 'Language',
@@ -331,12 +331,12 @@ export const en = {
 		'Removes every chat, its citations and its privacy history from this device. Documents stay in your library.',
 	'settings.deleteChats.cta': 'Delete all chats',
 	'settings.deleteChats.confirmTitle': 'Delete all chats?',
-	'settings.myai.title': 'My AI endpoint',
+	'settings.myai.title': 'My AI server',
 	'settings.myai.connection': 'Connection',
 	'settings.myai.model': 'Default model',
 	'settings.models.benchTitle': 'Speed test',
 	'settings.ai.use': 'Use this mode',
-	'settings.ai.model.title': 'Local model',
+	'settings.ai.model.title': 'Local AI',
 	'settings.ai.download': 'Download',
 	'settings.ai.load': 'Load',
 	'settings.ai.status.ready': 'ready',
@@ -374,35 +374,35 @@ export const en = {
 	'settings.workspace.export': 'Export my workspace',
 	'settings.workspace.quota': 'Assisted usage this month: {used} / {limit}',
 	'settings.workspace.quotaSignIn': "Assisted usage appears here once you're signed in.",
-	'settings.models.title': 'AI models on this device',
+	'settings.models.title': 'Downloaded AI on this device',
 	'settings.models.measuring': 'Measuring…',
-	'settings.models.none': 'No models downloaded yet.',
+	'settings.models.none': 'Nothing downloaded yet.',
 	'settings.models.files': '{count} files',
 	'settings.models.delete': 'Delete',
 	'settings.models.benchDesc':
-		'A short private generation measures how fast this device runs the local AI.',
+		'A short private test measures how fast this device runs the local AI.',
 	'settings.models.testing': 'Testing…',
 	'settings.models.test': 'Test my device',
 	'settings.models.prepareFirst': 'Prepare the private AI first (mode selector → Private).',
-	'settings.models.tps': '{tps} tokens/second',
+	'settings.models.tps': '{tps} words a second',
 	'settings.models.comfortable': 'this device runs Private mode comfortably.',
 	'settings.models.slow': 'this device is slow for Private mode; Assisted will feel much faster.',
 	'settings.wipe.title': 'Delete everything',
 	'settings.wipe.desc':
-		'Erases every document, chat, index and downloaded model from this device. Nothing exists anywhere else, so this cannot be undone.',
+		'Erases every document, chat, search index and downloaded AI from this device. Nothing exists anywhere else, so this cannot be undone.',
 	'settings.wipe.cta': 'Delete everything on this device',
 	'settings.wipe.last': 'Last confirmation',
 	'settings.wipe.confirmTitle': 'Delete everything on this device?',
 	'settings.wipe.armedBody':
-		'This permanently destroys every document, chat, index and downloaded model stored in this browser. Nothing exists anywhere else. Really delete?',
+		'This permanently destroys every document, chat, index and downloaded AI stored in this browser. Nothing exists anywhere else. Really delete?',
 	'settings.wipe.body':
-		'Documents, chats, search indexes and AI models will be erased from this browser. Your account survives; it holds no content.',
+		'Documents, chats, search indexes and downloaded AI will be erased from this browser. Your account survives; it holds no content.',
 	'settings.wipe.erasing': 'Erasing…',
 	'settings.wipe.confirm': 'Yes, erase it all',
 	'settings.wipe.continue': 'Continue',
 
 	// Privacy Report
-	'privacy.title': 'Privacy Report',
+	'privacy.title': 'Privacy report',
 	'privacy.subtitle': "Everything that left this device, or didn't",
 	'privacy.export': 'Export JSON',
 	'privacy.nothing': 'Nothing has left this device.',
@@ -418,12 +418,12 @@ export const en = {
 	'hiw.title': 'How your data flows',
 	'hiw.subtitle': 'Per mode · verifiable in the source',
 	'hiw.intro':
-		'Your documents are parsed, indexed and searched in this browser. The modes differ on one point: who writes the answer, and so what has to leave.',
+		'Your documents are read, indexed and searched in this browser. The modes differ on one point: who writes the answer, and so what has to leave.',
 	'hiw.whatLeaves': 'What leaves',
 	'hiw.whatStays': 'What stays',
 	'hiw.server': 'The server',
-	'hiw.private.leaves': 'Nothing. The model runs in your browser (one-time download).',
-	'hiw.private.stays': 'Documents, index, chats, the AI model, your questions and answers.',
+	'hiw.private.leaves': 'Nothing. The private AI runs in your browser (one-time download).',
+	'hiw.private.stays': 'Documents, index, chats, the private AI, your questions and answers.',
 	'hiw.private.server': 'Never contacted for answering. No account needed.',
 	'hiw.assisted.leaves':
 		'Your question and the excerpts you approved in the review step. Never full documents, never file names.',
@@ -431,14 +431,14 @@ export const en = {
 	'hiw.assisted.server':
 		'Relays the excerpts to the AI and streams the answer back. Stores your email, plan and a usage counter. Never stores or logs content.',
 	'hiw.myai.leaves':
-		'Your question plus the relevant excerpts, sent straight to the endpoint you configured.',
+		'Your question plus the relevant excerpts, sent straight to the AI server you configured.',
 	'hiw.myai.stays': 'Documents, index, chats.',
-	'hiw.myai.server': 'No server in between. Traffic goes from your browser to your endpoint.',
+	'hiw.myai.server': 'No server in between. Traffic goes from your browser to your AI server.',
 	'hiw.pipeline': 'The pipeline',
 	'hiw.step.document': 'Your document',
-	'hiw.step.parsing': 'Parsing',
-	'hiw.step.chunking': 'Chunking',
-	'hiw.step.embeddings': 'Embeddings',
+	'hiw.step.parsing': 'Reading',
+	'hiw.step.chunking': 'Splitting',
+	'hiw.step.embeddings': 'Encoding',
 	'hiw.step.index': 'Local index',
 	'hiw.step.question': 'Your question',
 	'hiw.step.search': 'Local search',
@@ -450,7 +450,7 @@ export const en = {
 		'Only the mode step decides whether anything leaves, and only Assisted and My AI send the selected passages.',
 	'hiw.proofTitle': 'Check it yourself',
 	'hiw.proofBody':
-		'Prepare Private mode, then turn off Wi-Fi and ask again. Parsing, search and the answer keep working.',
+		'Prepare Private mode, then turn off Wi-Fi and ask again. Reading, search and the answer keep working.',
 	'hiw.footer':
 		'The code is open source. Inspect it, self-host it, or stay in Private mode with the network off.',
 
@@ -471,8 +471,8 @@ export const en = {
 
 	// Toasts (layout + uploads)
 	'toast.ready': '{name} is ready',
-	'toast.failed': '{name} could not be indexed',
-	'toast.failedScanned': 'No extractable text. OCR is not supported yet.',
+	'toast.failed': "{name} couldn't be added",
+	'toast.failedScanned': "No text found. Scanned documents aren't supported yet.",
 	'toast.failedGeneric': 'Something went wrong while reading this file.',
 	'toast.added': '{name} added to My documents',
 	'toast.addedDesc': 'Available to every chat, stored on this device.',
@@ -486,7 +486,7 @@ export const en = {
 	'notice.retry': 'Retry',
 	'notice.stopped': 'Generation stopped before an answer came through.',
 	'notice.myaiUnreachable':
-		'Your AI endpoint is unreachable. Check that it is running, the URL, and its CORS settings.',
+		'Your AI server is unreachable. Check that it is running, plus the URL and its CORS settings.',
 	'notice.quota': 'Monthly Assisted quota reached. It resets next month.',
 	'notice.signIn': 'Sign in to use Assisted mode.',
 	'notice.assistedDown': 'The Assisted service is unavailable right now.',

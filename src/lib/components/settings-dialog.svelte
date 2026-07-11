@@ -472,7 +472,9 @@
 										{@render row(
 											t('settings.models.benchTitle'),
 											modelsStore.benchmark
-												? `${t('settings.models.tps', { tps: modelsStore.benchmark.tokensPerSecond })} — ${
+												? `${t('settings.models.tps', {
+														tps: Math.round(modelsStore.benchmark.tokensPerSecond * 0.75)
+													})} · ${
 														modelsStore.benchmark.recommendPrivate
 															? t('settings.models.comfortable')
 															: t('settings.models.slow')

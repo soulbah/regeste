@@ -11,7 +11,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'disabled.chooseMode': "Choisissez d'abord un mode IA.",
 	'disabled.needUrl': "Renseignez d'abord l'URL de base.",
 	'disabled.emptyMessage': "Écrivez d'abord un message.",
-	'disabled.indexing': "Ce document est encore en cours d'indexation.",
+	'disabled.indexing': 'Ce document est encore en cours de préparation.',
 	'disabled.needEmail': "Saisissez d'abord un email valide.",
 	'disabled.selectExcerpts': 'Sélectionnez au moins un passage.',
 	'disabled.consentFirst': "Acceptez d'abord l'envoi des passages.",
@@ -82,7 +82,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'modes.assisted.description': 'Seuls les extraits pertinents sont traités en ligne.',
 	'modes.myai.description': "Utilisez votre propre fournisseur d'IA.",
 	'modes.best': 'Idéal pour cet appareil',
-	'modes.bestReason.noGpu': "pas d'accès GPU dans ce navigateur",
+	'modes.bestReason.noGpu': "ce navigateur ne peut pas exécuter l'IA sur votre appareil",
 	'modes.bestReason.local': "cet appareil peut exécuter l'IA localement",
 	'modes.private.checking': 'Vérification de cet appareil…',
 	'modes.private.unavailable': 'Indisponible sur cet appareil',
@@ -136,14 +136,14 @@ export const fr: Record<keyof typeof en, string> = {
 
 	// Document ingest statuses
 	'status.ready': 'Prêt',
-	'status.indexing': 'Indexation',
+	'status.indexing': 'Préparation',
 	'status.reading': 'Lecture',
 	'status.splitting': 'Découpage',
-	'status.scanned': 'Aucun texte extractible. OCR pas encore pris en charge',
+	'status.scanned': "Ce document semble être une image scannée : aucun texte à lire pour l'instant",
 
 	// Pre-send review panel
 	'presend.title': 'Avant que ça parte',
-	'presend.subtitle': "Vérifiez ce que l'IA va voir",
+	'presend.subtitle': 'Vérifiez ce qui quitte votre appareil',
 	'presend.question': 'Votre question',
 	'presend.excerpts': 'Extraits trouvés dans vos documents',
 	'presend.weak':
@@ -152,39 +152,37 @@ export const fr: Record<keyof typeof en, string> = {
 	'presend.match': 'pertinence {pct}%',
 	'presend.firstTime': 'Première fois que quelque chose quitte cet appareil',
 	'presend.firstTimeBody':
-		"Jusqu'ici, tout s'est passé localement. Cet envoi transmet votre question et les extraits cochés au service Assisted, jamais vos fichiers. Il répond et oublie ; rien n'est stocké ni journalisé.",
+		"Jusqu'ici, tout s'est passé sur votre appareil. Cet envoi transmet votre question et les extraits cochés au service Assisted, jamais vos fichiers. Vous recevez votre réponse, et rien n'est stocké ni journalisé.",
 	'presend.consent': "J'ai compris, continuer",
 	'presend.count': '{selected}/{total} extraits · {kb} Ko',
 	'presend.footer':
 		'Seuls les extraits cochés et votre question sont envoyés. Vos fichiers restent ici.',
 
 	// Answer turn
-	'turn.whatAiSaw': "Ce que l'IA a vu",
+	'turn.whatAiSaw': "Ce que l'IA a reçu",
 	'turn.openSourceAria': 'Ouvrir la source {n}',
 	'turn.copied': 'Copié',
 	'turn.copy': 'Copier',
 	'turn.regenerate': 'Réessayer',
-	'turn.closest': "Passages les plus proches, aucun n'a permis de répondre",
+	'turn.closest': "Sources les plus proches, aucune n'a permis de répondre",
 
-	// Retrieval preview turn — la ligne de raison s'adapte à pourquoi aucune IA n'a répondu.
-	'retrieval.reason.download':
-		'Téléchargez le modèle sur votre appareil pour transformer ces passages en réponse rédigée.',
-	'retrieval.reason.setup': 'Configurez ce mode pour transformer ces passages en réponse rédigée.',
-	'retrieval.reason.loading':
-		'Le modèle sur votre appareil se charge encore, réessayez dans un instant.',
-	'retrieval.reason.ready':
-		'Reposez la question pour obtenir une réponse rédigée à partir de ces passages.',
-	'retrieval.reason.generic': 'Activez un mode IA prêt pour obtenir une réponse rédigée.',
+	// Retrieval preview turn — langage clair ; la raison s'adapte à pourquoi aucune
+	// réponse n'a été rédigée, et pointe vers les documents (chips-sources) affichés.
+	'retrieval.found': 'Trouvé dans vos documents',
+	'retrieval.reason.download': "Téléchargez l'IA sur votre appareil pour une réponse rédigée.",
+	'retrieval.reason.setup': 'Configurez ce mode pour une réponse rédigée.',
+	'retrieval.reason.loading': "L'IA sur votre appareil se prépare, réessayez dans un instant.",
+	'retrieval.reason.ready': 'Reposez votre question pour une réponse rédigée.',
+	'retrieval.reason.generic': 'Activez un mode IA pour une réponse rédigée.',
 	'retrieval.noDocs':
-		'Aucun document dans cette discussion. Joignez-en un pour le consulter ; les réponses de culture générale arrivent avec les modes IA.',
-	'retrieval.noHits':
-		'Aucun passage des documents joints ne correspond vraiment à cette recherche.',
+		'Aucun document dans cette discussion. Ajoutez-en un pour poser des questions dessus.',
+	'retrieval.noHits': 'Rien dans vos documents ne correspond à cette question.',
 	'retrieval.weak':
-		'Ces passages ont peu de rapport avec la question. Une réponse peut être peu fiable.',
-	'retrieval.openAria': 'Ouvrir {name} à ce passage',
+		'Ces sources ont peu de rapport avec la question. Une réponse peut être peu fiable.',
+	'retrieval.openAria': 'Ouvrir {name}',
 
 	// What AI saw panel
-	'wais.title': "Ce que l'IA a vu",
+	'wais.title': "Ce que l'IA a reçu",
 	'wais.subtitle': 'Pour cette réponse · enregistré localement',
 	'wais.destination': 'Destination',
 	'wais.device': "cet appareil, rien n'a été envoyé",
@@ -206,9 +204,9 @@ export const fr: Record<keyof typeof en, string> = {
 		'Ce document a été supprimé de votre bibliothèque. La citation a conservé un instantané du passage :',
 	'viewer.missing': 'Fichier original indisponible',
 	'viewer.missingBody':
-		"Le fichier original n'a pas pu être lu depuis le stockage de cet appareil. Voici le passage indexé :",
+		"Le fichier original n'a pas pu être lu depuis le stockage de cet appareil. Voici le passage enregistré :",
 	'viewer.missingPdfBody':
-		"Le PDF original n'a pas pu être lu depuis le stockage de cet appareil. Voici le passage indexé :",
+		"Le PDF original n'a pas pu être lu depuis le stockage de cet appareil. Voici le passage enregistré :",
 	'viewer.prevAria': 'Page précédente',
 	'viewer.nextAria': 'Page suivante',
 	'viewer.pageOf': 'page {n} / {total}',
@@ -216,8 +214,7 @@ export const fr: Record<keyof typeof en, string> = {
 
 	// Home (new chat)
 	'home.headline': 'Discutez avec vos documents privés.',
-	'home.sub':
-		"Ajoutez des documents, posez des questions et voyez exactement ce à quoi l'IA peut accéder.",
+	'home.sub': 'Ajoutez des documents, posez des questions et voyez exactement ce qui est partagé.',
 	'home.demoPreparing': 'Préparation de la démo…',
 	'home.demoCta': 'Essayer avec un contrat fictif',
 	'home.demoTitle': 'Démo · contrat fictif',
@@ -232,8 +229,8 @@ export const fr: Record<keyof typeof en, string> = {
 	'chat.fromSections': 'Depuis les sections de votre document',
 	'chat.editAria': 'Modifier cette question',
 	'chat.reviewing': 'En attente de votre vérification dans le panneau latéral',
-	'chat.writing': 'Rédaction…',
-	'chat.reading': 'Lecture de vos documents…',
+	'chat.writing': 'Préparation de votre réponse…',
+	'chat.reading': 'Recherche dans vos documents…',
 	'chat.stop': 'Arrêter',
 	'chat.meta': '{count} extrait{s} · {kb} Ko · {dest}',
 	'chat.editedAria': 'Question modifiée',
@@ -242,7 +239,7 @@ export const fr: Record<keyof typeof en, string> = {
 	// Documents page
 	'docsPage.count': '{count} dans votre espace de travail',
 	'docsPage.intro':
-		"Chaque document est lu et indexé dans votre navigateur, rien n'en sort. Votre bibliothèque reste consultable même hors ligne.",
+		"Chaque document est lu dans votre navigateur, rien n'en sort. Votre bibliothèque reste consultable même hors ligne.",
 	'docsPage.introAction': 'Ajoutez un document à une discussion pour poser vos questions.',
 	'docsPage.add': 'Ajouter des documents',
 	'docsPage.sortRecent': 'Plus récents',
@@ -265,7 +262,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'docsPage.deleteTitle': 'Supprimer « {name} » de cet appareil ?',
 	'docsPage.usedIn': 'Ce document est utilisé dans {count} discussion{s}.',
 	'docsPage.deleteBody':
-		'Le fichier, son index et ses embeddings seront définitivement supprimés. Cette action est irréversible.',
+		'Le fichier et ses données de recherche seront définitivement supprimés. Cette action est irréversible.',
 	'docsPage.deleteConfirm': 'Supprimer définitivement',
 
 	// Document sheet
@@ -273,7 +270,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'sheet.size': 'Taille',
 	'sheet.pages': 'Pages',
 	'sheet.indexed': 'Indexé',
-	'sheet.model': "Modèle d'embedding",
+	'sheet.model': 'Indexé avec',
 	'sheet.fingerprint': 'Empreinte',
 	'sheet.replacedLabel': 'Remplacé',
 	'sheet.times': '{count} fois',
@@ -345,12 +342,12 @@ export const fr: Record<keyof typeof en, string> = {
 		'Supprime de cet appareil toutes les discussions, leurs citations et leur historique de confidentialité. Les documents restent dans votre bibliothèque.',
 	'settings.deleteChats.cta': 'Supprimer les discussions',
 	'settings.deleteChats.confirmTitle': 'Supprimer toutes les discussions ?',
-	'settings.myai.title': 'Endpoint My AI',
+	'settings.myai.title': 'Serveur My AI',
 	'settings.myai.connection': 'Connexion',
 	'settings.myai.model': 'Modèle par défaut',
 	'settings.models.benchTitle': 'Test de vitesse',
 	'settings.ai.use': 'Utiliser ce mode',
-	'settings.ai.model.title': 'Modèle local',
+	'settings.ai.model.title': 'IA locale',
 	'settings.ai.download': 'Télécharger',
 	'settings.ai.load': 'Charger',
 	'settings.ai.status.ready': 'prêt',
@@ -388,30 +385,30 @@ export const fr: Record<keyof typeof en, string> = {
 	'settings.workspace.export': 'Exporter mon espace de travail',
 	'settings.workspace.quota': 'Utilisation Assisted ce mois-ci : {used} / {limit}',
 	'settings.workspace.quotaSignIn': "L'utilisation Assisted apparaît ici une fois connecté.",
-	'settings.models.title': 'Modèles IA sur cet appareil',
+	'settings.models.title': 'IA téléchargée sur cet appareil',
 	'settings.models.measuring': 'Mesure…',
-	'settings.models.none': 'Aucun modèle téléchargé pour le moment.',
+	'settings.models.none': 'Rien de téléchargé pour le moment.',
 	'settings.models.files': '{count} fichiers',
 	'settings.models.delete': 'Supprimer',
 	'settings.models.benchDesc':
-		"Une courte génération privée mesure la vitesse de l'IA locale sur cet appareil.",
+		"Un court test privé mesure la vitesse de l'IA locale sur cet appareil.",
 	'settings.models.testing': 'Test…',
 	'settings.models.test': 'Tester mon appareil',
 	'settings.models.prepareFirst': "Préparez d'abord l'IA privée (sélecteur de mode → Private).",
-	'settings.models.tps': '{tps} tokens/seconde',
+	'settings.models.tps': '{tps} mots par seconde',
 	'settings.models.comfortable': 'cet appareil exécute le mode Private confortablement.',
 	'settings.models.slow':
 		'cet appareil est lent pour le mode Private ; Assisted sera nettement plus rapide.',
 	'settings.wipe.title': 'Tout supprimer',
 	'settings.wipe.desc':
-		"Efface tous les documents, discussions, index et modèles IA de cet appareil. Rien n'existe ailleurs, cette action est donc irréversible.",
+		"Efface tous les documents, discussions, index et IA téléchargées de cet appareil. Rien n'existe ailleurs, cette action est donc irréversible.",
 	'settings.wipe.cta': 'Tout supprimer sur cet appareil',
 	'settings.wipe.last': 'Dernière confirmation',
 	'settings.wipe.confirmTitle': 'Tout supprimer sur cet appareil ?',
 	'settings.wipe.armedBody':
-		"Ceci détruit définitivement chaque document, discussion, index et modèle téléchargé stocké dans ce navigateur. Rien n'existe ailleurs. Vraiment supprimer ?",
+		"Ceci détruit définitivement chaque document, discussion, index et IA téléchargée stockée dans ce navigateur. Rien n'existe ailleurs. Vraiment supprimer ?",
 	'settings.wipe.body':
-		'Les documents, discussions, index de recherche et modèles IA seront effacés de ce navigateur. Votre compte survit ; il ne contient aucun contenu.',
+		'Les documents, discussions, index de recherche et IA téléchargées seront effacés de ce navigateur. Votre compte survit ; il ne contient aucun contenu.',
 	'settings.wipe.erasing': 'Effacement…',
 	'settings.wipe.confirm': 'Oui, tout effacer',
 	'settings.wipe.continue': 'Continuer',
@@ -437,8 +434,8 @@ export const fr: Record<keyof typeof en, string> = {
 	'hiw.whatLeaves': 'Ce qui part',
 	'hiw.whatStays': 'Ce qui reste',
 	'hiw.server': 'Le serveur',
-	'hiw.private.leaves': 'Rien. Le modèle tourne dans votre navigateur (téléchargement unique).',
-	'hiw.private.stays': "Documents, index, discussions, le modèle d'IA, vos questions et réponses.",
+	'hiw.private.leaves': "Rien. L'IA privée tourne dans votre navigateur (téléchargement unique).",
+	'hiw.private.stays': "Documents, index, discussions, l'IA privée, vos questions et réponses.",
 	'hiw.private.server': 'Jamais contacté pour répondre. Aucun compte requis.',
 	'hiw.assisted.leaves':
 		"Votre question et les extraits approuvés à l'étape de vérification. Jamais les documents entiers, jamais les noms de fichiers.",
@@ -446,15 +443,15 @@ export const fr: Record<keyof typeof en, string> = {
 	'hiw.assisted.server':
 		"Relaie les extraits à l'IA et renvoie la réponse en continu. Stocke votre e-mail, votre offre et un compteur d'utilisation. Ne stocke ni ne journalise jamais de contenu.",
 	'hiw.myai.leaves':
-		"Votre question plus les extraits pertinents, envoyés directement à l'endpoint que vous avez configuré.",
+		"Votre question plus les extraits pertinents, envoyés directement au serveur d'IA que vous avez configuré.",
 	'hiw.myai.stays': 'Documents, index, discussions.',
 	'hiw.myai.server':
-		'Aucun serveur intermédiaire. Le trafic va de votre navigateur à votre endpoint.',
+		"Aucun serveur intermédiaire. Le trafic va de votre navigateur à votre serveur d'IA.",
 	'hiw.pipeline': 'Le pipeline',
 	'hiw.step.document': 'Votre document',
 	'hiw.step.parsing': 'Analyse',
 	'hiw.step.chunking': 'Découpage',
-	'hiw.step.embeddings': 'Embeddings',
+	'hiw.step.embeddings': 'Encodage',
 	'hiw.step.index': 'Index local',
 	'hiw.step.question': 'Votre question',
 	'hiw.step.search': 'Recherche locale',
@@ -487,8 +484,9 @@ export const fr: Record<keyof typeof en, string> = {
 
 	// Toasts (layout + uploads)
 	'toast.ready': '{name} est prêt',
-	'toast.failed': "{name} n'a pas pu être indexé",
-	'toast.failedScanned': "Aucun texte extractible. L'OCR n'est pas encore pris en charge.",
+	'toast.failed': "{name} n'a pas pu être ajouté",
+	'toast.failedScanned':
+		'Aucun texte trouvé. Les documents scannés ne sont pas encore pris en charge.',
 	'toast.failedGeneric': 'Un problème est survenu pendant la lecture de ce fichier.',
 	'toast.added': '{name} ajouté à Mes documents',
 	'toast.addedDesc': 'Disponible dans chaque discussion, stocké sur cet appareil.',
@@ -502,7 +500,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'notice.retry': 'Réessayer',
 	'notice.stopped': "La génération s'est arrêtée avant la réponse.",
 	'notice.myaiUnreachable':
-		"Votre endpoint IA est injoignable. Vérifiez qu'il tourne, l'URL et ses réglages CORS.",
+		"Votre serveur d'IA est injoignable. Vérifiez qu'il tourne, l'URL et ses réglages CORS.",
 	'notice.quota': 'Quota mensuel Assisted atteint. Il se réinitialise le mois prochain.',
 	'notice.signIn': 'Connectez-vous pour utiliser le mode Assisted.',
 	'notice.assistedDown': 'Le service Assisted est indisponible pour le moment.',
