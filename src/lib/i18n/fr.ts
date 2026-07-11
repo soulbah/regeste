@@ -297,6 +297,21 @@ export const fr: Record<keyof typeof en, string> = {
 	'sheet.replaced': 'Document remplacé',
 	'sheet.replacedDesc': 'Les anciennes citations conservent leurs instantanés.',
 	'sheet.egressLine': '{date} : extraits envoyés à {dest}',
+	'sheet.language': 'Langue',
+	'sheet.sentCount': 'Envoyé {count} fois',
+	'sheet.seeAll': 'Voir tout ({count})',
+	'sheet.seeLess': 'Voir moins',
+	'sheet.copyAria': "Copier l'empreinte",
+	'sheet.copied': 'Empreinte copiée',
+	'sheet.details': 'Détails',
+	'sheet.usedInCount': 'Utilisé dans {count} discussion{s}',
+	'sheet.stillIndexing': 'Indexation en cours sur cet appareil',
+	'sheet.openChatAria': 'Ouvrir la discussion {title}',
+
+	// Pagination
+	'pagination.prev': 'Page précédente',
+	'pagination.next': 'Page suivante',
+	'pagination.goToPage': 'Aller à la page {n}',
 
 	// Settings
 	'settings.title': 'Réglages',

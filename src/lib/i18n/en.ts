@@ -287,6 +287,21 @@ export const en = {
 	'sheet.replaced': 'Document replaced',
 	'sheet.replacedDesc': 'Old citations keep their snapshots.',
 	'sheet.egressLine': '{date}: excerpts sent to {dest}',
+	'sheet.language': 'Language',
+	'sheet.sentCount': 'Sent {count} time{s}',
+	'sheet.seeAll': 'See all ({count})',
+	'sheet.seeLess': 'See less',
+	'sheet.copyAria': 'Copy fingerprint',
+	'sheet.copied': 'Fingerprint copied',
+	'sheet.details': 'Details',
+	'sheet.usedInCount': 'Used in {count} chat{s}',
+	'sheet.stillIndexing': 'Still indexing on this device',
+	'sheet.openChatAria': 'Open the chat {title}',
+
+	// Pagination
+	'pagination.prev': 'Previous page',
+	'pagination.next': 'Next page',
+	'pagination.goToPage': 'Go to page {n}',
 
 	// Settings
 	'settings.title': 'Settings',
