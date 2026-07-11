@@ -140,6 +140,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'docs.remove': 'Retirer de la discussion',
 	'docs.searchLibrary': 'Chercher dans vos documents…',
 	'docs.addCount': 'Ajouter {count} document{s}',
+	'docs.alreadyAdded': 'Ajouté',
 
 	// Document ingest statuses
 	'status.ready': 'Prêt',

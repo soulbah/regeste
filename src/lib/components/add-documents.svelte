@@ -22,6 +22,8 @@
 		hasReadyDocs = false,
 		onaction = null,
 		disabled = false,
+		/** Ids already attached to the chat — shown checked + locked in the picker. */
+		attachedIds = [],
 		/** Custom trigger; defaults to the composer's + icon button. */
 		trigger = null,
 		side = 'top'
@@ -33,6 +35,7 @@
 		hasReadyDocs?: boolean;
 		onaction?: ((question: string) => void) | null;
 		disabled?: boolean;
+		attachedIds?: string[];
 		trigger?: Snippet<[{ props: Record<string, unknown> }]> | null;
 		side?: 'top' | 'bottom';
 	} = $props();
@@ -146,4 +149,4 @@
 	</DropdownMenu.Content>
 </DropdownMenu.Root>
 
-<DocumentPicker bind:open={pickerOpen} onpick={onattach} />
+<DocumentPicker bind:open={pickerOpen} onpick={onattach} {attachedIds} />

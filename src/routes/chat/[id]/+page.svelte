@@ -487,6 +487,7 @@
 					onmodeselect={(m) => chatsStore.setMode(chatId, m)}
 					onupload={handleUpload}
 					onattach={(docIds) => chatsStore.attachMany(chatId, docIds)}
+					attachedIds={chatsStore.chatDocuments.map((d) => d.id)}
 					libraryEmpty={documentsStore.library.length === 0}
 					myaiModel={chatsStore.activeChat?.myaiModel ?? null}
 					privateOnly={chatsStore.activeChat?.privateOnly ?? false}

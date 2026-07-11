@@ -136,6 +136,7 @@ export const en = {
 	'docs.remove': 'Remove from chat',
 	'docs.searchLibrary': 'Search your documents…',
 	'docs.addCount': 'Add {count} document{s}',
+	'docs.alreadyAdded': 'Added',
 
 	// Document ingest statuses
 	'status.ready': 'Ready',

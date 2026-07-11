@@ -26,7 +26,8 @@
 		onstop = null,
 		followUp = false,
 		quote = null,
-		onquoteused = null
+		onquoteused = null,
+		attachedIds = []
 	}: {
 		/** null = never chosen on this device (spec 022 onboarding). */
 		mode: ChatMode | null;
@@ -48,6 +49,7 @@
 		/** Spec 020 — quote-reply: a selection arrives as a markdown quote. */
 		quote?: string | null;
 		onquoteused?: (() => void) | null;
+		attachedIds?: string[];
 	} = $props();
 
 	let text = $state('');
@@ -135,6 +137,7 @@
 			{onattach}
 			{hasReadyDocs}
 			{disabled}
+			{attachedIds}
 			onaction={(q) => !disabled && mode !== null && onsend(q)}
 		/>
 		<ModeSelector {mode} onselect={onmodeselect} {myaiModel} {privateOnly} />

@@ -180,6 +180,7 @@
 			libraryEmpty={documentsStore.library.length === 0}
 			onupload={handleUpload}
 			onattach={(docIds) => chatsStore.attachMany(chatId, docIds)}
+			attachedIds={chatsStore.chatDocuments.map((d) => d.id)}
 			side="top"
 		>
 			{#snippet trigger({ props })}

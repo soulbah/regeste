@@ -1,8 +1,8 @@
 <script lang="ts">
 	// Searchable multi-select library picker (spec 019 add-flow): once the library
-	// outgrows an inline submenu, "My documents" opens this. Reuses the ⌘K command
-	// surface (same search, same green keyboard-highlight) so it feels native, and
-	// lets several documents be picked in one pass, then attached together.
+	// outgrows an inline submenu, "My documents" opens this. Filters by name (not
+	// cmdk's fuzzy scorer, which matched on the appended id), lets several be
+	// picked at once, and shows documents already in the chat as checked + locked.
 	import * as Command from '$lib/components/ui/command';
 	import { Button } from '$lib/components/ui/button';
 	import { Checkbox } from '$lib/components/ui/checkbox';
@@ -12,17 +12,33 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import { documentsStore } from '$lib/state/documents.svelte';
 
-	let { open = $bindable(false), onpick }: { open?: boolean; onpick: (ids: string[]) => void } =
-		$props();
+	let {
+		open = $bindable(false),
+		onpick,
+		attachedIds = []
+	}: { open?: boolean; onpick: (ids: string[]) => void; attachedIds?: string[] } = $props();
 
+	const attached = $derived(new Set(attachedIds));
 	const selected = new SvelteSet<string>();
+	let query = $state('');
 
-	// Start each session with a clean slate.
+	const filtered = $derived.by(() => {
+		const q = query.trim().toLowerCase();
+		return q
+			? documentsStore.library.filter((d) => d.name.toLowerCase().includes(q))
+			: documentsStore.library;
+	});
+
+	// Fresh slate each time the dialog opens.
 	$effect(() => {
-		if (open) selected.clear();
+		if (open) {
+			selected.clear();
+			query = '';
+		}
 	});
 
 	function toggle(id: string) {
+		if (attached.has(id)) return;
 		if (selected.has(id)) selected.delete(id);
 		else selected.add(id);
 	}
@@ -42,21 +58,32 @@
 </script>
 
 <!-- Centered (overriding the palette's top-third anchor): the library list can
-     be long, and top-third left the dialog sagging near the bottom edge. -->
-<Command.Dialog bind:open class="top-1/2 -translate-y-1/2 rounded-xl shadow-2xl sm:max-w-[640px]">
-	<Command.Input placeholder={t('docs.searchLibrary')} class="h-14 text-[15px]" />
+     be long, and top-third left the dialog sagging near the bottom edge.
+     shouldFilter is off — we match on the name only, in the script. -->
+<Command.Dialog
+	bind:open
+	shouldFilter={false}
+	class="top-1/2 -translate-y-1/2 rounded-xl shadow-2xl sm:max-w-[640px]"
+>
+	<Command.Input
+		placeholder={t('docs.searchLibrary')}
+		bind:value={query}
+		class="h-14 text-[15px]"
+	/>
 	<div class="bg-border h-px shrink-0"></div>
 	<Command.List class="max-h-[50vh] p-2">
 		<Command.Empty>{t('docsPage.noMatch')}</Command.Empty>
-		{#each documentsStore.library as doc (doc.id)}
+		{#each filtered as doc (doc.id)}
+			{@const already = attached.has(doc.id)}
 			<Command.Item
-				value={`${doc.name} ${doc.id}`}
+				value={doc.id}
 				onSelect={() => toggle(doc.id)}
 				aria-label={t('docs.useAria', { name: doc.name })}
-				class="data-selected:before:hidden"
+				class="data-selected:before:hidden {already ? 'opacity-60' : ''}"
 			>
 				<Checkbox
-					checked={selected.has(doc.id)}
+					checked={already || selected.has(doc.id)}
+					disabled={already}
 					tabindex={-1}
 					aria-hidden="true"
 					class="pointer-events-none"
@@ -70,6 +97,13 @@
 						{meta(doc.name, doc.pages)}
 					</span>
 				</span>
+				{#if already}
+					<span
+						class="text-muted-foreground shrink-0 font-mono text-[10px] tracking-wide uppercase"
+					>
+						{t('docs.alreadyAdded')}
+					</span>
+				{/if}
 			</Command.Item>
 		{/each}
 	</Command.List>
