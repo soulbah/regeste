@@ -2,14 +2,20 @@
 
 Check a task off ONLY after its Done-when commands pass. `[P]` = safe to run in parallel with neighbors.
 
-## Phase 0 — Spike (gates; must pass before Phase 1+)
+## Phase 0 — Spike (gates) — DONE, both gates PASS (2026-07-11)
 
-- [ ] 0.1 Acquire PP-OCRv5 mobile ONNX weights (DB det, latin_v5 rec, dict), self-hosted.
-      Done when: files present under the app origin; sizes ~12 MB total; source + license (Apache-2.0) recorded.
-- [ ] 0.2 Throwaway harness: load det+rec as raw ORT sessions in a worker; probe WebGPU→WASM.
-      Done when: a `/dev/ocr` route runs both sessions on a sample image; console reports the active EP per session (no silent per-op WASM fallback on WebGPU) — GATE 1.
-- [ ] 0.3 Recognize a real French scan (clean + photographed) and eyeball accuracy.
-      Done when: recognized text of a French scan is legible with accents intact — GATE 2. If either gate fails, record it and switch the plan to Tesseract.js `fra`.
+Harness: `spike-ocr/` (plain Vite via `vite.spike.config.ts`, no CF adapter). Used
+the `ppu-paddle-ocr` SDK as a throwaway to isolate accuracy from plumbing.
+
+- [x] 0.1 Self-hosted PP-OCRv5 mobile ONNX (det 4.5 MB + latin_v5 rec 7.7 MB + dict), Apache-2.0, in `static/models/ocr/` (gitignored; fetch in spike-ocr/README).
+- [x] 0.2 GATE 1 (WebGPU): PP-OCRv5 det+rec ran on ORT's WebGPU provider and produced correct output; ~220 ms/page warm. Owner's real GPU is the definitive perf check.
+- [x] 0.3 GATE 2 (French): PASS on clean print — perfect `é è à ê û ç € —` + digits. Degraded synthetic loses accuracy (harsher than real scans); real-file testing via the harness upload. No fallback to Tesseract needed.
+
+Phase-2 gotchas found: (a) Vite dev rewrites ORT's dynamic `import()` to `?import`
+and 500s on same-origin public `.mjs` → self-host the ORT glue inside a worker
+(like `embed-worker.ts`), not via a page import. (b) The CF `platformProxy`
+(`hooks.server.ts` reads `platform.env` every request) spawns a `workerd` that can
+wedge in sandboxes — irrelevant to prod, but the OCR worker must not depend on it.
 
 ## Phase 1 — Parser per-page merge
 

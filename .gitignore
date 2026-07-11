@@ -30,3 +30,8 @@ docs/internal/
 
 # Vendored at install time from pinned packages (see package.json "vendor")
 static/vendor/
+
+# Spike 023 (OCR): self-hosted model weights + ORT wasm, fetched not committed
+# (see spike-ocr/README.md for the download commands)
+static/models/
+static/ort/
