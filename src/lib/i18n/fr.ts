@@ -168,7 +168,7 @@ export const fr: Record<keyof typeof en, string> = {
 
 	// Retrieval preview turn — langage clair ; la raison s'adapte à pourquoi aucune
 	// réponse n'a été rédigée, et pointe vers les documents (chips-sources) affichés.
-	'retrieval.found': 'Trouvé dans vos documents',
+	'retrieval.found': 'Trouvés dans vos documents',
 	'retrieval.reason.download': "Téléchargez l'IA sur votre appareil pour une réponse rédigée.",
 	'retrieval.reason.setup': 'Configurez ce mode pour une réponse rédigée.',
 	'retrieval.reason.loading': "L'IA sur votre appareil se prépare, réessayez dans un instant.",
