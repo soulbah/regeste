@@ -349,7 +349,11 @@
 								</div>
 							{/if}
 						{:else if message.mode === 'retrieval'}
-							<RetrievalTurn content={message.content} />
+							<RetrievalTurn
+								content={message.content}
+								mode={chatsStore.activeChat?.mode ?? null}
+								privateOnly={chatsStore.activeChat?.privateOnly ?? false}
+							/>
 						{:else if message.mode === 'notice'}
 							<!-- System notice, visually distinct from real answers. -->
 							<div class="border-muted-foreground/30 flex items-start gap-2 border-l-2 py-1 pl-3">

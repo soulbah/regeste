@@ -161,8 +161,13 @@ export const en = {
 	'turn.regenerate': 'Try again',
 	'turn.closest': 'Closest passages, none supported an answer',
 
-	// Retrieval preview turn
-	'retrieval.notice': 'No AI answer yet, so here are the matching passages from your documents.',
+	// Retrieval preview turn — the reason line adapts to why no AI answered.
+	'retrieval.reason.download':
+		'Download the on-device model to turn these passages into a written answer.',
+	'retrieval.reason.setup': 'Set up this mode to turn these passages into a written answer.',
+	'retrieval.reason.loading': 'The on-device model is still loading, so try again in a moment.',
+	'retrieval.reason.ready': 'Ask again to get a written answer from these passages.',
+	'retrieval.reason.generic': 'Turn on a ready AI mode to get a written answer.',
 	'retrieval.noDocs':
 		'No documents in this chat. Attach one to search it; AI answers from general knowledge arrive with the AI modes.',
 	'retrieval.noHits': 'No passage in the attached documents matches this closely.',

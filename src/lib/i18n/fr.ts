@@ -166,9 +166,15 @@ export const fr: Record<keyof typeof en, string> = {
 	'turn.regenerate': 'Réessayer',
 	'turn.closest': "Passages les plus proches, aucun n'a permis de répondre",
 
-	// Retrieval preview turn
-	'retrieval.notice':
-		'Pas encore de réponse IA : voici les passages de vos documents qui correspondent.',
+	// Retrieval preview turn — la ligne de raison s'adapte à pourquoi aucune IA n'a répondu.
+	'retrieval.reason.download':
+		'Téléchargez le modèle sur votre appareil pour transformer ces passages en réponse rédigée.',
+	'retrieval.reason.setup': 'Configurez ce mode pour transformer ces passages en réponse rédigée.',
+	'retrieval.reason.loading':
+		'Le modèle sur votre appareil se charge encore, réessayez dans un instant.',
+	'retrieval.reason.ready':
+		'Reposez la question pour obtenir une réponse rédigée à partir de ces passages.',
+	'retrieval.reason.generic': 'Activez un mode IA prêt pour obtenir une réponse rédigée.',
 	'retrieval.noDocs':
 		'Aucun document dans cette discussion. Joignez-en un pour le consulter ; les réponses de culture générale arrivent avec les modes IA.',
 	'retrieval.noHits':

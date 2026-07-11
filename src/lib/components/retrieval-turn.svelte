@@ -1,18 +1,23 @@
 <script lang="ts">
-	// Retrieval preview turn (spec 009): shown when a question runs without an AI
-	// mode. Reworked 2026-07 — a system notice (same voice as the chat's other
-	// notices) frames it, and the matching passages read as answer-style source
-	// chips (name + locator, the passage on hover, click opens the viewer) rather
-	// than raw text blocks.
+	// Retrieval preview turn (spec 009): shown when a question runs without a ready
+	// AI mode. The matching passages read as answer-style source chips; the notice
+	// below stands in for the answer and says WHY none was written, read from the
+	// same readiness verdict the picker and settings use — so it never claims an
+	// answer is "coming" when the mode needs setup or can't run at all.
 	import { Button } from '$lib/components/ui/button';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import InfoIcon from '@lucide/svelte/icons/info';
 	import { t } from '$lib/i18n/index.svelte';
 	import { isWeakMatch } from '$lib/pipeline/relevance';
+	import { modeReadiness } from '$lib/state/mode-readiness.svelte';
 	import { viewerStore } from '$lib/state/viewer.svelte';
-	import type { SearchHit } from '$lib/types';
+	import type { ChatMode, SearchHit } from '$lib/types';
 
-	let { content }: { content: string } = $props();
+	let {
+		content,
+		mode = null,
+		privateOnly = false
+	}: { content: string; mode?: ChatMode | null; privateOnly?: boolean } = $props();
 
 	const parsed = $derived.by(() => {
 		try {
@@ -22,12 +27,29 @@
 		}
 	});
 
+	// Why no written answer, from the shared readiness source: still loading
+	// (coming), needs a download / setup (your move), or blocked (won't run here).
+	const reason = $derived.by(() => {
+		if (!mode) return t('retrieval.reason.generic');
+		const r = modeReadiness(mode, { privateOnly });
+		switch (r.state) {
+			case 'progress':
+				return t('retrieval.reason.loading');
+			case 'setup':
+				return mode === 'private' ? t('retrieval.reason.download') : t('retrieval.reason.setup');
+			case 'blocked':
+				return r.blockedLine ?? t('retrieval.reason.generic');
+			case 'ready':
+				return t('retrieval.reason.ready');
+		}
+	});
+
 	const notice = $derived(
 		parsed.documentCount === 0
 			? t('retrieval.noDocs')
 			: parsed.hits.length === 0
 				? t('retrieval.noHits')
-				: t('retrieval.notice')
+				: reason
 	);
 
 	function locator(hit: SearchHit): string {
@@ -39,8 +61,8 @@
 
 <div class="space-y-2">
 	<!-- Matching passages sit on top, as in a real answer where the sources
-	     strip precedes the prose. Here the system notice below stands in for the
-	     answer that Private mode would write. -->
+	     strip precedes the prose. The notice below stands in for the answer a
+	     ready AI mode would write. -->
 	{#if parsed.hits.length}
 		<div class="flex flex-wrap gap-1.5">
 			{#each parsed.hits.slice(0, 6) as hit (hit.chunkId)}
