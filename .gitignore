@@ -31,7 +31,7 @@ docs/internal/
 # Vendored at install time from pinned packages (see package.json "vendor")
 static/vendor/
 
-# Spike 023 (OCR): self-hosted model weights + ORT wasm, fetched not committed
-# (see spike-ocr/README.md for the download commands)
-static/models/
+# Spike 023 (OCR): the ORT wasm copy was a dead end (glue loads from CDN); the
+# model weights (static/models/ocr, Apache-2.0, ~12 MB) ARE committed as app
+# assets so on-device OCR works on any clone. Re-fetch via spike-ocr/README.md.
 static/ort/

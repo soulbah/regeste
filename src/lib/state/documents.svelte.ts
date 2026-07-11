@@ -54,6 +54,8 @@ class DocumentsStore {
 	/** P3 — documentId → last time excerpts of it left the device. */
 	egress = $state<Record<string, number>>({});
 	ingests = $state<Record<string, IngestState>>({});
+	/** OCR pass abort controllers, keyed by document id (spec 023). */
+	ocrAborts = $state<Record<string, AbortController>>({});
 	dbInfo = $state<DbInfo | null>(null);
 	dbError = $state<string | null>(null);
 	searching = $state(false);
@@ -106,6 +108,7 @@ class DocumentsStore {
 			this.setIngest(id, { status: 'parsing', phaseProgress: 0 });
 			await db.setDocumentStatus(id, 'parsing');
 			const parsed = await parseByName(file.name, file.type, data);
+			const needsOcr = parsed.needsOcr ?? [];
 
 			this.setIngest(id, { status: 'chunking', phaseProgress: 0 });
 			const language =
@@ -117,26 +120,38 @@ class DocumentsStore {
 				) ?? undefined;
 			await db.setDocumentStatus(id, 'chunking', { pages: parsed.pages ?? undefined, language });
 			const chunks = chunkBlocks(parsed.blocks);
-			if (!chunks.length) {
+			// Genuinely empty (no text AND no image page to OCR) is the only hard fail.
+			if (!chunks.length && !needsOcr.length) {
 				throw Object.assign(new Error('No usable text'), { code: 'parse_failed' as const });
 			}
 
-			this.setIngest(id, { status: 'embedding', phaseProgress: 0 });
-			await db.setDocumentStatus(id, 'embedding');
-			const { data: vectors, dims } = await getEmbedWorker().embed(
-				chunks.map((c) => c.text),
-				'passage',
-				proxy((p: EmbedProgress) => {
-					this.setIngest(id, {
-						status: 'embedding',
-						phaseProgress: p.phase === 'embed' ? p.progress : p.progress * 0.5
-					});
-				})
-			);
+			if (chunks.length) {
+				this.setIngest(id, { status: 'embedding', phaseProgress: 0 });
+				await db.setDocumentStatus(id, 'embedding');
+				const { data: vectors, dims } = await getEmbedWorker().embed(
+					chunks.map((c) => c.text),
+					'passage',
+					proxy((p: EmbedProgress) => {
+						this.setIngest(id, {
+							status: 'embedding',
+							phaseProgress: p.phase === 'embed' ? p.progress : p.progress * 0.5
+						});
+					})
+				);
+				await db.insertChunks(id, chunks, vectors, dims);
+			}
 
-			await db.insertChunks(id, chunks, vectors, dims);
-			await db.setDocumentStatus(id, 'ready', { embeddingModel: EMBEDDING_MODEL });
-			this.setIngest(id, { status: 'ready', phaseProgress: 1 });
+			if (needsOcr.length) {
+				// Image-only pages remain: land in `scanned` with any text pages
+				// already searchable, awaiting an opt-in on-device OCR pass.
+				await db.setDocumentStatus(id, 'scanned', {
+					embeddingModel: chunks.length ? EMBEDDING_MODEL : undefined
+				});
+				this.setIngest(id, { status: 'scanned', phaseProgress: 1 });
+			} else {
+				await db.setDocumentStatus(id, 'ready', { embeddingModel: EMBEDDING_MODEL });
+				this.setIngest(id, { status: 'ready', phaseProgress: 1 });
+			}
 		} catch (err) {
 			const code: IngestErrorCode = (err as { code?: IngestErrorCode }).code ?? 'unknown';
 			await db.setDocumentStatus(id, 'error', { error: code });
@@ -222,6 +237,103 @@ class DocumentsStore {
 		} finally {
 			await this.refreshLibrary();
 		}
+	}
+
+	/**
+	 * Spec 023 — opt-in on-device OCR of a `scanned` document. Re-parses to find
+	 * the image-only pages, OCRs them on the main thread, splices the recognized
+	 * text back at its page number, then re-chunks + re-embeds the merged document
+	 * through the existing pipeline. Cancellable; nothing leaves the device.
+	 */
+	async ocrDocument(id: string): Promise<void> {
+		const { db } = await getLocalDb();
+		const doc = await db.getDocument(id);
+		if (!doc) return;
+		const data = await readOriginal(doc.hash);
+		if (!data) {
+			await db.setDocumentStatus(id, 'error', { error: 'parse_failed' });
+			this.setIngest(id, { status: 'error', phaseProgress: 0, error: 'parse_failed' });
+			await this.refreshLibrary();
+			return;
+		}
+		const controller = new AbortController();
+		this.ocrAborts = { ...this.ocrAborts, [id]: controller };
+		try {
+			this.setIngest(id, { status: 'ocr', phaseProgress: 0 });
+			await db.setDocumentStatus(id, 'ocr');
+			const parsed = await parseByName(doc.name, doc.mime, data);
+			const needsOcr = parsed.needsOcr ?? [];
+
+			const { ocrPages } = await import('$lib/pipeline/ocr');
+			const original = (await readOriginal(doc.hash)) ?? data;
+			const ocrBlocks = await ocrPages(
+				original,
+				needsOcr,
+				(p) =>
+					this.setIngest(id, {
+						status: 'ocr',
+						phaseProgress: p.total ? p.done / p.total : 0
+					}),
+				controller.signal
+			);
+
+			// Merge OCR text pages with the extractable text pages, in page order,
+			// so citations and the viewer resolve to the right location.
+			const merged = [...parsed.blocks, ...ocrBlocks].sort((a, b) => (a.page ?? 0) - (b.page ?? 0));
+			const chunks = chunkBlocks(merged);
+			if (!chunks.length) {
+				// OCR read nothing usable — honest terminal, not a silent success.
+				await db.setDocumentStatus(id, 'error', { error: 'scanned_pdf' });
+				this.setIngest(id, { status: 'error', phaseProgress: 0, error: 'scanned_pdf' });
+				return;
+			}
+
+			const language =
+				detectLanguage(
+					merged
+						.slice(0, 12)
+						.map((b) => b.text)
+						.join(' ')
+				) ?? undefined;
+			// db status stays 'ocr' through embedding so the panel keeps showing the
+			// pass; only the local ingest label switches to 'embedding'.
+			this.setIngest(id, { status: 'embedding', phaseProgress: 0 });
+			const { data: vectors, dims } = await getEmbedWorker().embed(
+				chunks.map((c) => c.text),
+				'passage',
+				proxy((p: EmbedProgress) => {
+					this.setIngest(id, {
+						status: 'embedding',
+						phaseProgress: p.phase === 'embed' ? p.progress : p.progress * 0.5
+					});
+				})
+			);
+			await db.deleteChunks(id);
+			await db.insertChunks(id, chunks, vectors, dims);
+			await db.setDocumentStatus(id, 'ready', { embeddingModel: EMBEDDING_MODEL, language });
+			this.setIngest(id, { status: 'ready', phaseProgress: 1 });
+		} catch (err) {
+			if (err instanceof DOMException && err.name === 'AbortError') {
+				// Cancelled: back to `scanned` — the text pages (if any) stay searchable.
+				await db.setDocumentStatus(id, 'scanned');
+				this.setIngest(id, { status: 'scanned', phaseProgress: 1 });
+			} else {
+				const code: IngestErrorCode = (err as { code?: IngestErrorCode }).code ?? 'unknown';
+				await db.setDocumentStatus(id, 'error', { error: code });
+				this.setIngest(id, { status: 'error', phaseProgress: 0, error: code });
+				if (code === 'unknown') console.error('[folio] OCR failed:', err);
+			}
+		} finally {
+			const rest = { ...this.ocrAborts };
+			delete rest[id];
+			this.ocrAborts = rest;
+			await this.refreshLibrary();
+		}
+	}
+
+	/** Cancel an in-flight OCR pass; the document reverts to `scanned`. */
+	cancelOcr(id: string): void {
+		this.ocrAborts[id]?.abort();
 	}
 
 	/**

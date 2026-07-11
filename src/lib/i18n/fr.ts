@@ -148,6 +148,8 @@ export const fr: Record<keyof typeof en, string> = {
 	'status.reading': 'Lecture',
 	'status.splitting': 'Découpage',
 	'status.scanned': "Ce document semble être une image scannée : aucun texte à lire pour l'instant",
+	'status.awaitingOcr': 'Numérisé',
+	'status.ocr': 'Lecture…',
 
 	// Pre-send review panel
 	'presend.title': 'Avant que ça parte',
@@ -262,6 +264,9 @@ export const fr: Record<keyof typeof en, string> = {
 	'docsPage.noMatch': 'Rien ne correspond à ce filtre.',
 	'docsPage.noText': 'aucun texte extractible',
 	'docsPage.error': 'erreur',
+	'docsPage.scanned': 'pages numérisées à lire',
+	'docsPage.ocrRunning': 'lecture des pages numérisées…',
+	'docsPage.readScanned': 'Lire les pages numérisées',
 	'docsPage.sentOn': 'Extraits envoyés le {date}',
 	'docsPage.neverSent': 'Jamais envoyé',
 	'docsPage.inChats': 'Dans {count} discussion{s}',
@@ -307,6 +312,11 @@ export const fr: Record<keyof typeof en, string> = {
 	'sheet.usedInCount': 'Utilisé dans {count} discussion{s}',
 	'sheet.stillIndexing': 'Indexation en cours sur cet appareil',
 	'sheet.openChatAria': 'Ouvrir la discussion {title}',
+	'sheet.scannedTitle': 'Ces pages sont des images numérisées.',
+	'sheet.scannedBody':
+		'Lisez-les sur votre appareil pour les rechercher et les citer. Rien n’est envoyé.',
+	'sheet.readScanned': 'Lire les pages numérisées',
+	'sheet.ocrRunning': 'Lecture de la page {done} sur {total}…',
 
 	// Pagination
 	'pagination.prev': 'Page précédente',

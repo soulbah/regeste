@@ -144,6 +144,8 @@ export const en = {
 	'status.reading': 'Reading',
 	'status.splitting': 'Splitting',
 	'status.scanned': "This looks like a scanned image, so there's no text to read yet",
+	'status.awaitingOcr': 'Scanned',
+	'status.ocr': 'Reading…',
 
 	// Pre-send review panel
 	'presend.title': 'Before it leaves',
@@ -253,6 +255,9 @@ export const en = {
 	'docsPage.noMatch': 'Nothing matches this filter.',
 	'docsPage.noText': 'no extractable text',
 	'docsPage.error': 'error',
+	'docsPage.scanned': 'scanned pages await reading',
+	'docsPage.ocrRunning': 'reading scanned pages…',
+	'docsPage.readScanned': 'Read the scanned pages',
 	'docsPage.sentOn': 'Excerpts sent {date}',
 	'docsPage.neverSent': 'Never sent',
 	'docsPage.inChats': 'In {count} chat{s}',
@@ -297,6 +302,10 @@ export const en = {
 	'sheet.usedInCount': 'Used in {count} chat{s}',
 	'sheet.stillIndexing': 'Still indexing on this device',
 	'sheet.openChatAria': 'Open the chat {title}',
+	'sheet.scannedTitle': 'These pages are scanned images.',
+	'sheet.scannedBody': 'Read them on your device to search and cite them. Nothing is sent.',
+	'sheet.readScanned': 'Read the scanned pages',
+	'sheet.ocrRunning': 'Reading page {done} of {total}…',
 
 	// Pagination
 	'pagination.prev': 'Previous page',

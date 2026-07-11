@@ -30,6 +30,8 @@
 		if (error === 'scanned_pdf') return t('status.scanned');
 		if (error) return error;
 		if (status === 'ready') return t('status.ready');
+		if (status === 'scanned') return t('status.awaitingOcr');
+		if (status === 'ocr') return t('status.ocr');
 		if (status === 'embedding') return t('status.indexing');
 		if (status === 'parsing') return t('status.reading');
 		if (status === 'chunking') return t('status.splitting');
@@ -120,16 +122,22 @@
 						{:else if ready}
 							<span class="bg-ring size-1.5 rounded-full"></span>
 							<span class="text-muted-foreground">{t('status.ready')}</span>
+						{:else if doc.status === 'scanned'}
+							<!-- Idle, awaiting an opt-in read: a still (non-pulsing) muted dot. -->
+							<span class="bg-muted-foreground/50 size-1.5 rounded-full"></span>
+							<span class="text-muted-foreground">{t('status.awaitingOcr')}</span>
 						{:else}
 							<span class="bg-ring size-1.5 animate-pulse rounded-full"></span>
 							<span class="text-muted-foreground">
-								{statusLabel(doc.status, doc.error)}{doc.status === 'embedding' && ingest
+								{statusLabel(doc.status, doc.error)}{(doc.status === 'embedding' ||
+									doc.status === 'ocr') &&
+								ingest
 									? ` ${Math.round(ingest.phaseProgress * 100)}%`
 									: '…'}
 							</span>
 						{/if}
 					</div>
-					{#if doc.status === 'embedding' && ingest}
+					{#if (doc.status === 'embedding' || doc.status === 'ocr') && ingest}
 						<Progress value={ingest.phaseProgress * 100} class="mt-1.5 h-1" />
 					{/if}
 				</div>

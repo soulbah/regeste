@@ -1,6 +1,12 @@
 // PDF parsing runs on the main thread: pdf.js does its heavy lifting in its
 // own worker, so the UI stays responsive. One block per page (the chunker
 // splits within pages); char offsets are relative to the page's text.
+//
+// Per-page OCR triage (spec 023): a page with usable extractable text keeps its
+// block; an image-only (sparse) page is recorded in `needsOcr` instead. A fully
+// scanned PDF therefore returns no blocks but every page number in `needsOcr`,
+// and a mixed PDF keeps its text pages searchable immediately — no more
+// all-or-nothing `scanned_pdf` throw that discarded the whole document.
 
 import type { ParsedDoc, ParsedBlock } from '$lib/types';
 
@@ -14,7 +20,7 @@ export async function parsePdf(data: ArrayBuffer): Promise<ParsedDoc> {
 	const loadingTask = pdfjs.getDocument({ data });
 	const doc = await loadingTask.promise;
 	const blocks: ParsedBlock[] = [];
-	let sparsePages = 0;
+	const needsOcr: number[] = [];
 
 	for (let pageNum = 1; pageNum <= doc.numPages; pageNum++) {
 		const page = await doc.getPage(pageNum);
@@ -26,19 +32,15 @@ export async function parsePdf(data: ArrayBuffer): Promise<ParsedDoc> {
 			text += item.hasEOL ? '\n' : ' ';
 		}
 		text = text.replace(/[ \t]+\n/g, '\n').trim();
-		if (text.length < SCANNED_MIN_CHARS_PER_PAGE) sparsePages++;
-		if (text.length > 0) {
+		if (text.length < SCANNED_MIN_CHARS_PER_PAGE) {
+			// Image-only page: OCR it later instead of keeping the crumbs of text.
+			needsOcr.push(pageNum);
+		} else {
 			blocks.push({ text, page: pageNum, charStart: 0, charEnd: text.length });
 		}
 		page.cleanup();
 	}
 	await loadingTask.destroy();
 
-	if (doc.numPages > 0 && sparsePages / doc.numPages > 0.5) {
-		throw Object.assign(new Error('No extractable text — likely a scanned PDF'), {
-			code: 'scanned_pdf' as const
-		});
-	}
-
-	return { blocks, pages: doc.numPages };
+	return { blocks, pages: doc.numPages, needsOcr };
 }
