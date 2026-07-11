@@ -35,3 +35,6 @@ static/vendor/
 # model weights (static/models/ocr, Apache-2.0, ~12 MB) ARE committed as app
 # assets so on-device OCR works on any clone. Re-fetch via spike-ocr/README.md.
 static/ort/
+
+# Stray miniflare/workerd config debug dump (MINIFLARE_WORKERD_CONFIG_DEBUG)
+/1
