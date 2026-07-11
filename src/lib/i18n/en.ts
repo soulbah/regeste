@@ -108,8 +108,7 @@ export const en = {
 	'myai.test': 'Test connection',
 	'myai.noModels': 'Connected, but the endpoint lists no models.',
 	'myai.pickModel': 'Pick a model',
-	'myai.direct':
-		"Requests go straight from this browser to your endpoint. Folio's servers are never involved.",
+	'myai.direct': 'Requests go straight from this browser to your endpoint. No server in between.',
 	'myai.corsHint.ollama':
 		'Start Ollama with OLLAMA_ORIGINS set to this site (or *) to allow browser access.',
 	'myai.corsHint.lmstudio':
@@ -310,7 +309,7 @@ export const en = {
 	'turn.nextVersion': 'Next version',
 	'turn.quote': 'Reply',
 	'related.title': 'Related',
-	'app.dbBusy': 'Folio is already open in another tab. Close it, then reload this one.',
+	'app.dbBusy': 'You already have this open in another tab. Close it there, then reload.',
 	'panel.backAria': 'Back to documents',
 	'panel.hideAria': 'Close the panel',
 	'chat.panelToggleAria': 'Open the side panel',
@@ -395,7 +394,7 @@ export const en = {
 	'settings.wipe.last': 'Last confirmation',
 	'settings.wipe.confirmTitle': 'Delete everything on this device?',
 	'settings.wipe.armedBody':
-		'This permanently destroys every document, chat, index and downloaded model stored by Folio in this browser. Nothing exists anywhere else. Really delete?',
+		'This permanently destroys every document, chat, index and downloaded model stored in this browser. Nothing exists anywhere else. Really delete?',
 	'settings.wipe.body':
 		'Documents, chats, search indexes and AI models will be erased from this browser. Your account survives; it holds no content.',
 	'settings.wipe.erasing': 'Erasing…',
@@ -419,7 +418,7 @@ export const en = {
 	'hiw.title': 'How your data flows',
 	'hiw.subtitle': 'Per mode · verifiable in the source',
 	'hiw.intro':
-		'Folio parses, indexes and searches your documents in this browser. The modes differ on one point: who writes the answer, and so what has to leave.',
+		'Your documents are parsed, indexed and searched in this browser. The modes differ on one point: who writes the answer, and so what has to leave.',
 	'hiw.whatLeaves': 'What leaves',
 	'hiw.whatStays': 'What stays',
 	'hiw.server': 'The server',
@@ -434,8 +433,7 @@ export const en = {
 	'hiw.myai.leaves':
 		'Your question plus the relevant excerpts, sent straight to the endpoint you configured.',
 	'hiw.myai.stays': 'Documents, index, chats.',
-	'hiw.myai.server':
-		"Folio's servers are not involved. Traffic goes from your browser to your endpoint.",
+	'hiw.myai.server': 'No server in between. Traffic goes from your browser to your endpoint.',
 	'hiw.pipeline': 'The pipeline',
 	'hiw.step.document': 'Your document',
 	'hiw.step.parsing': 'Parsing',

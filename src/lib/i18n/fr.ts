@@ -112,7 +112,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'myai.noModels': "Connecté, mais l'endpoint ne liste aucun modèle.",
 	'myai.pickModel': 'Choisissez un modèle',
 	'myai.direct':
-		'Les requêtes vont directement de ce navigateur à votre endpoint. Les serveurs de Folio ne sont jamais impliqués.',
+		'Les requêtes vont directement de ce navigateur à votre endpoint. Aucun serveur intermédiaire.',
 	'myai.corsHint.ollama':
 		"Lancez Ollama avec OLLAMA_ORIGINS réglé sur ce site (ou *) pour autoriser l'accès depuis le navigateur.",
 	'myai.corsHint.lmstudio':
@@ -322,7 +322,8 @@ export const fr: Record<keyof typeof en, string> = {
 	'turn.nextVersion': 'Version suivante',
 	'turn.quote': 'Citer',
 	'related.title': 'Questions liées',
-	'app.dbBusy': 'Folio est déjà ouvert dans un autre onglet. Fermez-le, puis rechargez celui-ci.',
+	'app.dbBusy':
+		'Vous avez déjà ceci ouvert dans un autre onglet. Fermez-le, puis rechargez cette page.',
 	'panel.backAria': 'Revenir aux documents',
 	'panel.hideAria': 'Fermer le panneau',
 	'chat.panelToggleAria': 'Ouvrir le panneau latéral',
@@ -408,7 +409,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'settings.wipe.last': 'Dernière confirmation',
 	'settings.wipe.confirmTitle': 'Tout supprimer sur cet appareil ?',
 	'settings.wipe.armedBody':
-		"Ceci détruit définitivement chaque document, discussion, index et modèle téléchargé stocké par Folio dans ce navigateur. Rien n'existe ailleurs. Vraiment supprimer ?",
+		"Ceci détruit définitivement chaque document, discussion, index et modèle téléchargé stocké dans ce navigateur. Rien n'existe ailleurs. Vraiment supprimer ?",
 	'settings.wipe.body':
 		'Les documents, discussions, index de recherche et modèles IA seront effacés de ce navigateur. Votre compte survit ; il ne contient aucun contenu.',
 	'settings.wipe.erasing': 'Effacement…',
@@ -432,7 +433,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'hiw.title': 'Comment circulent vos données',
 	'hiw.subtitle': 'Par mode · vérifiable dans le code source',
 	'hiw.intro':
-		'Folio analyse, indexe et cherche dans vos documents dans ce navigateur. Les modes ne diffèrent que sur un point : qui rédige la réponse, et donc ce qui doit partir.',
+		'Vos documents sont analysés, indexés et cherchés dans ce navigateur. Les modes ne diffèrent que sur un point : qui rédige la réponse, et donc ce qui doit partir.',
 	'hiw.whatLeaves': 'Ce qui part',
 	'hiw.whatStays': 'Ce qui reste',
 	'hiw.server': 'Le serveur',
@@ -448,7 +449,7 @@ export const fr: Record<keyof typeof en, string> = {
 		"Votre question plus les extraits pertinents, envoyés directement à l'endpoint que vous avez configuré.",
 	'hiw.myai.stays': 'Documents, index, discussions.',
 	'hiw.myai.server':
-		'Les serveurs de Folio ne sont pas impliqués. Le trafic va de votre navigateur à votre endpoint.',
+		'Aucun serveur intermédiaire. Le trafic va de votre navigateur à votre endpoint.',
 	'hiw.pipeline': 'Le pipeline',
 	'hiw.step.document': 'Votre document',
 	'hiw.step.parsing': 'Analyse',
