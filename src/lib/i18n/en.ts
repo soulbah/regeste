@@ -162,8 +162,7 @@ export const en = {
 	'turn.closest': 'Closest passages, none supported an answer',
 
 	// Retrieval preview turn
-	'retrieval.notice':
-		'Search preview. Private mode turns these passages into a written answer with citations.',
+	'retrieval.notice': 'No AI answer yet, so here are the matching passages from your documents.',
 	'retrieval.noDocs':
 		'No documents in this chat. Attach one to search it; AI answers from general knowledge arrive with the AI modes.',
 	'retrieval.noHits': 'No passage in the attached documents matches this closely.',

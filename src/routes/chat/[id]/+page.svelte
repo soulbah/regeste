@@ -109,7 +109,17 @@
 		}
 	}
 
+	// Closing the panel means clearing whatever summoned it — otherwise
+	// panelWanted stays true and the effect below re-opens it on the next tick
+	// (the bug where ✕ did nothing on the document viewer).
+	function clearPanelState() {
+		viewerStore.close();
+		chatsStore.closeWhatAiSaw();
+		if (reviewing) chatsStore.cancelAssisted();
+	}
+
 	function hidePanel() {
+		clearPanelState();
 		if (lgViewport.current) panelPane?.collapse();
 		else panelSheetOpen = false;
 	}
@@ -523,12 +533,18 @@
 
 <!-- Below 1024px the same panel rides a right Sheet over the conversation. -->
 {#if !lgViewport.current}
-	<Sheet.Root bind:open={panelSheetOpen}>
+	<Sheet.Root
+		open={panelSheetOpen}
+		onOpenChange={(o) => {
+			panelSheetOpen = o;
+			if (!o) clearPanelState();
+		}}
+	>
 		<Sheet.Content
 			side="right"
 			class="w-full gap-0 p-0 sm:max-w-md [&>[data-slot=sheet-close]]:hidden"
 		>
-			{@render panelContent(() => (panelSheetOpen = false))}
+			{@render panelContent(hidePanel)}
 		</Sheet.Content>
 	</Sheet.Root>
 {/if}

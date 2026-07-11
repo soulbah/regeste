@@ -168,7 +168,7 @@ export const fr: Record<keyof typeof en, string> = {
 
 	// Retrieval preview turn
 	'retrieval.notice':
-		'Aperçu de la recherche. Le mode Private transforme ces passages en une réponse rédigée avec citations.',
+		'Pas encore de réponse IA : voici les passages de vos documents qui correspondent.',
 	'retrieval.noDocs':
 		'Aucun document dans cette discussion. Joignez-en un pour le consulter ; les réponses de culture générale arrivent avec les modes IA.',
 	'retrieval.noHits':
