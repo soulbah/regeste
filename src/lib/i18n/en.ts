@@ -133,6 +133,7 @@ export const en = {
 	'docs.add': 'Add documents',
 	'docs.optionsAria': 'Options for {name}',
 	'docs.remove': 'Remove from chat',
+	'docs.searchLibrary': 'Search your documents…',
 
 	// Document ingest statuses
 	'status.ready': 'Ready',

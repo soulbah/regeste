@@ -11,6 +11,7 @@
 	import FolderIcon from '@lucide/svelte/icons/folder';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import ListChecksIcon from '@lucide/svelte/icons/list-checks';
+	import DocumentPicker from '$lib/components/document-picker.svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import { documentsStore } from '$lib/state/documents.svelte';
 
@@ -44,6 +45,17 @@
 	] as const;
 
 	let fileInput = $state<HTMLInputElement | null>(null);
+	let pickerOpen = $state(false);
+	// Past this many, an inline submenu is a cramped scroll with no search, so
+	// "My documents" opens the searchable picker instead.
+	const INLINE_MAX = 5;
+
+	function openPicker() {
+		// Let the menu finish closing (its dismiss layer unregister) before the
+		// dialog mounts, or the dialog comes up unable to close — the bits-ui
+		// menu→modal race.
+		setTimeout(() => (pickerOpen = true), 200);
+	}
 </script>
 
 <input
@@ -94,20 +106,27 @@
 			{t('addDocs.upload')}
 		</DropdownMenu.Item>
 		{#if !libraryEmpty}
-			<DropdownMenu.Sub>
-				<DropdownMenu.SubTrigger>
+			{#if documentsStore.library.length > INLINE_MAX}
+				<DropdownMenu.Item onSelect={openPicker}>
 					<FolderIcon class="text-muted-foreground" />
 					{t('addDocs.choose')}
-				</DropdownMenu.SubTrigger>
-				<DropdownMenu.SubContent class="max-h-72 w-72 overflow-y-auto">
-					{#each documentsStore.library as doc (doc.id)}
-						<DropdownMenu.Item onclick={() => onattach(doc.id)}>
-							<FileTextIcon class="text-muted-foreground shrink-0" />
-							<span class="truncate">{doc.name}</span>
-						</DropdownMenu.Item>
-					{/each}
-				</DropdownMenu.SubContent>
-			</DropdownMenu.Sub>
+				</DropdownMenu.Item>
+			{:else}
+				<DropdownMenu.Sub>
+					<DropdownMenu.SubTrigger>
+						<FolderIcon class="text-muted-foreground" />
+						{t('addDocs.choose')}
+					</DropdownMenu.SubTrigger>
+					<DropdownMenu.SubContent class="max-h-72 w-72 overflow-y-auto">
+						{#each documentsStore.library as doc (doc.id)}
+							<DropdownMenu.Item onclick={() => onattach(doc.id)}>
+								<FileTextIcon class="text-muted-foreground shrink-0" />
+								<span class="truncate">{doc.name}</span>
+							</DropdownMenu.Item>
+						{/each}
+					</DropdownMenu.SubContent>
+				</DropdownMenu.Sub>
+			{/if}
 		{/if}
 		{#if hasReadyDocs && onaction}
 			<DropdownMenu.Sub>
@@ -126,3 +145,5 @@
 		{/if}
 	</DropdownMenu.Content>
 </DropdownMenu.Root>
+
+<DocumentPicker bind:open={pickerOpen} onpick={onattach} />

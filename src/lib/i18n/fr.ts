@@ -137,6 +137,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'docs.add': 'Ajouter des documents',
 	'docs.optionsAria': 'Options de {name}',
 	'docs.remove': 'Retirer de la discussion',
+	'docs.searchLibrary': 'Chercher dans vos documents…',
 
 	// Document ingest statuses
 	'status.ready': 'Prêt',
