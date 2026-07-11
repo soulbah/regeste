@@ -41,7 +41,9 @@
 	}
 </script>
 
-<Command.Dialog bind:open class="rounded-xl shadow-2xl sm:max-w-[640px]">
+<!-- Centered (overriding the palette's top-third anchor): the library list can
+     be long, and top-third left the dialog sagging near the bottom edge. -->
+<Command.Dialog bind:open class="top-1/2 -translate-y-1/2 rounded-xl shadow-2xl sm:max-w-[640px]">
 	<Command.Input placeholder={t('docs.searchLibrary')} class="h-14 text-[15px]" />
 	<div class="bg-border h-px shrink-0"></div>
 	<Command.List class="max-h-[50vh] p-2">
