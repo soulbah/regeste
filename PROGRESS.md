@@ -28,6 +28,7 @@ Canonical project state. Read this first; update it (status table + one log line
 | 020  | Refonte leftovers: /chat/* routes, answer versions, related, quote     | done   |
 | 021  | Account menu, settings modal, 3-tab sidebar, cmd-k v2                  | done   |
 | 022  | AI modes: minimal picker, AI-tab cards, onboarding                     | done   |
+| 023  | OCR for scanned PDFs (PP-OCRv5 on-device, opt-in)                      | spike  |
 | —    | Landing page at / (root freed by 020); brand/logo; mobile pass         | later  |
 | —    | Open-source launch prep (checklist: docs/internal/OSS-LAUNCH.md)       | later  |
 
