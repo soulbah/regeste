@@ -11,7 +11,7 @@
 	import { Textarea } from '$lib/components/ui/textarea';
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import InfoIcon from '@lucide/svelte/icons/info';
-	import PanelRightOpenIcon from '@lucide/svelte/icons/panel-right-open';
+	import PanelRightIcon from '@lucide/svelte/icons/panel-right';
 	import MessageSquareQuoteIcon from '@lucide/svelte/icons/message-square-quote';
 	import Composer from '$lib/components/composer.svelte';
 	import RetrievalTurn from '$lib/components/retrieval-turn.svelte';
@@ -248,7 +248,7 @@
 										aria-label={t('chat.panelToggleAria')}
 										onclick={togglePanel}
 									>
-										<PanelRightOpenIcon />
+										<PanelRightIcon />
 									</Button>
 								{/snippet}
 							</Tooltip.Trigger>
