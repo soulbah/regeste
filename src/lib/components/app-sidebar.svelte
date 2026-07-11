@@ -29,6 +29,9 @@
 	let renameTarget = $state<LocalChat | null>(null);
 	let renameValue = $state('');
 	let deleteTarget = $state<LocalChat | null>(null);
+	// Which chat's options menu is open — its row stays highlighted so it's clear
+	// what pin/rename/export/delete will act on once focus moves into the menu.
+	let openMenuChatId = $state<string | null>(null);
 
 	async function confirmRename() {
 		if (!renameTarget) return;
@@ -168,14 +171,22 @@
 					<Sidebar.Menu>
 						{#each group.chats as chat (chat.id)}
 							<Sidebar.MenuItem>
-								<Sidebar.MenuButton isActive={page.url.pathname.includes(chat.id)}>
+								<Sidebar.MenuButton
+									isActive={page.url.pathname.includes(chat.id)}
+									class={openMenuChatId === chat.id
+										? 'bg-sidebar-accent text-sidebar-accent-foreground'
+										: ''}
+								>
 									{#snippet child({ props })}
 										<a href={resolve(`/chat/${chat.id}`)} {...props}>
 											<span class="truncate">{chat.title}</span>
 										</a>
 									{/snippet}
 								</Sidebar.MenuButton>
-								<DropdownMenu.Root>
+								<DropdownMenu.Root
+									open={openMenuChatId === chat.id}
+									onOpenChange={(v) => (openMenuChatId = v ? chat.id : null)}
+								>
 									<DropdownMenu.Trigger>
 										{#snippet child({ props: menuProps })}
 											<Tooltip.Root>
