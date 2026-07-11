@@ -48,8 +48,8 @@ export const en = {
 
 	// Command palette
 	'palette.placeholder': 'Search chats, documents, commands…',
-	'palette.noResults': 'Nothing found on this device.',
-	'palette.hint': 'Type to search everything on this device.',
+	'palette.noResults': 'Nothing found.',
+	'palette.hint': 'Type to search everything.',
 	'palette.chats': 'Chats',
 	'palette.documents': 'Documents',
 	'palette.commands': 'Commands',
@@ -192,7 +192,7 @@ export const en = {
 	'wais.kbSent': '{kb} KB sent',
 	'wais.excluded': 'Excluded by you',
 	'wais.sent': 'Sent',
-	'wais.stayed': 'Stayed on this device',
+	'wais.stayed': 'Stayed',
 	'wais.noPassages': 'No document passages. Only your question was involved.',
 	'wais.notRecorded': 'Passage details were not recorded for this older answer.',
 	'wais.nothing': 'Nothing recorded for this answer.',
@@ -200,7 +200,7 @@ export const en = {
 
 	// Viewer panel
 	'viewer.document': 'Document',
-	'viewer.removed': 'No longer on this device',
+	'viewer.removed': 'No longer available',
 	'viewer.removedBody':
 		'This document was removed from your library. The citation kept a snapshot of the passage:',
 	'viewer.missing': 'Original file unavailable',
@@ -258,8 +258,6 @@ export const en = {
 	'docsPage.scanned': 'scanned pages await reading',
 	'docsPage.ocrRunning': 'reading scanned pages…',
 	'docsPage.readScanned': 'Read the scanned pages',
-	'docsPage.sentOn': 'Excerpts sent {date}',
-	'docsPage.neverSent': 'Never sent',
 	'docsPage.inChats': 'In {count} chat{s}',
 	'docsPage.openAria': 'Open details for {name}',
 	'docsPage.deleteFromDevice': 'Delete from this device',
@@ -270,7 +268,6 @@ export const en = {
 	'docsPage.deleteConfirm': 'Delete permanently',
 
 	// Document sheet
-	'sheet.stored': 'Stored on this device',
 	'sheet.size': 'Size',
 	'sheet.pages': 'Pages',
 	'sheet.indexed': 'Indexed',
@@ -280,7 +277,7 @@ export const en = {
 	'sheet.times': '{count} time{s}',
 	'sheet.privacy': 'Privacy',
 	'sheet.loading': 'Loading…',
-	'sheet.neverSent': 'Never sent anywhere',
+	'sheet.neverSent': 'Never sent',
 	'sheet.usedIn': 'Used in',
 	'sheet.noChats': 'No chats yet.',
 	'sheet.open': 'Open',
@@ -300,10 +297,10 @@ export const en = {
 	'sheet.copied': 'Fingerprint copied',
 	'sheet.details': 'Details',
 	'sheet.usedInCount': 'Used in {count} chat{s}',
-	'sheet.stillIndexing': 'Still indexing on this device',
+	'sheet.stillIndexing': 'Still indexing',
 	'sheet.openChatAria': 'Open the chat {title}',
 	'sheet.scannedTitle': 'These pages are scanned images.',
-	'sheet.scannedBody': 'Read them on your device to search and cite them. Nothing is sent.',
+	'sheet.scannedBody': 'Read them to search and cite them.',
 	'sheet.readScanned': 'Read the scanned pages',
 	'sheet.ocrRunning': 'Reading page {done} of {total}…',
 
@@ -319,7 +316,7 @@ export const en = {
 	// Settings
 	'settings.title': 'Settings',
 	'settings.subtitle': 'Storage · privacy · offline',
-	'settings.storage.title': 'Storage on this device',
+	'settings.storage.title': 'Storage',
 	'settings.storage.used': '{used} used',
 	'settings.storage.available': '{quota} available',
 	'settings.storage.persistent': "Persistent: the browser won't evict your documents",
@@ -405,12 +402,12 @@ export const en = {
 	'settings.offline.badge': 'Offline · nothing leaves this device',
 	'settings.workspace.title': 'Workspace',
 	'settings.workspace.exportDesc':
-		'Export your documents, chats, citations and privacy history as a plain zip. Built on this device, sent nowhere.',
+		'Export your documents, chats, citations and privacy history as a plain zip.',
 	'settings.workspace.packing': 'Packing…',
 	'settings.workspace.export': 'Export my workspace',
 	'settings.workspace.quota': 'Assisted usage this month: {used} / {limit}',
 	'settings.workspace.quotaSignIn': "Assisted usage appears here once you're signed in.",
-	'settings.models.title': 'Downloaded AI on this device',
+	'settings.models.title': 'Downloaded AI',
 	'settings.models.measuring': 'Measuring…',
 	'settings.models.none': 'Nothing downloaded yet.',
 	'settings.models.files': '{count} files',
@@ -426,9 +423,9 @@ export const en = {
 	'settings.wipe.title': 'Delete everything',
 	'settings.wipe.desc':
 		'Erases every document, chat, search index and downloaded AI from this device. Nothing exists anywhere else, so this cannot be undone.',
-	'settings.wipe.cta': 'Delete everything on this device',
+	'settings.wipe.cta': 'Delete everything',
 	'settings.wipe.last': 'Last confirmation',
-	'settings.wipe.confirmTitle': 'Delete everything on this device?',
+	'settings.wipe.confirmTitle': 'Delete everything?',
 	'settings.wipe.armedBody':
 		'This permanently destroys every document, chat, index and downloaded AI stored in this browser. Nothing exists anywhere else. Really delete?',
 	'settings.wipe.body':
@@ -511,7 +508,7 @@ export const en = {
 	'toast.failedScanned': "No text found. Scanned documents aren't supported yet.",
 	'toast.failedGeneric': 'Something went wrong while reading this file.',
 	'toast.added': '{name} added to My documents',
-	'toast.addedDesc': 'Available to every chat, stored on this device.',
+	'toast.addedDesc': 'Available to every chat.',
 
 	// Errors (stores + net)
 	'error.offline': 'Offline mode is on. Nothing leaves this device.',

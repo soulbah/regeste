@@ -317,17 +317,6 @@
 										<Progress value={ingest.phaseProgress * 100} class="mt-1.5 h-1" />
 									{/if}
 								</div>
-								{#if documentsStore.egress[doc.id]}
-									<Badge variant="working" class="shrink-0 text-[10px]">
-										{t('docsPage.sentOn', {
-											date: new Date(documentsStore.egress[doc.id]).toLocaleDateString()
-										})}
-									</Badge>
-								{:else}
-									<Badge variant="secondary" class="shrink-0 text-[10px]">
-										{t('docsPage.neverSent')}
-									</Badge>
-								{/if}
 								<Badge variant="outline" class="shrink-0">
 									{t('docsPage.inChats', {
 										count: doc.chatCount,
