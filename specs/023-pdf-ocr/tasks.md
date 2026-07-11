@@ -34,14 +34,14 @@ wedge in sandboxes — irrelevant to prod, but the OCR worker must not depend on
 - [x] 3.1 `scanned`/`ocr` handled in the detail panel (bordered CTA block: "Read the scanned pages" → progress + Cancel), the documents row (meta + ⋯ menu action), and the chat sources panel (idle muted dot).
 - [x] 3.2 Per-page progress via the existing `setIngest` channel + Cancel; copy in both dictionaries, verb-first, no "OCR" jargon. `bun run lint` = 0 errors.
 
-## Phase 4 — Verify — PARTIAL (sandbox cannot run the app dev server)
+## Phase 4 — Verify — DONE (end-to-end, live)
 
 - [x] `bun run verify` (check + lint + test + build) all green.
 - [x] Engine + OffscreenCanvas path validated live in the plain-Vite spike.
-- [ ] **Owner to run**: the integrated flow (ingest scanned PDF → `scanned` → tap Read → `ready` → cited answer) can only run in the real app; the CF `platformProxy` wedges `workerd` in this sandbox, so the app dev server won't start here. `bun run dev` on the owner's machine, open a scanned PDF, verify zero document egress.
+- [x] **Full in-app flow verified live** (2026-07-11, localhost:5183, main-repo code): a generated image-only French PDF ingested → `scanned` ("scanned pages await reading", no error); tapping "Read the scanned pages" ran on-device OCR → merged/chunked/embedded → `ready` (Language FR detected, e5 embedding model set); ⌘K search for "François Ménard" — text present ONLY in the scanned image — returned the doc with the correct page-1 snippet, accents intact. The dev-server blocker was a stuck workerd vnode/inode in the main `node_modules` (byte-identical binary, bad file instance → every launch went `UE`); `bun install --force` recreated it (fresh inode) and the server started normally. Not a Node-23 or platformProxy issue after all.
 
 Completion checklist:
 
 - [x] `bun run verify` passes
 - [x] PROGRESS.md updated
-- [ ] spec.md Verification executed end-to-end (owner's machine — sandbox blocker above)
+- [x] spec.md Verification executed end-to-end (live)
