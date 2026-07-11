@@ -17,7 +17,9 @@ export async function parsePdf(data: ArrayBuffer): Promise<ParsedDoc> {
 	const workerUrl = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default;
 	pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
-	const loadingTask = pdfjs.getDocument({ data });
+	// slice() so pdf.js can't detach the caller's buffer — ingest and ocrDocument
+	// both reuse the same ArrayBuffer after parsing.
+	const loadingTask = pdfjs.getDocument({ data: data.slice(0) });
 	const doc = await loadingTask.promise;
 	const blocks: ParsedBlock[] = [];
 	const needsOcr: number[] = [];

@@ -265,9 +265,10 @@ class DocumentsStore {
 			const needsOcr = parsed.needsOcr ?? [];
 
 			const { ocrPages } = await import('$lib/pipeline/ocr');
-			const original = (await readOriginal(doc.hash)) ?? data;
+			// parseByName no longer detaches `data` (parsePdf slices), and ocrPages
+			// slices again before its own getDocument, so reuse is safe.
 			const ocrBlocks = await ocrPages(
-				original,
+				data,
 				needsOcr,
 				(p) =>
 					this.setIngest(id, {
