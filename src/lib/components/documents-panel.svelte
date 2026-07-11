@@ -179,7 +179,7 @@
 		<AddDocuments
 			libraryEmpty={documentsStore.library.length === 0}
 			onupload={handleUpload}
-			onattach={(docId) => chatsStore.attach(chatId, docId)}
+			onattach={(docIds) => chatsStore.attachMany(chatId, docIds)}
 			side="top"
 		>
 			{#snippet trigger({ props })}

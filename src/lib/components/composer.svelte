@@ -34,7 +34,7 @@
 		onsend: (text: string) => void;
 		onmodeselect: (mode: ChatMode) => void;
 		onupload: (files: File[]) => void;
-		onattach: (documentId: string) => void;
+		onattach: (documentIds: string[]) => void;
 		libraryEmpty: boolean;
 		myaiModel?: string | null;
 		privateOnly?: boolean;
@@ -82,7 +82,7 @@
 	});
 
 	function pickHash(docId: string) {
-		onattach(docId);
+		onattach([docId]);
 		text = text.replace(/(^|\s)#([\p{L}\p{N} _.-]*)$/u, '$1').trimEnd();
 	}
 </script>

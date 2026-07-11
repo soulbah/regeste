@@ -67,11 +67,11 @@
 		}
 	}
 
-	async function handleAttach(documentId: string) {
+	async function handleAttach(documentIds: string[]) {
 		const id = await chatsStore.create(mode ?? 'private');
 		await chatsStore.open(id);
 		goto(resolve(`/chat/${id}`));
-		await chatsStore.attach(id, documentId);
+		await chatsStore.attachMany(id, documentIds);
 	}
 </script>
 

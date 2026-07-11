@@ -14,6 +14,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'disabled.indexing': 'Ce document est encore en cours de préparation.',
 	'disabled.needEmail': "Saisissez d'abord un email valide.",
 	'disabled.selectExcerpts': 'Sélectionnez au moins un passage.',
+	'disabled.selectDoc': 'Sélectionnez au moins un document.',
 	'disabled.consentFirst': "Acceptez d'abord l'envoi des passages.",
 	'common.save': 'Enregistrer',
 	'common.send': 'Envoyer',
@@ -138,6 +139,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'docs.optionsAria': 'Options de {name}',
 	'docs.remove': 'Retirer de la discussion',
 	'docs.searchLibrary': 'Chercher dans vos documents…',
+	'docs.addSelected': 'Ajouter',
 
 	// Document ingest statuses
 	'status.ready': 'Prêt',

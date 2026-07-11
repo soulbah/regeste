@@ -486,7 +486,7 @@
 					onsend={handleSend}
 					onmodeselect={(m) => chatsStore.setMode(chatId, m)}
 					onupload={handleUpload}
-					onattach={(docId) => chatsStore.attach(chatId, docId)}
+					onattach={(docIds) => chatsStore.attachMany(chatId, docIds)}
 					libraryEmpty={documentsStore.library.length === 0}
 					myaiModel={chatsStore.activeChat?.myaiModel ?? null}
 					privateOnly={chatsStore.activeChat?.privateOnly ?? false}

@@ -309,6 +309,16 @@ class ChatsStore {
 		await documentsStore.refreshLibrary();
 	}
 
+	/** Attach several library documents to a chat in one go (picker multi-select). */
+	async attachMany(chatId: string, documentIds: string[]): Promise<void> {
+		if (!documentIds.length) return;
+		const { db } = await getLocalDb();
+		for (const id of documentIds) await db.attachDocument(chatId, id);
+		await db.touchChat(chatId);
+		if (this.activeChatId === chatId) this.chatDocuments = await db.listChatDocuments(chatId);
+		await documentsStore.refreshLibrary();
+	}
+
 	async detach(chatId: string, documentId: string): Promise<void> {
 		const { db } = await getLocalDb();
 		await db.detachDocument(chatId, documentId);

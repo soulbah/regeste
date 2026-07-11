@@ -28,7 +28,7 @@
 	}: {
 		libraryEmpty: boolean;
 		onupload: (files: File[]) => void;
-		onattach: (documentId: string) => void;
+		onattach: (documentIds: string[]) => void;
 		/** R3 — preset actions only make sense with something to act on. */
 		hasReadyDocs?: boolean;
 		onaction?: ((question: string) => void) | null;
@@ -52,8 +52,8 @@
 
 	function openPicker() {
 		// Let the menu finish closing (its dismiss layer unregister) before the
-		// dialog mounts, or the dialog comes up unable to close — the bits-ui
-		// menu→modal race.
+		// dialog mounts, or the dialog comes up unable to close (bits-ui
+		// menu-then-modal race).
 		setTimeout(() => (pickerOpen = true), 200);
 	}
 </script>
@@ -119,7 +119,7 @@
 					</DropdownMenu.SubTrigger>
 					<DropdownMenu.SubContent class="max-h-72 w-72 overflow-y-auto">
 						{#each documentsStore.library as doc (doc.id)}
-							<DropdownMenu.Item onclick={() => onattach(doc.id)}>
+							<DropdownMenu.Item onclick={() => onattach([doc.id])}>
 								<FileTextIcon class="text-muted-foreground shrink-0" />
 								<span class="truncate">{doc.name}</span>
 							</DropdownMenu.Item>

@@ -11,6 +11,7 @@ export const en = {
 	'disabled.indexing': 'This document is still being prepared.',
 	'disabled.needEmail': 'Enter a valid email first.',
 	'disabled.selectExcerpts': 'Select at least one excerpt.',
+	'disabled.selectDoc': 'Select at least one document.',
 	'disabled.consentFirst': 'Accept sending excerpts first.',
 	'common.save': 'Save',
 	'common.send': 'Send',
@@ -134,6 +135,7 @@ export const en = {
 	'docs.optionsAria': 'Options for {name}',
 	'docs.remove': 'Remove from chat',
 	'docs.searchLibrary': 'Search your documents…',
+	'docs.addSelected': 'Add',
 
 	// Document ingest statuses
 	'status.ready': 'Ready',
