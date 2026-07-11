@@ -43,6 +43,7 @@
 
 <Command.Dialog bind:open class="rounded-xl shadow-2xl sm:max-w-[640px]">
 	<Command.Input placeholder={t('docs.searchLibrary')} class="h-14 text-[15px]" />
+	<div class="bg-border h-px shrink-0"></div>
 	<Command.List class="max-h-[50vh] p-2">
 		<Command.Empty>{t('docsPage.noMatch')}</Command.Empty>
 		{#each documentsStore.library as doc (doc.id)}
@@ -50,6 +51,7 @@
 				value={`${doc.name} ${doc.id}`}
 				onSelect={() => toggle(doc.id)}
 				aria-label={t('docs.useAria', { name: doc.name })}
+				class="data-selected:before:hidden"
 			>
 				<Checkbox
 					checked={selected.has(doc.id)}
@@ -74,7 +76,9 @@
 			<Tooltip.Trigger>
 				{#snippet child({ props })}
 					<Button {...props} size="sm" disabled={selected.size === 0} onclick={confirm}>
-						{t('docs.addSelected')}{selected.size ? ` · ${selected.size}` : ''}
+						{selected.size === 0
+							? t('docs.add')
+							: t('docs.addCount', { count: selected.size, s: selected.size === 1 ? '' : 's' })}
 					</Button>
 				{/snippet}
 			</Tooltip.Trigger>

@@ -135,7 +135,7 @@ export const en = {
 	'docs.optionsAria': 'Options for {name}',
 	'docs.remove': 'Remove from chat',
 	'docs.searchLibrary': 'Search your documents…',
-	'docs.addSelected': 'Add',
+	'docs.addCount': 'Add {count} document{s}',
 
 	// Document ingest statuses
 	'status.ready': 'Ready',

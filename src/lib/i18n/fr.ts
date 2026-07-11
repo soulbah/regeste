@@ -139,7 +139,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'docs.optionsAria': 'Options de {name}',
 	'docs.remove': 'Retirer de la discussion',
 	'docs.searchLibrary': 'Chercher dans vos documents…',
-	'docs.addSelected': 'Ajouter',
+	'docs.addCount': 'Ajouter {count} document{s}',
 
 	// Document ingest statuses
 	'status.ready': 'Prêt',
