@@ -129,6 +129,10 @@ export const en = {
 	'docs.openAria': 'Open {name} in the viewer',
 	'docs.removeAria': 'Remove {name} from this chat',
 	'docs.empty': 'No documents in this chat yet.',
+	'docs.emptyHint': 'Add one to ask questions about it.',
+	'docs.add': 'Add documents',
+	'docs.optionsAria': 'Options for {name}',
+	'docs.remove': 'Remove from chat',
 
 	// Document ingest statuses
 	'status.ready': 'Ready',

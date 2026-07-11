@@ -2,6 +2,7 @@
 	// The composer's single + menu (spec 019): attach documents and preset
 	// actions live behind one entry point, like the ChatGPT/Claude + button.
 	import { mergeProps } from 'bits-ui';
+	import type { Snippet } from 'svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { Button } from '$lib/components/ui/button';
@@ -19,7 +20,10 @@
 		onattach,
 		hasReadyDocs = false,
 		onaction = null,
-		disabled = false
+		disabled = false,
+		/** Custom trigger; defaults to the composer's + icon button. */
+		trigger = null,
+		side = 'top'
 	}: {
 		libraryEmpty: boolean;
 		onupload: (files: File[]) => void;
@@ -28,6 +32,8 @@
 		hasReadyDocs?: boolean;
 		onaction?: ((question: string) => void) | null;
 		disabled?: boolean;
+		trigger?: Snippet<[{ props: Record<string, unknown> }]> | null;
+		side?: 'top' | 'bottom';
 	} = $props();
 
 	const presetActions = [
@@ -58,27 +64,31 @@
 <DropdownMenu.Root>
 	<DropdownMenu.Trigger>
 		{#snippet child({ props: menuProps })}
-			<Tooltip.Root>
-				<Tooltip.Trigger>
-					{#snippet child({ props: tipProps })}
-						<!-- mergeProps chains the two triggers' handlers; a plain double
-						     spread lets the tooltip's onpointerdown erase the menu's. -->
-						<Button
-							{...mergeProps(menuProps, tipProps)}
-							variant="ghost"
-							size="icon-sm"
-							class="text-muted-foreground"
-							aria-label={t('addDocs.menuAria')}
-						>
-							<PlusIcon />
-						</Button>
-					{/snippet}
-				</Tooltip.Trigger>
-				<Tooltip.Content side="top">{t('addDocs.menuAria')}</Tooltip.Content>
-			</Tooltip.Root>
+			{#if trigger}
+				{@render trigger({ props: menuProps })}
+			{:else}
+				<Tooltip.Root>
+					<Tooltip.Trigger>
+						{#snippet child({ props: tipProps })}
+							<!-- mergeProps chains the two triggers' handlers; a plain double
+							     spread lets the tooltip's onpointerdown erase the menu's. -->
+							<Button
+								{...mergeProps(menuProps, tipProps)}
+								variant="ghost"
+								size="icon-sm"
+								class="text-muted-foreground"
+								aria-label={t('addDocs.menuAria')}
+							>
+								<PlusIcon />
+							</Button>
+						{/snippet}
+					</Tooltip.Trigger>
+					<Tooltip.Content side="top">{t('addDocs.menuAria')}</Tooltip.Content>
+				</Tooltip.Root>
+			{/if}
 		{/snippet}
 	</DropdownMenu.Trigger>
-	<DropdownMenu.Content align="start" side="top" class="w-56">
+	<DropdownMenu.Content align="start" {side} class="w-56">
 		<DropdownMenu.Item onclick={() => fileInput?.click()}>
 			<UploadIcon class="text-muted-foreground" />
 			{t('addDocs.upload')}

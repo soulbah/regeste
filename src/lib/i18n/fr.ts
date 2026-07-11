@@ -133,6 +133,10 @@ export const fr: Record<keyof typeof en, string> = {
 	'docs.openAria': 'Ouvrir {name} dans la visionneuse',
 	'docs.removeAria': 'Retirer {name} de cette discussion',
 	'docs.empty': 'Aucun document dans cette discussion pour le moment.',
+	'docs.emptyHint': 'Ajoutez-en un pour poser des questions dessus.',
+	'docs.add': 'Ajouter des documents',
+	'docs.optionsAria': 'Options de {name}',
+	'docs.remove': 'Retirer de la discussion',
 
 	// Document ingest statuses
 	'status.ready': 'Prêt',
