@@ -380,13 +380,16 @@
 							})}
 						</p>
 						<div class="flex items-center gap-2">
+							<span class="text-muted-foreground hidden text-xs whitespace-nowrap sm:inline">
+								{t('pagination.perPage')}
+							</span>
 							<Select.Root
 								type="single"
 								value={String(pageSize)}
 								onValueChange={(v) => (pageSize = Number(v) as (typeof PAGE_SIZES)[number])}
 							>
-								<Select.Trigger class="h-8 w-[7.5rem] text-xs" aria-label={t('pagination.perPage')}>
-									{t('pagination.perPage')} · {pageSize}
+								<Select.Trigger class="h-8 w-16 text-xs" aria-label={t('pagination.perPage')}>
+									{pageSize}
 								</Select.Trigger>
 								<Select.Content>
 									{#each PAGE_SIZES as size (size)}
