@@ -162,10 +162,11 @@ export const en = {
 	'turn.closest': 'Closest passages, none supported an answer',
 
 	// Retrieval preview turn
-	'retrieval.badge': 'Retrieval preview · AI answers arrive with Private mode',
+	'retrieval.notice':
+		'Search preview. Private mode turns these passages into a written answer with citations.',
 	'retrieval.noDocs':
 		'No documents in this chat. Attach one to search it; AI answers from general knowledge arrive with the AI modes.',
-	'retrieval.noHits': "I couldn't find enough information in the attached documents for this.",
+	'retrieval.noHits': 'No passage in the attached documents matches this closely.',
 	'retrieval.weak': 'These passages barely match the question. An answer may be unreliable.',
 	'retrieval.openAria': 'Open {name} at this passage',
 

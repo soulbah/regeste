@@ -167,11 +167,12 @@ export const fr: Record<keyof typeof en, string> = {
 	'turn.closest': "Passages les plus proches, aucun n'a permis de répondre",
 
 	// Retrieval preview turn
-	'retrieval.badge': 'Aperçu de la recherche · les réponses IA arrivent avec le mode Private',
+	'retrieval.notice':
+		'Aperçu de la recherche. Le mode Private transforme ces passages en une réponse rédigée avec citations.',
 	'retrieval.noDocs':
 		'Aucun document dans cette discussion. Joignez-en un pour le consulter ; les réponses de culture générale arrivent avec les modes IA.',
 	'retrieval.noHits':
-		"Je n'ai pas trouvé assez d'informations dans les documents joints pour cela.",
+		'Aucun passage des documents joints ne correspond vraiment à cette recherche.',
 	'retrieval.weak':
 		'Ces passages ont peu de rapport avec la question. Une réponse peut être peu fiable.',
 	'retrieval.openAria': 'Ouvrir {name} à ce passage',
