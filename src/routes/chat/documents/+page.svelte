@@ -23,8 +23,12 @@
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import Trash2Icon from '@lucide/svelte/icons/trash-2';
 	import InfoIcon from '@lucide/svelte/icons/info';
+	import ReplaceIcon from '@lucide/svelte/icons/replace';
+	import ChevronsLeftIcon from '@lucide/svelte/icons/chevrons-left';
+	import ChevronsRightIcon from '@lucide/svelte/icons/chevrons-right';
 	import DocumentDetailPanel from '$lib/components/document-detail-panel.svelte';
 	import { MediaQuery } from 'svelte/reactivity';
+	import { toast } from 'svelte-sonner';
 	import { dev } from '$app/environment';
 	import { page } from '$app/state';
 	import { t } from '$lib/i18n/index.svelte';
@@ -32,6 +36,8 @@
 	import type { LibraryDocument } from '$lib/types';
 
 	let fileInput = $state<HTMLInputElement | null>(null);
+	let replaceInput = $state<HTMLInputElement | null>(null);
+	let replaceTarget = $state<LibraryDocument | null>(null);
 	let deleteTarget = $state<LibraryDocument | null>(null);
 	let selected = $state<LibraryDocument | null>(null);
 
@@ -40,9 +46,11 @@
 	let sortBy = $state<'recent' | 'name' | 'size'>('recent');
 	let typeFilter = $state<'all' | 'pdf' | 'docx' | 'md' | 'txt'>('all');
 
-	// Client-side pagination: numbered pages under the list. Small page size so
-	// the control appears for a real library rather than only past 25 documents.
-	const PAGE_SIZE = 10;
+	// Client-side pagination with a chooseable page size. The full bar (range,
+	// per-page, first/last jumps) shows once the library outgrows the smallest
+	// page size, so bumping the size never makes the control vanish.
+	const PAGE_SIZES = [10, 25, 50] as const;
+	let pageSize = $state<(typeof PAGE_SIZES)[number]>(10);
 	let pageNum = $state(1);
 
 	// Details dock as a right panel on lg+, a right Sheet below that.
@@ -106,21 +114,25 @@
 		});
 	});
 
-	// Reset to the first page whenever the filtered set is redefined, so a filter
-	// can never strand the user on a now-empty page.
+	// Reset to the first page whenever the filtered set or the page size changes,
+	// so neither can strand the user on a now-empty page.
 	$effect(() => {
 		void query;
 		void sortBy;
 		void typeFilter;
+		void pageSize;
 		pageNum = 1;
 	});
 	// Clamp after the set shrinks (e.g. a delete emptied the last page).
 	$effect(() => {
-		const total = Math.max(1, Math.ceil(shown.length / PAGE_SIZE));
+		const total = Math.max(1, Math.ceil(shown.length / pageSize));
 		if (pageNum > total) pageNum = total;
 	});
 
-	const paged = $derived(shown.slice((pageNum - 1) * PAGE_SIZE, pageNum * PAGE_SIZE));
+	const paged = $derived(shown.slice((pageNum - 1) * pageSize, pageNum * pageSize));
+	const lastPage = $derived(Math.max(1, Math.ceil(shown.length / pageSize)));
+	// The library outgrew the smallest page size: show the full pagination bar.
+	const paginated = $derived(shown.length > PAGE_SIZES[0]);
 
 	const sortLabels = $derived({
 		recent: t('docsPage.sortRecent'),
@@ -142,6 +154,26 @@
 		if (selected?.id === id) selected = null;
 		deleteTarget = null;
 	}
+
+	// Replace from the row menu: the target is set by the menu item, then the
+	// hidden input is opened and its file swapped in (same path as the panel).
+	async function handleReplace(files: File[]) {
+		const doc = replaceTarget;
+		replaceTarget = null;
+		if (!doc || !files.length) return;
+		const file = files[0];
+		const error = await documentsStore.replace(doc.id, file);
+		if (error) {
+			toast.error(t('sheet.replaceFailed', { name: file.name }), {
+				description:
+					error === 'parse_failed' || error === 'scanned_pdf'
+						? t('sheet.replaceFailedNoText')
+						: t('sheet.replaceFailedKeep')
+			});
+		} else {
+			toast.success(t('sheet.replaced'), { description: t('sheet.replacedDesc') });
+		}
+	}
 </script>
 
 <svelte:head><title>{t('docs.title')} · Folio</title></svelte:head>
@@ -157,6 +189,17 @@
 		const files = Array.from(e.currentTarget.files ?? []);
 		e.currentTarget.value = '';
 		handleFiles(files);
+	}}
+/>
+<input
+	bind:this={replaceInput}
+	type="file"
+	accept=".pdf,.docx,.md,.markdown,.txt"
+	class="hidden"
+	onchange={(e) => {
+		const files = Array.from(e.currentTarget.files ?? []);
+		e.currentTarget.value = '';
+		handleReplace(files);
 	}}
 />
 
@@ -299,6 +342,15 @@
 											<InfoIcon class="text-muted-foreground" />
 											{t('docsPage.details')}
 										</DropdownMenu.Item>
+										<DropdownMenu.Item
+											onclick={() => {
+												replaceTarget = doc;
+												replaceInput?.click();
+											}}
+										>
+											<ReplaceIcon class="text-muted-foreground" />
+											{t('sheet.replaceFile')}
+										</DropdownMenu.Item>
 										<DropdownMenu.Separator />
 										<DropdownMenu.Item
 											class="text-destructive"
@@ -318,41 +370,88 @@
 					</Card.Content>
 				</Card.Root>
 
-				{#if shown.length > PAGE_SIZE}
-					<Pagination.Root
-						count={shown.length}
-						perPage={PAGE_SIZE}
-						bind:page={pageNum}
-						siblingCount={1}
-					>
-						{#snippet children({ pages, currentPage })}
-							<Pagination.Content>
-								<Pagination.Item>
-									<Pagination.PrevButton aria-label={t('pagination.prev')} />
-								</Pagination.Item>
-								{#each pages as p (p.key)}
-									{#if p.type === 'ellipsis'}
+				{#if paginated}
+					<div class="flex flex-wrap items-center justify-between gap-3 pt-1">
+						<p class="text-muted-foreground text-xs">
+							{t('pagination.range', {
+								from: (pageNum - 1) * pageSize + 1,
+								to: Math.min(pageNum * pageSize, shown.length),
+								total: shown.length
+							})}
+						</p>
+						<div class="flex items-center gap-2">
+							<Select.Root
+								type="single"
+								value={String(pageSize)}
+								onValueChange={(v) => (pageSize = Number(v) as (typeof PAGE_SIZES)[number])}
+							>
+								<Select.Trigger class="h-8 w-[7.5rem] text-xs" aria-label={t('pagination.perPage')}>
+									{t('pagination.perPage')} · {pageSize}
+								</Select.Trigger>
+								<Select.Content>
+									{#each PAGE_SIZES as size (size)}
+										<Select.Item value={String(size)}>{size}</Select.Item>
+									{/each}
+								</Select.Content>
+							</Select.Root>
+							<Pagination.Root
+								count={shown.length}
+								perPage={pageSize}
+								bind:page={pageNum}
+								siblingCount={1}
+							>
+								{#snippet children({ pages, currentPage })}
+									<Pagination.Content>
 										<Pagination.Item>
-											<Pagination.Ellipsis />
-										</Pagination.Item>
-									{:else}
-										<Pagination.Item>
-											<Pagination.Link
-												page={p}
-												isActive={currentPage === p.value}
-												aria-label={t('pagination.goToPage', { n: p.value })}
+											<Button
+												variant="ghost"
+												size="icon-sm"
+												disabled={currentPage === 1}
+												onclick={() => (pageNum = 1)}
+												aria-label={t('pagination.first')}
 											>
-												{p.value}
-											</Pagination.Link>
+												<ChevronsLeftIcon />
+											</Button>
 										</Pagination.Item>
-									{/if}
-								{/each}
-								<Pagination.Item>
-									<Pagination.NextButton aria-label={t('pagination.next')} />
-								</Pagination.Item>
-							</Pagination.Content>
-						{/snippet}
-					</Pagination.Root>
+										<Pagination.Item>
+											<Pagination.PrevButton aria-label={t('pagination.prev')} />
+										</Pagination.Item>
+										{#each pages as p (p.key)}
+											{#if p.type === 'ellipsis'}
+												<Pagination.Item>
+													<Pagination.Ellipsis />
+												</Pagination.Item>
+											{:else}
+												<Pagination.Item>
+													<Pagination.Link
+														page={p}
+														isActive={currentPage === p.value}
+														aria-label={t('pagination.goToPage', { n: p.value })}
+													>
+														{p.value}
+													</Pagination.Link>
+												</Pagination.Item>
+											{/if}
+										{/each}
+										<Pagination.Item>
+											<Pagination.NextButton aria-label={t('pagination.next')} />
+										</Pagination.Item>
+										<Pagination.Item>
+											<Button
+												variant="ghost"
+												size="icon-sm"
+												disabled={currentPage === lastPage}
+												onclick={() => (pageNum = lastPage)}
+												aria-label={t('pagination.last')}
+											>
+												<ChevronsRightIcon />
+											</Button>
+										</Pagination.Item>
+									</Pagination.Content>
+								{/snippet}
+							</Pagination.Root>
+						</div>
+					</div>
 				{/if}
 			</div>
 		{/if}

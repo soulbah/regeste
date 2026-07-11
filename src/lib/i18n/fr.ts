@@ -311,7 +311,11 @@ export const fr: Record<keyof typeof en, string> = {
 	// Pagination
 	'pagination.prev': 'Page précédente',
 	'pagination.next': 'Page suivante',
+	'pagination.first': 'Première page',
+	'pagination.last': 'Dernière page',
 	'pagination.goToPage': 'Aller à la page {n}',
+	'pagination.range': '{from}–{to} sur {total}',
+	'pagination.perPage': 'Par page',
 
 	// Settings
 	'settings.title': 'Réglages',

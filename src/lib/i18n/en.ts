@@ -301,7 +301,11 @@ export const en = {
 	// Pagination
 	'pagination.prev': 'Previous page',
 	'pagination.next': 'Next page',
+	'pagination.first': 'First page',
+	'pagination.last': 'Last page',
 	'pagination.goToPage': 'Go to page {n}',
+	'pagination.range': '{from}–{to} of {total}',
+	'pagination.perPage': 'Per page',
 
 	// Settings
 	'settings.title': 'Settings',
