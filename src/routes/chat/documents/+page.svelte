@@ -29,11 +29,13 @@
 	import ChevronsLeftIcon from '@lucide/svelte/icons/chevrons-left';
 	import ChevronsRightIcon from '@lucide/svelte/icons/chevrons-right';
 	import DocumentDetailPanel from '$lib/components/document-detail-panel.svelte';
+	import ViewerPanel from '$lib/components/viewer-panel.svelte';
 	import { toast } from 'svelte-sonner';
 	import { dev } from '$app/environment';
 	import { page } from '$app/state';
 	import { t } from '$lib/i18n/index.svelte';
 	import { documentsStore } from '$lib/state/documents.svelte';
+	import { viewerStore } from '$lib/state/viewer.svelte';
 	import type { LibraryDocument } from '$lib/types';
 
 	let fileInput = $state<HTMLInputElement | null>(null);
@@ -54,11 +56,11 @@
 	let pageSize = $state<(typeof PAGE_SIZES)[number]>(10);
 	let pageNum = $state(1);
 
-	// The panel is open exactly when a document is selected — nothing else lives
-	// in it here, so an empty open panel (or inheriting the chat's open state)
-	// can't happen. Writable derived: PanelShell may flip it on drag-close, and
-	// onOpenChange then clears `selected` so it settles closed.
-	let panelOpen = $derived(selected !== null);
+	// The panel hosts either the selected document's detail or, once the user
+	// opens it, the document viewer (same reuse as the chat). Open exactly when
+	// one of those is showing. Writable derived: PanelShell may flip it on
+	// drag-close, and onOpenChange then clears the state so it settles closed.
+	let panelOpen = $derived(selected !== null || viewerStore.isOpen);
 
 	// Dev-only display mocks: /chat/documents?mock renders fake rows so the
 	// page can be reviewed without ingesting anything. Display only — the
@@ -212,7 +214,12 @@
 
 <PanelShell
 	bind:open={panelOpen}
-	onOpenChange={(o) => !o && (selected = null)}
+	onOpenChange={(o) => {
+		if (!o) {
+			selected = null;
+			viewerStore.close();
+		}
+	}}
 	autoSaveId="folio-docs-panes"
 >
 	{#snippet main()}
@@ -489,7 +496,16 @@
 		</section>
 	{/snippet}
 	{#snippet panel()}
-		{#if selected}
+		{#if viewerStore.isOpen}
+			<!-- Opening a document swaps the detail for the viewer in the same panel
+			     (its back arrow returns to the detail); mirrors the chat. -->
+			<ViewerPanel
+				onhide={() => {
+					viewerStore.close();
+					selected = null;
+				}}
+			/>
+		{:else if selected}
 			<DocumentDetailPanel
 				document={selected}
 				onhide={() => (selected = null)}

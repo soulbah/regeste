@@ -25,9 +25,9 @@
 
 	let { children } = $props();
 
-	// Outside a chat, the right pane doesn't exist: ⌘K document results open
-	// the viewer in an overlay sheet instead.
-	const onChatRoute = $derived(page.route.id === '/chat/[id]');
+	// On routes with a contextual panel (chat, documents), the viewer rides that
+	// panel. Elsewhere the right pane doesn't exist, so ⌘K document results open
+	// the viewer in this overlay sheet instead.
 
 	// A second tab must fail loudly, not silently orphan the database (the OPFS
 	// SAH pool is single-owner; the worker refuses with 'folio-db-busy').
@@ -115,7 +115,7 @@
 <SettingsDialog />
 
 <Sheet.Root
-	open={viewerStore.isOpen && !onChatRoute}
+	open={viewerStore.isOpen && !panelStore.usingShell}
 	onOpenChange={(o) => !o && viewerStore.close()}
 >
 	<Sheet.Content side="right" class="w-full gap-0 p-0 sm:max-w-md">

@@ -6,6 +6,7 @@
 	// drive visibility through `open`; the "why" (what summons/clears the panel)
 	// stays in the route.
 	import type { Snippet } from 'svelte';
+	import { onMount } from 'svelte';
 	import { MediaQuery } from 'svelte/reactivity';
 	import * as Resizable from '$lib/components/ui/resizable';
 	import * as Sheet from '$lib/components/ui/sheet';
@@ -41,6 +42,12 @@
 		isCollapsed: () => boolean;
 	} | null>(null);
 
+	// paneforge restores its persisted layout on mount and fires onCollapse/onExpand
+	// while doing so. That restore must not drive `open` — a stale "expanded" entry
+	// would otherwise open the panel with nothing to show. Accept pane events only
+	// after we've reconciled the restored pane to `open` below.
+	let mounted = $state(false);
+
 	// Tell the layout to drop its inset card so the two panes float as cards.
 	$effect(() => {
 		panelStore.usingShell = true;
@@ -55,6 +62,16 @@
 		if (!lgViewport.current || !panelPane) return;
 		if (open && panelPane.isCollapsed()) panelPane.expand();
 		else if (!open && !panelPane.isCollapsed()) panelPane.collapse();
+	});
+
+	// After paneforge has restored (child mounts run before this), force the pane
+	// to match `open`, discarding any persisted open/closed state; width is kept.
+	onMount(() => {
+		if (lgViewport.current && panelPane) {
+			if (open && panelPane.isCollapsed()) panelPane.expand();
+			else if (!open && !panelPane.isCollapsed()) panelPane.collapse();
+		}
+		mounted = true;
 	});
 
 	function setOpen(o: boolean) {
@@ -85,8 +102,8 @@
 		maxSize={50}
 		collapsible
 		collapsedSize={0}
-		onCollapse={() => setOpen(false)}
-		onExpand={() => setOpen(true)}
+		onCollapse={() => mounted && setOpen(false)}
+		onExpand={() => mounted && setOpen(true)}
 		class={[
 			'bg-card hidden overflow-hidden rounded-xl lg:block',
 			// Collapsed, the pane is 0-wide; the border would leave a 2px sliver.
