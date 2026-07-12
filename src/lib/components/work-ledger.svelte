@@ -13,9 +13,10 @@
 
 	function label(step: WorkStep): string {
 		const state = step.status === 'done' ? 'done' : 'active';
-		return t(`work.${step.id}.${state}` as Parameters<typeof t>[0], {
+		const text = t(`work.${step.id}.${state}` as Parameters<typeof t>[0], {
 			count: step.count ?? 0
 		});
+		return step.status === 'done' && step.elapsedMs ? `${text} · ${step.elapsedMs} ms` : text;
 	}
 </script>
 

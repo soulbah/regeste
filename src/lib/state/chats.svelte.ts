@@ -72,6 +72,7 @@ class ChatsStore {
 	versionsByGroup = $state<Record<string, string[]>>({});
 	methodByMessage = $state<Record<string, MethodSummary>>({});
 	workSteps = $state<WorkStep[]>([]);
+	private workStepStartedAt = 0;
 
 	activeChat = $derived(this.chats.find((c) => c.id === this.activeChatId) ?? null);
 
@@ -118,6 +119,7 @@ class ChatsStore {
 	}
 
 	private startWork(route: QuestionRoute, documentCount: number): void {
+		this.workStepStartedAt = performance.now();
 		this.workSteps = [
 			{ id: 'search', status: 'active', count: documentCount },
 			{ id: 'inspect', status: 'pending' },
@@ -127,13 +129,23 @@ class ChatsStore {
 	}
 
 	private advanceWork(id: WorkStep['id'], count?: number): void {
+		const now = performance.now();
 		this.workSteps = this.workSteps.map((step) =>
 			step.id === id
 				? { ...step, status: 'active', ...(count === undefined ? {} : { count }) }
 				: step.status === 'active'
-					? { ...step, status: 'done' }
+					? {
+							...step,
+							status: 'done',
+							elapsedMs: Math.max(1, Math.round(now - this.workStepStartedAt))
+						}
 					: step
 		);
+		this.workStepStartedAt = now;
+	}
+
+	private setWorkCount(id: WorkStep['id'], count: number): void {
+		this.workSteps = this.workSteps.map((step) => (step.id === id ? { ...step, count } : step));
 	}
 
 	/** Spec 020 — display another version of a turn (‹ n/N › nav). */
@@ -315,10 +327,12 @@ class ChatsStore {
 				? await documentsStore.retrieve(
 						context?.searchQuery ?? question,
 						enabledDocs.map((d) => d.id),
-						question
+						question,
+						() => this.advanceWork('inspect')
 					)
 				: [];
-			this.advanceWork('inspect', hits.length);
+			if (enabledDocs.length) this.setWorkCount('inspect', hits.length);
+			else this.advanceWork('inspect', 0);
 			await this.answer(
 				chatId,
 				question,
@@ -460,11 +474,13 @@ class ChatsStore {
 					hits = await documentsStore.retrieve(
 						context?.searchQuery ?? question,
 						enabledDocs.map((d) => d.id),
-						question
+						question,
+						() => this.advanceWork('inspect')
 					);
 				}
 
-				this.advanceWork('inspect', hits.length);
+				if (enabledDocs.length) this.setWorkCount('inspect', hits.length);
+				else this.advanceWork('inspect', 0);
 				await this.answer(
 					chatId,
 					question,

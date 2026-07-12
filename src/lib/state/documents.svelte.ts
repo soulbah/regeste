@@ -258,7 +258,8 @@ class DocumentsStore {
 	async retrieve(
 		query: string,
 		documentIds: string[] | null = null,
-		refinementQuery = query
+		refinementQuery = query,
+		onInspect?: () => void
 	): Promise<SearchHit[]> {
 		const { db } = await getLocalDb();
 		const clean = query.trim();
@@ -268,6 +269,7 @@ class DocumentsStore {
 			lexicalPromise,
 			db.searchVector(data, dims, documentIds, 80)
 		]);
+		onInspect?.();
 		const ranked = refineCandidates(semantic, lexical, refinementQuery.trim(), 16);
 		const neighbors = await db.listNeighborChunks(
 			ranked.slice(0, 8).map((hit) => hit.chunkId),

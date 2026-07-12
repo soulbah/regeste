@@ -91,6 +91,7 @@ export interface WorkStep {
 	id: 'search' | 'inspect' | 'calculate' | 'write';
 	status: 'pending' | 'active' | 'done';
 	count?: number;
+	elapsedMs?: number;
 }
 
 export type ChatMode = 'private' | 'assisted' | 'myai';

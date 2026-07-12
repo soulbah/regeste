@@ -13,6 +13,7 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import type { CitationRow, MessageExcerptRow } from '$lib/local-db/worker';
 	import { chatsStore } from '$lib/state/chats.svelte';
+	import { compactCitationMarkers } from '$lib/private-ai/prompt';
 	import { viewerStore } from '$lib/state/viewer.svelte';
 	import WorkLedger from '$lib/components/work-ledger.svelte';
 	import type { MethodSummary } from '$lib/types';
@@ -50,6 +51,7 @@
 
 	/** Honest refusal: no citations but passages were retrieved → show them. */
 	const closestSources = $derived(citations.length === 0 ? excerpts.slice(0, 3) : []);
+	const displayContent = $derived(compactCitationMarkers(content, citations.length));
 
 	async function openExcerpt(e: MessageExcerptRow) {
 		if (e.chunkId != null) {
@@ -64,7 +66,7 @@
 
 	/** One-click copy, sources included when the answer has them. */
 	async function copy() {
-		let text = content;
+		let text = displayContent;
 		if (citations.length) {
 			text +=
 				'\n\nSources:\n' +
@@ -81,12 +83,12 @@
 	const segments = $derived.by(() => {
 		const out: Array<{ type: 'text'; value: string } | { type: 'cite'; n: number }> = [];
 		let last = 0;
-		for (const m of content.matchAll(/\[(\d{1,2})\]/g)) {
-			if (m.index! > last) out.push({ type: 'text', value: content.slice(last, m.index) });
+		for (const m of displayContent.matchAll(/\[(\d{1,2})\]/g)) {
+			if (m.index! > last) out.push({ type: 'text', value: displayContent.slice(last, m.index) });
 			out.push({ type: 'cite', n: Number(m[1]) });
 			last = m.index! + m[0].length;
 		}
-		if (last < content.length) out.push({ type: 'text', value: content.slice(last) });
+		if (last < displayContent.length) out.push({ type: 'text', value: displayContent.slice(last) });
 		return out;
 	});
 

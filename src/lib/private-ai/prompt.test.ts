@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildUserPrompt, resolveCitations } from './prompt';
+import { buildUserPrompt, compactCitationMarkers, resolveCitations } from './prompt';
 import type { SearchHit } from '$lib/types';
 
 const hit = (n: number): SearchHit => ({
@@ -53,8 +53,27 @@ describe('resolveCitations', () => {
 
 	it('drops hallucinated markers outside the retrieved range', () => {
 		const { text, citations } = resolveCitations('Stated in [7]. Real one [2].', [hit(1), hit(2)]);
-		expect(text).toBe('Stated in . Real one [2].');
-		expect(citations.map((c) => c.n)).toEqual([2]);
+		expect(text).toBe('Stated in . Real one [1].');
+		expect(citations.map((c) => c.n)).toEqual([1]);
+		expect(citations[0].hit).toEqual(hit(2));
+	});
+
+	it('compacts sparse markers so answer chips and stored source rows stay aligned', () => {
+		const { text, citations } = resolveCitations('Les parties sont Alice et Bob [2][3].', [
+			hit(1),
+			hit(2),
+			hit(3)
+		]);
+		expect(text).toBe('Les parties sont Alice et Bob [1][2].');
+		expect(citations.map((c) => [c.n, c.hit.chunkId])).toEqual([
+			[1, 2],
+			[2, 3]
+		]);
+	});
+
+	it('repairs sparse markers in already persisted answers', () => {
+		expect(compactCitationMarkers('Alice et Bob [2][3].', 2)).toBe('Alice et Bob [1][2].');
+		expect(compactCitationMarkers('Unchanged [1][2].', 2)).toBe('Unchanged [1][2].');
 	});
 
 	it('passes through text with no markers', () => {

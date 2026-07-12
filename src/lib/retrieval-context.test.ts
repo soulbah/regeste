@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildRetrievalContext } from './retrieval-context';
+import { buildRetrievalContext, needsRetrievalContext } from './retrieval-context';
 import type { LocalMessage } from '$lib/types';
 
 const message = (
@@ -42,6 +42,27 @@ describe('buildRetrievalContext', () => {
 			current
 		);
 		expect(context?.searchQuery).toContain('JANE SMITH');
+	});
+
+	it('does not contaminate independent factual questions with the previous answer', () => {
+		const messages = [
+			message('user', 'Qui sont les parties prenantes ?'),
+			message('assistant', 'Les parties sont Alice Martin et Bob Durand [2][3].')
+		];
+		for (const question of [
+			'Quel est le montant du prêt à avoir ?',
+			'Quelle est la superficie de la maison ?',
+			'Quel est le prix de la maison ?'
+		]) {
+			expect(needsRetrievalContext(question)).toBe(false);
+			expect(buildRetrievalContext([...messages, message('user', question)], question)).toBeNull();
+		}
+	});
+
+	it('keeps elliptical follow-ups', () => {
+		expect(needsRetrievalContext('Et son prix ?')).toBe(true);
+		expect(needsRetrievalContext('Quel est le numéro de ce destinataire ?')).toBe(true);
+		expect(needsRetrievalContext('What about their address?')).toBe(true);
 	});
 
 	it('ignores notices and returns no context before a completed exchange', () => {

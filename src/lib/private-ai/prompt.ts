@@ -53,6 +53,17 @@ export interface CitationRef {
 	hit: SearchHit;
 }
 
+/** Repair citation numbering for messages persisted before sparse markers were compacted. */
+export function compactCitationMarkers(text: string, citationCount: number): string {
+	if (!citationCount) return text;
+	const numbers = [...new Set([...text.matchAll(/\[(\d{1,2})\]/g)].map((m) => Number(m[1])))].sort(
+		(a, b) => a - b
+	);
+	if (numbers.length !== citationCount) return text;
+	const compact = new Map(numbers.map((original, index) => [original, index + 1]));
+	return text.replace(/\[(\d{1,2})\]/g, (_, raw: string) => `[${compact.get(Number(raw))}]`);
+}
+
 /**
  * Validate [n] markers against the retrieved set. Returns the cleaned text
  * (invalid markers removed) and the ordered unique list of valid citations.
@@ -61,14 +72,24 @@ export function resolveCitations(
 	text: string,
 	hits: SearchHit[]
 ): { text: string; citations: CitationRef[] } {
-	const seen = new Map<number, CitationRef>();
-	const cleaned = text.replace(/\[(\d{1,2})\]/g, (marker, numStr: string) => {
+	const sourceNumbers = [
+		...new Set(
+			[...text.matchAll(/\[(\d{1,2})\]/g)]
+				.map((match) => Number(match[1]))
+				.filter((n) => n >= 1 && n <= hits.length)
+		)
+	].sort((a, b) => a - b);
+	const compactNumber = new Map(sourceNumbers.map((original, index) => [original, index + 1]));
+	const cleaned = text.replace(/\[(\d{1,2})\]/g, (_marker, numStr: string) => {
 		const n = Number(numStr);
-		if (n >= 1 && n <= hits.length) {
-			if (!seen.has(n)) seen.set(n, { n, hit: hits[n - 1] });
-			return marker;
-		}
-		return '';
+		const compact = compactNumber.get(n);
+		return compact === undefined ? '' : `[${compact}]`;
 	});
-	return { text: cleaned, citations: [...seen.values()].sort((a, b) => a.n - b.n) };
+	return {
+		text: cleaned,
+		citations: sourceNumbers.map((original, index) => ({
+			n: index + 1,
+			hit: hits[original - 1]
+		}))
+	};
 }
