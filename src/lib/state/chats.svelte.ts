@@ -42,6 +42,9 @@ class ChatsStore {
 	activeChatId = $state<string | null>(null);
 	messages = $state<LocalMessage[]>([]);
 	chatDocuments = $state<ChatDocument[]>([]);
+	/** False until the active chat's documents have loaded once, so the panel
+	 *  shows skeletons instead of flashing "no documents" over a populated chat. */
+	chatDocumentsLoaded = $state(false);
 	citations = $state<Record<string, CitationRow[]>>({});
 	privacyByMessage = $state<Record<string, MessagePrivacyRow>>({});
 	sending = $state(false);
@@ -72,10 +75,17 @@ class ChatsStore {
 	async open(chatId: string): Promise<void> {
 		this.activeChatId = chatId;
 		if (this.related?.chatId !== chatId) this.related = null;
-		const { db } = await getLocalDb();
-		this.messages = await db.listMessages(chatId);
-		this.chatDocuments = await db.listChatDocuments(chatId);
-		await this.loadCitations(chatId);
+		this.chatDocumentsLoaded = false;
+		try {
+			const { db } = await getLocalDb();
+			this.messages = await db.listMessages(chatId);
+			this.chatDocuments = await db.listChatDocuments(chatId);
+			await this.loadCitations(chatId);
+		} finally {
+			// End the panel's loading state whether the read succeeded, returned
+			// nothing, or the database failed to open — never hang on skeletons.
+			this.chatDocumentsLoaded = true;
+		}
 	}
 
 	private async loadCitations(chatId: string): Promise<void> {
@@ -225,6 +235,7 @@ class ChatsStore {
 		this.activeChatId = null;
 		this.messages = [];
 		this.chatDocuments = [];
+		this.chatDocumentsLoaded = false;
 	}
 
 	/** Lazy creation: called on first message or first attach from the empty state. */

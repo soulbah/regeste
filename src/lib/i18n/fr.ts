@@ -287,6 +287,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'sheet.times': '{count} fois',
 	'sheet.privacy': 'Confidentialité',
 	'sheet.loading': 'Chargement…',
+	'sheet.detailUnavailable': 'Les détails de ce document n’ont pas pu être lus pour l’instant.',
 	'sheet.neverSent': 'Aucun extrait n’a quitté votre appareil',
 	'sheet.usedIn': 'Utilisé dans',
 	'sheet.noChats': 'Aucune discussion pour le moment.',
@@ -477,6 +478,8 @@ export const fr: Record<keyof typeof en, string> = {
 	'privacy.onDevice': 'Sur cet appareil',
 	'privacy.privateAnswers': '{count} réponse{s} privée{s}',
 	'privacy.event': '{count} extrait{s} · {bytes} → {dest}',
+	'privacy.errorTitle': "Ce rapport n'a pas pu être chargé",
+	'privacy.errorBody': 'Fermez tout autre onglet où cette application est ouverte, puis réessayez.',
 
 	// How it works
 	'hiw.title': 'Comment circulent vos données',

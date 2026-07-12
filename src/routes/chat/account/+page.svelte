@@ -7,6 +7,7 @@
 	import * as Card from '$lib/components/ui/card';
 	import * as InputOTP from '$lib/components/ui/input-otp';
 	import * as Tooltip from '$lib/components/ui/tooltip';
+	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { t } from '$lib/i18n/index.svelte';
 	import { sessionStore } from '$lib/state/session.svelte';
 
@@ -43,7 +44,14 @@
 		</p>
 	</div>
 
-	{#if sessionStore.user}
+	{#if sessionStore.loading}
+		<Card.Root class="w-full max-w-sm">
+			<Card.Content class="space-y-4 pt-6">
+				<Skeleton class="mx-auto h-4 w-48" />
+				<Skeleton class="mx-auto h-9 w-28" />
+			</Card.Content>
+		</Card.Root>
+	{:else if sessionStore.user}
 		<Card.Root class="w-full max-w-sm">
 			<Card.Content class="space-y-4 pt-6 text-center">
 				<p class="text-sm">

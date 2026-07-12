@@ -41,17 +41,24 @@
 	} = $props();
 
 	let detail = $state<DocumentDetail | null>(null);
+	let detailError = $state(false);
 	let replaceInput = $state<HTMLInputElement | null>(null);
 	let showAllEgress = $state(false);
 
 	$effect(() => {
 		detail = null;
+		detailError = false;
 		showAllEgress = false;
 		if (!doc) return;
 		const id = doc.id;
 		(async () => {
-			const { db } = await getLocalDb();
-			detail = await db.documentDetail(id);
+			try {
+				const { db } = await getLocalDb();
+				detail = await db.documentDetail(id);
+			} catch {
+				// A failed read must not sit on "Loading…" forever; show it plainly.
+				detailError = true;
+			}
 		})();
 	});
 
@@ -147,7 +154,9 @@
 				<p class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
 					{t('sheet.privacy')}
 				</p>
-				{#if detail === null}
+				{#if detailError}
+					<p class="text-muted-foreground text-xs">{t('sheet.detailUnavailable')}</p>
+				{:else if detail === null}
 					<p class="text-muted-foreground text-xs">{t('sheet.loading')}</p>
 				{:else if detail.egress.length === 0}
 					<div class="flex items-center gap-2 text-sm">

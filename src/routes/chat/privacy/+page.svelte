@@ -8,6 +8,7 @@
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import DownloadIcon from '@lucide/svelte/icons/download';
 	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
+	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import { t } from '$lib/i18n/index.svelte';
 	import { getLocalDb } from '$lib/local-db/client';
 	import type { PrivacyEventRow, PrivacySummaryRow } from '$lib/local-db/worker';
@@ -16,15 +17,28 @@
 	let summary = $state<PrivacySummaryRow[]>([]);
 	let week = $state<PrivacySummaryRow[]>([]);
 	let loaded = $state(false);
+	let error = $state(false);
 
-	$effect(() => {
-		(async () => {
+	async function load() {
+		error = false;
+		loaded = false;
+		try {
 			const { db } = await getLocalDb();
 			events = await db.listPrivacyEvents(1000);
 			summary = await db.privacySummary();
 			week = await db.weekPrivacySummary();
+		} catch {
+			// A failed read must not read as proof: show a distinct error, never
+			// the "nothing has left this device" empty state (which claims a fact
+			// we could not verify). The finally guarantees the page never hangs.
+			error = true;
+		} finally {
 			loaded = true;
-		})();
+		}
+	}
+
+	$effect(() => {
+		load();
 	});
 
 	// Spec 021 — "Shared this week" moved here from Settings (it belongs with the proof).
@@ -82,7 +96,13 @@
 				<p class="text-muted-foreground text-xs">{t('privacy.subtitle')}</p>
 			</div>
 		</div>
-		<Button variant="outline" size="sm" class="gap-2" onclick={exportJson} disabled={!loaded}>
+		<Button
+			variant="outline"
+			size="sm"
+			class="gap-2"
+			onclick={exportJson}
+			disabled={!loaded || error}
+		>
 			<DownloadIcon class="size-3.5" />
 			{t('privacy.export')}
 		</Button>
@@ -107,7 +127,18 @@
 					</Card.Content>
 				</Card.Root>
 			{/if}
-			{#if loaded && egress.length === 0}
+			{#if loaded && error}
+				<Card.Root>
+					<Card.Content class="flex flex-col items-center gap-3 py-10 text-center">
+						<TriangleAlertIcon class="text-muted-foreground size-10" />
+						<p class="font-display text-2xl tracking-tight">{t('privacy.errorTitle')}</p>
+						<p class="text-muted-foreground max-w-md text-sm">{t('privacy.errorBody')}</p>
+						<Button variant="outline" size="sm" class="mt-1" onclick={load}>
+							{t('notice.retry')}
+						</Button>
+					</Card.Content>
+				</Card.Root>
+			{:else if loaded && egress.length === 0}
 				<Card.Root>
 					<Card.Content class="flex flex-col items-center gap-3 py-10 text-center">
 						<ShieldCheckIcon class="text-ring size-10" />

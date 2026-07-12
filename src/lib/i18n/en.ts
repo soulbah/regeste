@@ -278,6 +278,7 @@ export const en = {
 	'sheet.times': '{count} time{s}',
 	'sheet.privacy': 'Privacy',
 	'sheet.loading': 'Loading…',
+	'sheet.detailUnavailable': "This document's details couldn't be read right now.",
 	'sheet.neverSent': 'No excerpt has left your device',
 	'sheet.usedIn': 'Used in',
 	'sheet.noChats': 'No chats yet.',
@@ -465,6 +466,8 @@ export const en = {
 	'privacy.onDevice': 'On this device',
 	'privacy.privateAnswers': '{count} private answer{s}',
 	'privacy.event': '{count} excerpt{s} · {bytes} → {dest}',
+	'privacy.errorTitle': "This report couldn't be loaded",
+	'privacy.errorBody': 'Close any other tab with this app open, then try again.',
 
 	// How it works
 	'hiw.title': 'How your data flows',

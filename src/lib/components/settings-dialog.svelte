@@ -12,6 +12,7 @@
 	import { Progress } from '$lib/components/ui/progress';
 	import { ScrollArea } from '$lib/components/ui/scroll-area';
 	import { Separator } from '$lib/components/ui/separator';
+	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Switch } from '$lib/components/ui/switch';
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import DatabaseIcon from '@lucide/svelte/icons/database';
@@ -493,7 +494,7 @@
 											{@render stateBadge(assistedR)}
 										</header>
 										{#snippet assistedControl()}
-											{#if !sessionStore.user}
+											{#if !sessionStore.user && !sessionStore.loading}
 												<Button
 													variant="outline"
 													size="sm"
@@ -512,17 +513,23 @@
 											assistedR.blockedLine ??
 												(sessionStore.user
 													? sessionStore.user.email
-													: t('settings.ai.assisted.none')),
+													: sessionStore.loading
+														? ''
+														: t('settings.ai.assisted.none')),
 											assistedControl
 										)}
-										<p class="text-muted-foreground pt-2 text-xs">
-											{settingsStore.quota
-												? t('settings.workspace.quota', {
-														used: settingsStore.quota.used,
-														limit: settingsStore.quota.limit
-													})
-												: t('settings.workspace.quotaSignIn')}
-										</p>
+										{#if settingsStore.quota}
+											<p class="text-muted-foreground pt-2 text-xs">
+												{t('settings.workspace.quota', {
+													used: settingsStore.quota.used,
+													limit: settingsStore.quota.limit
+												})}
+											</p>
+										{:else if !sessionStore.user && !sessionStore.loading}
+											<p class="text-muted-foreground pt-2 text-xs">
+												{t('settings.workspace.quotaSignIn')}
+											</p>
+										{/if}
 										{#if assistedR.state === 'ready'}
 											{@render useMode('assisted')}
 										{/if}
@@ -664,6 +671,11 @@
 									t('settings.account.deleteDesc'),
 									deleteAccountControl
 								)}
+							{:else if sessionStore.loading}
+								<div class="space-y-2 py-2">
+									<Skeleton class="h-4 w-40" />
+									<Skeleton class="h-3 w-56" />
+								</div>
 							{:else}
 								{#snippet signInControl()}
 									<Button
