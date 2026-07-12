@@ -143,9 +143,9 @@ export const en = {
 	'status.indexing': 'Preparing',
 	'status.reading': 'Reading',
 	'status.splitting': 'Splitting',
-	'status.scanned': "This looks like a scanned image, so there's no text to read yet",
+	'status.scanned': 'This is a scanned image and no text could be extracted from it',
 	'status.awaitingOcr': 'Scanned',
-	'status.ocr': 'Reading…',
+	'status.ocr': 'Extracting text…',
 
 	// Pre-send review panel
 	'presend.title': 'Before it leaves',
@@ -256,9 +256,9 @@ export const en = {
 	'docsPage.noText': 'no extractable text',
 	'docsPage.error': 'error',
 	'docsPage.indexing': 'indexing…',
-	'docsPage.scanned': 'scanned pages await reading',
-	'docsPage.ocrRunning': 'reading scanned pages…',
-	'docsPage.readScanned': 'Read the scanned pages',
+	'docsPage.scanned': 'text not extracted',
+	'docsPage.ocrRunning': 'extracting text…',
+	'docsPage.readScanned': 'Extract the text',
 	'docsPage.inChats': 'In {count} chat{s}',
 	'docsPage.openAria': 'Open details for {name}',
 	'docsPage.deleteFromDevice': 'Delete from this device',
@@ -305,9 +305,9 @@ export const en = {
 	'sheet.stillIndexing': 'Still indexing',
 	'sheet.openChatAria': 'Open the chat {title}',
 	'sheet.scannedTitle': 'These pages are scanned images.',
-	'sheet.scannedBody': 'Read them to search and cite them.',
-	'sheet.readScanned': 'Read the scanned pages',
-	'sheet.ocrRunning': 'Reading page {done} of {total}…',
+	'sheet.scannedBody': 'Extract their text to search and cite them.',
+	'sheet.readScanned': 'Extract the text',
+	'sheet.ocrRunning': 'Extracting text, page {done} of {total}…',
 
 	// Pagination
 	'pagination.prev': 'Previous page',
@@ -527,7 +527,7 @@ export const en = {
 	// Toasts (layout + uploads)
 	'toast.ready': '{name} is ready',
 	'toast.failed': "{name} couldn't be added",
-	'toast.failedScanned': "No text found. Scanned documents aren't supported yet.",
+	'toast.failedScanned': 'No text could be extracted from the scanned pages.',
 	'toast.failedGeneric': 'Something went wrong while reading this file.',
 	'toast.added': '{name} added to My documents',
 	'toast.addedDesc': 'Available to every chat.',

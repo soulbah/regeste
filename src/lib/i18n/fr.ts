@@ -147,9 +147,9 @@ export const fr: Record<keyof typeof en, string> = {
 	'status.indexing': 'Préparation',
 	'status.reading': 'Lecture',
 	'status.splitting': 'Découpage',
-	'status.scanned': "Ce document semble être une image scannée : aucun texte à lire pour l'instant",
+	'status.scanned': "Image numérisée : aucun texte n'a pu être extrait",
 	'status.awaitingOcr': 'Numérisé',
-	'status.ocr': 'Lecture…',
+	'status.ocr': 'Extraction du texte…',
 
 	// Pre-send review panel
 	'presend.title': 'Avant que ça parte',
@@ -265,9 +265,9 @@ export const fr: Record<keyof typeof en, string> = {
 	'docsPage.noText': 'aucun texte extractible',
 	'docsPage.error': 'erreur',
 	'docsPage.indexing': 'indexation en cours…',
-	'docsPage.scanned': 'pages numérisées à lire',
-	'docsPage.ocrRunning': 'lecture des pages numérisées…',
-	'docsPage.readScanned': 'Lire les pages numérisées',
+	'docsPage.scanned': 'texte non extrait',
+	'docsPage.ocrRunning': 'extraction du texte…',
+	'docsPage.readScanned': 'Extraire le texte',
 	'docsPage.inChats': 'Dans {count} discussion{s}',
 	'docsPage.openAria': 'Ouvrir les détails de {name}',
 	'docsPage.deleteFromDevice': 'Supprimer de cet appareil',
@@ -315,9 +315,9 @@ export const fr: Record<keyof typeof en, string> = {
 	'sheet.stillIndexing': 'Indexation en cours',
 	'sheet.openChatAria': 'Ouvrir la discussion {title}',
 	'sheet.scannedTitle': 'Ces pages sont des images numérisées.',
-	'sheet.scannedBody': 'Lisez-les pour les rechercher et les citer.',
-	'sheet.readScanned': 'Lire les pages numérisées',
-	'sheet.ocrRunning': 'Lecture de la page {done} sur {total}…',
+	'sheet.scannedBody': 'Extrayez leur texte pour les rechercher et les citer.',
+	'sheet.readScanned': 'Extraire le texte',
+	'sheet.ocrRunning': 'Extraction du texte, page {done} sur {total}…',
 
 	// Pagination
 	'pagination.prev': 'Page précédente',
@@ -540,8 +540,7 @@ export const fr: Record<keyof typeof en, string> = {
 	// Toasts (layout + uploads)
 	'toast.ready': '{name} est prêt',
 	'toast.failed': "{name} n'a pas pu être ajouté",
-	'toast.failedScanned':
-		'Aucun texte trouvé. Les documents scannés ne sont pas encore pris en charge.',
+	'toast.failedScanned': "Aucun texte n'a pu être extrait des pages numérisées.",
 	'toast.failedGeneric': 'Un problème est survenu pendant la lecture de ce fichier.',
 	'toast.added': '{name} ajouté à Mes documents',
 	'toast.addedDesc': 'Disponible dans chaque discussion.',
