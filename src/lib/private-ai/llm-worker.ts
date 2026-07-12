@@ -27,7 +27,7 @@ async function load(model: string, onProgress?: (progress: number, text: string)
 async function generate(
 	messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
 	onDelta?: (delta: string) => void,
-	options: GenerationOptions = { reasoning: 'off' }
+	options: GenerationOptions = { reasoning: 'off', maxTokens: 320 }
 ): Promise<GenerationResult> {
 	if (!engine) throw new Error('engine not loaded');
 	const started = performance.now();
@@ -37,7 +37,7 @@ async function generate(
 		messages,
 		stream: true,
 		temperature: 0.2,
-		max_tokens: 700,
+		max_tokens: options.maxTokens,
 		extra_body: { enable_thinking: options.reasoning === 'on' },
 		stream_options: { include_usage: true }
 	});

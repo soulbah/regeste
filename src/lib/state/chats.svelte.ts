@@ -8,6 +8,9 @@ import { documentsStore } from './documents.svelte';
 import { guardedFetch, OfflineError } from '$lib/net';
 import { myaiStore, endpointHost, type ChatMessage } from './myai.svelte';
 import { llmStore } from '$lib/private-ai/llm.svelte';
+import { generationOptionsFor } from '$lib/private-ai/generation';
+import { buildRetrievalContext } from '$lib/retrieval-context';
+import { assistedPayloadBytes } from '$lib/assisted-payload';
 import { questionLocale, routeQuestion } from '$lib/analysis/query-router';
 import { formatAggregateResult } from '$lib/analysis/format-aggregate';
 import {
@@ -51,7 +54,12 @@ class ChatsStore {
 	/** Non-null while a Private answer streams in. */
 	streamingText = $state<string | null>(null);
 	/** Assisted send awaiting review in the right panel (FEATURES 5ter). */
-	pendingAssisted = $state<{ chatId: string; question: string; hits: SearchHit[] } | null>(null);
+	pendingAssisted = $state<{
+		chatId: string;
+		question: string;
+		hits: SearchHit[];
+		conversationContext: string | null;
+	} | null>(null);
 	/** P2 — active chat's egress state (cloud requests + bytes). */
 	chatEgress = $state<{ cloudRequests: number; bytes: number } | null>(null);
 	/** Spec 012 — per-message passage snapshots (what the AI actually saw). */
@@ -286,6 +294,7 @@ class ChatsStore {
 			const versionGroup = last.versionGroup ?? last.id;
 			await db.retireMessage(last.id, versionGroup);
 			this.messages = await db.listMessages(chatId);
+			const context = buildRetrievalContext(this.messages, question);
 			const enabledDocs = this.chatDocuments.filter((d) => d.enabled && d.status === 'ready');
 			const route = routeQuestion(question);
 			this.startWork(route, enabledDocs.length);
@@ -304,12 +313,21 @@ class ChatsStore {
 			}
 			const hits = enabledDocs.length
 				? await documentsStore.retrieve(
-						question,
-						enabledDocs.map((d) => d.id)
+						context?.searchQuery ?? question,
+						enabledDocs.map((d) => d.id),
+						question
 					)
 				: [];
 			this.advanceWork('inspect', hits.length);
-			await this.answer(chatId, question, hits, enabledDocs.length, versionGroup, route);
+			await this.answer(
+				chatId,
+				question,
+				hits,
+				enabledDocs.length,
+				versionGroup,
+				route,
+				context?.promptContext ?? null
+			);
 			await db.touchChat(chatId);
 			this.messages = await db.listMessages(chatId);
 			await this.refresh();
@@ -425,6 +443,7 @@ class ChatsStore {
 				mode: null
 			});
 			this.messages = await db.listMessages(chatId);
+			const context = buildRetrievalContext(this.messages, question);
 
 			const enabledDocs = this.chatDocuments.filter((d) => d.enabled && d.status === 'ready');
 			const route = routeQuestion(question);
@@ -439,13 +458,22 @@ class ChatsStore {
 				let hits: SearchHit[] = [];
 				if (enabledDocs.length) {
 					hits = await documentsStore.retrieve(
-						question,
-						enabledDocs.map((d) => d.id)
+						context?.searchQuery ?? question,
+						enabledDocs.map((d) => d.id),
+						question
 					);
 				}
 
 				this.advanceWork('inspect', hits.length);
-				await this.answer(chatId, question, hits, enabledDocs.length, null, route);
+				await this.answer(
+					chatId,
+					question,
+					hits,
+					enabledDocs.length,
+					null,
+					route,
+					context?.promptContext ?? null
+				);
 			}
 			await db.touchChat(chatId);
 			this.messages = await db.listMessages(chatId);
@@ -465,19 +493,35 @@ class ChatsStore {
 		hits: SearchHit[],
 		documentCount: number,
 		versionGroup: string | null = null,
-		route: QuestionRoute = 'targeted'
+		route: QuestionRoute = 'targeted',
+		conversationContext: string | null = null
 	): Promise<void> {
 		const { db } = await getLocalDb();
 		const chat = this.chats.find((c) => c.id === chatId);
 		if (chat?.mode === 'private' && llmStore.status === 'ready') {
-			await this.generatePrivate(chatId, question, hits, documentCount, versionGroup, route);
+			await this.generatePrivate(
+				chatId,
+				question,
+				hits,
+				documentCount,
+				versionGroup,
+				route,
+				conversationContext
+			);
 		} else if (
 			chat?.mode === 'myai' &&
 			!chat.privateOnly &&
 			myaiStore.baseUrl &&
 			(chat.myaiModel || myaiStore.defaultModel)
 		) {
-			await this.generateMyAi(chat, question, hits, documentCount, versionGroup);
+			await this.generateMyAi(
+				chat,
+				question,
+				hits,
+				documentCount,
+				versionGroup,
+				conversationContext
+			);
 		} else {
 			await db.insertMessage({
 				id: crypto.randomUUID(),
@@ -496,7 +540,8 @@ class ChatsStore {
 		hits: SearchHit[],
 		documentCount: number,
 		versionGroup: string | null = null,
-		route: QuestionRoute = 'targeted'
+		route: QuestionRoute = 'targeted',
+		conversationContext: string | null = null
 	): Promise<void> {
 		const { db } = await getLocalDb();
 		this.streamingText = '';
@@ -504,7 +549,10 @@ class ChatsStore {
 		const messages = grounded
 			? [
 					{ role: 'system' as const, content: SYSTEM_PROMPT },
-					{ role: 'user' as const, content: buildUserPrompt(question, hits) }
+					{
+						role: 'user' as const,
+						content: buildUserPrompt(question, hits, conversationContext)
+					}
 				]
 			: [
 					{
@@ -527,7 +575,7 @@ class ChatsStore {
 					streamRaw += delta;
 					this.streamingText = isThinking(streamRaw) ? '' : stripThink(streamRaw);
 				},
-				{ reasoning: route === 'synthesis' ? 'on' : 'off' }
+				generationOptionsFor(question, route === 'synthesis' ? 'synthesis' : 'targeted')
 			);
 		} catch (err) {
 			console.error('[folio] private generation failed:', err);
@@ -651,7 +699,8 @@ class ChatsStore {
 		question: string,
 		hits: SearchHit[],
 		documentCount: number,
-		versionGroup: string | null = null
+		versionGroup: string | null = null,
+		conversationContext: string | null = null
 	): Promise<void> {
 		const { db } = await getLocalDb();
 		const model = chat.myaiModel ?? myaiStore.defaultModel!;
@@ -663,7 +712,7 @@ class ChatsStore {
 		const messages: ChatMessage[] = grounded
 			? [
 					{ role: 'system', content: SYSTEM_PROMPT },
-					{ role: 'user', content: buildUserPrompt(question, hits) }
+					{ role: 'user', content: buildUserPrompt(question, hits, conversationContext) }
 				]
 			: [
 					{
@@ -740,20 +789,27 @@ class ChatsStore {
 	}
 
 	/** Retrieval over the active chat's enabled documents (assisted preview). */
-	async retrieveForActive(question: string): Promise<SearchHit[]> {
+	async retrieveForActive(query: string, refinementQuery = query): Promise<SearchHit[]> {
 		const enabledDocs = this.chatDocuments.filter((d) => d.enabled && d.status === 'ready');
 		if (!enabledDocs.length) return [];
 		return documentsStore.retrieve(
-			question,
-			enabledDocs.map((d) => d.id)
+			query,
+			enabledDocs.map((d) => d.id),
+			refinementQuery
 		);
 	}
 
 	/** Stage an assisted send for review in the right panel. */
 	async stageAssisted(chatId: string, question: string): Promise<'staged' | 'no-excerpts'> {
-		const hits = await this.retrieveForActive(question);
+		const context = buildRetrievalContext(this.messages, question);
+		const hits = await this.retrieveForActive(context?.searchQuery ?? question, question);
 		if (!hits.length) return 'no-excerpts';
-		this.pendingAssisted = { chatId, question, hits };
+		this.pendingAssisted = {
+			chatId,
+			question,
+			hits,
+			conversationContext: context?.promptContext ?? null
+		};
 		return 'staged';
 	}
 
@@ -763,7 +819,13 @@ class ChatsStore {
 		this.pendingAssisted = null;
 		const selectedIds = new Set(selected.map((h) => h.chunkId));
 		const excluded = pending.hits.filter((h) => !selectedIds.has(h.chunkId));
-		await this.sendAssisted(pending.chatId, pending.question, selected, excluded);
+		await this.sendAssisted(
+			pending.chatId,
+			pending.question,
+			selected,
+			excluded,
+			pending.conversationContext
+		);
 	}
 
 	cancelAssisted(): void {
@@ -778,7 +840,8 @@ class ChatsStore {
 		chatId: string,
 		question: string,
 		selected: SearchHit[],
-		excluded: SearchHit[] = []
+		excluded: SearchHit[] = [],
+		conversationContext: string | null = null
 	): Promise<void> {
 		if (this.sending) return;
 		this.sending = true;
@@ -802,9 +865,7 @@ class ChatsStore {
 				text: h.text,
 				label: `${h.documentName}${h.page ? ` · page ${h.page}` : h.headingPath ? ` · ${h.headingPath}` : ''}`
 			}));
-			const bytesSent =
-				new TextEncoder().encode(question).length +
-				excerpts.reduce((n, e) => n + new TextEncoder().encode(e.text).length, 0);
+			const bytesSent = assistedPayloadBytes(question, excerpts, conversationContext);
 
 			let raw = '';
 			let failed: string | null = null;
@@ -812,7 +873,7 @@ class ChatsStore {
 				const res = await guardedFetch('/api/assisted', {
 					method: 'POST',
 					headers: { 'content-type': 'application/json' },
-					body: JSON.stringify({ question, excerpts })
+					body: JSON.stringify({ question, excerpts, context: conversationContext ?? undefined })
 				});
 				if (!res.ok) {
 					failed =

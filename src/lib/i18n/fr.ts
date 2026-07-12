@@ -155,6 +155,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'presend.title': 'Avant que ça parte',
 	'presend.subtitle': 'Vérifiez ce qui quitte votre appareil',
 	'presend.question': 'Votre question',
+	'presend.context': 'Contexte de la discussion',
 	'presend.excerpts': 'Extraits trouvés dans vos documents',
 	'presend.weak':
 		'Ces passages ont peu de rapport avec la question. La réponse peut être peu fiable.',
@@ -167,6 +168,8 @@ export const fr: Record<keyof typeof en, string> = {
 	'presend.count': '{selected}/{total} extraits · {kb} Ko',
 	'presend.footer':
 		'Seuls les extraits cochés et votre question sont envoyés. Vos fichiers restent ici.',
+	'presend.footerWithContext':
+		'Votre question, ce contexte et les extraits cochés sont envoyés. Vos fichiers restent ici.',
 
 	// Answer turn
 	'turn.whatAiSaw': "Ce que l'IA a reçu",

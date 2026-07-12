@@ -94,7 +94,7 @@
 					{ role: 'user', content: 'Write one sentence explaining why exact arithmetic matters.' }
 				],
 				() => {},
-				{ reasoning: 'off' }
+				{ reasoning: 'off', maxTokens: 160 }
 			);
 		} finally {
 			generationBenchmarking = false;

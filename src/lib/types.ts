@@ -64,6 +64,8 @@ export interface Chunk {
 
 export interface SearchHit {
 	chunkId: number;
+	/** Document-local order, used only for bounded neighbor expansion. */
+	seq?: number;
 	documentId: string;
 	documentName: string;
 	text: string;

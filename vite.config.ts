@@ -8,6 +8,9 @@ export default defineConfig({
 	plugins: [
 		tailwindcss(),
 		sveltekit({
+			// Inference Service Worker is production-only. Manual registration in
+			// +layout keeps Vite HMR free from persistent worker lifecycle state.
+			serviceWorker: { register: false },
 			compilerOptions: {
 				// Force runes mode for the project, except for libraries. Can be removed in svelte 6.
 				runes: ({ filename }) =>

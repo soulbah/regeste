@@ -10,14 +10,13 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import { chatsStore } from '$lib/state/chats.svelte';
 	import { settingsStore } from '$lib/state/settings.svelte';
-	import { isWeakMatch } from '$lib/pipeline/relevance';
+	import { assistedPayloadBytes } from '$lib/assisted-payload';
+	import { isWeakMatch, relevancePercent } from '$lib/pipeline/relevance';
 	import type { SearchHit } from '$lib/types';
 
 	let { onhide = null }: { onhide?: (() => void) | null } = $props();
 
 	const pending = $derived(chatsStore.pendingAssisted);
-	const maxScore = $derived(Math.max(...(pending?.hits ?? []).map((h) => h.score), 0));
-
 	let excluded = $state<Record<number, boolean>>({});
 
 	$effect(() => {
@@ -27,8 +26,7 @@
 
 	const selected = $derived((pending?.hits ?? []).filter((h) => !excluded[h.chunkId]));
 	const bytes = $derived(
-		selected.reduce((n, h) => n + new TextEncoder().encode(h.text).length, 0) +
-			new TextEncoder().encode(pending?.question ?? '').length
+		assistedPayloadBytes(pending?.question ?? '', selected, pending?.conversationContext ?? null)
 	);
 
 	function locator(hit: SearchHit): string {
@@ -50,6 +48,14 @@
 			{t('presend.question')}
 		</p>
 		<p class="mt-1 text-sm italic">“{pending?.question}”</p>
+		{#if pending?.conversationContext}
+			<p class="text-muted-foreground mt-3 font-mono text-[10px] tracking-widest uppercase">
+				{t('presend.context')}
+			</p>
+			<p class="mt-1 text-xs leading-relaxed whitespace-pre-wrap">
+				{pending.conversationContext}
+			</p>
+		{/if}
 	</div>
 
 	<ScrollArea class="flex-1">
@@ -78,8 +84,8 @@
 					<span class="min-w-0">
 						<span class="text-muted-foreground block font-mono text-[10px] uppercase">
 							{hit.documentName}{locator(hit) ? ` · ${locator(hit)}` : ''}
-							{#if maxScore > 0}
-								· {t('presend.match', { pct: Math.round((hit.score / maxScore) * 100) })}
+							{#if hit.score > 0}
+								· {t('presend.match', { pct: relevancePercent(hit) })}
 							{/if}
 						</span>
 						<span class="mt-0.5 block text-xs leading-relaxed">
@@ -121,7 +127,7 @@
 			</span>
 		</div>
 		<p class="text-muted-foreground text-xs">
-			{t('presend.footer')}
+			{t(pending?.conversationContext ? 'presend.footerWithContext' : 'presend.footer')}
 		</p>
 		<div class="flex gap-2">
 			<Button variant="outline" class="flex-1" onclick={() => chatsStore.cancelAssisted()}>

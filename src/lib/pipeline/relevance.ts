@@ -5,7 +5,13 @@
 import type { SearchHit } from '$lib/types';
 
 export const WEAK_SCORE_THRESHOLD = 0.018;
+const MAX_REFINED_SCORE = 2 / 61 + 0.008;
 
 export function isWeakMatch(hits: SearchHit[]): boolean {
 	return hits.length > 0 && Math.max(...hits.map((h) => h.score)) < WEAK_SCORE_THRESHOLD;
+}
+
+/** Absolute calibration: never call the best item 100% merely because others are worse. */
+export function relevancePercent(hit: SearchHit): number {
+	return Math.round(Math.max(0, Math.min(1, hit.score / MAX_REFINED_SCORE)) * 100);
 }

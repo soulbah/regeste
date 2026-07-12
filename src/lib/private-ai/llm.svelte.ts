@@ -14,6 +14,7 @@ import type { LlmApi } from './llm-worker';
 import type { WllamaApi } from './wllama-worker';
 import type { GenerationOptions } from './generation';
 import type { GenerationResult } from './generation';
+import type { WebLlmClient } from './webllm-client';
 
 const PREPARED_KEY = 'folio:private-prepared-model';
 const METRICS_KEY = 'folio:private-last-metrics';
@@ -29,9 +30,9 @@ export type PrivateStatus =
 	| 'error';
 
 // Both engines expose the same load/generate/abort surface.
-let webllmApi: Remote<LlmApi> | null = null;
+let webllmApi: WebLlmClient | null = null;
 let wllamaApi: Remote<WllamaApi> | null = null;
-function getWorker(engine: 'webllm' | 'wllama'): Remote<LlmApi> {
+async function getWorker(engine: 'webllm' | 'wllama'): Promise<Remote<LlmApi> | WebLlmClient> {
 	if (engine === 'wllama') {
 		if (!wllamaApi) {
 			const worker = new Worker(new URL('./wllama-worker.ts', import.meta.url), {
@@ -41,10 +42,7 @@ function getWorker(engine: 'webllm' | 'wllama'): Remote<LlmApi> {
 		}
 		return wllamaApi as unknown as Remote<LlmApi>;
 	}
-	if (!webllmApi) {
-		const worker = new Worker(new URL('./llm-worker.ts', import.meta.url), { type: 'module' });
-		webllmApi = wrap<LlmApi>(worker);
-	}
+	if (!webllmApi) webllmApi = (await import('./webllm-client')).webLlmClient;
 	return webllmApi;
 }
 
@@ -75,15 +73,26 @@ class LlmStore {
 		this.tier = tier;
 		this.prepared = localStorage.getItem(PREPARED_KEY) === tier.model;
 		this.status = 'needs-download';
+		// Consent was given on the first preparation. Later visits reconnect to
+		// the resident production worker or load weights from browser cache.
+		if (this.prepared) void this.prepare();
 	}
 
 	/** Explicit user consent → download (or fast cache load) then ready. */
 	async prepare(): Promise<void> {
-		if (!this.tier || this.status === 'downloading' || this.status === 'ready') return;
+		if (
+			!this.tier ||
+			this.status === 'downloading' ||
+			this.status === 'loading' ||
+			this.status === 'ready'
+		)
+			return;
 		this.status = this.prepared ? 'loading' : 'downloading';
 		this.progress = 0;
 		try {
-			await getWorker(this.tier.engine).load(
+			await (
+				await getWorker(this.tier.engine)
+			).load(
 				this.tier.model,
 				proxy((p: number) => {
 					this.progress = p;
@@ -111,12 +120,14 @@ class LlmStore {
 	async generate(
 		messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
 		onDelta: (delta: string) => void,
-		options: GenerationOptions = { reasoning: 'off' }
+		options: GenerationOptions = { reasoning: 'off', maxTokens: 320 }
 	): Promise<string> {
 		if (this.status !== 'ready' || !this.tier) throw new Error('private engine not ready');
 		this.status = 'generating';
 		try {
-			const result = await getWorker(this.tier.engine).generate(messages, proxy(onDelta), options);
+			const result = await (
+				await getWorker(this.tier.engine)
+			).generate(messages, proxy(onDelta), options);
 			this.lastMetrics = {
 				ttftMs: result.ttftMs,
 				tokensPerSecond: result.tokensPerSecond,
@@ -130,7 +141,8 @@ class LlmStore {
 	}
 
 	async stop(): Promise<void> {
-		if (this.status === 'generating' && this.tier) await getWorker(this.tier.engine).abort();
+		if (this.status === 'generating' && this.tier)
+			await (await getWorker(this.tier.engine)).abort();
 	}
 }
 

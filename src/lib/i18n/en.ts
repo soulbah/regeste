@@ -151,6 +151,7 @@ export const en = {
 	'presend.title': 'Before it leaves',
 	'presend.subtitle': 'Review what leaves your device',
 	'presend.question': 'Your question',
+	'presend.context': 'Conversation context',
 	'presend.excerpts': 'Excerpts found in your documents',
 	'presend.weak': 'These passages barely match the question. The answer may be unreliable.',
 	'presend.includeAria': 'Include this excerpt',
@@ -161,6 +162,8 @@ export const en = {
 	'presend.consent': 'I understand, continue',
 	'presend.count': '{selected}/{total} excerpts · {kb} KB',
 	'presend.footer': 'Only the checked excerpts and your question are sent. Your files stay here.',
+	'presend.footerWithContext':
+		'Your question, this context, and the checked excerpts are sent. Your files stay here.',
 
 	// Answer turn
 	'turn.whatAiSaw': 'What the AI received',

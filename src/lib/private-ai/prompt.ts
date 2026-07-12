@@ -7,18 +7,28 @@ import type { SearchHit } from '$lib/types';
 export const SYSTEM_PROMPT = `You are a careful assistant answering questions strictly from the numbered document excerpts provided.
 Rules:
 - Answer in the language of the question.
+- Answer the exact question immediately. For a name, number, date, or amount, use one short natural sentence unless clarification is necessary.
+- Preserve names as written. Do not split a full name into an alias or add phrases such as "under the name" unless the source explicitly distinguishes them.
 - Use ONLY the excerpts. If they do not contain enough information, reply exactly: "I couldn't find enough information in the attached documents to answer this." (translated to the question's language) and nothing else.
 - Cite every factual statement with the excerpt number in square brackets, e.g. [1] or [2][3].
-- Be concise.`;
+- Conversation context may resolve pronouns, but it is not evidence. Never cite it or repeat a fact that current excerpts do not support.
+- Be concise. No reasoning preamble.`;
 
-export function buildUserPrompt(question: string, hits: SearchHit[]): string {
+export function buildUserPrompt(
+	question: string,
+	hits: SearchHit[],
+	conversationContext: string | null = null
+): string {
 	const excerpts = hits
 		.map((h, i) => {
 			const locator = h.page ? `page ${h.page}` : (h.headingPath ?? '');
 			return `[${i + 1}] (${h.documentName}${locator ? ` · ${locator}` : ''})\n${h.text}`;
 		})
 		.join('\n\n');
-	return `Excerpts:\n\n${excerpts}\n\nQuestion: ${question}`;
+	const context = conversationContext
+		? `Conversation context (reference resolution only, not a source):\n${conversationContext}\n\n`
+		: '';
+	return `${context}Excerpts:\n\n${excerpts}\n\nQuestion: ${question}`;
 }
 
 /**

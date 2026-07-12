@@ -19,6 +19,12 @@ describe('buildUserPrompt', () => {
 		expect(p).toContain('[2] (Contract.pdf · page 2)');
 		expect(p.endsWith('Question: Q?')).toBe(true);
 	});
+
+	it('labels prior conversation as context rather than evidence', () => {
+		const p = buildUserPrompt('Quel est son numéro ?', [hit(1)], 'Previous answer: JOHN DOE');
+		expect(p).toContain('reference resolution only, not a source');
+		expect(p).toContain('Previous answer: JOHN DOE');
+	});
 });
 
 describe('stripThink / isThinking', () => {

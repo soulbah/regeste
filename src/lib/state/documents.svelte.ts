@@ -17,7 +17,7 @@ import {
 	type EmbedProgress,
 	type EmbeddingProfile
 } from '$lib/pipeline/embed-model';
-import { fuseCandidates } from '$lib/pipeline/retrieval';
+import { refineCandidates, selectWithNeighbors } from '$lib/pipeline/retrieval';
 import { extractMoneyCandidates } from '$lib/analysis/money';
 import type { MoneyKind } from '$lib/analysis/money';
 import {
@@ -256,7 +256,11 @@ class DocumentsStore {
 	}
 
 	/** Hybrid retrieval over the given documents; returns the hits. */
-	async retrieve(query: string, documentIds: string[] | null = null): Promise<SearchHit[]> {
+	async retrieve(
+		query: string,
+		documentIds: string[] | null = null,
+		refinementQuery = query
+	): Promise<SearchHit[]> {
 		const { db } = await getLocalDb();
 		const clean = query.trim();
 		const lexicalPromise = db.searchLexical(clean, documentIds, 80);
@@ -265,7 +269,12 @@ class DocumentsStore {
 			lexicalPromise,
 			db.searchVector(data, dims, documentIds, 80)
 		]);
-		return fuseCandidates(semantic, lexical, 8);
+		const ranked = refineCandidates(semantic, lexical, refinementQuery.trim(), 16);
+		const neighbors = await db.listNeighborChunks(
+			ranked.slice(0, 8).map((hit) => hit.chunkId),
+			1
+		);
+		return selectWithNeighbors(ranked, neighbors, refinementQuery.trim(), 8);
 	}
 
 	/** Exhaustive local path for numerical questions: no top-k truncation. */

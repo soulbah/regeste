@@ -47,7 +47,7 @@ async function load(modelUrl: string, onProgress?: (progress: number, text: stri
 async function generate(
 	messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
 	onDelta?: (delta: string) => void,
-	options: GenerationOptions = { reasoning: 'off' }
+	options: GenerationOptions = { reasoning: 'off', maxTokens: 320 }
 ): Promise<GenerationResult> {
 	if (!wllama) throw new Error('engine not loaded');
 	aborter = new AbortController();
@@ -61,7 +61,7 @@ async function generate(
 			stream: true,
 			abortSignal: aborter.signal,
 			temperature: 0.2,
-			max_tokens: 700,
+			max_tokens: options.maxTokens,
 			// Qwen3 thinks by default; grounded QA doesn't need it and CPU
 			// tokens are expensive. stripThink upstream catches any leak.
 			chat_template_kwargs: { enable_thinking: options.reasoning === 'on' }

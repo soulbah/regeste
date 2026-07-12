@@ -13,6 +13,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import { dev } from '$app/environment';
 	import { SvelteMap } from 'svelte/reactivity';
 	import { i18n, t } from '$lib/i18n/index.svelte';
 	import { documentsStore } from '$lib/state/documents.svelte';
@@ -49,6 +50,20 @@
 		guardDb(chatsStore.refresh());
 		// Offline switch loads first so a forced-offline session never phones home.
 		guardDb(settingsStore.init().then(() => sessionStore.refresh()));
+	});
+
+	// Not a PWA: production-only message worker for WebLLM, with no fetch
+	// interception or app-shell cache. Dev stays on a Dedicated Worker so HMR
+	// never competes with a persistent Service Worker.
+	$effect(() => {
+		if (dev || !('serviceWorker' in navigator)) return;
+		const register = () => {
+			void navigator.serviceWorker.register('/service-worker.js').catch((err) => {
+				console.warn('[folio] inference service worker unavailable:', err);
+			});
+		};
+		if (document.readyState === 'complete') register();
+		else window.addEventListener('load', register, { once: true });
 	});
 
 	// Feedback rules (FEATURES 5bis): ingestion state lives in the documents

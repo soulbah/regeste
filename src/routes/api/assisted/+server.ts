@@ -11,6 +11,7 @@ import { error, json } from '@sveltejs/kit';
 import * as v from 'valibot';
 import { drizzle } from 'drizzle-orm/d1';
 import { checkAndIncrementQuota } from '$lib/server/quota';
+import { buildAssistedUserContent } from '$lib/server/assisted-prompt';
 import type { RequestHandler } from './$types';
 
 // glm-4.7-flash verified 2026-07-09: correct grounded answers but ~2 min per
@@ -20,6 +21,7 @@ const MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 
 const BodySchema = v.object({
 	question: v.pipe(v.string(), v.minLength(1), v.maxLength(4000)),
+	context: v.optional(v.pipe(v.string(), v.minLength(1), v.maxLength(2000))),
 	excerpts: v.pipe(
 		v.array(
 			v.object({
@@ -34,8 +36,11 @@ const BodySchema = v.object({
 const SYSTEM = `You are a careful assistant answering questions strictly from the numbered document excerpts provided.
 Rules:
 - Answer in the language of the question.
+- For a name, number, date, or amount, answer in one short natural sentence unless clarification is necessary.
+- Preserve full names as written. Do not invent aliases or split a full name.
 - Use ONLY the excerpts. If they do not contain enough information, say you couldn't find enough information in the documents (in the question's language) and nothing else.
 - Cite every factual statement with the excerpt number in square brackets, e.g. [1] or [2][3].
+- Conversation context resolves references only. It is not evidence and must not be cited.
 - Be concise. Answer directly without reasoning preamble.`;
 
 interface ChatCompletion {
@@ -49,7 +54,7 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 
 	const parsed = v.safeParse(BodySchema, await request.json().catch(() => null));
 	if (!parsed.success) throw error(400, 'Invalid request');
-	const { question, excerpts } = parsed.output;
+	const { question, excerpts, context } = parsed.output;
 
 	const env = platform!.env;
 	// Local dev runs without the AI binding (wrangler.dev.jsonc) — honest 503.
@@ -58,9 +63,7 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 	const quota = await checkAndIncrementQuota(db, session.user.id);
 	if (!quota.allowed) throw error(429, 'Monthly Assisted quota reached');
 
-	const userContent = excerpts.length
-		? `Excerpts:\n\n${excerpts.map((e, i) => `[${i + 1}] (${e.label})\n${e.text}`).join('\n\n')}\n\nQuestion: ${question}`
-		: question;
+	const userContent = buildAssistedUserContent(question, excerpts, context);
 
 	const t0 = Date.now();
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any

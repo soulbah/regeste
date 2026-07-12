@@ -421,7 +421,7 @@ function searchLexical(queryText: string, documentIds: string[] | null, limit = 
 	const scope = scopeSql(documentIds);
 	return db
 		.selectObjects(
-			`SELECT c.id AS chunk_id, c.document_id, d.name AS document_name, c.text,
+			`SELECT c.id AS chunk_id, c.document_id, d.name AS document_name, c.text, c.seq,
 			        c.page, c.heading_path, bm25(chunks_fts) AS lexical_score
 			 FROM chunks_fts
 			 JOIN chunks c ON c.id = chunks_fts.rowid
@@ -435,6 +435,7 @@ function searchLexical(queryText: string, documentIds: string[] | null, limit = 
 			documentId: r.document_id,
 			documentName: r.document_name,
 			text: r.text,
+			seq: r.seq,
 			page: r.page,
 			headingPath: r.heading_path,
 			score: r.lexical_score,
@@ -460,7 +461,7 @@ function searchVector(
 	const scope = scopeSql(documentIds);
 	return db
 		.selectObjects(
-			`SELECT c.id AS chunk_id, c.document_id, d.name AS document_name, c.text,
+			`SELECT c.id AS chunk_id, c.document_id, d.name AS document_name, c.text, c.seq,
 			        c.page, c.heading_path,
 			        vec_distance_cosine(v.embedding, ?) AS distance
 			 FROM ${table} v
@@ -475,6 +476,7 @@ function searchVector(
 			documentId: r.document_id,
 			documentName: r.document_name,
 			text: r.text,
+			seq: r.seq,
 			page: r.page,
 			headingPath: r.heading_path,
 			score: 1 - Number(r.distance),
@@ -488,7 +490,7 @@ function listChunksForDocuments(documentIds: string[]): SearchHit[] {
 	const scope = scopeSql(documentIds);
 	return db
 		.selectObjects(
-			`SELECT c.id AS chunk_id, c.document_id, d.name AS document_name, c.text,
+			`SELECT c.id AS chunk_id, c.document_id, d.name AS document_name, c.text, c.seq,
 			        c.page, c.heading_path
 			 FROM chunks c JOIN documents d ON d.id = c.document_id
 			 WHERE d.status = 'ready'${scope.clause}
@@ -500,6 +502,39 @@ function listChunksForDocuments(documentIds: string[]): SearchHit[] {
 			documentId: r.document_id,
 			documentName: r.document_name,
 			text: r.text,
+			seq: r.seq,
+			page: r.page,
+			headingPath: r.heading_path,
+			score: 0,
+			semanticScore: null,
+			lexicalScore: null
+		}));
+}
+
+/** Immediate document-local chunks around selected anchors. */
+function listNeighborChunks(chunkIds: number[], radius = 1): SearchHit[] {
+	if (!chunkIds.length) return [];
+	const placeholders = chunkIds.map(() => '?').join(',');
+	return db
+		.selectObjects(
+			`WITH anchors AS (
+				SELECT document_id, seq FROM chunks WHERE id IN (${placeholders})
+			)
+			SELECT DISTINCT c.id AS chunk_id, c.document_id, d.name AS document_name,
+			       c.text, c.seq, c.page, c.heading_path
+			FROM chunks c
+			JOIN documents d ON d.id = c.document_id
+			JOIN anchors a ON a.document_id = c.document_id AND abs(a.seq - c.seq) <= ?
+			WHERE d.status = 'ready'
+			ORDER BY c.document_id, c.seq`,
+			[...chunkIds, radius]
+		)
+		.map((r: any) => ({
+			chunkId: r.chunk_id,
+			documentId: r.document_id,
+			documentName: r.document_name,
+			text: r.text,
+			seq: r.seq,
 			page: r.page,
 			headingPath: r.heading_path,
 			score: 0,
@@ -1318,6 +1353,7 @@ const api = {
 	searchLexical,
 	searchVector,
 	listChunksForDocuments,
+	listNeighborChunks,
 	countChunks,
 	getChunk,
 	getDocument,
