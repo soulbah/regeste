@@ -324,7 +324,10 @@
 											<Button
 												variant="ghost"
 												class="hover:text-foreground block h-auto w-full justify-start truncate p-0 text-left text-sm font-medium hover:bg-transparent"
-												onclick={() => (selected = doc)}
+												onclick={() => {
+													selected = doc;
+													viewerStore.close();
+												}}
 												aria-label={t('docsPage.openAria', { name: doc.name })}
 											>
 												{doc.name}
@@ -366,7 +369,12 @@
 												{/snippet}
 											</DropdownMenu.Trigger>
 											<DropdownMenu.Content align="end" class="w-56">
-												<DropdownMenu.Item onclick={() => (selected = doc)}>
+												<DropdownMenu.Item
+													onclick={() => {
+														selected = doc;
+														viewerStore.close();
+													}}
+												>
 													<InfoIcon class="text-muted-foreground" />
 													{t('docsPage.details')}
 												</DropdownMenu.Item>
