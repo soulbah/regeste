@@ -126,24 +126,66 @@ class DocumentsStore {
 
 	/** Ingest a file; returns the document id (existing one on dedup). */
 	async ingest(file: File): Promise<string> {
-		const { db } = await getLocalDb();
-		const data = await file.arrayBuffer();
-		const hash = await sha256Hex(data);
+		const staged = await this.stageDocument(file);
+		await this.refreshLibrary();
+		if (staged.isNew) await this.processDocument(staged.id, file, staged.hash);
+		return staged.id;
+	}
 
+	/**
+	 * Ingest several files at once. Every row is inserted first so the whole
+	 * selection shows immediately, in-progress, then the files are processed in
+	 * the background with limited concurrency — instead of trickling in one at a
+	 * time as each finishes. Returns the ids (existing ones on dedup) right after
+	 * staging, so a caller can attach them without waiting for indexing.
+	 */
+	async ingestMany(files: File[]): Promise<string[]> {
+		const staged: { id: string; hash: string; isNew: boolean; file: File }[] = [];
+		for (const file of files) {
+			staged.push({ ...(await this.stageDocument(file)), file });
+		}
+		await this.refreshLibrary();
+		void this.processMany(staged.filter((s) => s.isNew));
+		return staged.map((s) => s.id);
+	}
+
+	/** Hash + dedup + insert a pending row. Returns the id and whether it is new
+	 *  (an existing hash is a no-op to process). The bytes are re-read at process
+	 *  time so a large batch never holds every file in memory at once. */
+	private async stageDocument(file: File): Promise<{ id: string; hash: string; isNew: boolean }> {
+		const { db } = await getLocalDb();
+		const hash = await sha256Hex(await file.arrayBuffer());
 		const existing = await db.getDocumentByHash(hash);
 		if (existing) {
 			this.setIngest(existing.id, { status: existing.status, phaseProgress: 1, dedup: true });
-			await this.refreshLibrary();
-			return existing.id;
+			return { id: existing.id, hash, isNew: false };
 		}
-
 		const id = crypto.randomUUID();
 		await db.insertDocument({ id, hash, name: file.name, mime: file.type, size: file.size });
 		this.setIngest(id, { status: 'received', phaseProgress: 0 });
-		// Show the new row immediately, indexing in progress — don't wait for `ready`.
-		await this.refreshLibrary();
+		return { id, hash, isNew: true };
+	}
 
+	/** Process staged files with limited concurrency. The single embed worker
+	 *  serializes the heavy step, so this mostly overlaps parsing with embedding
+	 *  rather than truly running everything at once — which would thrash. */
+	private async processMany(staged: { id: string; hash: string; file: File }[]): Promise<void> {
+		const CONCURRENCY = 3;
+		let next = 0;
+		const worker = async () => {
+			while (next < staged.length) {
+				const s = staged[next++];
+				await this.processDocument(s.id, s.file, s.hash);
+			}
+		};
+		await Promise.all(Array.from({ length: Math.min(CONCURRENCY, staged.length) }, worker));
+	}
+
+	/** Parse → chunk → embed → index one staged document (bytes re-read here). */
+	private async processDocument(id: string, file: File, hash: string): Promise<void> {
+		const { db } = await getLocalDb();
 		try {
+			const data = await file.arrayBuffer();
 			await storeOriginal(hash, data);
 
 			this.setIngest(id, { status: 'parsing', phaseProgress: 0 });
@@ -211,7 +253,6 @@ class DocumentsStore {
 		} finally {
 			await this.refreshLibrary();
 		}
-		return id;
 	}
 
 	/** Hybrid retrieval over the given documents; returns the hits. */

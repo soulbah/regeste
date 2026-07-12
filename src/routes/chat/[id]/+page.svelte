@@ -49,13 +49,15 @@
 	});
 
 	async function handleUpload(files: File[]) {
-		for (const file of files) {
-			const known = new Set(documentsStore.library.map((d) => d.id));
-			const docId = await documentsStore.ingest(file);
-			await chatsStore.attach(chatId, docId);
+		// Stage the whole selection first (all rows appear at once, indexing in the
+		// background), then attach each to the chat without waiting for indexing.
+		const known = new Set(documentsStore.library.map((d) => d.id));
+		const ids = await documentsStore.ingestMany(files);
+		for (let i = 0; i < ids.length; i++) {
+			await chatsStore.attach(chatId, ids[i]);
 			// FEATURES: chat uploads land in the global library too — say it once.
-			if (!known.has(docId)) {
-				toast.success(t('toast.added', { name: file.name }), {
+			if (!known.has(ids[i])) {
+				toast.success(t('toast.added', { name: files[i].name }), {
 					description: t('toast.addedDesc')
 				});
 			}

@@ -150,10 +150,10 @@
 	});
 
 	async function handleFiles(files: File[]) {
-		// Library upload = global only (no chat attach).
-		for (const file of files) {
-			await documentsStore.ingest(file);
-		}
+		// Library upload = global only (no chat attach). ingestMany inserts every
+		// row up front so the whole selection appears at once, then indexes in the
+		// background instead of one file at a time.
+		await documentsStore.ingestMany(files);
 	}
 
 	async function confirmDelete() {

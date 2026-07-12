@@ -55,12 +55,13 @@
 		const id = await chatsStore.create(mode ?? 'private');
 		await chatsStore.open(id);
 		goto(resolve(`/chat/${id}`));
-		for (const file of files) {
-			const known = new Set(documentsStore.library.map((d) => d.id));
-			const docId = await documentsStore.ingest(file);
-			await chatsStore.attach(id, docId);
-			if (!known.has(docId)) {
-				toast.success(t('toast.added', { name: file.name }), {
+		// Stage all up front so they appear at once, index in the background.
+		const known = new Set(documentsStore.library.map((d) => d.id));
+		const ids = await documentsStore.ingestMany(files);
+		for (let i = 0; i < ids.length; i++) {
+			await chatsStore.attach(id, ids[i]);
+			if (!known.has(ids[i])) {
+				toast.success(t('toast.added', { name: files[i].name }), {
 					description: t('toast.addedDesc')
 				});
 			}

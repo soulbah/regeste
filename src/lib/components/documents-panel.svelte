@@ -45,10 +45,9 @@
 	}
 
 	async function handleUpload(files: File[]) {
-		for (const file of files) {
-			const docId = await documentsStore.ingest(file);
-			await chatsStore.attach(chatId, docId);
-		}
+		// Stage all at once (rows appear immediately), attach, index in background.
+		const ids = await documentsStore.ingestMany(files);
+		for (const id of ids) await chatsStore.attach(chatId, id);
 	}
 
 	const openDoc = (doc: ChatDocument) => viewerStore.openDocument(doc);
