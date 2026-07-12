@@ -17,7 +17,11 @@ import {
 	type EmbedProgress,
 	type EmbeddingProfile
 } from '$lib/pipeline/embed-model';
-import { refineCandidates, selectWithNeighbors } from '$lib/pipeline/retrieval';
+import {
+	expandRetrievalQuery,
+	refineCandidates,
+	selectWithNeighbors
+} from '$lib/pipeline/retrieval';
 import { extractMoneyCandidates } from '$lib/analysis/money';
 import type { MoneyKind } from '$lib/analysis/money';
 import {
@@ -28,6 +32,8 @@ import {
 import type { IngestErrorCode, LibraryDocument, LocalDocument, SearchHit } from '$lib/types';
 
 let embedApi: Remote<EmbedApi> | null = null;
+const OCR_INDEX_VERSION = 2;
+const OCR_INDEX_VERSION_KEY = 'folio:ocr-index-version';
 function getEmbedWorker(): Remote<EmbedApi> {
 	if (!embedApi) {
 		const worker = new Worker(new URL('../pipeline/embed-worker.ts', import.meta.url), {
@@ -71,6 +77,7 @@ class DocumentsStore {
 	/** Serializes auto-OCR passes so adding several scanned PDFs at once doesn't
 	 *  run multiple main-thread reads concurrently and jank the UI. */
 	private ocrChain: Promise<unknown> = Promise.resolve();
+	private ocrRepairStarted = false;
 	dbInfo = $state<DbInfo | null>(null);
 	dbError = $state<string | null>(null);
 	/** False until the first library load lands, so the UI can tell "loading"
@@ -88,6 +95,7 @@ class DocumentsStore {
 			this.dbInfo = info;
 			this.embeddingProfile = await detectEmbeddingProfile();
 			await this.refreshLibrary();
+			void this.repairOcrIndexes();
 		} catch (err) {
 			this.dbError = err instanceof Error ? err.message : String(err);
 		} finally {
@@ -95,6 +103,34 @@ class DocumentsStore {
 			// settles, even if the database failed to open — an unresolved load
 			// would otherwise hang the page on skeletons forever.
 			this.libraryLoaded = true;
+		}
+	}
+
+	/** One-time repair for scanned PDFs indexed before per-page OCR cache bypass. */
+	private async repairOcrIndexes(): Promise<void> {
+		if (
+			this.ocrRepairStarted ||
+			Number(localStorage.getItem(OCR_INDEX_VERSION_KEY) ?? 0) >= OCR_INDEX_VERSION
+		)
+			return;
+		this.ocrRepairStarted = true;
+		try {
+			const { db } = await getLocalDb();
+			for (const doc of this.documents.filter(
+				(item) => item.status === 'ready' && item.mime === 'application/pdf'
+			)) {
+				const data = await readOriginal(doc.hash);
+				if (!data) continue;
+				const parsed = await parseByName(doc.name, doc.mime, data);
+				if (!parsed.needsOcr?.length) continue;
+				await db.setDocumentStatus(doc.id, 'scanned');
+				this.setIngest(doc.id, { status: 'scanned', phaseProgress: 0 });
+				await this.ocrDocument(doc.id);
+			}
+			localStorage.setItem(OCR_INDEX_VERSION_KEY, String(OCR_INDEX_VERSION));
+		} finally {
+			this.ocrRepairStarted = false;
+			await this.refreshLibrary();
 		}
 	}
 
@@ -262,7 +298,8 @@ class DocumentsStore {
 		onInspect?: () => void
 	): Promise<SearchHit[]> {
 		const { db } = await getLocalDb();
-		const clean = query.trim();
+		const clean = expandRetrievalQuery(query.trim());
+		const refinedQuery = expandRetrievalQuery(refinementQuery.trim());
 		const lexicalPromise = db.searchLexical(clean, documentIds, 80);
 		const { data, dims } = await getEmbedWorker().embed([clean], 'query');
 		const [lexical, semantic] = await Promise.all([
@@ -270,12 +307,12 @@ class DocumentsStore {
 			db.searchVector(data, dims, documentIds, 80)
 		]);
 		onInspect?.();
-		const ranked = refineCandidates(semantic, lexical, refinementQuery.trim(), 16);
+		const ranked = refineCandidates(semantic, lexical, refinedQuery, 24);
 		const neighbors = await db.listNeighborChunks(
-			ranked.slice(0, 8).map((hit) => hit.chunkId),
+			ranked.slice(0, 12).map((hit) => hit.chunkId),
 			1
 		);
-		return selectWithNeighbors(ranked, neighbors, refinementQuery.trim(), 8);
+		return selectWithNeighbors(ranked, neighbors, refinedQuery, 8);
 	}
 
 	/** Exhaustive local path for numerical questions: no top-k truncation. */

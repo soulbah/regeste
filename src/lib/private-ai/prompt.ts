@@ -3,6 +3,7 @@
 // retrieved set after generation — an invalid [n] is silently dropped.
 
 import type { SearchHit } from '$lib/types';
+import { queryCoverage } from '$lib/pipeline/retrieval';
 
 export const SYSTEM_PROMPT = `You are a careful assistant answering questions strictly from the numbered document excerpts provided.
 Rules:
@@ -91,5 +92,23 @@ export function resolveCitations(
 			n: index + 1,
 			hit: hits[original - 1]
 		}))
+	};
+}
+
+/** For one-fact answers, bind citation to passage that best supports words/numbers actually written. */
+export function resolveTargetedCitations(
+	text: string,
+	hits: SearchHit[],
+	question: string
+): { text: string; citations: CitationRef[] } {
+	if (!/\[\d{1,2}\]/.test(text) || !hits.length) return resolveCitations(text, hits);
+	const grounding = `${question} ${text.replace(/\[\d{1,2}\]/g, '')}`;
+	const best = [...hits]
+		.map((hit) => ({ hit, support: queryCoverage(grounding, hit.text) }))
+		.sort((a, b) => b.support - a.support || b.hit.score - a.hit.score)[0];
+	if (!best || best.support === 0) return resolveCitations(text, hits);
+	return {
+		text: text.replace(/(?:\s*\[\d{1,2}\])+/g, ' [1]'),
+		citations: [{ n: 1, hit: best.hit }]
 	};
 }

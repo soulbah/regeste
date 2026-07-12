@@ -2,6 +2,12 @@ import type { SearchHit } from '$lib/types';
 
 const RRF_K = 60;
 
+const CONCEPT_EXPANSIONS: Array<[RegExp, string]> = [
+	[/\b(?:prix|price|cost)\b/iu, 'prix vente montant euros'],
+	[/\b(?:pr[eê]t|emprunt|loan|mortgage|financement)\b/iu, 'prêt emprunt financement montant'],
+	[/\b(?:superficie|surface|area|square)\b/iu, 'superficie surface contenance mètres carrés m² ca']
+];
+
 const STOPWORDS = new Set([
 	'avec',
 	'cette',
@@ -36,6 +42,14 @@ function terms(text: string): string[] {
 				?.filter((term) => term.length > 2 && !STOPWORDS.has(term)) ?? []
 		)
 	];
+}
+
+/** Add document vocabulary commonly used for the user's plain-language concept. */
+export function expandRetrievalQuery(query: string): string {
+	const additions = CONCEPT_EXPANSIONS.filter(([pattern]) => pattern.test(query)).map(
+		([, expansion]) => expansion
+	);
+	return additions.length ? `${query}\n${additions.join(' ')}` : query;
 }
 
 export function queryCoverage(query: string, text: string): number {

@@ -72,7 +72,11 @@ export async function ocrPages(
 			ctx.fillRect(0, 0, canvas.width, canvas.height);
 			await page.render({ canvas, canvasContext: ctx, viewport } as never).promise;
 
-			const result = await svc.recognize(canvas, { flatten: true });
+			// SDK cache hashes only a small image sample. Document pages share large
+			// white margins, so distinct pages can collide and replay page 1's OCR
+			// result across the whole PDF. Each page is processed once here: bypass
+			// that cache and keep model/session reuse only.
+			const result = await svc.recognize(canvas, { flatten: true, noCache: true });
 			const text = (result.text ?? '').trim();
 			if (text) out.push({ text, page: pageNum, charStart: 0, charEnd: text.length });
 

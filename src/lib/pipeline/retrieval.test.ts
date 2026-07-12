@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { fuseCandidates, queryCoverage, refineCandidates, selectWithNeighbors } from './retrieval';
+import {
+	expandRetrievalQuery,
+	fuseCandidates,
+	queryCoverage,
+	refineCandidates,
+	selectWithNeighbors
+} from './retrieval';
 import { chunkBlocks } from './chunk';
 import type { SearchHit } from '$lib/types';
 
@@ -28,6 +34,50 @@ describe('fuseCandidates', () => {
 });
 
 describe('retrieval refinement', () => {
+	it('expands real-estate questions to document vocabulary', () => {
+		expect(expandRetrievalQuery('Quel est le prix de la maison ?')).toContain(
+			'vente montant euros'
+		);
+		expect(expandRetrievalQuery('Quel est le montant du prêt ?')).toContain('emprunt financement');
+		expect(expandRetrievalQuery('Quelle est la superficie ?')).toContain(
+			'contenance mètres carrés'
+		);
+	});
+
+	it('promotes the Martin price, loan and cadastral-area passages', () => {
+		const candidates = [
+			{ ...hit(1, 'compromis', 0.03), page: 4, text: 'Description générale de immeuble' },
+			{
+				...hit(2, 'compromis', 0.029),
+				page: 3,
+				text: 'PRIX DE LA VENTE montant CENT CINQUANTE MILLE EUROS 146.000,00 €'
+			},
+			{
+				...hit(3, 'compromis', 0.029),
+				page: 19,
+				text: 'FINANCEMENT Montant du prêt 146.000,00 €'
+			},
+			{
+				...hit(4, 'compromis', 0.029),
+				page: 2,
+				text: 'Une maison à usage habitation, contenance totale 76 ca'
+			}
+		];
+		expect(
+			refineCandidates(candidates, candidates, expandRetrievalQuery('prix de la maison'), 4)[0].page
+		).toBe(3);
+		expect(
+			refineCandidates(candidates, candidates, expandRetrievalQuery('montant du prêt'), 4)[0].page
+		).toBe(19);
+		expect(
+			refineCandidates(
+				candidates,
+				candidates,
+				expandRetrievalQuery('superficie de la maison'),
+				4
+			)[0].chunkId
+		).toBe(4);
+	});
 	it('promotes entity coverage over unrelated early-page candidates', () => {
 		const early = { ...hit(1, 'scan', 0.9), page: 2, seq: 1, text: 'Expéditeur ACME numéro 7788' };
 		const late = {

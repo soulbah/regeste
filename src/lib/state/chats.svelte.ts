@@ -18,6 +18,7 @@ import {
 	buildUserPrompt,
 	isThinking,
 	resolveCitations,
+	resolveTargetedCitations,
 	stripThink
 } from '$lib/private-ai/prompt';
 import type {
@@ -602,7 +603,11 @@ class ChatsStore {
 		const stopped = !raw.trim();
 
 		const { text: cleaned, citations } =
-			grounded && !stopped ? resolveCitations(raw, hits) : { text: raw, citations: [] };
+			grounded && !stopped
+				? route === 'targeted'
+					? resolveTargetedCitations(raw, hits, question)
+					: resolveCitations(raw, hits)
+				: { text: raw, citations: [] };
 
 		const messageId = crypto.randomUUID();
 		await db.insertMessage({

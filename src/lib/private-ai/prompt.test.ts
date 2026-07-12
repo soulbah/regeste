@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { buildUserPrompt, compactCitationMarkers, resolveCitations } from './prompt';
+import {
+	buildUserPrompt,
+	compactCitationMarkers,
+	resolveCitations,
+	resolveTargetedCitations
+} from './prompt';
 import type { SearchHit } from '$lib/types';
 
 const hit = (n: number): SearchHit => ({
@@ -74,6 +79,22 @@ describe('resolveCitations', () => {
 	it('repairs sparse markers in already persisted answers', () => {
 		expect(compactCitationMarkers('Alice et Bob [2][3].', 2)).toBe('Alice et Bob [1][2].');
 		expect(compactCitationMarkers('Unchanged [1][2].', 2)).toBe('Unchanged [1][2].');
+	});
+
+	it('rebinds a short factual answer to the passage supporting its actual names', () => {
+		const irrelevant = { ...hit(1), text: 'Diagnostic plomb et amiante', page: 11 };
+		const parties = {
+			...hit(2),
+			text: 'Vendeurs Cédric MARTIN et Hélène DUPUIS. Acquéreur Idrissa KONATÉ.',
+			page: 1
+		};
+		const result = resolveTargetedCitations(
+			'Cédric MARTIN et Hélène DUPUIS sont vendeurs, Idrissa KONATÉ est acquéreur [1].',
+			[irrelevant, parties],
+			'Qui sont les parties prenantes ?'
+		);
+		expect(result.text).toContain('[1]');
+		expect(result.citations[0].hit.page).toBe(1);
 	});
 
 	it('passes through text with no markers', () => {
