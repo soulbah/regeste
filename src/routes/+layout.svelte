@@ -21,6 +21,7 @@
 	import { sessionStore } from '$lib/state/session.svelte';
 	import { settingsStore } from '$lib/state/settings.svelte';
 	import { viewerStore } from '$lib/state/viewer.svelte';
+	import { panelStore } from '$lib/state/panel.svelte';
 
 	let { children } = $props();
 
@@ -124,11 +125,11 @@
 
 <Sidebar.Provider>
 	<AppSidebar />
-	<!-- On a chat, the inset stops being a card and becomes a transparent frame:
-	     the conversation and the contextual panel float as their own cards on the
-	     sidebar-coloured workspace. Every other route keeps the single inset card. -->
+	<!-- When a route mounts a PanelShell (chat, documents…), the inset stops being
+	     a card and becomes a transparent frame: the main content and the contextual
+	     panel float as their own cards on the workspace. Other routes keep the card. -->
 	<Sidebar.Inset
-		class={onChatRoute
+		class={panelStore.usingShell
 			? 'md:overflow-visible md:bg-transparent md:peer-data-[variant=inset]:rounded-none md:peer-data-[variant=inset]:border-0 md:peer-data-[variant=inset]:shadow-none'
 			: undefined}
 	>

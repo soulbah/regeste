@@ -1,10 +1,8 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
-	import { MediaQuery } from 'svelte/reactivity';
-	import * as Resizable from '$lib/components/ui/resizable';
-	import * as Sheet from '$lib/components/ui/sheet';
 	import * as Sidebar from '$lib/components/ui/sidebar';
+	import PanelShell from '$lib/components/panel-shell.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Button } from '$lib/components/ui/button';
@@ -87,32 +85,13 @@
 		await chatsStore.editLast(chatId, editText);
 	}
 
-	// Right contextual panel (spec 019): inline resizable pane ≥1024px, a right
-	// Sheet below that. Fully closable; the header toggle, ⌘. and any event
-	// needing the panel (citation, review, What AI saw) reopen it.
-	const lgViewport = new MediaQuery('(min-width: 1024px)');
-	const PANEL_DEFAULT_SIZE = 30;
-	let panelPane = $state<{
-		collapse: () => void;
-		expand: () => void;
-		resize: (size: number) => void;
-		isCollapsed: () => boolean;
-	} | null>(null);
+	// Right contextual panel (PanelShell owns the mechanics; here we only say when
+	// it's open and clear whatever summoned it on close). Open by default.
 	let panelOpen = $state(true);
-	let panelSheetOpen = $state(false);
 
-	function togglePanel() {
-		if (lgViewport.current) {
-			if (panelPane?.isCollapsed()) panelPane.expand();
-			else panelPane?.collapse();
-		} else {
-			panelSheetOpen = !panelSheetOpen;
-		}
-	}
-
-	// Closing the panel means clearing whatever summoned it — otherwise
-	// panelWanted stays true and the effect below re-opens it on the next tick
-	// (the bug where ✕ did nothing on the document viewer).
+	// Closing the panel clears whatever summoned it — otherwise panelWanted stays
+	// true and the effect below re-opens it (the bug where ✕ did nothing on the
+	// document viewer).
 	function clearPanelState() {
 		viewerStore.close();
 		chatsStore.closeWhatAiSaw();
@@ -121,20 +100,14 @@
 
 	function hidePanel() {
 		clearPanelState();
-		if (lgViewport.current) panelPane?.collapse();
-		else panelSheetOpen = false;
+		panelOpen = false;
 	}
 
 	const panelWanted = $derived(
 		reviewing || chatsStore.waisMessageId !== null || viewerStore.isOpen
 	);
 	$effect(() => {
-		if (!panelWanted) return;
-		if (lgViewport.current) {
-			if (panelPane?.isCollapsed()) panelPane.expand();
-		} else {
-			panelSheetOpen = true;
-		}
+		if (panelWanted) panelOpen = true;
 	});
 
 	// Spec 020 — quote-reply: select answer text → floating button → composer.
@@ -190,7 +163,7 @@
 	onkeydown={(e) => {
 		if ((e.metaKey || e.ctrlKey) && e.key === '.') {
 			e.preventDefault();
-			togglePanel();
+			panelOpen = !panelOpen;
 			return;
 		}
 		// Esc stops generation (spec 019 UX checklist), partial output kept.
@@ -200,12 +173,8 @@
 	}}
 />
 
-<Resizable.PaneGroup direction="horizontal" class="h-full" autoSaveId="folio-panes">
-	<Resizable.Pane
-		defaultSize={70}
-		minSize={35}
-		class="bg-background overflow-hidden md:rounded-xl md:border md:shadow-sm"
-	>
+<PanelShell bind:open={panelOpen} onOpenChange={(o) => !o && clearPanelState()}>
+	{#snippet main()}
 		<div class="flex h-full flex-col">
 			<header class="flex h-14 shrink-0 items-center justify-between gap-3 border-b px-4">
 				<div class="flex min-w-0 items-center gap-1">
@@ -248,7 +217,7 @@
 					</a>
 					<!-- Opens only: once the panel shows, its own ✕ is the sole close control
 					     (standard pattern), so the opener disappears instead of flipping icon. -->
-					{#if !(lgViewport.current ? panelOpen : panelSheetOpen)}
+					{#if !panelOpen}
 						<Tooltip.Root>
 							<Tooltip.Trigger>
 								{#snippet child({ props })}
@@ -257,7 +226,7 @@
 										variant="ghost"
 										size="icon-sm"
 										aria-label={t('chat.panelToggleAria')}
-										onclick={togglePanel}
+										onclick={() => (panelOpen = !panelOpen)}
 									>
 										<PanelRightIcon />
 									</Button>
@@ -491,61 +460,16 @@
 				/>
 			</div>
 		</div>
-	</Resizable.Pane>
-	<!-- The gutter between the two cards: a transparent 0.5rem lane on the
-	     workspace, same width as the frame around them. Hidden when the panel is
-	     closed so no stray pill floats at the edge. -->
-	<Resizable.Handle
-		withHandle
-		class={panelOpen ? 'hidden w-2 bg-transparent lg:flex' : 'hidden'}
-		ondblclick={() => panelPane?.resize(PANEL_DEFAULT_SIZE)}
-	/>
-	<Resizable.Pane
-		bind:this={panelPane}
-		defaultSize={PANEL_DEFAULT_SIZE}
-		minSize={22}
-		maxSize={50}
-		collapsible
-		collapsedSize={0}
-		onCollapse={() => (panelOpen = false)}
-		onExpand={() => (panelOpen = true)}
-		class={[
-			'bg-card hidden overflow-hidden rounded-xl lg:block',
-			// Collapsed, the pane is 0-wide; without this its borders leave a 2px
-			// sliver pinned to the right frame.
-			panelOpen && 'border shadow-sm'
-		]}
-	>
-		{@render panelContent(hidePanel)}
-	</Resizable.Pane>
-</Resizable.PaneGroup>
-
-{#snippet panelContent(onhide: () => void)}
-	{#if reviewing}
-		<PresendPanel {onhide} />
-	{:else if chatsStore.waisMessageId}
-		<WhatAiSawPanel {onhide} />
-	{:else if viewerStore.isOpen}
-		<ViewerPanel {onhide} />
-	{:else}
-		<DocumentsPanel {chatId} {onhide} />
-	{/if}
-{/snippet}
-
-<!-- Below 1024px the same panel rides a right Sheet over the conversation. -->
-{#if !lgViewport.current}
-	<Sheet.Root
-		open={panelSheetOpen}
-		onOpenChange={(o) => {
-			panelSheetOpen = o;
-			if (!o) clearPanelState();
-		}}
-	>
-		<Sheet.Content
-			side="right"
-			class="w-full gap-0 p-0 sm:max-w-md [&>[data-slot=sheet-close]]:hidden"
-		>
-			{@render panelContent(hidePanel)}
-		</Sheet.Content>
-	</Sheet.Root>
-{/if}
+	{/snippet}
+	{#snippet panel()}
+		{#if reviewing}
+			<PresendPanel onhide={hidePanel} />
+		{:else if chatsStore.waisMessageId}
+			<WhatAiSawPanel onhide={hidePanel} />
+		{:else if viewerStore.isOpen}
+			<ViewerPanel onhide={hidePanel} />
+		{:else}
+			<DocumentsPanel {chatId} onhide={hidePanel} />
+		{/if}
+	{/snippet}
+</PanelShell>

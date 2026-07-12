@@ -277,7 +277,7 @@ export const en = {
 	'sheet.times': '{count} time{s}',
 	'sheet.privacy': 'Privacy',
 	'sheet.loading': 'Loading…',
-	'sheet.neverSent': 'Never sent',
+	'sheet.neverSent': 'No excerpt has left your device',
 	'sheet.usedIn': 'Used in',
 	'sheet.noChats': 'No chats yet.',
 	'sheet.open': 'Open',

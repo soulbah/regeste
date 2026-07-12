@@ -286,7 +286,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'sheet.times': '{count} fois',
 	'sheet.privacy': 'Confidentialité',
 	'sheet.loading': 'Chargement…',
-	'sheet.neverSent': 'Jamais envoyé',
+	'sheet.neverSent': 'Aucun extrait n’a quitté votre appareil',
 	'sheet.usedIn': 'Utilisé dans',
 	'sheet.noChats': 'Aucune discussion pour le moment.',
 	'sheet.open': 'Ouvrir',
