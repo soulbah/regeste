@@ -13,6 +13,7 @@
 	import { Input } from '$lib/components/ui/input';
 	import * as Pagination from '$lib/components/ui/pagination';
 	import { Progress } from '$lib/components/ui/progress';
+	import { Skeleton } from '$lib/components/ui/skeleton';
 	import * as Select from '$lib/components/ui/select';
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import PanelShell from '$lib/components/panel-shell.svelte';
@@ -96,6 +97,9 @@
 	}
 	const useMocks = $derived(dev && page.url.searchParams.has('mock'));
 	const library = $derived(useMocks ? MOCK_DOCS : documentsStore.library);
+	// Only trust "empty" once the first library load lands — otherwise the empty
+	// state flashes before the rows arrive on a page refresh.
+	const loaded = $derived(useMocks || documentsStore.libraryLoaded);
 
 	function docType(doc: LibraryDocument): 'pdf' | 'docx' | 'md' | 'txt' {
 		const n = doc.name.toLowerCase();
@@ -223,7 +227,7 @@
 				</div>
 			</header>
 
-			{#if library.length === 0}
+			{#if loaded && library.length === 0}
 				<!-- The privacy pitch lives here, said once, where it can still convince. -->
 				<div class="flex flex-1 flex-col items-center justify-center gap-4 px-6 pb-16">
 					<FilesIcon class="text-muted-foreground size-10" />
@@ -287,95 +291,110 @@
 
 					<Card.Root class="rounded-xl">
 						<Card.Content class="divide-y p-0">
-							{#each paged as doc (doc.id)}
-								{@const ingest = documentsStore.ingests[doc.id]}
-								{@const st = ingest?.status ?? doc.status}
-								<div
-									class="group hover:bg-foreground/3 flex items-center gap-4 px-4 py-3 {selected?.id ===
-									doc.id
-										? 'bg-foreground/4'
-										: ''}"
-								>
-									<FileTextIcon class="text-muted-foreground size-5 shrink-0" />
-									<div class="min-w-0 flex-1">
-										<Button
-											variant="ghost"
-											class="hover:text-foreground block h-auto w-full justify-start truncate p-0 text-left text-sm font-medium hover:bg-transparent"
-											onclick={() => (selected = doc)}
-											aria-label={t('docsPage.openAria', { name: doc.name })}
-										>
-											{doc.name}
-										</Button>
-										<p class="text-muted-foreground font-mono text-[10px] uppercase">
-											{docType(doc)} · {(doc.size / 1024).toFixed(0)} KB{doc.pages
-												? ` · ${t('common.pages', { n: doc.pages })}`
-												: ''} · {t('docsPage.added', {
-												date: new Date(doc.createdAt).toLocaleDateString()
-											})}
-											{#if st === 'error'}
-												· {doc.error === 'scanned_pdf' ? t('docsPage.noText') : t('docsPage.error')}
-											{:else if st === 'scanned'}
-												· {t('docsPage.scanned')}
-											{:else if st === 'ocr'}
-												· {t('docsPage.ocrRunning')}
-											{:else if st !== 'ready'}
-												· {t('docsPage.indexing')}
-											{/if}
-										</p>
-										{#if ingest && (st === 'embedding' || st === 'ocr')}
-											<Progress value={ingest.phaseProgress * 100} class="mt-1.5 h-1" />
-										{/if}
+							{#if !loaded}
+								{#each { length: 5 }, i (i)}
+									<div class="flex items-center gap-4 px-4 py-3">
+										<Skeleton class="size-5 shrink-0 rounded" />
+										<div class="min-w-0 flex-1 space-y-2">
+											<Skeleton class="h-3.5 w-48" />
+											<Skeleton class="h-2.5 w-64" />
+										</div>
+										<Skeleton class="h-5 w-20 shrink-0 rounded-full" />
 									</div>
-									<Badge variant="outline" class="shrink-0">
-										{t('docsPage.inChats', {
-											count: doc.chatCount,
-											s: doc.chatCount === 1 ? '' : 's'
-										})}
-									</Badge>
-									<DropdownMenu.Root>
-										<DropdownMenu.Trigger>
-											{#snippet child({ props })}
-												<Button {...props} variant="ghost" size="icon" class="size-7">
-													<EllipsisVerticalIcon class="size-4" />
-												</Button>
-											{/snippet}
-										</DropdownMenu.Trigger>
-										<DropdownMenu.Content align="end" class="w-56">
-											<DropdownMenu.Item onclick={() => (selected = doc)}>
-												<InfoIcon class="text-muted-foreground" />
-												{t('docsPage.details')}
-											</DropdownMenu.Item>
-											{#if doc.status === 'scanned'}
-												<DropdownMenu.Item onclick={() => documentsStore.ocrDocument(doc.id)}>
-													<ScanTextIcon class="text-muted-foreground" />
-													{t('docsPage.readScanned')}
-												</DropdownMenu.Item>
-											{/if}
-											<DropdownMenu.Item
-												onclick={() => {
-													replaceTarget = doc;
-													replaceInput?.click();
-												}}
-											>
-												<ReplaceIcon class="text-muted-foreground" />
-												{t('sheet.replaceFile')}
-											</DropdownMenu.Item>
-											<DropdownMenu.Separator />
-											<DropdownMenu.Item
-												class="text-destructive"
-												onclick={() => (deleteTarget = doc)}
-											>
-												<Trash2Icon class="text-destructive" />
-												{t('docsPage.deleteFromDevice')}
-											</DropdownMenu.Item>
-										</DropdownMenu.Content>
-									</DropdownMenu.Root>
-								</div>
+								{/each}
 							{:else}
-								<p class="text-muted-foreground p-10 text-center text-sm">
-									{t('docsPage.noMatch')}
-								</p>
-							{/each}
+								{#each paged as doc (doc.id)}
+									{@const ingest = documentsStore.ingests[doc.id]}
+									{@const st = ingest?.status ?? doc.status}
+									<div
+										class="group hover:bg-foreground/3 flex items-center gap-4 px-4 py-3 {selected?.id ===
+										doc.id
+											? 'bg-foreground/4'
+											: ''}"
+									>
+										<FileTextIcon class="text-muted-foreground size-5 shrink-0" />
+										<div class="min-w-0 flex-1">
+											<Button
+												variant="ghost"
+												class="hover:text-foreground block h-auto w-full justify-start truncate p-0 text-left text-sm font-medium hover:bg-transparent"
+												onclick={() => (selected = doc)}
+												aria-label={t('docsPage.openAria', { name: doc.name })}
+											>
+												{doc.name}
+											</Button>
+											<p class="text-muted-foreground font-mono text-[10px] uppercase">
+												{docType(doc)} · {(doc.size / 1024).toFixed(0)} KB{doc.pages
+													? ` · ${t('common.pages', { n: doc.pages })}`
+													: ''} · {t('docsPage.added', {
+													date: new Date(doc.createdAt).toLocaleDateString()
+												})}
+												{#if st === 'error'}
+													· {doc.error === 'scanned_pdf'
+														? t('docsPage.noText')
+														: t('docsPage.error')}
+												{:else if st === 'scanned'}
+													· {t('docsPage.scanned')}
+												{:else if st === 'ocr'}
+													· {t('docsPage.ocrRunning')}
+												{:else if st !== 'ready'}
+													· {t('docsPage.indexing')}
+												{/if}
+											</p>
+											{#if ingest && (st === 'embedding' || st === 'ocr')}
+												<Progress value={ingest.phaseProgress * 100} class="mt-1.5 h-1" />
+											{/if}
+										</div>
+										<Badge variant="outline" class="shrink-0">
+											{t('docsPage.inChats', {
+												count: doc.chatCount,
+												s: doc.chatCount === 1 ? '' : 's'
+											})}
+										</Badge>
+										<DropdownMenu.Root>
+											<DropdownMenu.Trigger>
+												{#snippet child({ props })}
+													<Button {...props} variant="ghost" size="icon" class="size-7">
+														<EllipsisVerticalIcon class="size-4" />
+													</Button>
+												{/snippet}
+											</DropdownMenu.Trigger>
+											<DropdownMenu.Content align="end" class="w-56">
+												<DropdownMenu.Item onclick={() => (selected = doc)}>
+													<InfoIcon class="text-muted-foreground" />
+													{t('docsPage.details')}
+												</DropdownMenu.Item>
+												{#if doc.status === 'scanned'}
+													<DropdownMenu.Item onclick={() => documentsStore.ocrDocument(doc.id)}>
+														<ScanTextIcon class="text-muted-foreground" />
+														{t('docsPage.readScanned')}
+													</DropdownMenu.Item>
+												{/if}
+												<DropdownMenu.Item
+													onclick={() => {
+														replaceTarget = doc;
+														replaceInput?.click();
+													}}
+												>
+													<ReplaceIcon class="text-muted-foreground" />
+													{t('sheet.replaceFile')}
+												</DropdownMenu.Item>
+												<DropdownMenu.Separator />
+												<DropdownMenu.Item
+													class="text-destructive"
+													onclick={() => (deleteTarget = doc)}
+												>
+													<Trash2Icon class="text-destructive" />
+													{t('docsPage.deleteFromDevice')}
+												</DropdownMenu.Item>
+											</DropdownMenu.Content>
+										</DropdownMenu.Root>
+									</div>
+								{:else}
+									<p class="text-muted-foreground p-10 text-center text-sm">
+										{t('docsPage.noMatch')}
+									</p>
+								{/each}
+							{/if}
 						</Card.Content>
 					</Card.Root>
 

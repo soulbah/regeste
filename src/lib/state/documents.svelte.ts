@@ -70,6 +70,9 @@ class DocumentsStore {
 	ocrAborts = $state<Record<string, AbortController>>({});
 	dbInfo = $state<DbInfo | null>(null);
 	dbError = $state<string | null>(null);
+	/** False until the first library load lands, so the UI can tell "loading"
+	 * apart from "genuinely empty" (no empty-state flash on refresh). */
+	libraryLoaded = $state(false);
 	searching = $state(false);
 	results = $state<SearchHit[]>([]);
 	lastSearchMs = $state<number | null>(null);
@@ -84,6 +87,11 @@ class DocumentsStore {
 			await this.refreshLibrary();
 		} catch (err) {
 			this.dbError = err instanceof Error ? err.message : String(err);
+		} finally {
+			// The library list must stop showing skeletons once the first load
+			// settles, even if the database failed to open — an unresolved load
+			// would otherwise hang the page on skeletons forever.
+			this.libraryLoaded = true;
 		}
 	}
 
@@ -102,6 +110,7 @@ class DocumentsStore {
 						.map((doc) => doc.id)
 				: []
 		);
+		this.libraryLoaded = true;
 	}
 
 	needsReindex(id: string): boolean {
