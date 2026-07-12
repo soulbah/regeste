@@ -51,8 +51,8 @@ export const fr: Record<keyof typeof en, string> = {
 
 	// Command palette
 	'palette.placeholder': 'Rechercher discussions, documents, commandes…',
-	'palette.noResults': 'Rien trouvé sur cet appareil.',
-	'palette.hint': 'Tapez pour chercher partout sur cet appareil.',
+	'palette.noResults': 'Rien trouvé.',
+	'palette.hint': 'Tapez pour tout rechercher.',
 	'palette.chats': 'Discussions',
 	'palette.documents': 'Documents',
 	'palette.commands': 'Commandes',
@@ -148,6 +148,8 @@ export const fr: Record<keyof typeof en, string> = {
 	'status.reading': 'Lecture',
 	'status.splitting': 'Découpage',
 	'status.scanned': "Ce document semble être une image scannée : aucun texte à lire pour l'instant",
+	'status.awaitingOcr': 'Numérisé',
+	'status.ocr': 'Lecture…',
 
 	// Pre-send review panel
 	'presend.title': 'Avant que ça parte',
@@ -198,7 +200,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'wais.kbSent': '{kb} Ko envoyés',
 	'wais.excluded': 'Exclu par vous',
 	'wais.sent': 'Envoyé',
-	'wais.stayed': 'Resté sur cet appareil',
+	'wais.stayed': 'Resté',
 	'wais.noPassages': 'Aucun passage de document. Seule votre question était concernée.',
 	'wais.notRecorded':
 		"Le détail des passages n'a pas été enregistré pour cette réponse plus ancienne.",
@@ -207,7 +209,7 @@ export const fr: Record<keyof typeof en, string> = {
 
 	// Viewer panel
 	'viewer.document': 'Document',
-	'viewer.removed': 'Plus sur cet appareil',
+	'viewer.removed': 'Plus disponible',
 	'viewer.removedBody':
 		'Ce document a été supprimé de votre bibliothèque. La citation a conservé un instantané du passage :',
 	'viewer.missing': 'Fichier original indisponible',
@@ -262,8 +264,9 @@ export const fr: Record<keyof typeof en, string> = {
 	'docsPage.noMatch': 'Rien ne correspond à ce filtre.',
 	'docsPage.noText': 'aucun texte extractible',
 	'docsPage.error': 'erreur',
-	'docsPage.sentOn': 'Extraits envoyés le {date}',
-	'docsPage.neverSent': 'Jamais envoyé',
+	'docsPage.scanned': 'pages numérisées à lire',
+	'docsPage.ocrRunning': 'lecture des pages numérisées…',
+	'docsPage.readScanned': 'Lire les pages numérisées',
 	'docsPage.inChats': 'Dans {count} discussion{s}',
 	'docsPage.openAria': 'Ouvrir les détails de {name}',
 	'docsPage.deleteFromDevice': 'Supprimer de cet appareil',
@@ -274,7 +277,6 @@ export const fr: Record<keyof typeof en, string> = {
 	'docsPage.deleteConfirm': 'Supprimer définitivement',
 
 	// Document sheet
-	'sheet.stored': 'Stocké sur cet appareil',
 	'sheet.size': 'Taille',
 	'sheet.pages': 'Pages',
 	'sheet.indexed': 'Indexé',
@@ -284,7 +286,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'sheet.times': '{count} fois',
 	'sheet.privacy': 'Confidentialité',
 	'sheet.loading': 'Chargement…',
-	'sheet.neverSent': 'Jamais envoyé nulle part',
+	'sheet.neverSent': 'Jamais envoyé',
 	'sheet.usedIn': 'Utilisé dans',
 	'sheet.noChats': 'Aucune discussion pour le moment.',
 	'sheet.open': 'Ouvrir',
@@ -308,8 +310,12 @@ export const fr: Record<keyof typeof en, string> = {
 	'sheet.copied': 'Empreinte copiée',
 	'sheet.details': 'Détails',
 	'sheet.usedInCount': 'Utilisé dans {count} discussion{s}',
-	'sheet.stillIndexing': 'Indexation en cours sur cet appareil',
+	'sheet.stillIndexing': 'Indexation en cours',
 	'sheet.openChatAria': 'Ouvrir la discussion {title}',
+	'sheet.scannedTitle': 'Ces pages sont des images numérisées.',
+	'sheet.scannedBody': 'Lisez-les pour les rechercher et les citer.',
+	'sheet.readScanned': 'Lire les pages numérisées',
+	'sheet.ocrRunning': 'Lecture de la page {done} sur {total}…',
 
 	// Pagination
 	'pagination.prev': 'Page précédente',
@@ -323,7 +329,7 @@ export const fr: Record<keyof typeof en, string> = {
 	// Settings
 	'settings.title': 'Réglages',
 	'settings.subtitle': 'Stockage · confidentialité · hors ligne',
-	'settings.storage.title': 'Stockage sur cet appareil',
+	'settings.storage.title': 'Stockage',
 	'settings.storage.used': '{used} utilisés',
 	'settings.storage.available': '{quota} disponibles',
 	'settings.storage.persistent': "Persistant : le navigateur n'évincera pas vos documents",
@@ -425,12 +431,12 @@ export const fr: Record<keyof typeof en, string> = {
 	'settings.offline.badge': 'Hors ligne · rien ne quitte cet appareil',
 	'settings.workspace.title': 'Espace de travail',
 	'settings.workspace.exportDesc':
-		'Exportez vos documents, discussions, citations et historique de confidentialité dans un simple zip. Construit sur cet appareil, envoyé nulle part.',
+		'Exportez vos documents, discussions, citations et historique de confidentialité dans un simple zip.',
 	'settings.workspace.packing': 'Préparation…',
 	'settings.workspace.export': 'Exporter mon espace de travail',
 	'settings.workspace.quota': 'Utilisation Assisted ce mois-ci : {used} / {limit}',
 	'settings.workspace.quotaSignIn': "L'utilisation Assisted apparaît ici une fois connecté.",
-	'settings.models.title': 'IA téléchargée sur cet appareil',
+	'settings.models.title': 'IA téléchargée',
 	'settings.models.measuring': 'Mesure…',
 	'settings.models.none': 'Rien de téléchargé pour le moment.',
 	'settings.models.files': '{count} fichiers',
@@ -447,9 +453,9 @@ export const fr: Record<keyof typeof en, string> = {
 	'settings.wipe.title': 'Tout supprimer',
 	'settings.wipe.desc':
 		"Efface tous les documents, discussions, index et IA téléchargées de cet appareil. Rien n'existe ailleurs, cette action est donc irréversible.",
-	'settings.wipe.cta': 'Tout supprimer sur cet appareil',
+	'settings.wipe.cta': 'Tout supprimer',
 	'settings.wipe.last': 'Dernière confirmation',
-	'settings.wipe.confirmTitle': 'Tout supprimer sur cet appareil ?',
+	'settings.wipe.confirmTitle': 'Tout supprimer ?',
 	'settings.wipe.armedBody':
 		"Ceci détruit définitivement chaque document, discussion, index et IA téléchargée stockée dans ce navigateur. Rien n'existe ailleurs. Vraiment supprimer ?",
 	'settings.wipe.body':
@@ -534,7 +540,7 @@ export const fr: Record<keyof typeof en, string> = {
 		'Aucun texte trouvé. Les documents scannés ne sont pas encore pris en charge.',
 	'toast.failedGeneric': 'Un problème est survenu pendant la lecture de ce fichier.',
 	'toast.added': '{name} ajouté à Mes documents',
-	'toast.addedDesc': 'Disponible dans chaque discussion, stocké sur cet appareil.',
+	'toast.addedDesc': 'Disponible dans chaque discussion.',
 
 	// Errors (stores + net)
 	'error.offline': 'Le mode hors ligne est activé. Rien ne quitte cet appareil.',

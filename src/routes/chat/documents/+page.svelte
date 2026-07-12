@@ -23,6 +23,7 @@
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import Trash2Icon from '@lucide/svelte/icons/trash-2';
 	import InfoIcon from '@lucide/svelte/icons/info';
+	import ScanTextIcon from '@lucide/svelte/icons/scan-text';
 	import ReplaceIcon from '@lucide/svelte/icons/replace';
 	import ChevronsLeftIcon from '@lucide/svelte/icons/chevrons-left';
 	import ChevronsRightIcon from '@lucide/svelte/icons/chevrons-right';
@@ -304,25 +305,18 @@
 										})}
 										{#if doc.status === 'error'}
 											· {doc.error === 'scanned_pdf' ? t('docsPage.noText') : t('docsPage.error')}
+										{:else if doc.status === 'scanned'}
+											· {t('docsPage.scanned')}
+										{:else if doc.status === 'ocr'}
+											· {t('docsPage.ocrRunning')}
 										{:else if doc.status !== 'ready'}
 											· {doc.status}…
 										{/if}
 									</p>
-									{#if ingest && doc.status === 'embedding'}
+									{#if ingest && (doc.status === 'embedding' || doc.status === 'ocr')}
 										<Progress value={ingest.phaseProgress * 100} class="mt-1.5 h-1" />
 									{/if}
 								</div>
-								{#if documentsStore.egress[doc.id]}
-									<Badge variant="working" class="shrink-0 text-[10px]">
-										{t('docsPage.sentOn', {
-											date: new Date(documentsStore.egress[doc.id]).toLocaleDateString()
-										})}
-									</Badge>
-								{:else}
-									<Badge variant="secondary" class="shrink-0 text-[10px]">
-										{t('docsPage.neverSent')}
-									</Badge>
-								{/if}
 								<Badge variant="outline" class="shrink-0">
 									{t('docsPage.inChats', {
 										count: doc.chatCount,
@@ -342,6 +336,12 @@
 											<InfoIcon class="text-muted-foreground" />
 											{t('docsPage.details')}
 										</DropdownMenu.Item>
+										{#if doc.status === 'scanned'}
+											<DropdownMenu.Item onclick={() => documentsStore.ocrDocument(doc.id)}>
+												<ScanTextIcon class="text-muted-foreground" />
+												{t('docsPage.readScanned')}
+											</DropdownMenu.Item>
+										{/if}
 										<DropdownMenu.Item
 											onclick={() => {
 												replaceTarget = doc;

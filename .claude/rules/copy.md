@@ -7,7 +7,7 @@ Every string a user reads must read like it was written by a careful human, not 
 - **Em dashes (—)** as a connector. Use a comma, a period, a colon, or parentheses. One em dash per screen is already suspicious.
 - **Negative parallelisms**: "not just X, but Y", "X, not Y", "proof, not promises", "transparency, not magic". Say the thing directly.
 - **Rule of three**: "clear, fast, and private" enumerations everywhere. Two items or a plain sentence usually carry it.
-- **Overexplanation**: don't restate the privacy promise in every sentence. Say it once, where it matters; trust the reader's memory.
+- **Overexplanation / privacy forcing** (owner, 2026-07-11, hard): say the privacy promise ONCE, only where it IS the message — Private mode, the pre-send review, the Privacy Report, how-it-works, offline mode, the documents empty state. NEVER sprinkle "on this device / on your device / nothing is sent / stays local / never sent" into palette results, toasts, settings section titles ("Storage", not "Storage on this device"), status labels, delete-confirm titles, tooltips, or per-row badges. No per-row egress column; a "sent" chip appears only on the rare document whose excerpts actually left. Repeated reassurance reads as insecurity.
 - **Repetition of pet words**: seamless, robust, delve, crucial, pivotal, leverage, empower, showcase, journey, effortless; FR: fluide, robuste, crucial, pivot, découvrez, sans effort.
 - **Inflated verbs replacing "is"**: "serves as", "represents", "marks", "boasts"; FR: "constitue", "représente" where "est" works.
 - **Drama in mundane sentences**: "the whole story", "living proof", "don't take our word for it", exclamation marks, suspense ellipses.

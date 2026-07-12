@@ -8,6 +8,7 @@
 	// library row); the layout is what changed.
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
+	import { Progress } from '$lib/components/ui/progress';
 	import { Separator } from '$lib/components/ui/separator';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import PanelHeader from '$lib/components/panel-header.svelte';
@@ -15,6 +16,7 @@
 	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
 	import MessagesSquareIcon from '@lucide/svelte/icons/messages-square';
 	import EyeIcon from '@lucide/svelte/icons/eye';
+	import ScanTextIcon from '@lucide/svelte/icons/scan-text';
 	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
 	import ReplaceIcon from '@lucide/svelte/icons/replace';
 	import Trash2Icon from '@lucide/svelte/icons/trash-2';
@@ -107,6 +109,38 @@
 		<PanelHeader title={live.name} {subtitle} {onhide} />
 
 		<div class="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4">
+			<!-- Scanned pages await an opt-in on-device read (spec 023). -->
+			{#if live.status === 'scanned' || live.status === 'ocr'}
+				<div class="space-y-2 rounded-lg border p-3">
+					<div class="flex items-center gap-2 text-sm font-medium">
+						<ScanTextIcon class="text-muted-foreground size-4 shrink-0" />
+						{t('sheet.scannedTitle')}
+					</div>
+					<p class="text-muted-foreground text-xs">{t('sheet.scannedBody')}</p>
+					{#if live.status === 'ocr'}
+						<Progress value={(ingest?.phaseProgress ?? 0) * 100} class="h-1" />
+						<div class="flex items-center justify-between">
+							<span class="text-muted-foreground text-xs">
+								{ingest?.status === 'embedding' ? t('status.indexing') : t('status.ocr')}
+							</span>
+							<Button
+								variant="ghost"
+								size="xs"
+								class="text-muted-foreground"
+								onclick={() => documentsStore.cancelOcr(live.id)}
+							>
+								{t('common.cancel')}
+							</Button>
+						</div>
+					{:else}
+						<Button class="w-full gap-2" onclick={() => documentsStore.ocrDocument(live.id)}>
+							<ScanTextIcon class="size-4" />
+							{t('sheet.readScanned')}
+						</Button>
+					{/if}
+				</div>
+			{/if}
+
 			<!-- The differentiator, elevated to the first block: the one bordered box
 			     on the surface, so the eye lands on the privacy state. -->
 			<div class="space-y-1.5 rounded-lg border p-3">

@@ -1,7 +1,15 @@
 // Shared types for the local pipeline. Everything here describes data that
 // lives in the browser only — none of it may ever be sent to a server.
 
-export type DocumentStatus = 'received' | 'parsing' | 'chunking' | 'embedding' | 'ready' | 'error';
+export type DocumentStatus =
+	| 'received'
+	| 'parsing'
+	| 'chunking'
+	| 'embedding'
+	| 'ready'
+	| 'scanned' // image-only pages await an opt-in on-device OCR pass (spec 023)
+	| 'ocr' // OCR pass running
+	| 'error';
 
 export type IngestErrorCode = 'scanned_pdf' | 'unsupported_format' | 'parse_failed' | 'unknown';
 
@@ -38,6 +46,8 @@ export interface ParsedBlock {
 export interface ParsedDoc {
 	blocks: ParsedBlock[];
 	pages: number | null;
+	/** 1-based page numbers with no extractable text — image-only, OCR candidates (spec 023). */
+	needsOcr?: number[];
 }
 
 export interface Chunk {
