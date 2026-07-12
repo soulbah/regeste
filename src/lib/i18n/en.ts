@@ -138,14 +138,13 @@ export const en = {
 	'docs.addCount': 'Add {count} document{s}',
 	'docs.alreadyAdded': 'Added',
 
-	// Document ingest statuses
+	// Document ingest statuses. Scanned-page work deliberately reuses Reading.
+	'status.received': 'Received',
 	'status.ready': 'Ready',
-	'status.indexing': 'Preparing',
 	'status.reading': 'Reading',
 	'status.splitting': 'Splitting',
-	'status.scanned': 'This is a scanned image and no text could be extracted from it',
-	'status.awaitingOcr': 'Scanned',
-	'status.ocr': 'Extracting text…',
+	'status.indexing': 'Preparing',
+	'status.failed': 'Failed',
 
 	// Pre-send review panel
 	'presend.title': 'Before it leaves',
@@ -256,12 +255,8 @@ export const en = {
 	'docsPage.added': 'added {date}',
 	'docsPage.details': 'Details',
 	'docsPage.noMatch': 'Nothing matches this filter.',
-	'docsPage.noText': 'no extractable text',
-	'docsPage.error': 'error',
+	'docsPage.error': 'failed',
 	'docsPage.indexing': 'indexing…',
-	'docsPage.scanned': 'text not extracted',
-	'docsPage.ocrRunning': 'extracting text…',
-	'docsPage.readScanned': 'Extract the text',
 	'docsPage.inChats': 'In {count} chat{s}',
 	'docsPage.openAria': 'Open details for {name}',
 	'docsPage.deleteFromDevice': 'Delete from this device',
@@ -307,10 +302,7 @@ export const en = {
 	'sheet.usedInCount': 'Used in {count} chat{s}',
 	'sheet.stillIndexing': 'Still indexing',
 	'sheet.openChatAria': 'Open the chat {title}',
-	'sheet.scannedTitle': 'These pages are scanned images.',
-	'sheet.scannedBody': 'Extract their text to search and cite them.',
-	'sheet.readScanned': 'Extract the text',
-	'sheet.ocrRunning': 'Extracting text, page {done} of {total}…',
+	'sheet.indexFailed': "This document couldn't be indexed.",
 
 	// Pagination
 	'pagination.prev': 'Previous page',
@@ -530,8 +522,7 @@ export const en = {
 	// Toasts (layout + uploads)
 	'toast.ready': '{name} is ready',
 	'toast.failed': "{name} couldn't be added",
-	'toast.failedScanned': 'No text could be extracted from the scanned pages.',
-	'toast.failedGeneric': 'Something went wrong while reading this file.',
+	'toast.failedGeneric': 'Something went wrong while indexing this file.',
 	'toast.added': '{name} added to My documents',
 	'toast.addedDesc': 'Available to every chat.',
 

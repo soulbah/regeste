@@ -19,6 +19,7 @@
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import PanelHeader from '$lib/components/panel-header.svelte';
 	import AddDocuments from '$lib/components/add-documents.svelte';
+	import { documentStatusKey } from '$lib/document-status';
 	import { t } from '$lib/i18n/index.svelte';
 	import { chatsStore } from '$lib/state/chats.svelte';
 	import { documentsStore } from '$lib/state/documents.svelte';
@@ -26,18 +27,6 @@
 	import type { ChatDocument } from '$lib/types';
 
 	let { chatId, onhide = null }: { chatId: string; onhide?: (() => void) | null } = $props();
-
-	function statusLabel(status: string, error: string | null): string {
-		if (error === 'scanned_pdf') return t('status.scanned');
-		if (error) return error;
-		if (status === 'ready') return t('status.ready');
-		if (status === 'scanned') return t('status.awaitingOcr');
-		if (status === 'ocr') return t('status.ocr');
-		if (status === 'embedding') return t('status.indexing');
-		if (status === 'parsing') return t('status.reading');
-		if (status === 'chunking') return t('status.splitting');
-		return status;
-	}
 
 	function ext(name: string): string {
 		const dot = name.lastIndexOf('.');
@@ -82,6 +71,7 @@
 		{:else}
 			{#each chatsStore.chatDocuments as doc (doc.id)}
 				{@const ingest = documentsStore.ingests[doc.id]}
+				{@const status = ingest?.status ?? doc.status}
 				{@const ready = doc.status === 'ready'}
 				{@const errored = doc.status === 'error'}
 				{@const dimmed = ready && !doc.enabled}
@@ -123,32 +113,27 @@
 							{ext(doc.name)}{doc.pages ? ` · ${t('common.pages', { n: doc.pages })}` : ''}
 						</p>
 
-						<!-- Live status: a solid dot when ready, a pulsing dot while indexing
-					     (with a progress bar), red on failure. Amber is reserved for
-					     egress, so on-device indexing stays green. -->
+						<!-- Named ingest phases stay visible. Scanned pages reuse the normal
+					     Reading phase, so OCR remains an implementation detail. -->
 						<div class="mt-1.5 flex items-center gap-1.5 text-[11px]">
 							{#if errored}
 								<span class="bg-destructive size-1.5 rounded-full"></span>
-								<span class="text-destructive">{statusLabel(doc.status, doc.error)}</span>
+								<span class="text-destructive">
+									{t(documentStatusKey(status, ingest?.error ?? doc.error))}
+								</span>
 							{:else if ready}
 								<span class="bg-ring size-1.5 rounded-full"></span>
 								<span class="text-muted-foreground">{t('status.ready')}</span>
-							{:else if doc.status === 'scanned'}
-								<!-- Idle, awaiting an opt-in read: a still (non-pulsing) muted dot. -->
-								<span class="bg-muted-foreground/50 size-1.5 rounded-full"></span>
-								<span class="text-muted-foreground">{t('status.awaitingOcr')}</span>
 							{:else}
 								<span class="bg-ring size-1.5 animate-pulse rounded-full"></span>
 								<span class="text-muted-foreground">
-									{statusLabel(doc.status, doc.error)}{(doc.status === 'embedding' ||
-										doc.status === 'ocr') &&
-									ingest
+									{t(documentStatusKey(status))}{status === 'embedding' && ingest
 										? ` ${Math.round(ingest.phaseProgress * 100)}%`
 										: '…'}
 								</span>
 							{/if}
 						</div>
-						{#if (doc.status === 'embedding' || doc.status === 'ocr') && ingest}
+						{#if status === 'embedding' && ingest}
 							<Progress value={ingest.phaseProgress * 100} class="mt-1.5 h-1" />
 						{/if}
 					</div>

@@ -80,8 +80,7 @@
 					toast.success(t('toast.ready', { name: doc.name }));
 				} else if (doc.status === 'error') {
 					toast.error(t('toast.failed', { name: doc.name }), {
-						description:
-							doc.error === 'scanned_pdf' ? t('toast.failedScanned') : t('toast.failedGeneric')
+						description: t('toast.failedGeneric')
 					});
 				}
 			}

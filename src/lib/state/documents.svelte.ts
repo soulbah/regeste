@@ -234,8 +234,7 @@ class DocumentsStore {
 				// Image-only pages remain: land in `scanned` (text pages, if any,
 				// already searchable), then read them on-device right away — a PDF
 				// the user just added is expected to become searchable on its own,
-				// not to wait for a click. Background + cancellable; if it fails or
-				// is cancelled the detail panel still offers a manual retry.
+				// not to wait for a click. Background + internally cancellable.
 				await db.setDocumentStatus(id, 'scanned', {
 					embeddingModel
 				});
@@ -357,7 +356,7 @@ class DocumentsStore {
 	}
 
 	/**
-	 * Spec 023 — opt-in on-device OCR of a `scanned` document. Re-parses to find
+	 * Spec 023 — automatic on-device OCR of a `scanned` document. Re-parses to find
 	 * the image-only pages, OCRs them on the main thread, splices the recognized
 	 * text back at its page number, then re-chunks + re-embeds the merged document
 	 * through the existing pipeline. Cancellable; nothing leaves the device.
@@ -401,6 +400,7 @@ class DocumentsStore {
 			// Merge OCR text pages with the extractable text pages, in page order,
 			// so citations and the viewer resolve to the right location.
 			const merged = [...parsed.blocks, ...ocrBlocks].sort((a, b) => (a.page ?? 0) - (b.page ?? 0));
+			this.setIngest(id, { status: 'chunking', phaseProgress: 0 });
 			const chunks = chunkBlocks(merged, doc.name);
 			if (!chunks.length) {
 				// OCR read nothing usable — honest terminal, not a silent success.

@@ -24,7 +24,6 @@
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import Trash2Icon from '@lucide/svelte/icons/trash-2';
 	import InfoIcon from '@lucide/svelte/icons/info';
-	import ScanTextIcon from '@lucide/svelte/icons/scan-text';
 	import ReplaceIcon from '@lucide/svelte/icons/replace';
 	import ChevronsLeftIcon from '@lucide/svelte/icons/chevrons-left';
 	import ChevronsRightIcon from '@lucide/svelte/icons/chevrons-right';
@@ -33,6 +32,7 @@
 	import { toast } from 'svelte-sonner';
 	import { dev } from '$app/environment';
 	import { page } from '$app/state';
+	import { documentStatusKey } from '$lib/document-status';
 	import { t } from '$lib/i18n/index.svelte';
 	import { documentsStore } from '$lib/state/documents.svelte';
 	import { viewerStore } from '$lib/state/viewer.svelte';
@@ -339,18 +339,12 @@
 													date: new Date(doc.createdAt).toLocaleDateString()
 												})}
 												{#if st === 'error'}
-													· {doc.error === 'scanned_pdf'
-														? t('docsPage.noText')
-														: t('docsPage.error')}
-												{:else if st === 'scanned'}
-													· {t('docsPage.scanned')}
-												{:else if st === 'ocr'}
-													· {t('docsPage.ocrRunning')}
+													· {t('docsPage.error')}
 												{:else if st !== 'ready'}
-													· {t('docsPage.indexing')}
+													· {t(documentStatusKey(st, ingest?.error ?? doc.error))}
 												{/if}
 											</p>
-											{#if ingest && (st === 'embedding' || st === 'ocr')}
+											{#if ingest && st === 'embedding'}
 												<Progress value={ingest.phaseProgress * 100} class="mt-1.5 h-1" />
 											{/if}
 										</div>
@@ -378,12 +372,6 @@
 													<InfoIcon class="text-muted-foreground" />
 													{t('docsPage.details')}
 												</DropdownMenu.Item>
-												{#if doc.status === 'scanned'}
-													<DropdownMenu.Item onclick={() => documentsStore.ocrDocument(doc.id)}>
-														<ScanTextIcon class="text-muted-foreground" />
-														{t('docsPage.readScanned')}
-													</DropdownMenu.Item>
-												{/if}
 												<DropdownMenu.Item
 													onclick={() => {
 														replaceTarget = doc;

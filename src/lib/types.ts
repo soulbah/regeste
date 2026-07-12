@@ -7,7 +7,7 @@ export type DocumentStatus =
 	| 'chunking'
 	| 'embedding'
 	| 'ready'
-	| 'scanned' // image-only pages await an opt-in on-device OCR pass (spec 023)
+	| 'scanned' // image-only pages are queued for an automatic on-device OCR pass
 	| 'ocr' // OCR pass running
 	| 'error';
 

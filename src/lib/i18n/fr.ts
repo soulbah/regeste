@@ -142,14 +142,13 @@ export const fr: Record<keyof typeof en, string> = {
 	'docs.addCount': 'Ajouter {count} document{s}',
 	'docs.alreadyAdded': 'Ajouté',
 
-	// Document ingest statuses
+	// Document ingest statuses. Le travail sur les pages numérisées reprend Lecture.
+	'status.received': 'Reçu',
 	'status.ready': 'Prêt',
-	'status.indexing': 'Préparation',
 	'status.reading': 'Lecture',
 	'status.splitting': 'Découpage',
-	'status.scanned': "Image numérisée : aucun texte n'a pu être extrait",
-	'status.awaitingOcr': 'Numérisé',
-	'status.ocr': 'Extraction du texte…',
+	'status.indexing': 'Préparation',
+	'status.failed': 'Échec',
 
 	// Pre-send review panel
 	'presend.title': 'Avant que ça parte',
@@ -265,12 +264,8 @@ export const fr: Record<keyof typeof en, string> = {
 	'docsPage.added': 'ajouté le {date}',
 	'docsPage.details': 'Détails',
 	'docsPage.noMatch': 'Rien ne correspond à ce filtre.',
-	'docsPage.noText': 'aucun texte extractible',
-	'docsPage.error': 'erreur',
+	'docsPage.error': 'échec',
 	'docsPage.indexing': 'indexation en cours…',
-	'docsPage.scanned': 'texte non extrait',
-	'docsPage.ocrRunning': 'extraction du texte…',
-	'docsPage.readScanned': 'Extraire le texte',
 	'docsPage.inChats': 'Dans {count} discussion{s}',
 	'docsPage.openAria': 'Ouvrir les détails de {name}',
 	'docsPage.deleteFromDevice': 'Supprimer de cet appareil',
@@ -317,10 +312,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'sheet.usedInCount': 'Utilisé dans {count} discussion{s}',
 	'sheet.stillIndexing': 'Indexation en cours',
 	'sheet.openChatAria': 'Ouvrir la discussion {title}',
-	'sheet.scannedTitle': 'Ces pages sont des images numérisées.',
-	'sheet.scannedBody': 'Extrayez leur texte pour les rechercher et les citer.',
-	'sheet.readScanned': 'Extraire le texte',
-	'sheet.ocrRunning': 'Extraction du texte, page {done} sur {total}…',
+	'sheet.indexFailed': "Ce document n'a pas pu être indexé.",
 
 	// Pagination
 	'pagination.prev': 'Page précédente',
@@ -543,8 +535,7 @@ export const fr: Record<keyof typeof en, string> = {
 	// Toasts (layout + uploads)
 	'toast.ready': '{name} est prêt',
 	'toast.failed': "{name} n'a pas pu être ajouté",
-	'toast.failedScanned': "Aucun texte n'a pu être extrait des pages numérisées.",
-	'toast.failedGeneric': 'Un problème est survenu pendant la lecture de ce fichier.',
+	'toast.failedGeneric': "Un problème est survenu pendant l'indexation de ce fichier.",
 	'toast.added': '{name} ajouté à Mes documents',
 	'toast.addedDesc': 'Disponible dans chaque discussion.',
 
