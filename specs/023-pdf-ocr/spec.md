@@ -8,9 +8,10 @@ discards a large share of real-world PDFs (contracts, invoices, administrative
 scans). Recognize that text on the user's device so scanned PDFs become
 first-class, searchable documents without any content leaving the browser.
 
-Direction validated by the owner (2026-07-11, after the in-browser OCR research):
-engine **PaddleOCR PP-OCRv5 mobile on onnxruntime-web**, OCR is **opt-in** (never
-silent at ingest), Tesseract.js `fra` is the named fallback if the spike fails.
+Direction validated by the owner (2026-07-11, after the in-browser OCR research),
+then refined after live use (2026-07-12): engine **PaddleOCR PP-OCRv5 mobile on
+onnxruntime-web**; scanned pages are read automatically during ingest. OCR stays
+an implementation detail and follows the same visible phases as text PDFs.
 
 ## What
 
@@ -18,13 +19,13 @@ silent at ingest), Tesseract.js `fra` is the named fallback if the spike fails.
   keep the text pages' blocks and record the image-only page numbers as awaiting
   OCR, and SHALL NOT throw away the document (no more all-or-nothing `scanned_pdf`).
 - WHEN a document has pages awaiting OCR THEN it SHALL land in a non-error
-  `scanned` status that carries an opt-in action, not a terminal error.
-- WHEN the user runs the OCR action THEN the app SHALL, entirely on the device,
+  internal `scanned` status and queue recognition automatically.
+- WHEN recognition runs THEN the app SHALL, entirely on the device,
   rasterize each awaiting page, recognize its text, splice it back as a block at
   that page number, then re-chunk and re-embed the merged document through the
   existing pipeline.
-- WHEN OCR is running THEN progress SHALL be visible per page and the pass SHALL
-  be cancellable.
+- WHEN OCR is running THEN the UI SHALL use the normal document phases (Reading,
+  Splitting, Preparing), with no scanned-only label, action or progress treatment.
 - WHEN WebGPU is unavailable THEN OCR SHALL run on multi-threaded WASM (slower,
   stated honestly), never a hard failure.
 - The recognized text and the page images SHALL be treated as document content:
@@ -39,27 +40,26 @@ silent at ingest), Tesseract.js `fra` is the named fallback if the spike fails.
 
 - Handwriting and non-Latin scripts (Latin recognizer only).
 - In-viewer per-word box highlighting of OCR'd text (keep boxes optional; future).
-- Moving the e5 embedding model same-origin (same metadata-leak class; separate).
-- Auto-OCR without the button (deferred; revisit if opt-in proves annoying).
+- Moving the e5 embedding model same-origin. This remains separate from spec 023;
+  only OCR weights are self-hosted here.
 
-## Open questions
+## Resolved decisions
 
-- [SPIKE GATE 1] Do PP-OCRv5 det+rec run under ORT's WebGPU EP in a worker against
-  the pinned nightly onnxruntime-web without silent per-op WASM fallback?
-- [SPIKE GATE 2] Does French accuracy hold on real scans (clean + photographed)?
-  If either gate fails → fall back to Tesseract.js `fra`.
-- [NEEDS CLARIFICATION] Also move e5 same-origin now, or keep the current HF-CDN
-  fetch and only self-host the OCR weights?
+- PP-OCRv5 det+rec passed the WebGPU and French-accuracy spike gates; no
+  Tesseract.js fallback was needed.
+- OCR runs on the main thread with WebGPU/WASM inference, matching the proven
+  spike. Worker migration remains a performance follow-up.
+- OCR weights are self-hosted. The e5 model keeps its existing Hugging Face fetch
+  and is explicitly outside this spec.
 
 ## Verification
 
 - Spike proves both gates on a real French scan (WebGPU path + WASM path), or the
   fallback is chosen with the reason recorded.
 - A scanned French PDF ingests to `scanned` status (not error), the good text
-  pages of a mixed PDF are already searchable, and the awaiting pages are listed.
-- Tapping the opt-in action OCRs on-device with visible per-page progress; the
-  network panel shows zero document egress and zero third-party fetch after the
-  weights are cached.
+  pages of a mixed PDF are already searchable, and recognition starts automatically.
+- Scanned and text PDFs expose the same named ingest phases; the network panel
+  shows zero document egress and zero third-party fetch after weights are cached.
 - After OCR the document is `ready`; a question retrieves an OCR'd passage and the
   citation opens the correct page in the viewer.
 - `bun run verify` exits 0; both locales sweep clean (no `OCR` jargon in copy).

@@ -29,16 +29,16 @@ wedge in sandboxes — irrelevant to prod, but the OCR worker must not depend on
 - [x] 2.2 `ocr.ts` (NOT a worker — main thread, mirroring the proven spike; a worker was unverifiable here): pdf.js renders each page to an OffscreenCanvas @300 DPI, one in flight, ppu-paddle-ocr (PP-OCRv5) recognizes → text per page. **Validated live in the spike: OffscreenCanvas + self-hosted models → perfect French, 736 ms.**
 - [x] 2.3 `ocrDocument(id)`: re-parses for `needsOcr`, OCRs those pages, splices blocks at their page numbers, re-chunks, re-embeds, re-indexes → `ready`; cancellable (AbortController → reverts to `scanned`).
 
-## Phase 3 — UI (opt-in) — DONE
+## Phase 3 — UI + automatic ingest — DONE
 
-- [x] 3.1 `scanned`/`ocr` handled in the detail panel (bordered CTA block: "Read the scanned pages" → progress + Cancel), the documents row (meta + ⋯ menu action), and the chat sources panel (idle muted dot).
-- [x] 3.2 Per-page progress via the existing `setIngest` channel + Cancel; copy in both dictionaries, verb-first, no "OCR" jargon. `bun run lint` = 0 errors.
+- [x] 3.1 Image-only pages queue `ocrDocument` automatically after ingest; passes are serialized so multi-file batches do not run concurrent main-thread recognition.
+- [x] 3.2 Library rows, chat sources and document detail share one named status mapping: `scanned`/`ocr` render as Reading, then rejoin Splitting and Preparing. No scanned-only label, action, progress treatment or "OCR" jargon remains in user-facing copy.
 
 ## Phase 4 — Verify — DONE (end-to-end, live)
 
 - [x] `bun run verify` (check + lint + test + build) all green.
 - [x] Engine + OffscreenCanvas path validated live in the plain-Vite spike.
-- [x] **Full in-app flow verified live** (2026-07-11, localhost:5183, main-repo code): a generated image-only French PDF ingested → `scanned` ("scanned pages await reading", no error); tapping "Read the scanned pages" ran on-device OCR → merged/chunked/embedded → `ready` (Language FR detected, e5 embedding model set); ⌘K search for "François Ménard" — text present ONLY in the scanned image — returned the doc with the correct page-1 snippet, accents intact. The dev-server blocker was a stuck workerd vnode/inode in the main `node_modules` (byte-identical binary, bad file instance → every launch went `UE`); `bun install --force` recreated it (fresh inode) and the server started normally. Not a Node-23 or platformProxy issue after all.
+- [x] **Full in-app flow verified live** (2026-07-12): a generated image-only French PDF advanced automatically from ingest through recognition to `ready`; search returned text present only in the scanned image with the correct page citation. A later UI pass verified the shared named phases and removed every scanned-only action and label.
 
 Completion checklist:
 
