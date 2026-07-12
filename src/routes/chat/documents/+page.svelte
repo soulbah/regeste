@@ -53,13 +53,11 @@
 	let pageSize = $state<(typeof PAGE_SIZES)[number]>(10);
 	let pageNum = $state(1);
 
-	// Details open in the shared contextual panel (PanelShell). Selecting a
-	// document opens it; closing the panel clears the selection.
-	let panelOpen = $state(false);
-	const panelWanted = $derived(selected !== null);
-	$effect(() => {
-		if (panelWanted) panelOpen = true;
-	});
+	// The panel is open exactly when a document is selected — nothing else lives
+	// in it here, so an empty open panel (or inheriting the chat's open state)
+	// can't happen. Writable derived: PanelShell may flip it on drag-close, and
+	// onOpenChange then clears `selected` so it settles closed.
+	let panelOpen = $derived(selected !== null);
 
 	// Dev-only display mocks: /chat/documents?mock renders fake rows so the
 	// page can be reviewed without ingesting anything. Display only — the
@@ -208,7 +206,11 @@
 	}}
 />
 
-<PanelShell bind:open={panelOpen} onOpenChange={(o) => !o && (selected = null)}>
+<PanelShell
+	bind:open={panelOpen}
+	onOpenChange={(o) => !o && (selected = null)}
+	autoSaveId="folio-docs-panes"
+>
 	{#snippet main()}
 		<section class="flex h-full min-w-0 flex-1 flex-col">
 			<header class="flex h-14 shrink-0 items-center gap-1 border-b px-4">
@@ -287,6 +289,7 @@
 						<Card.Content class="divide-y p-0">
 							{#each paged as doc (doc.id)}
 								{@const ingest = documentsStore.ingests[doc.id]}
+								{@const st = ingest?.status ?? doc.status}
 								<div
 									class="group hover:bg-foreground/3 flex items-center gap-4 px-4 py-3 {selected?.id ===
 									doc.id
@@ -309,17 +312,17 @@
 												: ''} · {t('docsPage.added', {
 												date: new Date(doc.createdAt).toLocaleDateString()
 											})}
-											{#if doc.status === 'error'}
+											{#if st === 'error'}
 												· {doc.error === 'scanned_pdf' ? t('docsPage.noText') : t('docsPage.error')}
-											{:else if doc.status === 'scanned'}
+											{:else if st === 'scanned'}
 												· {t('docsPage.scanned')}
-											{:else if doc.status === 'ocr'}
+											{:else if st === 'ocr'}
 												· {t('docsPage.ocrRunning')}
-											{:else if doc.status !== 'ready'}
-												· {doc.status}…
+											{:else if st !== 'ready'}
+												· {t('docsPage.indexing')}
 											{/if}
 										</p>
-										{#if ingest && (doc.status === 'embedding' || doc.status === 'ocr')}
+										{#if ingest && (st === 'embedding' || st === 'ocr')}
 											<Progress value={ingest.phaseProgress * 100} class="mt-1.5 h-1" />
 										{/if}
 									</div>

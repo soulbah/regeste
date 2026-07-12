@@ -255,6 +255,7 @@ export const en = {
 	'docsPage.noMatch': 'Nothing matches this filter.',
 	'docsPage.noText': 'no extractable text',
 	'docsPage.error': 'error',
+	'docsPage.indexing': 'indexing…',
 	'docsPage.scanned': 'scanned pages await reading',
 	'docsPage.ocrRunning': 'reading scanned pages…',
 	'docsPage.readScanned': 'Read the scanned pages',

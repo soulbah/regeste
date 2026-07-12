@@ -264,6 +264,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'docsPage.noMatch': 'Rien ne correspond à ce filtre.',
 	'docsPage.noText': 'aucun texte extractible',
 	'docsPage.error': 'erreur',
+	'docsPage.indexing': 'indexation en cours…',
 	'docsPage.scanned': 'pages numérisées à lire',
 	'docsPage.ocrRunning': 'lecture des pages numérisées…',
 	'docsPage.readScanned': 'Lire les pages numérisées',

@@ -128,7 +128,8 @@ class DocumentsStore {
 		const id = crypto.randomUUID();
 		await db.insertDocument({ id, hash, name: file.name, mime: file.type, size: file.size });
 		this.setIngest(id, { status: 'received', phaseProgress: 0 });
-		this.documents = await db.listDocuments();
+		// Show the new row immediately, indexing in progress — don't wait for `ready`.
+		await this.refreshLibrary();
 
 		try {
 			await storeOriginal(hash, data);
