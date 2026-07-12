@@ -68,6 +68,9 @@ class DocumentsStore {
 	ingests = $state<Record<string, IngestState>>({});
 	/** OCR pass abort controllers, keyed by document id (spec 023). */
 	ocrAborts = $state<Record<string, AbortController>>({});
+	/** Serializes auto-OCR passes so adding several scanned PDFs at once doesn't
+	 *  run multiple main-thread reads concurrently and jank the UI. */
+	private ocrChain: Promise<unknown> = Promise.resolve();
 	dbInfo = $state<DbInfo | null>(null);
 	dbError = $state<string | null>(null);
 	/** False until the first library load lands, so the UI can tell "loading"
@@ -186,12 +189,16 @@ class DocumentsStore {
 			}
 
 			if (needsOcr.length) {
-				// Image-only pages remain: land in `scanned` with any text pages
-				// already searchable, awaiting an opt-in on-device OCR pass.
+				// Image-only pages remain: land in `scanned` (text pages, if any,
+				// already searchable), then read them on-device right away — a PDF
+				// the user just added is expected to become searchable on its own,
+				// not to wait for a click. Background + cancellable; if it fails or
+				// is cancelled the detail panel still offers a manual retry.
 				await db.setDocumentStatus(id, 'scanned', {
 					embeddingModel
 				});
 				this.setIngest(id, { status: 'scanned', phaseProgress: 1 });
+				this.ocrChain = this.ocrChain.catch(() => {}).then(() => this.ocrDocument(id));
 			} else {
 				await db.setDocumentStatus(id, 'ready', { embeddingModel });
 				this.setIngest(id, { status: 'ready', phaseProgress: 1 });
@@ -306,6 +313,9 @@ class DocumentsStore {
 	 * through the existing pipeline. Cancellable; nothing leaves the device.
 	 */
 	async ocrDocument(id: string): Promise<void> {
+		// Already reading this document (auto-queue or a prior click): don't start
+		// a second concurrent pass over the same pages.
+		if (this.ocrAborts[id]) return;
 		const { db } = await getLocalDb();
 		const doc = await db.getDocument(id);
 		if (!doc) return;
