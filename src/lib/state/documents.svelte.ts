@@ -30,7 +30,13 @@ import {
 	FACT_EXTRACTOR_VERSION,
 	type AggregateResult
 } from '$lib/analysis/aggregate';
-import type { IngestErrorCode, LibraryDocument, LocalDocument, SearchHit } from '$lib/types';
+import type {
+	IngestErrorCode,
+	LibraryDocument,
+	LocalDocument,
+	QuestionRoute,
+	SearchHit
+} from '$lib/types';
 
 let embedApi: Remote<EmbedApi> | null = null;
 const OCR_INDEX_VERSION = 2;
@@ -92,6 +98,14 @@ class DocumentsStore {
 	lastSearchMs = $state<number | null>(null);
 	embeddingProfile = $state<EmbeddingProfile | null>(null);
 	staleDocumentIds = $state<Set<string>>(new Set());
+
+	/** Shared local query encoder for semantic routing and retrieval. */
+	async embedQueries(
+		texts: string[]
+	): Promise<{ data: Float32Array; dims: number; model: string }> {
+		const { data, dims, model } = await getEmbedWorker().embed(texts, 'query');
+		return { data, dims, model };
+	}
 
 	async init(): Promise<void> {
 		try {
@@ -369,7 +383,8 @@ class DocumentsStore {
 		query: string,
 		documentIds: string[] | null = null,
 		refinementQuery = query,
-		onInspect?: () => void
+		onInspect?: () => void,
+		route?: QuestionRoute
 	): Promise<SearchHit[]> {
 		const { db } = await getLocalDb();
 		const embeddingQuery = query.trim();
@@ -389,7 +404,7 @@ class DocumentsStore {
 			ranked.slice(0, 12).map((hit) => hit.chunkId),
 			1
 		);
-		return selectWithNeighbors(ranked, neighbors, refinedQuery, 8);
+		return selectWithNeighbors(ranked, neighbors, refinedQuery, 8, route);
 	}
 
 	/** Dev benchmark ablation: same candidates, isolated by retrieval channel. */

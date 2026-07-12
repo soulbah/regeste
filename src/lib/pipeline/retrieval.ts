@@ -201,9 +201,10 @@ export function selectWithNeighbors(
 	ranked: SearchHit[],
 	neighbors: SearchHit[],
 	query: string,
-	topK = 8
+	topK = 8,
+	route = analyzeQuestion(query).route
 ): SearchHit[] {
-	const preserveRecordPages = analyzeQuestion(query).route === 'aggregate';
+	const preserveRecordPages = route === 'aggregate';
 	const candidates = new Map(ranked.map((hit) => [hit.chunkId, hit]));
 	for (const neighbor of neighbors) {
 		if (candidates.has(neighbor.chunkId) || neighbor.seq === undefined) continue;
@@ -235,7 +236,7 @@ export function selectWithNeighbors(
 			sorted.findIndex((candidate) => candidate.documentId === hit.documentId) === index
 	);
 	const order =
-		analyzeQuestion(query).route === 'synthesis'
+		route === 'synthesis'
 			? [
 					...documentLeaders,
 					...sorted.filter(

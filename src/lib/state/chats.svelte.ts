@@ -1,7 +1,7 @@
 // Chat state: list, active chat, messages, and the transitional
 // retrieval-only "answer" (real generation lands in specs 004/005).
 
-import { t } from '$lib/i18n/index.svelte';
+import { t, translate } from '$lib/i18n/index.svelte';
 import { getLocalDb } from '$lib/local-db/client';
 import type { CitationRow, MessageExcerptRow, MessagePrivacyRow } from '$lib/local-db/worker';
 import { documentsStore } from './documents.svelte';
@@ -9,10 +9,12 @@ import { guardedFetch, OfflineError } from '$lib/net';
 import { myaiStore, endpointHost, type ChatMessage } from './myai.svelte';
 import { llmStore } from '$lib/private-ai/llm.svelte';
 import { generationOptionsFor } from '$lib/private-ai/generation';
-import { buildRetrievalContext } from '$lib/retrieval-context';
+import { buildClarificationContext, buildRetrievalContext } from '$lib/retrieval-context';
 import { assistedPayloadBytes } from '$lib/assisted-payload';
-import { questionLocale, routeQuestion } from '$lib/analysis/query-router';
+import { questionLocale } from '$lib/analysis/query-router';
+import { resolveQuestion, type EmbedQuestions } from '$lib/nlu/semantic-resolver';
 import { formatAggregateResult } from '$lib/analysis/format-aggregate';
+import { parseRelatedQuestions } from '$lib/related-questions';
 import { hasAnswerBearingEvidence } from '$lib/pipeline/relevance';
 import {
 	SYSTEM_PROMPT,
@@ -61,6 +63,7 @@ class ChatsStore {
 		question: string;
 		hits: SearchHit[];
 		conversationContext: string | null;
+		route: QuestionRoute;
 	} | null>(null);
 	/** P2 — active chat's egress state (cloud requests + bytes). */
 	chatEgress = $state<{ cloudRequests: number; bytes: number } | null>(null);
@@ -75,6 +78,7 @@ class ChatsStore {
 	methodByMessage = $state<Record<string, MethodSummary>>({});
 	workSteps = $state<WorkStep[]>([]);
 	private workStepStartedAt = 0;
+	private readonly embedQuestions: EmbedQuestions = (texts) => documentsStore.embedQueries(texts);
 
 	activeChat = $derived(this.chats.find((c) => c.id === this.activeChatId) ?? null);
 
@@ -128,6 +132,50 @@ class ChatsStore {
 			...(route === 'aggregate' ? [{ id: 'calculate' as const, status: 'pending' as const }] : []),
 			{ id: 'write', status: 'pending' }
 		];
+	}
+
+	private retrievalContext(question: string) {
+		const clarificationIds = new Set(
+			Object.entries(this.methodByMessage)
+				.filter(([, summary]) => summary.kind === 'clarification')
+				.map(([messageId]) => messageId)
+		);
+		return (
+			buildClarificationContext(this.messages, question, clarificationIds) ??
+			buildRetrievalContext(this.messages, question)
+		);
+	}
+
+	private async insertClarification(
+		chatId: string,
+		kind: 'scope' | 'financial_role' | 'intent',
+		locale: 'fr' | 'en',
+		versionGroup: string | null = null
+	): Promise<void> {
+		const { db } = await getLocalDb();
+		const key =
+			kind === 'financial_role'
+				? 'clarification.financialRole'
+				: kind === 'scope'
+					? 'clarification.scope'
+					: 'clarification.intent';
+		const messageId = crypto.randomUUID();
+		await db.insertMessage({
+			id: messageId,
+			chatId,
+			role: 'assistant',
+			content: translate(locale, key),
+			mode: 'private',
+			versionGroup
+		});
+		await db.insertMessageMethod(messageId, {
+			kind: 'clarification',
+			documentCount: 0,
+			passageCount: 0,
+			reasoningUsed: false,
+			clarification: kind
+		});
+		await this.loadCitations(chatId);
 	}
 
 	private advanceWork(id: WorkStep['id'], count?: number): void {
@@ -211,11 +259,7 @@ class ChatsStore {
 				return;
 			}
 
-			const questions = stripThink(raw)
-				.split('\n')
-				.map((l) => l.replace(/^[\s\-*\d.)]+/, '').trim())
-				.filter((l) => l.length > 8 && l.length < 160)
-				.slice(0, 3);
+			const questions = parseRelatedQuestions(raw);
 			if (questions.length && this.activeChatId === chatId) {
 				this.related = { chatId, messageId: last.id, questions };
 			}
@@ -308,10 +352,16 @@ class ChatsStore {
 			const versionGroup = last.versionGroup ?? last.id;
 			await db.retireMessage(last.id, versionGroup);
 			this.messages = await db.listMessages(chatId);
-			const context = buildRetrievalContext(this.messages, question);
+			const context = this.retrievalContext(question);
 			const enabledDocs = this.chatDocuments.filter((d) => d.enabled && d.status === 'ready');
 			const analysisQuestion = context?.analysisQuery ?? question;
-			const route = routeQuestion(analysisQuestion);
+			const frame = await resolveQuestion(analysisQuestion, this.embedQuestions);
+			if (frame.clarification) {
+				await this.insertClarification(chatId, frame.clarification, frame.locale, versionGroup);
+				this.messages = await db.listMessages(chatId);
+				return;
+			}
+			const route = frame.route;
 			this.startWork(route, enabledDocs.length);
 			if (route === 'aggregate') {
 				await this.generateAggregate(
@@ -331,7 +381,8 @@ class ChatsStore {
 						context?.searchQuery ?? question,
 						enabledDocs.map((d) => d.id),
 						question,
-						() => this.advanceWork('inspect')
+						() => this.advanceWork('inspect'),
+						route
 					)
 				: [];
 			if (enabledDocs.length) this.setWorkCount('inspect', hits.length);
@@ -460,11 +511,19 @@ class ChatsStore {
 				mode: null
 			});
 			this.messages = await db.listMessages(chatId);
-			const context = buildRetrievalContext(this.messages, question);
+			const context = this.retrievalContext(question);
 
 			const enabledDocs = this.chatDocuments.filter((d) => d.enabled && d.status === 'ready');
 			const analysisQuestion = context?.analysisQuery ?? question;
-			const route = routeQuestion(analysisQuestion);
+			const frame = await resolveQuestion(analysisQuestion, this.embedQuestions);
+			if (frame.clarification) {
+				await this.insertClarification(chatId, frame.clarification, frame.locale);
+				await db.touchChat(chatId);
+				this.messages = await db.listMessages(chatId);
+				await this.refresh();
+				return;
+			}
+			const route = frame.route;
 			this.startWork(route, enabledDocs.length);
 			if (route === 'aggregate') {
 				await this.generateAggregate(
@@ -479,7 +538,8 @@ class ChatsStore {
 						context?.searchQuery ?? question,
 						enabledDocs.map((d) => d.id),
 						question,
-						() => this.advanceWork('inspect')
+						() => this.advanceWork('inspect'),
+						route
 					);
 					if (!hasAnswerBearingEvidence(question, hits)) hits = [];
 				}
@@ -541,7 +601,8 @@ class ChatsStore {
 				hits,
 				documentCount,
 				versionGroup,
-				conversationContext
+				conversationContext,
+				route
 			);
 		} else {
 			await db.insertMessage({
@@ -725,7 +786,8 @@ class ChatsStore {
 		hits: SearchHit[],
 		documentCount: number,
 		versionGroup: string | null = null,
-		conversationContext: string | null = null
+		conversationContext: string | null = null,
+		route: QuestionRoute = 'targeted'
 	): Promise<void> {
 		const { db } = await getLocalDb();
 		const model = chat.myaiModel ?? myaiStore.defaultModel!;
@@ -805,6 +867,12 @@ class ChatsStore {
 				await db.insertMessageExcerpts(messageId, ChatsStore.excerptRows(hits, true, new Set()));
 			}
 		}
+		await db.insertMessageMethod(messageId, {
+			kind: route,
+			documentCount,
+			passageCount: hits.length,
+			reasoningUsed: route === 'synthesis'
+		});
 		await this.loadCitations(chat.id);
 	}
 
@@ -814,26 +882,45 @@ class ChatsStore {
 	}
 
 	/** Retrieval over the active chat's enabled documents (assisted preview). */
-	async retrieveForActive(query: string, refinementQuery = query): Promise<SearchHit[]> {
+	async retrieveForActive(
+		query: string,
+		refinementQuery = query,
+		route?: QuestionRoute
+	): Promise<SearchHit[]> {
 		const enabledDocs = this.chatDocuments.filter((d) => d.enabled && d.status === 'ready');
 		if (!enabledDocs.length) return [];
 		return documentsStore.retrieve(
 			query,
 			enabledDocs.map((d) => d.id),
-			refinementQuery
+			refinementQuery,
+			undefined,
+			route
 		);
 	}
 
 	/** Stage an assisted send for review in the right panel. */
-	async stageAssisted(chatId: string, question: string): Promise<'staged' | 'no-excerpts'> {
-		const context = buildRetrievalContext(this.messages, question);
-		const hits = await this.retrieveForActive(context?.searchQuery ?? question, question);
+	async stageAssisted(
+		chatId: string,
+		question: string
+	): Promise<'staged' | 'no-excerpts' | 'handled'> {
+		const context = this.retrievalContext(question);
+		const frame = await resolveQuestion(context?.analysisQuery ?? question, this.embedQuestions);
+		if (frame.clarification || frame.route === 'aggregate') {
+			await this.send(chatId, question);
+			return 'handled';
+		}
+		const hits = await this.retrieveForActive(
+			context?.searchQuery ?? question,
+			question,
+			frame.route
+		);
 		if (!hits.length) return 'no-excerpts';
 		this.pendingAssisted = {
 			chatId,
 			question,
 			hits,
-			conversationContext: context?.promptContext ?? null
+			conversationContext: context?.promptContext ?? null,
+			route: frame.route
 		};
 		return 'staged';
 	}
@@ -849,7 +936,8 @@ class ChatsStore {
 			pending.question,
 			selected,
 			excluded,
-			pending.conversationContext
+			pending.conversationContext,
+			pending.route
 		);
 	}
 
@@ -866,7 +954,8 @@ class ChatsStore {
 		question: string,
 		selected: SearchHit[],
 		excluded: SearchHit[] = [],
-		conversationContext: string | null = null
+		conversationContext: string | null = null,
+		route: QuestionRoute = 'targeted'
 	): Promise<void> {
 		if (this.sending) return;
 		this.sending = true;
@@ -952,6 +1041,12 @@ class ChatsStore {
 					await db.insertMessageExcerpts(messageId, ChatsStore.excerptRows(all, true, excludedIds));
 				}
 			}
+			await db.insertMessageMethod(messageId, {
+				kind: route,
+				documentCount: new Set(selected.map((hit) => hit.documentId)).size,
+				passageCount: selected.length,
+				reasoningUsed: route === 'synthesis'
+			});
 			await db.touchChat(chatId);
 			this.messages = await db.listMessages(chatId);
 			await this.loadCitations(chatId);

@@ -1,18 +1,52 @@
 import { describe, expect, it } from 'vitest';
-import { buildRetrievalContext, needsRetrievalContext } from './retrieval-context';
+import {
+	buildClarificationContext,
+	buildRetrievalContext,
+	needsRetrievalContext
+} from './retrieval-context';
 import type { LocalMessage } from '$lib/types';
 
 const message = (
 	role: 'user' | 'assistant',
 	content: string,
-	mode: LocalMessage['mode'] = role === 'assistant' ? 'private' : null
+	mode: LocalMessage['mode'] = role === 'assistant' ? 'private' : null,
+	id: string = crypto.randomUUID()
 ): LocalMessage => ({
-	id: crypto.randomUUID(),
+	id,
 	chatId: 'chat',
 	role,
 	content,
 	mode,
 	createdAt: Date.now()
+});
+
+describe('buildClarificationContext', () => {
+	it('composes the original question with every user-provided slot', () => {
+		const messages = [
+			message('user', 'Quel est le total ?', null, 'u1'),
+			message('assistant', 'Un relevé ou tous les documents ?', 'private', 'a1'),
+			message('user', 'Tous les documents sélectionnés', null, 'u2'),
+			message('assistant', 'Quel montant faut-il utiliser ?', 'private', 'a2'),
+			message('user', 'Les montants envoyés', null, 'u3')
+		];
+		const context = buildClarificationContext(
+			messages,
+			'Les montants envoyés',
+			new Set(['a1', 'a2'])
+		);
+		expect(context?.analysisQuery).toBe(
+			'Quel est le total ?\nTous les documents sélectionnés\nLes montants envoyés'
+		);
+	});
+
+	it('does not carry an ordinary assistant turn as clarification state', () => {
+		const messages = [
+			message('user', 'Quel est le total ?', null, 'u1'),
+			message('assistant', '42 €', 'private', 'a1'),
+			message('user', 'Les montants envoyés', null, 'u2')
+		];
+		expect(buildClarificationContext(messages, 'Les montants envoyés', new Set())).toBeNull();
+	});
 });
 
 describe('buildRetrievalContext', () => {
@@ -85,6 +119,24 @@ describe('buildRetrievalContext', () => {
 		);
 		expect(context?.analysisQuery.startsWith('Et en mai ?')).toBe(true);
 		expect(context?.analysisQuery).toContain('Combien ai-je envoyé en juin ?');
+	});
+
+	it('binds a clarification reply to the original question even without a pronoun', () => {
+		const current = 'Tous les documents sélectionnés';
+		const context = buildRetrievalContext(
+			[
+				message('user', 'Quel est le total ?'),
+				message(
+					'assistant',
+					'Faut-il calculer ce montant pour un seul relevé ou pour tous les documents sélectionnés ?'
+				),
+				message('user', current)
+			],
+			current,
+			true
+		);
+		expect(context?.analysisQuery).toContain('Quel est le total ?');
+		expect(context?.analysisQuery.startsWith(current)).toBe(true);
 	});
 
 	it('ignores notices and returns no context before a completed exchange', () => {

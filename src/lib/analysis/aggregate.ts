@@ -1,5 +1,5 @@
 import { extractFinancialRecords, type FinancialRecordFact } from './financial-records';
-import { requestedMoneyKind, type MoneyKind } from './money';
+import type { MoneyKind } from './money';
 import { analyzeQuestion, type AggregateOperation, type TemporalScope } from './query-router';
 import type { QuestionRoute, SearchHit } from '$lib/types';
 
@@ -60,7 +60,7 @@ export function aggregateMoneyFacts(
 	candidates: DocumentMoneyFact[]
 ): AggregateResult {
 	const analysis = analyzeQuestion(question);
-	const requested = analysis.moneyRole ?? requestedMoneyKind(question);
+	const requested = analysis.moneyRole;
 	const operation = analysis.operation ?? 'sum';
 	const byRecord = new Map<string, DocumentMoneyFact[]>();
 	for (const candidate of candidates) {

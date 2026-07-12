@@ -30,6 +30,31 @@ describe('query routing', () => {
 		).toBe('synthesis');
 	});
 
+	it.each([
+		["Combien j'ai envoyé au total ?", 'aggregate', 'sent'],
+		['Combien ai-je envoyé en tout ?', 'aggregate', 'sent'],
+		['Montant total envoyé', 'aggregate', 'sent'],
+		['How much did I send?', 'aggregate', 'sent'],
+		['Total des montants reçus', 'aggregate', 'received'],
+		['Liste les frais', 'aggregate', 'fee']
+	] as const)('composes operation and financial role for %s', (question, route, role) => {
+		const analysis = analyzeQuestion(question);
+		expect(analysis.route).toBe(route);
+		expect(analysis.moneyRole).toBe(role);
+		expect(analysis.exhaustive).toBe(true);
+	});
+
+	it.each([
+		['Quel est le total de la facture F-102 ?', null],
+		['Combien ai-je envoyé pour la transaction T-123 ?', 'sent'],
+		['How much did I send for the transfer T-456?', 'sent'],
+		['Quel montant ai-je envoyé page 3 ?', 'sent']
+	] as const)('preserves explicit single-record scope for %s', (question, role) => {
+		const analysis = analyzeQuestion(question);
+		expect(analysis.route).toBe('targeted');
+		expect(analysis.moneyRole).toBe(role);
+	});
+
 	it('keeps short French questions in French', () => {
 		expect(questionLocale('Quelle est la somme TTC de toutes les factures ?')).toBe('fr');
 		expect(questionLocale('What is the sum across all invoices?')).toBe('en');
@@ -42,6 +67,22 @@ describe('query routing', () => {
 		expect(result.route).toBe('aggregate');
 		expect(result.moneyRole).toBe('sent');
 		expect(result.temporal?.month).toBe(7);
+	});
+
+	it('clarifies ambiguous aggregate slots progressively', () => {
+		expect(analyzeQuestion('Quel est le total ?').clarification).toBe('scope');
+		expect(
+			analyzeQuestion('Tous les documents sélectionnés\nPrevious question: Quel est le total ?')
+				.clarification
+		).toBe('financial_role');
+		const resolved = analyzeQuestion(
+			'Montants envoyés\nPrevious question: Tous les documents sélectionnés\nQuel est le total ?'
+		);
+		expect(resolved).toMatchObject({
+			route: 'aggregate',
+			moneyRole: 'sent',
+			clarification: null
+		});
 	});
 });
 

@@ -1,10 +1,8 @@
 import type { LocalMessage } from '$lib/types';
+import { analyzeQuestion } from '$lib/analysis/query-router';
 
 const MAX_PART_CHARS = 700;
 const CITATION_MARKER = /\[(?:\d{1,2})\]/g;
-const FOLLOW_UP_REFERENCE =
-	/\b(?:son|sa|ses|leur|leurs|lui|elle|il|eux|elles|ce|cet|cette|ces|celui|celle|ceux|celles|dernier|derniere|dernière|their|his|her|hers|its|him|them|they|he|she|this|that|former|latter)\b/iu;
-const ELLIPTICAL_FOLLOW_UP = /^(?:et\b|and\b|qu['’]en est-il\b|what about\b)/iu;
 
 export interface RetrievalContext {
 	previousQuestion: string;
@@ -21,15 +19,7 @@ function clean(text: string): string {
 
 /** Only carry prior turns when the current question actually refers back to them. */
 export function needsRetrievalContext(question: string): boolean {
-	const normalized = clean(question);
-	// In French subject-verb inversion, "est-elle" / "a-t-il" is grammar,
-	// not necessarily a reference to the previous turn. Treating it as one made
-	// explicit new questions inherit unrelated entities and retrieval terms.
-	const withoutInversion = normalized.replace(
-		/\b(?:est|sont|a|ont|avait|etaient|peut|peuvent|doit|doivent|sera|seront|fait|font)-(?:t-)?(?:il|elle|ils|elles)\b/giu,
-		''
-	);
-	return FOLLOW_UP_REFERENCE.test(withoutInversion) || ELLIPTICAL_FOLLOW_UP.test(normalized);
+	return analyzeQuestion(clean(question)).referencesPrevious;
 }
 
 /**
@@ -39,9 +29,10 @@ export function needsRetrievalContext(question: string): boolean {
  */
 export function buildRetrievalContext(
 	messages: LocalMessage[],
-	currentQuestion: string
+	currentQuestion: string,
+	force = false
 ): RetrievalContext | null {
-	if (!needsRetrievalContext(currentQuestion)) return null;
+	if (!force && !needsRetrievalContext(currentQuestion)) return null;
 	let skippedCurrent = false;
 	let previousAnswer = '';
 	let previousQuestion = '';
@@ -77,5 +68,49 @@ export function buildRetrievalContext(
 		searchQuery: `${previousQuestion}\n${previousAnswer}\n${question}`,
 		analysisQuery: `${question}\nPrevious question: ${previousQuestion}`,
 		promptContext: `Previous question: ${previousQuestion}\nPrevious answer: ${previousAnswer}`
+	};
+}
+
+/** Rebuild a multi-step clarification as one compositional query. Assistant
+ * prompts are control messages, so only the original question and user slots
+ * are carried into analysis/retrieval. */
+export function buildClarificationContext(
+	messages: LocalMessage[],
+	currentQuestion: string,
+	clarificationMessageIds: ReadonlySet<string>
+): RetrievalContext | null {
+	const parts = [clean(currentQuestion)];
+	let skippedCurrent = false;
+	let awaitingAnswer = false;
+	let sawClarification = false;
+	for (let index = messages.length - 1; index >= 0; index--) {
+		const message = messages[index];
+		if (
+			!skippedCurrent &&
+			message.role === 'user' &&
+			clean(message.content) === clean(currentQuestion)
+		) {
+			skippedCurrent = true;
+			continue;
+		}
+		if (message.role === 'assistant') {
+			if (!clarificationMessageIds.has(message.id)) break;
+			sawClarification = true;
+			awaitingAnswer = true;
+			continue;
+		}
+		if (message.role === 'user' && awaitingAnswer) {
+			parts.unshift(clean(message.content));
+			awaitingAnswer = false;
+		}
+	}
+	if (!sawClarification || awaitingAnswer || parts.length < 2) return null;
+	const analysisQuery = parts.join('\n');
+	return {
+		previousQuestion: parts[0],
+		previousAnswer: '',
+		searchQuery: analysisQuery,
+		analysisQuery,
+		promptContext: `Clarified request: ${analysisQuery}`
 	};
 }

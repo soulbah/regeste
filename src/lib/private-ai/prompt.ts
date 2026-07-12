@@ -4,6 +4,7 @@
 
 import type { SearchHit } from '$lib/types';
 import { queryCoverage } from '$lib/pipeline/retrieval';
+import { analyzeQuestion } from '$lib/analysis/query-router';
 
 export const SYSTEM_PROMPT = `You are a careful assistant answering questions strictly from the numbered document excerpts provided.
 Rules:
@@ -29,7 +30,11 @@ export function buildUserPrompt(
 	const context = conversationContext
 		? `Conversation context (reference resolution only, not a source):\n${conversationContext}\n\n`
 		: '';
-	return `${context}Excerpts:\n\n${excerpts}\n\nQuestion: ${question}`;
+	const role = analyzeQuestion(question).moneyRole;
+	const roleConstraint = role
+		? `Requested financial role: ${role}. Keep financial roles distinct; do not substitute sent, received, fees, tax, subtotal, or total/debited values for one another.\n\n`
+		: '';
+	return `${context}${roleConstraint}Excerpts:\n\n${excerpts}\n\nQuestion: ${question}`;
 }
 
 /**

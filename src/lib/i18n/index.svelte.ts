@@ -37,13 +37,19 @@ class I18nStore {
 
 export const i18n = new I18nStore();
 
-/** Reactive translate: `t('key')` or `t('key', { n: 3 })` for {n} slots. */
-export function t(key: MessageKey, params?: Record<string, string | number>): string {
-	let msg = dictionaries[i18n.locale][key] ?? en[key] ?? key;
+export function translate(
+	locale: Locale,
+	key: MessageKey,
+	params?: Record<string, string | number>
+): string {
+	let msg = dictionaries[locale][key] ?? en[key] ?? key;
 	if (params) {
-		for (const [k, v] of Object.entries(params)) {
-			msg = msg.replaceAll(`{${k}}`, String(v));
-		}
+		for (const [k, v] of Object.entries(params)) msg = msg.replaceAll(`{${k}}`, String(v));
 	}
 	return msg;
+}
+
+/** Reactive translate: `t('key')` or `t('key', { n: 3 })` for {n} slots. */
+export function t(key: MessageKey, params?: Record<string, string | number>): string {
+	return translate(i18n.locale, key, params);
 }

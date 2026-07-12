@@ -30,6 +30,12 @@ describe('buildUserPrompt', () => {
 		expect(p).toContain('reference resolution only, not a source');
 		expect(p).toContain('Previous answer: JOHN DOE');
 	});
+
+	it('pins the requested financial role without enumerating surface phrasings', () => {
+		const p = buildUserPrompt('Combien ai-je envoyé pour la transaction T-123 ?', [hit(1)]);
+		expect(p).toContain('Requested financial role: sent.');
+		expect(p).toContain('do not substitute sent, received, fees, tax, subtotal, or total/debited');
+	});
 });
 
 describe('stripThink / isThinking', () => {

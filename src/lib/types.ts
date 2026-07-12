@@ -85,13 +85,15 @@ export interface SearchHit {
 }
 
 export type QuestionRoute = 'targeted' | 'synthesis' | 'aggregate';
+export type MethodKind = QuestionRoute | 'clarification';
 
 export interface MethodSummary {
-	kind: QuestionRoute;
+	kind: MethodKind;
 	documentCount: number;
 	passageCount: number;
 	reasoningUsed: boolean;
 	calculation?: string | null;
+	clarification?: 'scope' | 'financial_role' | 'intent' | null;
 }
 
 export interface WorkStep {

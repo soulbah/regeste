@@ -358,6 +358,8 @@ export const fr: Record<keyof typeof en, string> = {
 	'work.method.synthesis': '{count} passages pertinents comparés avant la réponse.',
 	'work.method.aggregate':
 		'Documents sélectionnés lus intégralement, puis calcul effectué sur {count} valeurs retenues.',
+	'work.method.clarification':
+		'Une précision a été demandée avant la recherche dans les documents.',
 	'work.method.reasoning':
 		'Une passe de raisonnement privée a été utilisée ; seul ce résumé opérationnel est affiché.',
 	'turn.sourcesMore': '+{count}',
@@ -367,6 +369,12 @@ export const fr: Record<keyof typeof en, string> = {
 	'turn.nextVersion': 'Version suivante',
 	'turn.quote': 'Citer',
 	'related.title': 'Questions liées',
+	'clarification.scope':
+		'Faut-il calculer ce montant pour un seul relevé ou pour tous les documents sélectionnés ?',
+	'clarification.financialRole':
+		'Quel montant faut-il utiliser : envoyé, reçu, frais, taxes ou total débité ?',
+	'clarification.intent':
+		'Quel résultat souhaitez-vous obtenir à partir des documents sélectionnés ?',
 	'app.dbBusy':
 		'Vous avez déjà ceci ouvert dans un autre onglet. Fermez-le, puis rechargez cette page.',
 	'panel.backAria': 'Revenir aux documents',

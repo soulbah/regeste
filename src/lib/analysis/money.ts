@@ -70,23 +70,6 @@ function kindFromLabel(label: string): MoneyKind | null {
 	return null;
 }
 
-export function requestedMoneyKind(question: string): MoneyKind | null {
-	const q = normalizeQuestion(question);
-	if (/\b(montant recu|recu|received)\b/.test(q)) return 'received';
-	if (/\b(frais|commission|fees?|charges?)\b/.test(q)) return 'fee';
-	if (
-		/\b(debite|debitee|debites|debitees|preleve|avec les frais|total charged|debited|including fees)\b/.test(
-			q
-		)
-	)
-		return 'debited';
-	if (/\b(envoye|envoyee|envoyes|envoyees|transfere|sent|transferred)\b/.test(q)) return 'sent';
-	if (/\b(ttc|net a payer|amount due|total due|grand total)\b/.test(q)) return 'total_ttc';
-	if (/\b(ht|hors taxe|subtotal|before tax)\b/.test(q)) return 'subtotal';
-	if (/\b(tva|vat|taxe|tax)\b/.test(q)) return 'tax';
-	return null;
-}
-
 /** Parse only explicit value/currency pairs; proximity never changes currency ownership. */
 export function extractMoneyCandidates(text: string): MoneyCandidate[] {
 	const found: MoneyCandidate[] = [];

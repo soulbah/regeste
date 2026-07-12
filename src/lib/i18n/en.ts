@@ -348,6 +348,7 @@ export const en = {
 	'work.method.synthesis': 'Compared {count} relevant passages before answering.',
 	'work.method.aggregate':
 		'Read the selected documents exhaustively and calculated from {count} retained values.',
+	'work.method.clarification': 'Asked for the missing detail before searching the documents.',
 	'work.method.reasoning':
 		'A private reasoning pass was used; only this operational summary is shown.',
 	'turn.sourcesMore': '+{count}',
@@ -357,6 +358,10 @@ export const en = {
 	'turn.nextVersion': 'Next version',
 	'turn.quote': 'Reply',
 	'related.title': 'Related',
+	'clarification.scope': 'Should I calculate this for one record or across all selected documents?',
+	'clarification.financialRole':
+		'Which amount should I use: sent, received, fees, taxes, or the total charged?',
+	'clarification.intent': 'What result do you want from the selected documents?',
 	'app.dbBusy': 'You already have this open in another tab. Close it there, then reload.',
 	'panel.backAria': 'Back to documents',
 	'panel.hideAria': 'Close the panel',

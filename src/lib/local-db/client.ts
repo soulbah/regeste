@@ -40,7 +40,12 @@ async function acquire(): Promise<{ db: LocalDb; info: DbInfo }> {
 	});
 	if (!granted) throw new DbLockedError();
 
-	const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
+	// This build bundles both OPFS implementations. Folio explicitly uses
+	// opfs-sahpool below, so disable the unused async "opfs" VFS before SQLite
+	// bootstrap; otherwise it tries to fetch an unshipped proxy Worker.
+	const workerUrl = new URL('./worker.ts', import.meta.url);
+	workerUrl.searchParams.set('opfs-disable', '1');
+	const worker = new Worker(workerUrl, { type: 'module' });
 	const db = wrap<DbApi>(worker);
 	const info = await db.init();
 	return { db, info };

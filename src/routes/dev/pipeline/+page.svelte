@@ -28,6 +28,10 @@
 	} from '$lib/benchmark/retrieval-metrics';
 	import { normalizeForFuzzy } from '$lib/pipeline/fuzzy';
 	import { RETRIEVAL_VERSION } from '$lib/pipeline/retrieval-version';
+	import {
+		runSemanticBenchmark,
+		type SemanticBenchmarkReport
+	} from '$lib/benchmark/semantic-metrics';
 	import publicQa from '../../../../benchmarks/fuzzy-public-qa.json';
 
 	type IndexDiagnostic = {
@@ -93,6 +97,9 @@
 	} | null>(null);
 	let fuzzyBenchmarkError = $state<string | null>(null);
 	let compromisDiagnostic = $state<unknown>(null);
+	let semanticBenchmarking = $state(false);
+	let semanticBenchmarkReport = $state<SemanticBenchmarkReport | null>(null);
+	let semanticBenchmarkError = $state<string | null>(null);
 
 	onMount(async () => {
 		await documentsStore.init();
@@ -130,6 +137,21 @@
 			]);
 		} catch {
 			return null;
+		}
+	}
+
+	async function runSemanticRoutingBenchmark() {
+		semanticBenchmarking = true;
+		semanticBenchmarkReport = null;
+		semanticBenchmarkError = null;
+		try {
+			semanticBenchmarkReport = await runSemanticBenchmark((texts) =>
+				documentsStore.embedQueries(texts)
+			);
+		} catch (error) {
+			semanticBenchmarkError = error instanceof Error ? error.message : String(error);
+		} finally {
+			semanticBenchmarking = false;
 		}
 	}
 
@@ -243,7 +265,21 @@
 			let bytes = 0;
 			const ids = new SvelteMap<string, string>();
 			for (const [url, name, mime] of fixtures) {
-				const data = await fetch(url).then((response) => response.arrayBuffer());
+				const reusable = documentsStore.documents
+					.filter((document) => document.name === name && document.status === 'ready')
+					.sort((left, right) => right.size - left.size)[0];
+				if (reusable && (await db.countChunks(reusable.id)) > 0) {
+					ids.set(name, reusable.id);
+					continue;
+				}
+				const response = await fetch(url);
+				const contentType = response.headers.get('content-type') ?? '';
+				if (!response.ok || contentType.includes('text/html')) {
+					throw new Error(
+						`Missing fuzzy fixture ${name}; generate/download the benchmark assets before running.`
+					);
+				}
+				const data = await response.arrayBuffer();
 				bytes += data.byteLength;
 				ids.set(name, await documentsStore.ingest(new File([data], name, { type: mime })));
 			}
@@ -679,6 +715,13 @@
 					{fuzzyBenchmarking ? 'Running fuzzy benchmark…' : 'Run fuzzy benchmark'}
 				</Button>
 				<Button variant="outline" onclick={runMartinDiagnostic}>Run Martin diagnostic</Button>
+				<Button
+					variant="outline"
+					onclick={runSemanticRoutingBenchmark}
+					disabled={semanticBenchmarking}
+				>
+					{semanticBenchmarking ? 'Running semantic benchmark…' : 'Run semantic benchmark'}
+				</Button>
 				<Button variant="outline" onclick={resetFuzzyFixtures}>Reset fuzzy fixtures</Button>
 			</div>
 			{#if llmStore.lastMetrics}
@@ -718,6 +761,20 @@
 						null,
 						2
 					)}</pre>
+			{/if}
+			{#if semanticBenchmarkReport}
+				<pre
+					data-testid="semantic-benchmark-report"
+					class="bg-muted overflow-auto rounded-md p-3 text-xs">{JSON.stringify(
+						semanticBenchmarkReport,
+						null,
+						2
+					)}</pre>
+			{/if}
+			{#if semanticBenchmarkError}
+				<p data-testid="semantic-benchmark-error" class="text-destructive text-sm">
+					{semanticBenchmarkError}
+				</p>
 			{/if}
 		</Card.Content>
 	</Card.Root>
