@@ -12,8 +12,11 @@ import { detectTier } from './capability';
 import { downgrade, type Tier } from './tiers';
 import type { LlmApi } from './llm-worker';
 import type { WllamaApi } from './wllama-worker';
+import type { GenerationOptions } from './generation';
+import type { GenerationResult } from './generation';
 
 const PREPARED_KEY = 'folio:private-prepared-model';
+const METRICS_KEY = 'folio:private-last-metrics';
 
 export type PrivateStatus =
 	| 'detecting'
@@ -52,11 +55,18 @@ class LlmStore {
 	errorMessage = $state<string | null>(null);
 	/** True when weights are cached from a previous session (fast load). */
 	prepared = $state(false);
+	lastMetrics = $state<Omit<GenerationResult, 'text'> | null>(null);
 
 	downloadLabel = $derived(this.tier?.downloadLabel ?? '');
 
 	async init(): Promise<void> {
 		if (this.status !== 'detecting') return;
+		try {
+			const saved = localStorage.getItem(METRICS_KEY);
+			if (saved) this.lastMetrics = JSON.parse(saved);
+		} catch {
+			// A corrupt optional benchmark must never block Private mode.
+		}
 		const tier = await detectTier();
 		if (!tier) {
 			this.status = 'unavailable';
@@ -100,12 +110,20 @@ class LlmStore {
 
 	async generate(
 		messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
-		onDelta: (delta: string) => void
+		onDelta: (delta: string) => void,
+		options: GenerationOptions = { reasoning: 'off' }
 	): Promise<string> {
 		if (this.status !== 'ready' || !this.tier) throw new Error('private engine not ready');
 		this.status = 'generating';
 		try {
-			return await getWorker(this.tier.engine).generate(messages, proxy(onDelta));
+			const result = await getWorker(this.tier.engine).generate(messages, proxy(onDelta), options);
+			this.lastMetrics = {
+				ttftMs: result.ttftMs,
+				tokensPerSecond: result.tokensPerSecond,
+				completionTokens: result.completionTokens
+			};
+			localStorage.setItem(METRICS_KEY, JSON.stringify(this.lastMetrics));
+			return result.text;
 		} finally {
 			this.status = 'ready';
 		}

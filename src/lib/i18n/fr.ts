@@ -289,6 +289,9 @@ export const fr: Record<keyof typeof en, string> = {
 	'sheet.noChats': 'Aucune discussion pour le moment.',
 	'sheet.open': 'Ouvrir',
 	'sheet.reindex': 'Réindexer',
+	'sheet.improveSearch': 'Améliorer la recherche',
+	'sheet.reindexRecommended':
+		'Un meilleur modèle de recherche local est disponible. L’index actuel reste utilisable jusqu’à sa reconstruction.',
 	'sheet.replaceFile': 'Remplacer le fichier…',
 	'sheet.replaceFailed': 'Impossible de remplacer par {name}',
 	'sheet.replaceFailedNoText':
@@ -339,6 +342,21 @@ export const fr: Record<keyof typeof en, string> = {
 	'composer.enterHint': '⏎ envoyer · ⇧⏎ à la ligne',
 	'composer.sendAria': 'Envoyer',
 	'turn.privateMeta': 'Privé · {count} passage{s}',
+	'work.search.active': 'Recherche dans {count} documents',
+	'work.search.done': 'Recherche faite dans {count} documents',
+	'work.inspect.active': 'Vérification des passages pertinents',
+	'work.inspect.done': '{count} passages vérifiés',
+	'work.calculate.active': 'Calcul exact des valeurs',
+	'work.calculate.done': '{count} valeurs calculées',
+	'work.write.active': 'Rédaction de la réponse',
+	'work.write.done': 'Réponse rédigée',
+	'work.method': 'Comment ce résultat a été construit',
+	'work.method.targeted': '{count} passages pertinents retrouvés et vérifiés.',
+	'work.method.synthesis': '{count} passages pertinents comparés avant la réponse.',
+	'work.method.aggregate':
+		'Documents sélectionnés lus intégralement, puis calcul effectué sur {count} valeurs retenues.',
+	'work.method.reasoning':
+		'Une passe de raisonnement privée a été utilisée ; seul ce résumé opérationnel est affiché.',
 	'turn.sourcesMore': '+{count}',
 	'turn.sourcesLess': 'Réduire les sources',
 	'turn.copyAria': 'Copier la réponse',

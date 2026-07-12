@@ -8,6 +8,8 @@ import { documentsStore } from './documents.svelte';
 import { guardedFetch, OfflineError } from '$lib/net';
 import { myaiStore, endpointHost, type ChatMessage } from './myai.svelte';
 import { llmStore } from '$lib/private-ai/llm.svelte';
+import { questionLocale, routeQuestion } from '$lib/analysis/query-router';
+import { formatAggregateResult } from '$lib/analysis/format-aggregate';
 import {
 	SYSTEM_PROMPT,
 	buildUserPrompt,
@@ -15,7 +17,16 @@ import {
 	resolveCitations,
 	stripThink
 } from '$lib/private-ai/prompt';
-import type { ChatDocument, ChatMode, LocalChat, LocalMessage, SearchHit } from '$lib/types';
+import type {
+	ChatDocument,
+	ChatMode,
+	LocalChat,
+	LocalMessage,
+	MethodSummary,
+	QuestionRoute,
+	SearchHit,
+	WorkStep
+} from '$lib/types';
 
 /** First user message → chat title, cut at a word boundary. Pure (unit-tested). */
 export function titleFromMessage(text: string, max = 40): string {
@@ -48,6 +59,8 @@ class ChatsStore {
 	related = $state<{ chatId: string; messageId: string; questions: string[] } | null>(null);
 	/** Spec 020 — answer versions per version group (oldest first). */
 	versionsByGroup = $state<Record<string, string[]>>({});
+	methodByMessage = $state<Record<string, MethodSummary>>({});
+	workSteps = $state<WorkStep[]>([]);
 
 	activeChat = $derived(this.chats.find((c) => c.id === this.activeChatId) ?? null);
 
@@ -82,6 +95,27 @@ class ChatsStore {
 		const byGroup: Record<string, string[]> = {};
 		for (const v of versions) (byGroup[v.versionGroup] ??= []).push(v.id);
 		this.versionsByGroup = byGroup;
+		const methods = await db.listChatMessageMethods(chatId);
+		this.methodByMessage = Object.fromEntries(methods.map((row) => [row.messageId, row.summary]));
+	}
+
+	private startWork(route: QuestionRoute, documentCount: number): void {
+		this.workSteps = [
+			{ id: 'search', status: 'active', count: documentCount },
+			{ id: 'inspect', status: 'pending' },
+			...(route === 'aggregate' ? [{ id: 'calculate' as const, status: 'pending' as const }] : []),
+			{ id: 'write', status: 'pending' }
+		];
+	}
+
+	private advanceWork(id: WorkStep['id'], count?: number): void {
+		this.workSteps = this.workSteps.map((step) =>
+			step.id === id
+				? { ...step, status: 'active', ...(count === undefined ? {} : { count }) }
+				: step.status === 'active'
+					? { ...step, status: 'done' }
+					: step
+		);
 	}
 
 	/** Spec 020 — display another version of a turn (‹ n/N › nav). */
@@ -105,6 +139,7 @@ class ChatsStore {
 			const last = this.messages[this.messages.length - 1];
 			if (!chat || !last || last.role !== 'assistant') return;
 			if (last.mode !== 'private' && last.mode !== 'myai') return;
+			if (this.methodByMessage[last.id]?.kind === 'aggregate') return;
 			const question = [...this.messages].reverse().find((m) => m.role === 'user')?.content;
 			if (!question) return;
 
@@ -241,13 +276,29 @@ class ChatsStore {
 			await db.retireMessage(last.id, versionGroup);
 			this.messages = await db.listMessages(chatId);
 			const enabledDocs = this.chatDocuments.filter((d) => d.enabled && d.status === 'ready');
+			const route = routeQuestion(question);
+			this.startWork(route, enabledDocs.length);
+			if (route === 'aggregate') {
+				await this.generateAggregate(
+					chatId,
+					question,
+					enabledDocs.map((d) => d.id),
+					versionGroup
+				);
+				await db.touchChat(chatId);
+				this.messages = await db.listMessages(chatId);
+				await this.refresh();
+				await this.loadCitations(chatId);
+				return;
+			}
 			const hits = enabledDocs.length
 				? await documentsStore.retrieve(
 						question,
 						enabledDocs.map((d) => d.id)
 					)
 				: [];
-			await this.answer(chatId, question, hits, enabledDocs.length, versionGroup);
+			this.advanceWork('inspect', hits.length);
+			await this.answer(chatId, question, hits, enabledDocs.length, versionGroup, route);
 			await db.touchChat(chatId);
 			this.messages = await db.listMessages(chatId);
 			await this.refresh();
@@ -255,6 +306,7 @@ class ChatsStore {
 		} finally {
 			this.sending = false;
 			this.streamingText = null;
+			this.workSteps = [];
 		}
 		void this.generateRelated(chatId);
 	}
@@ -364,21 +416,33 @@ class ChatsStore {
 			this.messages = await db.listMessages(chatId);
 
 			const enabledDocs = this.chatDocuments.filter((d) => d.enabled && d.status === 'ready');
-			let hits: SearchHit[] = [];
-			if (enabledDocs.length) {
-				hits = await documentsStore.retrieve(
+			const route = routeQuestion(question);
+			this.startWork(route, enabledDocs.length);
+			if (route === 'aggregate') {
+				await this.generateAggregate(
+					chatId,
 					question,
 					enabledDocs.map((d) => d.id)
 				);
-			}
+			} else {
+				let hits: SearchHit[] = [];
+				if (enabledDocs.length) {
+					hits = await documentsStore.retrieve(
+						question,
+						enabledDocs.map((d) => d.id)
+					);
+				}
 
-			await this.answer(chatId, question, hits, enabledDocs.length);
+				this.advanceWork('inspect', hits.length);
+				await this.answer(chatId, question, hits, enabledDocs.length, null, route);
+			}
 			await db.touchChat(chatId);
 			this.messages = await db.listMessages(chatId);
 			await this.refresh();
 		} finally {
 			this.sending = false;
 			this.streamingText = null;
+			this.workSteps = [];
 		}
 		void this.generateRelated(chatId);
 	}
@@ -389,12 +453,13 @@ class ChatsStore {
 		question: string,
 		hits: SearchHit[],
 		documentCount: number,
-		versionGroup: string | null = null
+		versionGroup: string | null = null,
+		route: QuestionRoute = 'targeted'
 	): Promise<void> {
 		const { db } = await getLocalDb();
 		const chat = this.chats.find((c) => c.id === chatId);
 		if (chat?.mode === 'private' && llmStore.status === 'ready') {
-			await this.generatePrivate(chatId, question, hits, documentCount, versionGroup);
+			await this.generatePrivate(chatId, question, hits, documentCount, versionGroup, route);
 		} else if (
 			chat?.mode === 'myai' &&
 			!chat.privateOnly &&
@@ -419,7 +484,8 @@ class ChatsStore {
 		question: string,
 		hits: SearchHit[],
 		documentCount: number,
-		versionGroup: string | null = null
+		versionGroup: string | null = null,
+		route: QuestionRoute = 'targeted'
 	): Promise<void> {
 		const { db } = await getLocalDb();
 		this.streamingText = '';
@@ -442,11 +508,16 @@ class ChatsStore {
 		// (empty streamingText) until the actual answer starts.
 		let streamRaw = '';
 		let raw: string;
+		this.advanceWork('write');
 		try {
-			raw = await llmStore.generate(messages, (delta) => {
-				streamRaw += delta;
-				this.streamingText = isThinking(streamRaw) ? '' : stripThink(streamRaw);
-			});
+			raw = await llmStore.generate(
+				messages,
+				(delta) => {
+					streamRaw += delta;
+					this.streamingText = isThinking(streamRaw) ? '' : stripThink(streamRaw);
+				},
+				{ reasoning: route === 'synthesis' ? 'on' : 'off' }
+			);
 		} catch (err) {
 			console.error('[folio] private generation failed:', err);
 			raw = streamRaw;
@@ -489,6 +560,74 @@ class ChatsStore {
 		if (grounded && hits.length) {
 			await db.insertMessageExcerpts(messageId, ChatsStore.excerptRows(hits, false, new Set()));
 		}
+		await db.insertMessageMethod(messageId, {
+			kind: route,
+			documentCount,
+			passageCount: hits.length,
+			reasoningUsed: route === 'synthesis'
+		});
+		await this.loadCitations(chatId);
+	}
+
+	private async generateAggregate(
+		chatId: string,
+		question: string,
+		documentIds: string[],
+		versionGroup: string | null = null
+	): Promise<void> {
+		const { db } = await getLocalDb();
+		this.advanceWork('inspect');
+		const result = await documentsStore.aggregate(question, documentIds);
+		this.advanceWork('calculate', result.facts.length);
+		const locale = questionLocale(question);
+		const formatted = formatAggregateResult(result, locale);
+		this.advanceWork('write');
+		const messageId = crypto.randomUUID();
+		await db.insertMessage({
+			id: messageId,
+			chatId,
+			role: 'assistant',
+			content: formatted.text,
+			mode: 'private',
+			versionGroup
+		});
+		if (result.facts.length) {
+			await db.insertCitations(
+				messageId,
+				result.facts.map((fact) => ({
+					chunkId: fact.chunkId,
+					snippet: fact.text.slice(0, 240),
+					documentName: fact.documentName,
+					locator: fact.page ? `page ${fact.page}` : fact.headingPath
+				}))
+			);
+			await db.insertMessageExcerpts(
+				messageId,
+				result.facts.map((fact) => ({
+					chunkId: fact.chunkId,
+					sent: false,
+					excluded: false,
+					snippet: fact.text.slice(0, 240),
+					documentName: fact.documentName,
+					locator: fact.page ? `page ${fact.page}` : fact.headingPath
+				}))
+			);
+		}
+		await db.insertPrivacyEvent({
+			chatId,
+			messageId,
+			mode: 'private',
+			destination: 'device',
+			excerptCount: result.facts.length,
+			bytesSent: 0
+		});
+		await db.insertMessageMethod(messageId, {
+			kind: 'aggregate',
+			documentCount: documentIds.length,
+			passageCount: result.facts.length,
+			reasoningUsed: false,
+			calculation: formatted.calculation
+		});
 		await this.loadCitations(chatId);
 	}
 

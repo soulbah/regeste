@@ -1,17 +1,36 @@
 /// <reference lib="webworker" />
-// Embedding worker: transformers.js singleton running multilingual-e5-small
-// (q8, 384 dims) on WebGPU when available, WASM otherwise. Model files are
-// downloaded once and cached by the library (Cache API). e5 requires
-// "query: " / "passage: " prefixes — enforced here so callers can't forget.
+// Embedding worker: EmbeddingGemma on WebGPU, multilingual-e5-small on WASM.
+// Model files are downloaded once and cached by the library (Cache API).
 
 import { expose } from 'comlink';
-import { pipeline, type FeatureExtractionPipeline } from '@huggingface/transformers';
-import { EMBEDDING_MODEL, type EmbedProgress } from './embed-model';
+import {
+	AutoModel,
+	AutoTokenizer,
+	pipeline,
+	type FeatureExtractionPipeline,
+	type PreTrainedModel,
+	type PreTrainedTokenizer,
+	type Tensor
+} from '@huggingface/transformers';
+import {
+	E5_EMBEDDING_MODEL,
+	GEMMA_EMBEDDING_MODEL,
+	type EmbedProgress,
+	type EmbeddingProfile
+} from './embed-model';
 
 const BATCH_SIZE = 16;
 
-let extractorPromise: Promise<FeatureExtractionPipeline> | null = null;
-let device: 'webgpu' | 'wasm' = 'wasm';
+type Embedder =
+	| { kind: 'e5'; extractor: FeatureExtractionPipeline; profile: EmbeddingProfile }
+	| {
+			kind: 'gemma';
+			model: PreTrainedModel;
+			tokenizer: PreTrainedTokenizer;
+			profile: EmbeddingProfile;
+	  };
+
+let embedderPromise: Promise<Embedder> | null = null;
 
 /** The API existing is not enough — headless/VM Chromium exposes navigator.gpu
  * with no usable adapter. Probe for a real one, fall back to WASM. */
@@ -24,57 +43,112 @@ async function pickDevice(): Promise<'webgpu' | 'wasm'> {
 	}
 }
 
-function buildExtractor(
-	dev: 'webgpu' | 'wasm',
-	onProgress?: (p: EmbedProgress) => void
-): Promise<FeatureExtractionPipeline> {
-	return pipeline('feature-extraction', EMBEDDING_MODEL, {
-		dtype: 'q8',
-		device: dev,
-		progress_callback: (info: { status: string; progress?: number }) => {
-			if (info.status === 'progress' && typeof info.progress === 'number') {
-				onProgress?.({ phase: 'download', progress: info.progress / 100 });
-			}
+function reportDownload(onProgress?: (p: EmbedProgress) => void) {
+	return (info: { status: string; progress?: number }) => {
+		if (info.status === 'progress' && typeof info.progress === 'number') {
+			onProgress?.({ phase: 'download', progress: info.progress / 100 });
 		}
+	};
+}
+
+function buildE5(onProgress?: (p: EmbedProgress) => void): Promise<FeatureExtractionPipeline> {
+	return pipeline('feature-extraction', E5_EMBEDDING_MODEL, {
+		dtype: 'q8',
+		device: 'wasm',
+		progress_callback: reportDownload(onProgress)
 	}) as Promise<FeatureExtractionPipeline>;
 }
 
-function getExtractor(onProgress?: (p: EmbedProgress) => void): Promise<FeatureExtractionPipeline> {
-	if (!extractorPromise) {
-		extractorPromise = (async () => {
-			device = await pickDevice();
-			try {
-				return await buildExtractor(device, onProgress);
-			} catch (err) {
-				if (device === 'wasm') throw err;
-				// Adapter probe passed but the backend still failed — WASM rescue.
-				console.warn('[folio] webgpu embeddings failed, falling back to wasm:', err);
-				device = 'wasm';
-				return await buildExtractor('wasm', onProgress);
+async function buildGemma(onProgress?: (p: EmbedProgress) => void): Promise<Embedder> {
+	const progress_callback = reportDownload(onProgress);
+	const [tokenizer, model] = await Promise.all([
+		AutoTokenizer.from_pretrained(GEMMA_EMBEDDING_MODEL, { progress_callback }),
+		AutoModel.from_pretrained(GEMMA_EMBEDDING_MODEL, {
+			device: 'webgpu',
+			dtype: 'q4',
+			progress_callback
+		})
+	]);
+	return {
+		kind: 'gemma',
+		tokenizer,
+		model,
+		profile: { model: GEMMA_EMBEDDING_MODEL, dims: 256, device: 'webgpu' }
+	};
+}
+
+function getEmbedder(onProgress?: (p: EmbedProgress) => void): Promise<Embedder> {
+	if (!embedderPromise) {
+		embedderPromise = (async (): Promise<Embedder> => {
+			if ((await pickDevice()) === 'webgpu') {
+				try {
+					return await buildGemma(onProgress);
+				} catch (err) {
+					console.warn('[folio] webgpu embeddings failed, falling back to wasm:', err);
+				}
 			}
+			return {
+				kind: 'e5' as const,
+				extractor: await buildE5(onProgress),
+				profile: { model: E5_EMBEDDING_MODEL, dims: 384, device: 'wasm' as const }
+			};
 		})().catch((err) => {
-			extractorPromise = null;
+			embedderPromise = null;
 			throw err;
 		});
 	}
-	return extractorPromise;
+	return embedderPromise!;
+}
+
+function truncateAndNormalize(tensor: Tensor, targetDims: number): Float32Array {
+	const sourceDims = tensor.dims[tensor.dims.length - 1];
+	const rows = tensor.size / sourceDims;
+	const source = tensor.data as Float32Array;
+	const data = new Float32Array(rows * targetDims);
+	for (let row = 0; row < rows; row++) {
+		let norm = 0;
+		for (let i = 0; i < targetDims; i++) {
+			const value = source[row * sourceDims + i];
+			data[row * targetDims + i] = value;
+			norm += value * value;
+		}
+		norm = Math.sqrt(norm) || 1;
+		for (let i = 0; i < targetDims; i++) data[row * targetDims + i] /= norm;
+	}
+	return data;
 }
 
 async function embed(
 	texts: string[],
 	kind: 'passage' | 'query',
 	onProgress?: (p: EmbedProgress) => void
-): Promise<{ data: Float32Array; dims: number; device: string }> {
-	const extractor = await getExtractor(onProgress);
-	const prefixed = texts.map((t) => `${kind}: ${t}`);
+): Promise<{ data: Float32Array; dims: number; device: string; model: string }> {
+	const embedder = await getEmbedder(onProgress);
+	const prefixed = texts.map((t) =>
+		embedder.kind === 'gemma'
+			? kind === 'query'
+				? `task: search result | query: ${t}`
+				: `title: none | text: ${t}`
+			: `${kind}: ${t}`
+	);
 	const out: Float32Array[] = [];
-	let dims = 0;
+	const dims = embedder.profile.dims;
 	for (let i = 0; i < prefixed.length; i += BATCH_SIZE) {
 		const batch = prefixed.slice(i, i + BATCH_SIZE);
-		const tensor = await extractor(batch, { pooling: 'mean', normalize: true });
-		dims = tensor.dims[tensor.dims.length - 1];
-		out.push(tensor.data.slice(0) as Float32Array);
-		tensor.dispose();
+		if (embedder.kind === 'gemma') {
+			const inputs = await embedder.tokenizer(batch, {
+				padding: true,
+				truncation: true,
+				max_length: 2048
+			});
+			const output = (await embedder.model(inputs)) as unknown as { sentence_embedding: Tensor };
+			out.push(truncateAndNormalize(output.sentence_embedding, dims));
+			output.sentence_embedding.dispose();
+		} else {
+			const tensor = await embedder.extractor(batch, { pooling: 'mean', normalize: true });
+			out.push(tensor.data.slice(0) as Float32Array);
+			tensor.dispose();
+		}
 		onProgress?.({ phase: 'embed', progress: Math.min(1, (i + batch.length) / prefixed.length) });
 	}
 	const total = out.reduce((n, a) => n + a.length, 0);
@@ -84,7 +158,12 @@ async function embed(
 		data.set(a, off);
 		off += a.length;
 	}
-	return { data, dims, device };
+	return {
+		data,
+		dims,
+		device: embedder.profile.device,
+		model: embedder.profile.model
+	};
 }
 
 const api = { embed };

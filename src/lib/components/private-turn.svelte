@@ -14,6 +14,8 @@
 	import type { CitationRow, MessageExcerptRow } from '$lib/local-db/worker';
 	import { chatsStore } from '$lib/state/chats.svelte';
 	import { viewerStore } from '$lib/state/viewer.svelte';
+	import WorkLedger from '$lib/components/work-ledger.svelte';
+	import type { MethodSummary } from '$lib/types';
 
 	let {
 		content,
@@ -24,7 +26,8 @@
 		messageId = null,
 		excerpts = [],
 		versions = null,
-		onswitchversion = null
+		onswitchversion = null,
+		method = null
 	}: {
 		content: string;
 		citations?: CitationRow[];
@@ -38,6 +41,7 @@
 		/** Spec 020 — ids of every version of this turn (oldest first). */
 		versions?: string[] | null;
 		onswitchversion?: ((id: string) => void) | null;
+		method?: MethodSummary | null;
 	} = $props();
 
 	// Spec 020 — ‹ n/N › version nav (Try again keeps the previous answer).
@@ -102,6 +106,7 @@
 </script>
 
 <div class="space-y-2">
+	{#if method}<WorkLedger {method} />{/if}
 	{#if citations.length}
 		<div class="flex flex-wrap items-center gap-1.5">
 			{#each stripSources as c, i (i)}

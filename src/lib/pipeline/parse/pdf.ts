@@ -19,16 +19,46 @@ export async function parsePdf(data: ArrayBuffer): Promise<ParsedDoc> {
 	for (let pageNum = 1; pageNum <= doc.numPages; pageNum++) {
 		const page = await doc.getPage(pageNum);
 		const content = await page.getTextContent();
-		let text = '';
-		for (const item of content.items) {
-			if (!('str' in item)) continue;
-			text += item.str;
-			text += item.hasEOL ? '\n' : ' ';
+		const positioned = content.items
+			.filter(
+				(item): item is (typeof content.items)[number] & { str: string; transform: number[] } =>
+					'str' in item && Array.isArray(item.transform)
+			)
+			.map((item) => ({ text: item.str.trim(), x: item.transform[4], y: item.transform[5] }))
+			.filter((item) => item.text.length > 0);
+		// Rebuild visual lines. Financial documents depend on labels staying next
+		// to their values; flat item concatenation loses that relationship.
+		const lines: Array<{ y: number; items: Array<{ text: string; x: number }> }> = [];
+		for (const item of positioned) {
+			let line = lines.find((candidate) => Math.abs(candidate.y - item.y) <= 2);
+			if (!line) {
+				line = { y: item.y, items: [] };
+				lines.push(line);
+			}
+			line.items.push({ text: item.text, x: item.x });
 		}
-		text = text.replace(/[ \t]+\n/g, '\n').trim();
+		lines.sort((a, b) => b.y - a.y);
+		const lineTexts = lines.map((line) =>
+			line.items
+				.sort((a, b) => a.x - b.x)
+				.map((item) => item.text)
+				.join(' ')
+				.replace(/\s+/g, ' ')
+				.trim()
+		);
+		const text = lineTexts.join('\n').trim();
 		if (text.length < SCANNED_MIN_CHARS_PER_PAGE) sparsePages++;
 		if (text.length > 0) {
-			blocks.push({ text, page: pageNum, charStart: 0, charEnd: text.length });
+			let offset = 0;
+			for (const line of lineTexts) {
+				blocks.push({
+					text: line,
+					page: pageNum,
+					charStart: offset,
+					charEnd: offset + line.length
+				});
+				offset += line.length + 1;
+			}
 		}
 		page.cleanup();
 	}

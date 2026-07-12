@@ -4,7 +4,7 @@
 // (spec 018) is a GGUF URL run by wllama, multithreaded via SharedArrayBuffer.
 
 export interface Tier {
-	id: 'standard' | 'standard-f32' | 'plus' | 'lite';
+	id: 'standard' | 'standard-f32' | 'plus' | 'max' | 'lite';
 	engine: 'webllm' | 'wllama';
 	model: string;
 	downloadLabel: string; // shown to the user ("~0.7 GB")
@@ -13,10 +13,17 @@ export interface Tier {
 
 export const TIERS: Tier[] = [
 	{
+		id: 'max',
+		engine: 'webllm',
+		model: 'Qwen3.5-4B-q4f16_1-MLC',
+		downloadLabel: '~2.4 GB',
+		requiresF16: true
+	},
+	{
 		id: 'plus',
 		engine: 'webllm',
-		model: 'Qwen3-1.7B-q4f16_1-MLC',
-		downloadLabel: '~1.2 GB',
+		model: 'Qwen3.5-2B-q4f16_1-MLC',
+		downloadLabel: '~1.1 GB',
 		requiresF16: true
 	},
 	{
@@ -63,6 +70,9 @@ export function pickTier(signals: DeviceSignals): Tier | null {
 	}
 	if (!signals.hasF16) return TIERS.find((t) => t.id === 'standard-f32')!;
 	// Plus tier only with strong signals; unknown memory defaults to standard.
+	if ((signals.deviceMemory ?? 0) >= 8 && signals.hardwareConcurrency >= 12) {
+		return TIERS.find((t) => t.id === 'max')!;
+	}
 	if ((signals.deviceMemory ?? 0) >= 8 && signals.hardwareConcurrency >= 8) {
 		return TIERS.find((t) => t.id === 'plus')!;
 	}
@@ -71,6 +81,7 @@ export function pickTier(signals: DeviceSignals): Tier | null {
 
 /** One-step downgrade when a load fails (ground truth beats heuristics). */
 export function downgrade(tier: Tier): Tier | null {
+	if (tier.id === 'max') return TIERS.find((t) => t.id === 'plus')!;
 	if (tier.id === 'plus') return TIERS.find((t) => t.id === 'standard')!;
 	if (tier.id === 'standard') return TIERS.find((t) => t.id === 'standard-f32')!;
 	return null;

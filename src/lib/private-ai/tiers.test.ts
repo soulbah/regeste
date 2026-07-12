@@ -26,6 +26,7 @@ describe('pickTier', () => {
 
 	it('picks plus only with strong memory+cores signals', () => {
 		expect(pickTier(signals({}))?.id).toBe('plus');
+		expect(pickTier(signals({ hardwareConcurrency: 12 }))?.id).toBe('max');
 		expect(pickTier(signals({ deviceMemory: 4 }))?.id).toBe('standard');
 		expect(pickTier(signals({ deviceMemory: null }))?.id).toBe('standard');
 		expect(pickTier(signals({ hardwareConcurrency: 4 }))?.id).toBe('standard');
@@ -33,8 +34,10 @@ describe('pickTier', () => {
 });
 
 describe('downgrade', () => {
-	it('steps plus → standard → standard-f32 → null', () => {
+	it('steps max → plus → standard → standard-f32 → null', () => {
+		const max = TIERS.find((t) => t.id === 'max')!;
 		const plus = TIERS.find((t) => t.id === 'plus')!;
+		expect(downgrade(max)?.id).toBe('plus');
 		const std = downgrade(plus)!;
 		expect(std.id).toBe('standard');
 		const f32 = downgrade(std)!;

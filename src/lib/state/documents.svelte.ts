@@ -12,7 +12,19 @@ import { detectLanguage } from '$lib/pipeline/language';
 import { parseByName } from '$lib/pipeline/parse';
 import { readOriginal } from '$lib/opfs';
 import type { EmbedApi } from '$lib/pipeline/embed-worker';
-import { EMBEDDING_MODEL, type EmbedProgress } from '$lib/pipeline/embed-model';
+import {
+	detectEmbeddingProfile,
+	type EmbedProgress,
+	type EmbeddingProfile
+} from '$lib/pipeline/embed-model';
+import { fuseCandidates } from '$lib/pipeline/retrieval';
+import { extractMoneyCandidates } from '$lib/analysis/money';
+import type { MoneyKind } from '$lib/analysis/money';
+import {
+	aggregateMoneyFacts,
+	FACT_EXTRACTOR_VERSION,
+	type AggregateResult
+} from '$lib/analysis/aggregate';
 import type { IngestErrorCode, LibraryDocument, LocalDocument, SearchHit } from '$lib/types';
 
 let embedApi: Remote<EmbedApi> | null = null;
@@ -59,11 +71,14 @@ class DocumentsStore {
 	searching = $state(false);
 	results = $state<SearchHit[]>([]);
 	lastSearchMs = $state<number | null>(null);
+	embeddingProfile = $state<EmbeddingProfile | null>(null);
+	staleDocumentIds = $state<Set<string>>(new Set());
 
 	async init(): Promise<void> {
 		try {
 			const { info } = await getLocalDb();
 			this.dbInfo = info;
+			this.embeddingProfile = await detectEmbeddingProfile();
 			await this.refreshLibrary();
 		} catch (err) {
 			this.dbError = err instanceof Error ? err.message : String(err);
@@ -76,6 +91,19 @@ class DocumentsStore {
 		this.library = await db.listLibrary();
 		const rows = await db.documentEgress();
 		this.egress = Object.fromEntries(rows.map((r) => [r.documentId, r.lastSentAt]));
+		this.staleDocumentIds = new Set(
+			this.embeddingProfile
+				? this.documents
+						.filter(
+							(doc) => doc.status === 'ready' && doc.embeddingModel !== this.embeddingProfile!.model
+						)
+						.map((doc) => doc.id)
+				: []
+		);
+	}
+
+	needsReindex(id: string): boolean {
+		return this.staleDocumentIds.has(id);
 	}
 
 	private setIngest(id: string, state: IngestState): void {
@@ -116,15 +144,19 @@ class DocumentsStore {
 						.join(' ')
 				) ?? undefined;
 			await db.setDocumentStatus(id, 'chunking', { pages: parsed.pages ?? undefined, language });
-			const chunks = chunkBlocks(parsed.blocks);
+			const chunks = chunkBlocks(parsed.blocks, file.name);
 			if (!chunks.length) {
 				throw Object.assign(new Error('No usable text'), { code: 'parse_failed' as const });
 			}
 
 			this.setIngest(id, { status: 'embedding', phaseProgress: 0 });
 			await db.setDocumentStatus(id, 'embedding');
-			const { data: vectors, dims } = await getEmbedWorker().embed(
-				chunks.map((c) => c.text),
+			const {
+				data: vectors,
+				dims,
+				model
+			} = await getEmbedWorker().embed(
+				chunks.map((c) => c.searchText),
 				'passage',
 				proxy((p: EmbedProgress) => {
 					this.setIngest(id, {
@@ -135,7 +167,7 @@ class DocumentsStore {
 			);
 
 			await db.insertChunks(id, chunks, vectors, dims);
-			await db.setDocumentStatus(id, 'ready', { embeddingModel: EMBEDDING_MODEL });
+			await db.setDocumentStatus(id, 'ready', { embeddingModel: model });
 			this.setIngest(id, { status: 'ready', phaseProgress: 1 });
 		} catch (err) {
 			const code: IngestErrorCode = (err as { code?: IngestErrorCode }).code ?? 'unknown';
@@ -151,8 +183,34 @@ class DocumentsStore {
 	/** Hybrid retrieval over the given documents; returns the hits. */
 	async retrieve(query: string, documentIds: string[] | null = null): Promise<SearchHit[]> {
 		const { db } = await getLocalDb();
-		const { data } = await getEmbedWorker().embed([query.trim()], 'query');
-		return db.search(data, query.trim(), documentIds);
+		const clean = query.trim();
+		const lexicalPromise = db.searchLexical(clean, documentIds, 80);
+		const { data, dims } = await getEmbedWorker().embed([clean], 'query');
+		const [lexical, semantic] = await Promise.all([
+			lexicalPromise,
+			db.searchVector(data, dims, documentIds, 80)
+		]);
+		return fuseCandidates(semantic, lexical, 8);
+	}
+
+	/** Exhaustive local path for numerical questions: no top-k truncation. */
+	async aggregate(query: string, documentIds: string[]): Promise<AggregateResult> {
+		const { db } = await getLocalDb();
+		const cached = new Set(await db.listDocumentFactRunIds(documentIds, FACT_EXTRACTOR_VERSION));
+		for (const documentId of documentIds.filter((id) => !cached.has(id))) {
+			const chunks = await db.listChunksForDocuments([documentId]);
+			const facts = chunks.flatMap((chunk) =>
+				extractMoneyCandidates(chunk.text).map((fact) => ({ ...fact, chunkId: chunk.chunkId }))
+			);
+			await db.replaceDocumentFacts(documentId, FACT_EXTRACTOR_VERSION, facts);
+		}
+		const facts = await db.listMoneyFacts(documentIds, FACT_EXTRACTOR_VERSION);
+		return aggregateMoneyFacts(
+			query,
+			facts
+				.filter((fact) => fact.chunkId !== null)
+				.map((fact) => ({ ...fact, chunkId: fact.chunkId!, kind: fact.kind as MoneyKind }))
+		);
 	}
 
 	async search(query: string, documentIds: string[] | null = null): Promise<void> {
@@ -186,23 +244,16 @@ class DocumentsStore {
 		}
 		try {
 			this.setIngest(id, { status: 'parsing', phaseProgress: 0 });
-			await db.setDocumentStatus(id, 'parsing');
 			const parsed = await parseByName(doc.name, doc.mime, data);
 			this.setIngest(id, { status: 'chunking', phaseProgress: 0 });
-			await db.setDocumentStatus(id, 'chunking', {
-				language:
-					detectLanguage(
-						parsed.blocks
-							.slice(0, 12)
-							.map((b) => b.text)
-							.join(' ')
-					) ?? undefined
-			});
-			const chunks = chunkBlocks(parsed.blocks);
+			const chunks = chunkBlocks(parsed.blocks, doc.name);
 			this.setIngest(id, { status: 'embedding', phaseProgress: 0 });
-			await db.setDocumentStatus(id, 'embedding');
-			const { data: vectors, dims } = await getEmbedWorker().embed(
-				chunks.map((c) => c.text),
+			const {
+				data: vectors,
+				dims,
+				model
+			} = await getEmbedWorker().embed(
+				chunks.map((c) => c.searchText),
 				'passage',
 				proxy((p: EmbedProgress) => {
 					this.setIngest(id, {
@@ -211,13 +262,10 @@ class DocumentsStore {
 					});
 				})
 			);
-			await db.deleteChunks(id);
-			await db.insertChunks(id, chunks, vectors, dims);
-			await db.setDocumentStatus(id, 'ready', { embeddingModel: EMBEDDING_MODEL });
+			await db.reindexDocument(id, chunks, vectors, dims, model);
 			this.setIngest(id, { status: 'ready', phaseProgress: 1 });
 		} catch (err) {
 			const code: IngestErrorCode = (err as { code?: IngestErrorCode }).code ?? 'unknown';
-			await db.setDocumentStatus(id, 'error', { error: code });
 			this.setIngest(id, { status: 'error', phaseProgress: 0, error: code });
 		} finally {
 			await this.refreshLibrary();
@@ -235,12 +283,16 @@ class DocumentsStore {
 		const hash = await sha256Hex(data);
 		try {
 			const parsed = await parseByName(file.name, file.type, data);
-			const chunks = chunkBlocks(parsed.blocks);
+			const chunks = chunkBlocks(parsed.blocks, file.name);
 			if (!chunks.length) {
 				throw Object.assign(new Error('No usable text'), { code: 'parse_failed' as const });
 			}
-			const { data: vectors, dims } = await getEmbedWorker().embed(
-				chunks.map((c) => c.text),
+			const {
+				data: vectors,
+				dims,
+				model
+			} = await getEmbedWorker().embed(
+				chunks.map((c) => c.searchText),
 				'passage'
 			);
 			const language = detectLanguage(
@@ -258,6 +310,7 @@ class DocumentsStore {
 				dims,
 				language
 			);
+			await db.setDocumentStatus(id, 'ready', { embeddingModel: model });
 			return null;
 		} catch (err) {
 			return (err as { code?: IngestErrorCode }).code ?? 'unknown';

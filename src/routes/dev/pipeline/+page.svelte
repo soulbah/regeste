@@ -6,13 +6,22 @@
 	import { Progress } from '$lib/components/ui/progress';
 	import * as Card from '$lib/components/ui/card';
 	import { documentsStore } from '$lib/state/documents.svelte';
+	import {
+		runIntelligenceBenchmark,
+		type IntelligenceBenchmarkReport
+	} from '$lib/benchmark/intelligence';
+	import { llmStore } from '$lib/private-ai/llm.svelte';
 
 	let fileInput = $state<HTMLInputElement | null>(null);
 	let query = $state('');
 	let dragOver = $state(false);
+	let benchmarking = $state(false);
+	let generationBenchmarking = $state(false);
+	let benchmarkReport = $state<IntelligenceBenchmarkReport | null>(null);
 
 	onMount(() => {
 		documentsStore.init();
+		llmStore.init();
 	});
 
 	async function handleFiles(files: FileList | null) {
@@ -27,6 +36,70 @@
 		if (status === 'error') return 'destructive';
 		return 'secondary';
 	}
+
+	async function runInvoiceBenchmark() {
+		benchmarking = true;
+		benchmarkReport = null;
+		try {
+			const count = 25;
+			const documentIds: string[] = [];
+			for (let number = 1; number <= count; number++) {
+				const amount = `${number},25`;
+				const file = new File(
+					[`FACTURE BENCH-${number}\nClient Benchmark ${number}\nTotal TTC ${amount} EUR\n`],
+					`benchmark-invoice-${number}.txt`,
+					{ type: 'text/plain' }
+				);
+				documentIds.push(await documentsStore.ingest(file));
+			}
+			const retrievalCases = [];
+			for (let number = 1; number <= 10; number++) {
+				const query = `benchmark-invoice-${number}`;
+				const scoped = await documentsStore.retrieve(query, [documentIds[number - 1]]);
+				retrievalCases.push({
+					query,
+					documentIds,
+					relevantChunkIds: scoped.map((hit) => hit.chunkId)
+				});
+			}
+			benchmarkReport = await runIntelligenceBenchmark({
+				retrievalCases,
+				aggregateCases: [
+					{
+						query: 'Quelle est la somme TTC de toutes les factures ?',
+						documentIds,
+						expected: [
+							{ currency: 'EUR', valueMinor: (100 * count * (count + 1)) / 2 + 25 * count, count }
+						]
+					}
+				],
+				retrieve: (query, ids) => documentsStore.retrieve(query, ids),
+				aggregate: (query, ids) => documentsStore.aggregate(query, ids),
+				generationMetrics:
+					llmStore.lastMetrics === null ? undefined : async () => llmStore.lastMetrics!
+			});
+		} finally {
+			benchmarking = false;
+		}
+	}
+
+	async function runGenerationBenchmark() {
+		generationBenchmarking = true;
+		try {
+			if (llmStore.status === 'needs-download') await llmStore.prepare();
+			if (llmStore.status !== 'ready') return;
+			await llmStore.generate(
+				[
+					{ role: 'system', content: 'Answer directly and briefly.' },
+					{ role: 'user', content: 'Write one sentence explaining why exact arithmetic matters.' }
+				],
+				() => {},
+				{ reasoning: 'off' }
+			);
+		} finally {
+			generationBenchmarking = false;
+		}
+	}
 </script>
 
 <svelte:head><title>Folio · dev pipeline</title></svelte:head>
@@ -38,6 +111,41 @@
 			Dev-only page exercising the local database and document pipeline (spec 002).
 		</p>
 	</div>
+
+	<Card.Root>
+		<Card.Header>
+			<Card.Title>Intelligence benchmark</Card.Title>
+			<Card.Description>25 synthetic invoices, entirely on this device.</Card.Description>
+		</Card.Header>
+		<Card.Content class="space-y-3">
+			<div class="flex flex-wrap gap-2">
+				<Button onclick={runInvoiceBenchmark} disabled={benchmarking}>
+					{benchmarking ? 'Running benchmark…' : 'Run invoice benchmark'}
+				</Button>
+				<Button
+					variant="outline"
+					onclick={runGenerationBenchmark}
+					disabled={generationBenchmarking}
+				>
+					{generationBenchmarking ? 'Measuring generation…' : 'Run generation benchmark'}
+				</Button>
+			</div>
+			{#if llmStore.lastMetrics}
+				<pre class="bg-muted overflow-auto rounded-md p-3 text-xs">{JSON.stringify(
+						llmStore.lastMetrics,
+						null,
+						2
+					)}</pre>
+			{/if}
+			{#if benchmarkReport}
+				<pre class="bg-muted overflow-auto rounded-md p-3 text-xs">{JSON.stringify(
+						benchmarkReport,
+						null,
+						2
+					)}</pre>
+			{/if}
+		</Card.Content>
+	</Card.Root>
 
 	{#if documentsStore.dbError}
 		<Card.Root class="border-destructive">

@@ -6,6 +6,7 @@
 
 import { expose } from 'comlink';
 import { MIGRATIONS } from './schema';
+import { fuseCandidates } from '$lib/pipeline/retrieval';
 import type {
 	ChatDocument,
 	Chunk,
@@ -13,6 +14,7 @@ import type {
 	LocalChat,
 	LocalDocument,
 	LocalMessage,
+	MethodSummary,
 	SearchHit
 } from '$lib/types';
 
@@ -171,18 +173,32 @@ function setDocumentStatus(
 	});
 }
 
+function deleteChunkIndexes(row: { id: number; text: string; search_text?: string | null }): void {
+	db.exec({ sql: 'DELETE FROM chunks_vec WHERE rowid = ?', bind: [row.id] });
+	db.exec({ sql: 'DELETE FROM chunks_vec_v2 WHERE rowid = ?', bind: [row.id] });
+	db.exec({
+		sql: "INSERT INTO chunks_fts(chunks_fts, rowid, search_text) VALUES('delete', ?, ?)",
+		bind: [row.id, row.search_text ?? row.text]
+	});
+}
+
+function insertVector(rowid: number, vector: Float32Array, dims: number): void {
+	const table = dims === 256 ? 'chunks_vec_v2' : 'chunks_vec';
+	db.exec({
+		sql: `INSERT INTO ${table}(rowid, embedding) VALUES (?, ?)`,
+		bind: [rowid, new Uint8Array(vector.buffer, vector.byteOffset, vector.byteLength).slice()]
+	});
+}
+
 function deleteDocument(id: string): void {
 	db.transaction(() => {
 		// Real chunk text in the FTS delete: with a dummy value the terms would
 		// stay physically indexed — deleted documents must not linger on disk.
-		const rows = db.selectObjects('SELECT id, text FROM chunks WHERE document_id = ?', [id]);
-		for (const r of rows) {
-			db.exec({ sql: 'DELETE FROM chunks_vec WHERE rowid = ?', bind: [r.id] });
-			db.exec({
-				sql: "INSERT INTO chunks_fts(chunks_fts, rowid, text) VALUES('delete', ?, ?)",
-				bind: [r.id, r.text]
-			});
-		}
+		const rows = db.selectObjects(
+			'SELECT id, text, search_text FROM chunks WHERE document_id = ?',
+			[id]
+		);
+		for (const r of rows) deleteChunkIndexes(r);
 		db.exec({ sql: 'DELETE FROM chunks WHERE document_id = ?', bind: [id] });
 		db.exec({ sql: 'DELETE FROM documents WHERE id = ?', bind: [id] });
 	});
@@ -191,16 +207,13 @@ function deleteDocument(id: string): void {
 /** Remove a document's chunks from all three stores (FTS with real text). */
 function deleteChunks(documentId: string): void {
 	db.transaction(() => {
-		const rows = db.selectObjects('SELECT id, text FROM chunks WHERE document_id = ?', [
-			documentId
-		]);
-		for (const r of rows) {
-			db.exec({ sql: 'DELETE FROM chunks_vec WHERE rowid = ?', bind: [r.id] });
-			db.exec({
-				sql: "INSERT INTO chunks_fts(chunks_fts, rowid, text) VALUES('delete', ?, ?)",
-				bind: [r.id, r.text]
-			});
-		}
+		const rows = db.selectObjects(
+			'SELECT id, text, search_text FROM chunks WHERE document_id = ?',
+			[documentId]
+		);
+		for (const r of rows) deleteChunkIndexes(r);
+		db.exec({ sql: 'DELETE FROM document_facts WHERE document_id = ?', bind: [documentId] });
+		db.exec({ sql: 'DELETE FROM document_fact_runs WHERE document_id = ?', bind: [documentId] });
 		db.exec({ sql: 'DELETE FROM chunks WHERE document_id = ?', bind: [documentId] });
 	});
 }
@@ -226,14 +239,13 @@ function replaceDocument(
 				bind: [crypto.randomUUID(), id, old.hash, Date.now()]
 			});
 		}
-		const rows = db.selectObjects('SELECT id, text FROM chunks WHERE document_id = ?', [id]);
-		for (const r of rows) {
-			db.exec({ sql: 'DELETE FROM chunks_vec WHERE rowid = ?', bind: [r.id] });
-			db.exec({
-				sql: "INSERT INTO chunks_fts(chunks_fts, rowid, text) VALUES('delete', ?, ?)",
-				bind: [r.id, r.text]
-			});
-		}
+		const rows = db.selectObjects(
+			'SELECT id, text, search_text FROM chunks WHERE document_id = ?',
+			[id]
+		);
+		for (const r of rows) deleteChunkIndexes(r);
+		db.exec({ sql: 'DELETE FROM document_facts WHERE document_id = ?', bind: [id] });
+		db.exec({ sql: 'DELETE FROM document_fact_runs WHERE document_id = ?', bind: [id] });
 		db.exec({ sql: 'DELETE FROM chunks WHERE document_id = ?', bind: [id] });
 		db.exec({
 			sql: `UPDATE documents SET hash = ?, name = ?, mime = ?, size = ?, pages = ?,
@@ -243,17 +255,27 @@ function replaceDocument(
 		for (let i = 0; i < chunks.length; i++) {
 			const c = chunks[i];
 			db.exec({
-				sql: `INSERT INTO chunks(document_id, seq, text, page, heading_path, para_index, char_start, char_end)
-				      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-				bind: [id, c.seq, c.text, c.page, c.headingPath, c.paraIndex, c.charStart, c.charEnd]
+				sql: `INSERT INTO chunks(document_id, seq, text, search_text, page, heading_path, para_index, char_start, char_end)
+				      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				bind: [
+					id,
+					c.seq,
+					c.text,
+					c.searchText,
+					c.page,
+					c.headingPath,
+					c.paraIndex,
+					c.charStart,
+					c.charEnd
+				]
 			});
 			const rowid = db.selectValue('SELECT last_insert_rowid()') as number;
-			db.exec({ sql: 'INSERT INTO chunks_fts(rowid, text) VALUES (?, ?)', bind: [rowid, c.text] });
-			const vec = embeddings.subarray(i * dims, (i + 1) * dims);
 			db.exec({
-				sql: 'INSERT INTO chunks_vec(rowid, embedding) VALUES (?, ?)',
-				bind: [rowid, new Uint8Array(vec.buffer, vec.byteOffset, vec.byteLength).slice()]
+				sql: 'INSERT INTO chunks_fts(rowid, search_text) VALUES (?, ?)',
+				bind: [rowid, c.searchText]
 			});
+			const vec = embeddings.subarray(i * dims, (i + 1) * dims);
+			insertVector(rowid, vec, dims);
 		}
 	});
 }
@@ -302,12 +324,13 @@ function insertChunks(
 		for (let i = 0; i < chunks.length; i++) {
 			const c = chunks[i];
 			db.exec({
-				sql: `INSERT INTO chunks(document_id, seq, text, page, heading_path, para_index, char_start, char_end)
-				      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+				sql: `INSERT INTO chunks(document_id, seq, text, search_text, page, heading_path, para_index, char_start, char_end)
+				      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 				bind: [
 					documentId,
 					c.seq,
 					c.text,
+					c.searchText,
 					c.page,
 					c.headingPath,
 					c.paraIndex,
@@ -316,13 +339,61 @@ function insertChunks(
 				]
 			});
 			const rowid = db.selectValue('SELECT last_insert_rowid()') as number;
-			db.exec({ sql: 'INSERT INTO chunks_fts(rowid, text) VALUES (?, ?)', bind: [rowid, c.text] });
-			const vec = embeddings.subarray(i * dims, (i + 1) * dims);
 			db.exec({
-				sql: 'INSERT INTO chunks_vec(rowid, embedding) VALUES (?, ?)',
-				bind: [rowid, new Uint8Array(vec.buffer, vec.byteOffset, vec.byteLength).slice()]
+				sql: 'INSERT INTO chunks_fts(rowid, search_text) VALUES (?, ?)',
+				bind: [rowid, c.searchText]
 			});
+			const vec = embeddings.subarray(i * dims, (i + 1) * dims);
+			insertVector(rowid, vec, dims);
 		}
+	});
+}
+
+/** Build completes before entry; this transaction swaps every local index at once. */
+function reindexDocument(
+	documentId: string,
+	chunks: Chunk[],
+	embeddings: Float32Array,
+	dims: number,
+	embeddingModel: string
+): void {
+	db.transaction(() => {
+		const rows = db.selectObjects(
+			'SELECT id, text, search_text FROM chunks WHERE document_id = ?',
+			[documentId]
+		);
+		for (const row of rows) deleteChunkIndexes(row);
+		db.exec({ sql: 'DELETE FROM document_facts WHERE document_id = ?', bind: [documentId] });
+		db.exec({ sql: 'DELETE FROM document_fact_runs WHERE document_id = ?', bind: [documentId] });
+		db.exec({ sql: 'DELETE FROM chunks WHERE document_id = ?', bind: [documentId] });
+		for (let i = 0; i < chunks.length; i++) {
+			const chunk = chunks[i];
+			db.exec({
+				sql: `INSERT INTO chunks(document_id, seq, text, search_text, page, heading_path, para_index, char_start, char_end)
+				      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				bind: [
+					documentId,
+					chunk.seq,
+					chunk.text,
+					chunk.searchText,
+					chunk.page,
+					chunk.headingPath,
+					chunk.paraIndex,
+					chunk.charStart,
+					chunk.charEnd
+				]
+			});
+			const rowid = db.selectValue('SELECT last_insert_rowid()') as number;
+			db.exec({
+				sql: 'INSERT INTO chunks_fts(rowid, search_text) VALUES (?, ?)',
+				bind: [rowid, chunk.searchText]
+			});
+			insertVector(rowid, embeddings.subarray(i * dims, (i + 1) * dims), dims);
+		}
+		db.exec({
+			sql: `UPDATE documents SET embedding_model = ?, status = 'ready', error = NULL, updated_at = ? WHERE id = ?`,
+			bind: [embeddingModel, Date.now(), documentId]
+		});
 	});
 }
 
@@ -336,6 +407,107 @@ function toFtsQuery(q: string): string {
 	return tokens.map((t) => `"${t.replaceAll('"', '')}"`).join(' OR ');
 }
 
+function scopeSql(documentIds: string[] | null, column = 'c.document_id') {
+	if (!documentIds?.length) return { clause: '', bind: [] as string[] };
+	return {
+		clause: ` AND ${column} IN (${documentIds.map(() => '?').join(',')})`,
+		bind: documentIds
+	};
+}
+
+/** Lexical candidates start immediately while the query embedding loads. */
+function searchLexical(queryText: string, documentIds: string[] | null, limit = 80): SearchHit[] {
+	const fts = toFtsQuery(queryText);
+	const scope = scopeSql(documentIds);
+	return db
+		.selectObjects(
+			`SELECT c.id AS chunk_id, c.document_id, d.name AS document_name, c.text,
+			        c.page, c.heading_path, bm25(chunks_fts) AS lexical_score
+			 FROM chunks_fts
+			 JOIN chunks c ON c.id = chunks_fts.rowid
+			 JOIN documents d ON d.id = c.document_id
+			 WHERE chunks_fts MATCH ? AND d.status = 'ready'${scope.clause}
+			 ORDER BY lexical_score LIMIT ?`,
+			[fts, ...scope.bind, limit]
+		)
+		.map((r: any) => ({
+			chunkId: r.chunk_id,
+			documentId: r.document_id,
+			documentName: r.document_name,
+			text: r.text,
+			page: r.page,
+			headingPath: r.heading_path,
+			score: r.lexical_score,
+			lexicalScore: r.lexical_score,
+			semanticScore: null
+		}));
+}
+
+/** Exact pre-filtered vector scan. At browser corpus sizes this stays cheap and
+ * avoids the correctness bug caused by global top-k followed by filtering. */
+function searchVector(
+	queryEmbedding: Float32Array,
+	dims: number,
+	documentIds: string[] | null,
+	limit = 80
+): SearchHit[] {
+	const table = dims === 256 ? 'chunks_vec_v2' : 'chunks_vec';
+	const vecBlob = new Uint8Array(
+		queryEmbedding.buffer,
+		queryEmbedding.byteOffset,
+		queryEmbedding.byteLength
+	).slice();
+	const scope = scopeSql(documentIds);
+	return db
+		.selectObjects(
+			`SELECT c.id AS chunk_id, c.document_id, d.name AS document_name, c.text,
+			        c.page, c.heading_path,
+			        vec_distance_cosine(v.embedding, ?) AS distance
+			 FROM ${table} v
+			 JOIN chunks c ON c.id = v.rowid
+			 JOIN documents d ON d.id = c.document_id
+			 WHERE d.status = 'ready'${scope.clause}
+			 ORDER BY distance LIMIT ?`,
+			[vecBlob, ...scope.bind, limit]
+		)
+		.map((r: any) => ({
+			chunkId: r.chunk_id,
+			documentId: r.document_id,
+			documentName: r.document_name,
+			text: r.text,
+			page: r.page,
+			headingPath: r.heading_path,
+			score: 1 - Number(r.distance),
+			semanticScore: 1 - Number(r.distance),
+			lexicalScore: null
+		}));
+}
+
+function listChunksForDocuments(documentIds: string[]): SearchHit[] {
+	if (!documentIds.length) return [];
+	const scope = scopeSql(documentIds);
+	return db
+		.selectObjects(
+			`SELECT c.id AS chunk_id, c.document_id, d.name AS document_name, c.text,
+			        c.page, c.heading_path
+			 FROM chunks c JOIN documents d ON d.id = c.document_id
+			 WHERE d.status = 'ready'${scope.clause}
+			 ORDER BY c.document_id, c.seq`,
+			scope.bind
+		)
+		.map((r: any) => ({
+			chunkId: r.chunk_id,
+			documentId: r.document_id,
+			documentName: r.document_name,
+			text: r.text,
+			page: r.page,
+			headingPath: r.heading_path,
+			score: 0,
+			semanticScore: null,
+			lexicalScore: null
+		}));
+}
+
 /** Hybrid search: FTS5 BM25 + vec0 KNN fused with RRF (k=60). */
 function search(
 	queryEmbedding: Float32Array,
@@ -343,48 +515,11 @@ function search(
 	documentIds: string[] | null,
 	topK = 8
 ): SearchHit[] {
-	const vecBlob = new Uint8Array(
-		queryEmbedding.buffer,
-		queryEmbedding.byteOffset,
-		queryEmbedding.byteLength
-	).slice();
-	const fts = toFtsQuery(queryText);
-	// vec0 KNN cannot pre-filter by document: over-fetch and filter in the join.
-	const rows = db.selectObjects(
-		`WITH vec_matches AS (
-			SELECT rowid AS id, ROW_NUMBER() OVER (ORDER BY distance) AS rank_n
-			FROM chunks_vec WHERE embedding MATCH ? AND k = 40
-		),
-		fts_matches AS (
-			SELECT rowid AS id, ROW_NUMBER() OVER (ORDER BY rank) AS rank_n
-			FROM chunks_fts WHERE chunks_fts MATCH ? LIMIT 40
-		),
-		fused AS (
-			SELECT COALESCE(v.id, f.id) AS id,
-				COALESCE(1.0 / (60 + v.rank_n), 0) + COALESCE(1.0 / (60 + f.rank_n), 0) AS score
-			FROM vec_matches v FULL OUTER JOIN fts_matches f ON v.id = f.id
-		)
-		SELECT c.id AS chunk_id, c.document_id, d.name AS document_name, c.text,
-		       c.page, c.heading_path, fused.score
-		FROM fused
-		JOIN chunks c ON c.id = fused.id
-		JOIN documents d ON d.id = c.document_id
-		WHERE d.status = 'ready'
-		ORDER BY fused.score DESC`,
-		[vecBlob, fts]
+	return fuseCandidates(
+		searchVector(queryEmbedding, queryEmbedding.length, documentIds, 80),
+		searchLexical(queryText, documentIds, 80),
+		topK
 	);
-	const filtered = documentIds?.length
-		? rows.filter((r: any) => documentIds.includes(r.document_id))
-		: rows;
-	return filtered.slice(0, topK).map((r: any) => ({
-		chunkId: r.chunk_id,
-		documentId: r.document_id,
-		documentName: r.document_name,
-		text: r.text,
-		page: r.page,
-		headingPath: r.heading_path,
-		score: r.score
-	}));
 }
 
 export interface ChunkWithDocument {
@@ -976,6 +1111,157 @@ function listPrivacyEvents(limit = 100): PrivacyEventRow[] {
 		}));
 }
 
+export interface DocumentFactRow {
+	id: string;
+	documentId: string;
+	chunkId: number | null;
+	extractorVersion: string;
+	kind: string;
+	label: string;
+	valueMinor: number;
+	currency: string;
+	confidence: number;
+}
+
+function replaceDocumentFacts(
+	documentId: string,
+	extractorVersion: string,
+	facts: Array<{
+		chunkId: number | null;
+		kind: string;
+		label: string;
+		valueMinor: number;
+		currency: string;
+		confidence: number;
+	}>
+): void {
+	db.transaction(() => {
+		db.exec({
+			sql: 'DELETE FROM document_facts WHERE document_id = ? AND extractor_version = ?',
+			bind: [documentId, extractorVersion]
+		});
+		for (const fact of facts) {
+			db.exec({
+				sql: `INSERT INTO document_facts(
+				        id, document_id, chunk_id, extractor_version, kind, label,
+				        value_minor, currency, confidence, created_at
+				      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				bind: [
+					crypto.randomUUID(),
+					documentId,
+					fact.chunkId,
+					extractorVersion,
+					fact.kind,
+					fact.label,
+					fact.valueMinor,
+					fact.currency,
+					fact.confidence,
+					Date.now()
+				]
+			});
+		}
+		db.exec({
+			sql: `INSERT INTO document_fact_runs(document_id, extractor_version, completed_at)
+			      VALUES (?, ?, ?) ON CONFLICT(document_id, extractor_version)
+			      DO UPDATE SET completed_at = excluded.completed_at`,
+			bind: [documentId, extractorVersion, Date.now()]
+		});
+	});
+}
+
+function listDocumentFactRunIds(documentIds: string[], extractorVersion: string): string[] {
+	if (!documentIds.length) return [];
+	return db
+		.selectObjects(
+			`SELECT document_id FROM document_fact_runs WHERE extractor_version = ?
+			 AND document_id IN (${documentIds.map(() => '?').join(',')})`,
+			[extractorVersion, ...documentIds]
+		)
+		.map((row: any) => row.document_id);
+}
+
+function listMoneyFacts(
+	documentIds: string[],
+	extractorVersion: string
+): Array<
+	DocumentFactRow & {
+		documentName: string;
+		text: string;
+		page: number | null;
+		headingPath: string | null;
+	}
+> {
+	if (!documentIds.length) return [];
+	return db
+		.selectObjects(
+			`SELECT f.*, d.name AS document_name, c.text, c.page, c.heading_path
+			 FROM document_facts f JOIN documents d ON d.id = f.document_id
+			 LEFT JOIN chunks c ON c.id = f.chunk_id
+			 WHERE f.extractor_version = ?
+			 AND f.document_id IN (${documentIds.map(() => '?').join(',')})`,
+			[extractorVersion, ...documentIds]
+		)
+		.map((row: any) => ({
+			id: row.id,
+			documentId: row.document_id,
+			chunkId: row.chunk_id,
+			extractorVersion: row.extractor_version,
+			kind: row.kind,
+			label: row.label,
+			valueMinor: row.value_minor,
+			currency: row.currency,
+			confidence: row.confidence,
+			documentName: row.document_name,
+			text: row.text ?? '',
+			page: row.page,
+			headingPath: row.heading_path
+		}));
+}
+
+function listDocumentFacts(documentIds: string[], extractorVersion: string): DocumentFactRow[] {
+	if (!documentIds.length) return [];
+	return db
+		.selectObjects(
+			`SELECT * FROM document_facts
+			 WHERE extractor_version = ?
+			   AND document_id IN (${documentIds.map(() => '?').join(',')})`,
+			[extractorVersion, ...documentIds]
+		)
+		.map((r: any) => ({
+			id: r.id,
+			documentId: r.document_id,
+			chunkId: r.chunk_id,
+			extractorVersion: r.extractor_version,
+			kind: r.kind,
+			label: r.label,
+			valueMinor: r.value_minor,
+			currency: r.currency,
+			confidence: r.confidence
+		}));
+}
+
+function insertMessageMethod(messageId: string, summary: MethodSummary): void {
+	db.exec({
+		sql: `INSERT INTO message_methods(message_id, summary_json, created_at)
+		      VALUES (?, ?, ?)
+		      ON CONFLICT(message_id) DO UPDATE SET summary_json = excluded.summary_json`,
+		bind: [messageId, JSON.stringify(summary), Date.now()]
+	});
+}
+
+function listChatMessageMethods(
+	chatId: string
+): Array<{ messageId: string; summary: MethodSummary }> {
+	return db
+		.selectObjects(
+			`SELECT mm.message_id, mm.summary_json
+			 FROM message_methods mm JOIN messages m ON m.id = mm.message_id
+			 WHERE m.chat_id = ?`,
+			[chatId]
+		)
+		.map((r: any) => ({ messageId: r.message_id, summary: JSON.parse(r.summary_json) }));
+}
+
 /**
  * T1 panic wipe, database half: close the connection and destroy every file
  * in the SAH pool (the pool holds exclusive OPFS handles, so the main thread
@@ -1007,6 +1293,9 @@ function exportData(): Record<string, unknown> {
 		chatDocuments: table('chat_documents'),
 		citations: table('citations'),
 		messageExcerpts: table('message_excerpts'),
+		messageMethods: table('message_methods'),
+		documentFacts: table('document_facts'),
+		documentFactRuns: table('document_fact_runs'),
 		privacyEvents: table('privacy_events')
 	};
 }
@@ -1021,10 +1310,14 @@ const api = {
 	setDocumentStatus,
 	deleteDocument,
 	insertChunks,
+	reindexDocument,
 	deleteChunks,
 	replaceDocument,
 	documentDetail,
 	search,
+	searchLexical,
+	searchVector,
+	listChunksForDocuments,
 	countChunks,
 	getChunk,
 	getDocument,
@@ -1061,6 +1354,12 @@ const api = {
 	chatPrivacySummary,
 	documentEgress,
 	weekPrivacySummary,
+	replaceDocumentFacts,
+	listDocumentFacts,
+	listDocumentFactRunIds,
+	listMoneyFacts,
+	insertMessageMethod,
+	listChatMessageMethods,
 	setChatPrivateOnly,
 	searchAll
 };

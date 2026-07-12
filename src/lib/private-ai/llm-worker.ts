@@ -5,6 +5,7 @@
 
 import { expose } from 'comlink';
 import { CreateMLCEngine, type MLCEngineInterface, type InitProgressReport } from '@mlc-ai/web-llm';
+import type { GenerationOptions, GenerationResult } from './generation';
 
 let engine: MLCEngineInterface | null = null;
 let loadedModel: string | null = null;
@@ -25,24 +26,41 @@ async function load(model: string, onProgress?: (progress: number, text: string)
 
 async function generate(
 	messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
-	onDelta?: (delta: string) => void
-): Promise<string> {
+	onDelta?: (delta: string) => void,
+	options: GenerationOptions = { reasoning: 'off' }
+): Promise<GenerationResult> {
 	if (!engine) throw new Error('engine not loaded');
+	const started = performance.now();
+	let firstTokenAt: number | null = null;
+	let completionTokens: number | null = null;
 	const chunks = await engine.chat.completions.create({
 		messages,
 		stream: true,
 		temperature: 0.2,
-		max_tokens: 700
+		max_tokens: 700,
+		extra_body: { enable_thinking: options.reasoning === 'on' },
+		stream_options: { include_usage: true }
 	});
 	let full = '';
 	for await (const chunk of chunks) {
 		const delta = chunk.choices[0]?.delta?.content ?? '';
 		if (delta) {
+			firstTokenAt ??= performance.now();
 			full += delta;
 			onDelta?.(delta);
 		}
+		completionTokens = chunk.usage?.completion_tokens ?? completionTokens;
 	}
-	return full;
+	const finished = performance.now();
+	return {
+		text: full,
+		ttftMs: firstTokenAt === null ? null : firstTokenAt - started,
+		tokensPerSecond:
+			completionTokens && firstTokenAt !== null && finished > firstTokenAt
+				? completionTokens / ((finished - firstTokenAt) / 1000)
+				: null,
+		completionTokens
+	};
 }
 
 async function abort() {

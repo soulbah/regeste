@@ -7,8 +7,11 @@
 
 import type { Chunk, ParsedBlock } from '$lib/types';
 
-export const CHUNK_TARGET_CHARS = 1600; // ≈ 400 tokens
-export const CHUNK_OVERLAP_CHARS = 160; // 10%
+// Conservative browser budget: around 180–260 tokens for French/English prose.
+// Exact model tokenization still happens before inference; this bound prevents
+// dense pages from compressing several unrelated facts into one embedding.
+export const CHUNK_TARGET_CHARS = 1000;
+export const CHUNK_OVERLAP_CHARS = 120;
 
 interface Piece {
 	text: string;
@@ -59,7 +62,7 @@ export function splitSentences(
 	return out.filter((p) => p.text.trim().length > 0);
 }
 
-export function chunkBlocks(blocks: ParsedBlock[]): Chunk[] {
+export function chunkBlocks(blocks: ParsedBlock[], documentName = ''): Chunk[] {
 	const chunks: Chunk[] = [];
 	let seq = 0;
 
@@ -92,11 +95,14 @@ export function chunkBlocks(blocks: ParsedBlock[]): Chunk[] {
 			const first = buf[0];
 			const last = buf[buf.length - 1];
 			const b = first.block;
+			const text = buf.map((p) => p.text).join('\n');
+			const headingPath = b.headingPath?.join(' > ') ?? null;
 			chunks.push({
-				text: buf.map((p) => p.text).join('\n'),
+				text,
+				searchText: [documentName, headingPath, text].filter(Boolean).join('\n'),
 				seq: seq++,
 				page: b.page ?? null,
-				headingPath: b.headingPath?.join(' > ') ?? null,
+				headingPath,
 				paraIndex: b.paraIndex ?? null,
 				charStart: first.charStart,
 				charEnd: last.charEnd

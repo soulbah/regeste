@@ -254,6 +254,9 @@
 					<Tooltip.Content side="top">{t('disabled.indexing')}</Tooltip.Content>
 				{/if}
 			</Tooltip.Root>
+			{#if documentsStore.needsReindex(live.id)}
+				<p class="text-muted-foreground text-xs">{t('sheet.reindexRecommended')}</p>
+			{/if}
 			<div class="grid grid-cols-2 gap-2">
 				<Tooltip.Root>
 					<Tooltip.Trigger class="block w-full">
@@ -266,7 +269,9 @@
 								onclick={() => documentsStore.reindex(live.id)}
 							>
 								<RefreshCwIcon class="size-4" />
-								{t('sheet.reindex')}
+								{documentsStore.needsReindex(live.id)
+									? t('sheet.improveSearch')
+									: t('sheet.reindex')}
 							</Button>
 						{/snippet}
 					</Tooltip.Trigger>

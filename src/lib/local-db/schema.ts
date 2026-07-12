@@ -156,5 +156,43 @@ export const MIGRATIONS: string[] = [
 	ALTER TABLE messages ADD COLUMN version_group TEXT;
 	ALTER TABLE messages ADD COLUMN active INTEGER NOT NULL DEFAULT 1;
 	CREATE INDEX idx_messages_version_group ON messages(version_group);
+	`,
+
+	// v9 — browser intelligence core (spec 024). Source text stays untouched;
+	// search_text carries document/section context. A second vec0 table allows
+	// gradual, per-document migration from 384d E5 to 256d EmbeddingGemma.
+	`
+	ALTER TABLE chunks ADD COLUMN search_text TEXT;
+	UPDATE chunks SET search_text = text WHERE search_text IS NULL;
+	DROP TABLE chunks_fts;
+	CREATE VIRTUAL TABLE chunks_fts USING fts5(search_text, content='chunks', content_rowid='id');
+	INSERT INTO chunks_fts(chunks_fts) VALUES('rebuild');
+	CREATE VIRTUAL TABLE chunks_vec_v2 USING vec0(embedding float[256]);
+
+	CREATE TABLE document_facts (
+		id TEXT PRIMARY KEY,
+		document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+		chunk_id INTEGER REFERENCES chunks(id) ON DELETE CASCADE,
+		extractor_version TEXT NOT NULL,
+		kind TEXT NOT NULL,
+		label TEXT NOT NULL,
+		value_minor INTEGER NOT NULL,
+		currency TEXT NOT NULL,
+		confidence REAL NOT NULL,
+		created_at INTEGER NOT NULL
+	);
+	CREATE INDEX idx_document_facts_document ON document_facts(document_id, extractor_version);
+	CREATE TABLE document_fact_runs (
+		document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+		extractor_version TEXT NOT NULL,
+		completed_at INTEGER NOT NULL,
+		PRIMARY KEY(document_id, extractor_version)
+	);
+
+	CREATE TABLE message_methods (
+		message_id TEXT PRIMARY KEY REFERENCES messages(id) ON DELETE CASCADE,
+		summary_json TEXT NOT NULL,
+		created_at INTEGER NOT NULL
+	);
 	`
 ];

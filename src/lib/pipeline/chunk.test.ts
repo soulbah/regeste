@@ -36,6 +36,22 @@ describe('chunkBlocks', () => {
 		expect(chunks.map((c) => c.headingPath)).toEqual(['A', 'B']);
 	});
 
+	it('adds document and heading context only to searchable text', () => {
+		const chunks = chunkBlocks(
+			[
+				{
+					text: 'The notice period is three months.',
+					headingPath: ['Termination'],
+					charStart: 0,
+					charEnd: 34
+				}
+			],
+			'contract.pdf'
+		);
+		expect(chunks[0].text).toBe('The notice period is three months.');
+		expect(chunks[0].searchText).toContain('contract.pdf\nTermination\n');
+	});
+
 	it('packs small blocks of the same section together', () => {
 		const blocks: ParsedBlock[] = Array.from({ length: 6 }, (_, i) => ({
 			text: `Short paragraph number ${i} with a little bit of content.`,

@@ -14,7 +14,18 @@ export async function parseDocx(data: ArrayBuffer): Promise<ParsedDoc> {
 	let offset = 0;
 
 	for (const el of Array.from(dom.body.children)) {
-		const text = (el.textContent ?? '').trim();
+		const tableRows =
+			el.tagName === 'TABLE'
+				? Array.from(el.querySelectorAll('tr'))
+						.map((row) =>
+							Array.from(row.querySelectorAll('th,td'))
+								.map((cell) => (cell.textContent ?? '').replace(/\s+/g, ' ').trim())
+								.filter(Boolean)
+								.join(' | ')
+						)
+						.filter(Boolean)
+				: [];
+		const text = tableRows.length ? tableRows.join('\n') : (el.textContent ?? '').trim();
 		if (!text) continue;
 		const level = /^H([1-6])$/.exec(el.tagName)?.[1];
 		if (level) {

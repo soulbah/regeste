@@ -42,6 +42,8 @@ export interface ParsedDoc {
 
 export interface Chunk {
 	text: string;
+	/** Retrieval-only representation enriched with document/section labels. */
+	searchText: string;
 	seq: number;
 	page: number | null;
 	headingPath: string | null; // ' > '-joined
@@ -58,6 +60,25 @@ export interface SearchHit {
 	page: number | null;
 	headingPath: string | null;
 	score: number;
+	/** Raw component scores retained for calibration and honest refusals. */
+	semanticScore?: number | null;
+	lexicalScore?: number | null;
+}
+
+export type QuestionRoute = 'targeted' | 'synthesis' | 'aggregate';
+
+export interface MethodSummary {
+	kind: QuestionRoute;
+	documentCount: number;
+	passageCount: number;
+	reasoningUsed: boolean;
+	calculation?: string | null;
+}
+
+export interface WorkStep {
+	id: 'search' | 'inspect' | 'calculate' | 'write';
+	status: 'pending' | 'active' | 'done';
+	count?: number;
 }
 
 export type ChatMode = 'private' | 'assisted' | 'myai';

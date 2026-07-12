@@ -11,6 +11,7 @@ import { expose } from 'comlink';
 // into svelte-check).
 import { Wllama } from '@wllama/wllama/esm/index.js';
 import wllamaWasmUrl from '@wllama/wllama/esm/wasm/wllama.wasm?url';
+import type { GenerationOptions, GenerationResult } from './generation';
 
 // wllama resolves asset paths with `new URL(path, document.baseURI)` and
 // workers have no `document` — shim just what it reads. Worker-local, so it
@@ -45,10 +46,14 @@ async function load(modelUrl: string, onProgress?: (progress: number, text: stri
 
 async function generate(
 	messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
-	onDelta?: (delta: string) => void
-): Promise<string> {
+	onDelta?: (delta: string) => void,
+	options: GenerationOptions = { reasoning: 'off' }
+): Promise<GenerationResult> {
 	if (!wllama) throw new Error('engine not loaded');
 	aborter = new AbortController();
+	const started = performance.now();
+	let firstTokenAt: number | null = null;
+	let completionTokens: number | null = null;
 	let full = '';
 	try {
 		const chunks = await wllama.createChatCompletion({
@@ -59,14 +64,16 @@ async function generate(
 			max_tokens: 700,
 			// Qwen3 thinks by default; grounded QA doesn't need it and CPU
 			// tokens are expensive. stripThink upstream catches any leak.
-			chat_template_kwargs: { enable_thinking: false }
+			chat_template_kwargs: { enable_thinking: options.reasoning === 'on' }
 		});
 		for await (const chunk of chunks) {
 			const delta = chunk.choices[0]?.delta?.content ?? '';
 			if (delta) {
+				firstTokenAt ??= performance.now();
 				full += delta;
 				onDelta?.(delta);
 			}
+			completionTokens = chunk.usage?.completion_tokens ?? completionTokens;
 		}
 	} catch (err) {
 		// Abort is a normal stop, not a failure.
@@ -76,7 +83,16 @@ async function generate(
 	} finally {
 		aborter = null;
 	}
-	return full;
+	const finished = performance.now();
+	return {
+		text: full,
+		ttftMs: firstTokenAt === null ? null : firstTokenAt - started,
+		tokensPerSecond:
+			completionTokens && firstTokenAt !== null && finished > firstTokenAt
+				? completionTokens / ((finished - firstTokenAt) / 1000)
+				: null,
+		completionTokens
+	};
 }
 
 async function abort() {

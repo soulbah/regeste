@@ -16,6 +16,7 @@
 	import Composer from '$lib/components/composer.svelte';
 	import RetrievalTurn from '$lib/components/retrieval-turn.svelte';
 	import PrivateTurn from '$lib/components/private-turn.svelte';
+	import WorkLedger from '$lib/components/work-ledger.svelte';
 	import PresendPanel from '$lib/components/presend-panel.svelte';
 	import DocumentsPanel from '$lib/components/documents-panel.svelte';
 	import ViewerPanel from '$lib/components/viewer-panel.svelte';
@@ -400,6 +401,7 @@
 									onswitchversion={message.versionGroup
 										? (id) => chatsStore.switchVersion(chatId, message.versionGroup!, id)
 										: null}
+									method={chatsStore.methodByMessage[message.id] ?? null}
 								/>
 							</div>
 						{:else}
@@ -416,12 +418,7 @@
 					{/if}
 					{#if chatsStore.streamingText !== null}
 						<div class="space-y-2">
-							<div class="flex items-center gap-2">
-								<span class="bg-ring size-1.5 animate-pulse rounded-full"></span>
-								<span class="text-muted-foreground font-mono text-[10px]">
-									{chatsStore.streamingText ? t('chat.writing') : t('chat.reading')}
-								</span>
-							</div>
+							<WorkLedger steps={chatsStore.workSteps} />
 							{#if chatsStore.streamingText}
 								<p class="text-sm leading-relaxed whitespace-pre-wrap">
 									{chatsStore.streamingText}
@@ -432,8 +429,7 @@
 						</div>
 					{:else if chatsStore.sending}
 						<div class="space-y-2">
-							<Skeleton class="h-4 w-2/3" />
-							<Skeleton class="h-4 w-1/2" />
+							<WorkLedger steps={chatsStore.workSteps} />
 						</div>
 					{/if}
 					<!-- Spec 020 — related questions: last answer only, max 3, silent absence. -->
