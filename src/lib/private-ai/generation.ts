@@ -17,6 +17,18 @@ export function generationOptionsFor(
 	question: string,
 	route: 'targeted' | 'synthesis'
 ): GenerationOptions {
-	if (route === 'synthesis') return { reasoning: 'on', maxTokens: 700 };
+	if (route === 'synthesis') return { reasoning: 'off', maxTokens: 420 };
 	return { reasoning: 'off', maxTokens: SHORT_FACT.test(question.trim()) ? 160 : 320 };
+}
+
+/** CPU Qwen can spend its entire synthesis budget inside <think> and produce
+ * no answer. Keep reasoning for capable WebGPU tiers; force direct generation
+ * and a bounded answer budget on the Lite CPU engine. */
+export function adaptGenerationOptions(
+	options: GenerationOptions,
+	engine: 'webllm' | 'wllama'
+): GenerationOptions {
+	return engine === 'wllama' && options.reasoning === 'on'
+		? { reasoning: 'off', maxTokens: Math.min(options.maxTokens, 420) }
+		: options;
 }

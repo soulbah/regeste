@@ -1,5 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { SvelteMap } from 'svelte/reactivity';
+	import { replaceState } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Badge } from '$lib/components/ui/badge';
@@ -11,6 +14,43 @@
 		type IntelligenceBenchmarkReport
 	} from '$lib/benchmark/intelligence';
 	import { llmStore } from '$lib/private-ai/llm.svelte';
+	import {
+		CROSS_DOCUMENT_CASES,
+		CROSS_DOCUMENT_FIXTURES,
+		scoreCrossDocumentEvidence
+	} from '$lib/benchmark/cross-document-stress';
+	import { hasAnswerBearingEvidence, isWeakMatch } from '$lib/pipeline/relevance';
+	import { getLocalDb } from '$lib/local-db/client';
+	import {
+		evaluateRetrieval,
+		type RetrievalEvaluation,
+		type RetrievalMetrics
+	} from '$lib/benchmark/retrieval-metrics';
+	import { normalizeForFuzzy } from '$lib/pipeline/fuzzy';
+	import { RETRIEVAL_VERSION } from '$lib/pipeline/retrieval-version';
+	import publicQa from '../../../../benchmarks/fuzzy-public-qa.json';
+
+	type IndexDiagnostic = {
+		name: string;
+		status: string;
+		chunks: number;
+		retrievalVersion: number;
+	};
+	type MemoryPerformance = Performance & {
+		measureUserAgentSpecificMemory?: () => Promise<{ bytes: number }>;
+	};
+	const FUZZY_FIXTURE_NAMES = [
+		'malik-profile-study.docx',
+		'malik-profile-family.docx',
+		'near-identifiers-table.docx',
+		'malik-profile-note.txt',
+		'http-semantics.md',
+		'cfr-fiberboard-boxes.pdf',
+		'federal-register-two-column.pdf',
+		'apollo-flight-planning-report.pdf',
+		'rfc9110.txt',
+		'rfc9110.pdf'
+	];
 
 	let fileInput = $state<HTMLInputElement | null>(null);
 	let query = $state('');
@@ -18,11 +58,409 @@
 	let benchmarking = $state(false);
 	let generationBenchmarking = $state(false);
 	let benchmarkReport = $state<IntelligenceBenchmarkReport | null>(null);
+	let crossDocumentReport = $state<
+		| (ReturnType<typeof scoreCrossDocumentEvidence> & {
+				failures: Array<{ query: string; expected: string[]; retrieved: string[] }>;
+		  })
+		| null
+	>(null);
+	let indexDiagnostics = $state<IndexDiagnostic[] | null>(null);
+	let repairingIndexes = $state(false);
+	let fuzzyBenchmarking = $state(false);
+	let fuzzyBenchmarkReport = $state<{
+		metrics: RetrievalMetrics;
+		ablation: Record<'lexical' | 'fuzzy' | 'dense', RetrievalMetrics>;
+		ingestMs: number;
+		bytes: number;
+		cases: number;
+		failures: string[];
+		slowest: Array<{ id: string; ms: number }>;
+		cost: {
+			databaseBytesBefore: number;
+			databaseBytesAfter: number;
+			databaseDeltaBytes: number;
+			browserStorageBytesBefore: number;
+			browserStorageBytesAfter: number;
+			browserStorageDeltaBytes: number;
+			sampledPeakMemoryBytes: number | null;
+			chunks: number;
+			indexedTextBytes: number;
+			embeddingBytes: number;
+			pages: number;
+			megabytesPerSecond: number;
+			pagesPerSecond: number;
+		};
+	} | null>(null);
+	let fuzzyBenchmarkError = $state<string | null>(null);
+	let compromisDiagnostic = $state<unknown>(null);
 
-	onMount(() => {
-		documentsStore.init();
+	onMount(async () => {
+		await documentsStore.init();
+		await refreshIndexDiagnostics();
 		llmStore.init();
+		if (new URLSearchParams(location.search).has('record-stress')) {
+			replaceState(resolve('/dev/pipeline'), {});
+			await runRecordStressBenchmark();
+		}
+		if (new URLSearchParams(location.search).has('cross-document-stress')) {
+			replaceState(resolve('/dev/pipeline'), {});
+			await runCrossDocumentStressBenchmark();
+		}
 	});
+
+	async function refreshIndexDiagnostics() {
+		const { db } = await getLocalDb();
+		indexDiagnostics = await Promise.all(
+			documentsStore.documents.map(async (document) => ({
+				name: document.name,
+				status: document.status,
+				chunks: await db.countChunks(document.id),
+				retrievalVersion: document.retrievalVersion ?? 1
+			}))
+		);
+	}
+
+	async function sampleMemory(): Promise<number | null> {
+		try {
+			const measure = (performance as MemoryPerformance).measureUserAgentSpecificMemory;
+			if (!measure) return null;
+			return await Promise.race([
+				measure.call(performance).then((result) => result.bytes),
+				new Promise<null>((resolve) => setTimeout(() => resolve(null), 1000))
+			]);
+		} catch {
+			return null;
+		}
+	}
+
+	async function resetFuzzyFixtures() {
+		for (const document of documentsStore.documents.filter((item) =>
+			FUZZY_FIXTURE_NAMES.includes(item.name)
+		)) {
+			await documentsStore.remove(document.id);
+		}
+		await refreshIndexDiagnostics();
+	}
+
+	async function repairEmptyIndexes() {
+		repairingIndexes = true;
+		try {
+			const { db } = await getLocalDb();
+			for (const document of documentsStore.documents) {
+				if ((await db.countChunks(document.id)) === 0) await documentsStore.reindex(document.id);
+			}
+			await refreshIndexDiagnostics();
+		} finally {
+			repairingIndexes = false;
+		}
+	}
+
+	async function waitUntilReady(documentIds: string[]) {
+		const deadline = Date.now() + 10 * 60_000;
+		while (Date.now() < deadline) {
+			await documentsStore.refreshLibrary();
+			const rows = documentIds.map((id) => documentsStore.documents.find((doc) => doc.id === id));
+			const failed = rows.find((doc) => doc?.status === 'error');
+			if (failed) throw new Error(`fuzzy ingest failed: ${failed.name} (${failed.error})`);
+			if (
+				rows.every(
+					(doc) => doc?.status === 'ready' && (doc.retrievalVersion ?? 1) >= RETRIEVAL_VERSION
+				)
+			)
+				return;
+			await new Promise((resolve) => setTimeout(resolve, 500));
+		}
+		throw new Error('fuzzy benchmark ingest timed out');
+	}
+
+	function containsEvidence(text: string, needle: string): boolean {
+		const normalizedText = normalizeForFuzzy(text);
+		if (
+			normalizedText.includes(needle) ||
+			normalizedText.replaceAll(' ', '').includes(needle.replaceAll(' ', ''))
+		)
+			return true;
+		const available = normalizedText.split(' ');
+		const expected = needle.split(' ');
+		let cursor = -1;
+		for (const token of expected) {
+			const next = available.findIndex(
+				(candidate, index) =>
+					index > cursor && (cursor < 0 || index <= cursor + 10) && candidate === token
+			);
+			if (next < 0) return false;
+			cursor = next;
+		}
+		return true;
+	}
+
+	async function runFuzzyBenchmark() {
+		fuzzyBenchmarking = true;
+		fuzzyBenchmarkReport = null;
+		fuzzyBenchmarkError = null;
+		try {
+			const { db } = await getLocalDb();
+			const browserStorageBytesBefore = (await navigator.storage.estimate()).usage ?? 0;
+			const databaseBytesBefore = await db.databaseBytes();
+			let sampledPeakMemoryBytes = await sampleMemory();
+			const fixtures = [
+				[
+					'/dev/fuzzy-stress/malik-profile-study.docx',
+					'malik-profile-study.docx',
+					'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+				],
+				[
+					'/dev/fuzzy-stress/malik-profile-family.docx',
+					'malik-profile-family.docx',
+					'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+				],
+				[
+					'/dev/fuzzy-stress/near-identifiers-table.docx',
+					'near-identifiers-table.docx',
+					'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+				],
+				['/dev/fuzzy-stress/malik-profile-note.txt', 'malik-profile-note.txt', 'text/plain'],
+				['/dev/fuzzy-stress/http-semantics.md', 'http-semantics.md', 'text/markdown'],
+				[
+					'/dev/fuzzy-public/cfr-fiberboard-boxes.pdf',
+					'cfr-fiberboard-boxes.pdf',
+					'application/pdf'
+				],
+				[
+					'/dev/fuzzy-public/federal-register-two-column.pdf',
+					'federal-register-two-column.pdf',
+					'application/pdf'
+				],
+				[
+					'/dev/fuzzy-public/apollo-flight-planning-report.pdf',
+					'apollo-flight-planning-report.pdf',
+					'application/pdf'
+				],
+				['/dev/fuzzy-public/rfc9110.txt', 'rfc9110.txt', 'text/plain'],
+				['/dev/fuzzy-public/rfc9110.pdf', 'rfc9110.pdf', 'application/pdf']
+			] as const;
+			const started = performance.now();
+			let bytes = 0;
+			const ids = new SvelteMap<string, string>();
+			for (const [url, name, mime] of fixtures) {
+				const data = await fetch(url).then((response) => response.arrayBuffer());
+				bytes += data.byteLength;
+				ids.set(name, await documentsStore.ingest(new File([data], name, { type: mime })));
+			}
+			await waitUntilReady([...ids.values()]);
+			const memoryAfter = await sampleMemory();
+			if (memoryAfter !== null)
+				sampledPeakMemoryBytes = Math.max(sampledPeakMemoryBytes ?? 0, memoryAfter);
+			const ingestMs = Math.round(performance.now() - started);
+			const browserStorageBytesAfter = (await navigator.storage.estimate()).usage ?? 0;
+			const databaseBytesAfter = await db.databaseBytes();
+			const indexedChunks = await db.listChunksForDocuments([...ids.values()]);
+			const indexedTextBytes = indexedChunks.reduce(
+				(sum, chunk) => sum + new TextEncoder().encode(chunk.text).byteLength,
+				0
+			);
+			const pages = [...ids.values()].reduce(
+				(sum, id) =>
+					sum + (documentsStore.documents.find((document) => document.id === id)?.pages ?? 0),
+				0
+			);
+			const cases = [
+				{
+					id: 'malik-multi-source',
+					query: 'Que sait-on du statut et des activités de Malk Ouedragoo ?',
+					documents: [
+						'malik-profile-study.docx',
+						'malik-profile-family.docx',
+						'malik-profile-note.txt'
+					],
+					evidence: ['Étudiant', 'Marié', 'violoncelle'],
+					answerable: true,
+					locator: null
+				},
+				{
+					id: 'table-bx77',
+					query: 'Quelle est la capcité de BX-77 ?',
+					documents: ['near-identifiers-table.docx'],
+					evidence: ['42 kg'],
+					answerable: true,
+					locator: null
+				},
+				{
+					id: 'table-8x77',
+					query: 'Quelle est la capacité de 8X-77 ?',
+					documents: ['near-identifiers-table.docx'],
+					evidence: ['7 kg'],
+					answerable: true,
+					locator: null
+				},
+				{
+					id: 'table-near-negative',
+					query: 'Quelle est la capacité de BX-72 ?',
+					documents: [],
+					evidence: [],
+					answerable: false,
+					locator: null
+				},
+				...publicQa.cases.map((item) => ({
+					id: item.id,
+					query: item.noisyQuery,
+					documents: item.document?.split('+') ?? [],
+					evidence: item.evidenceContains ? [item.evidenceContains] : [],
+					answerable: item.answerable,
+					locator: item.locator
+				}))
+			];
+			const evaluations: RetrievalEvaluation[] = [];
+			const ablationEvaluations: Record<'lexical' | 'fuzzy' | 'dense', RetrievalEvaluation[]> = {
+				lexical: [],
+				fuzzy: [],
+				dense: []
+			};
+			const failures: string[] = [];
+			const timings: Array<{ id: string; ms: number }> = [];
+			for (const test of cases) {
+				const t0 = performance.now();
+				const hits = await documentsStore.retrieve(test.query, [...ids.values()]);
+				const latencyMs = performance.now() - t0;
+				timings.push({ id: test.id, ms: Math.round(latencyMs) });
+				const answerBearing = !isWeakMatch(hits) && hasAnswerBearingEvidence(test.query, hits);
+				const normalizedEvidence = test.evidence.map(normalizeForFuzzy);
+				const matchedEvidence = normalizedEvidence.filter((needle) =>
+					hits.some((hit) => containsEvidence(hit.text, needle))
+				);
+				const canonicalRfcId = ids.get('rfc9110.txt')!;
+				const canonicalize = (id: string) =>
+					test.id !== 'cross-format-rfc' &&
+					(id === ids.get('rfc9110.txt') || id === ids.get('rfc9110.pdf'))
+						? canonicalRfcId
+						: id;
+				const expectedIds = [
+					...new Set(
+						test.documents.flatMap((name) => (ids.has(name) ? [canonicalize(ids.get(name)!)] : []))
+					)
+				];
+				const retrievedIds = answerBearing
+					? [...new Set(hits.map((hit) => canonicalize(hit.documentId)))]
+					: [];
+				const page =
+					typeof test.locator === 'string' ? /page (\d+)/i.exec(test.locator)?.[1] : null;
+				const citationValid =
+					!test.answerable ||
+					(matchedEvidence.length === normalizedEvidence.length &&
+						(!page ||
+							hits.some(
+								(hit) =>
+									hit.page === Number(page) && expectedIds.includes(canonicalize(hit.documentId))
+							)));
+				const channels = await documentsStore.retrieveChannelCandidates(test.query, [
+					...ids.values()
+				]);
+				for (const [channel, channelHits] of Object.entries(channels) as Array<
+					['lexical' | 'fuzzy' | 'dense', typeof hits]
+				>) {
+					const channelAnswerBearing =
+						!isWeakMatch(channelHits) && hasAnswerBearingEvidence(test.query, channelHits);
+					const channelEvidence = normalizedEvidence.filter((needle) =>
+						channelHits.some((hit) => containsEvidence(hit.text, needle))
+					);
+					const channelIds = channelAnswerBearing
+						? [...new Set(channelHits.map((hit) => canonicalize(hit.documentId)))]
+						: [];
+					ablationEvaluations[channel].push({
+						expectedIds,
+						retrievedIds: channelIds,
+						answerable: test.answerable,
+						expectedEvidence: normalizedEvidence,
+						retrievedEvidence: channelEvidence,
+						citationValid:
+							!test.answerable ||
+							(channelEvidence.length === normalizedEvidence.length &&
+								(!page ||
+									channelHits.some(
+										(hit) =>
+											hit.page === Number(page) &&
+											expectedIds.includes(canonicalize(hit.documentId))
+									)))
+					});
+				}
+				evaluations.push({
+					expectedIds,
+					retrievedIds,
+					answerable: test.answerable,
+					expectedEvidence: normalizedEvidence,
+					retrievedEvidence: matchedEvidence,
+					citationValid,
+					latencyMs
+				});
+				if (
+					(test.answerable &&
+						(!expectedIds.every((id) => retrievedIds.slice(0, 5).includes(id)) ||
+							!citationValid)) ||
+					(!test.answerable && retrievedIds.length)
+				)
+					failures.push(
+						`${test.id}: answerBearing=${answerBearing} recall5=${expectedIds.every((id) => retrievedIds.slice(0, 5).includes(id))} evidence=${matchedEvidence.length}/${normalizedEvidence.length} citation=${citationValid} top=${hits
+							.slice(0, 5)
+							.map(
+								(hit) =>
+									`${hit.documentName}@${hit.page ?? hit.headingPath ?? '-'}:${normalizeForFuzzy(hit.text).slice(0, 80)}`
+							)
+							.join(' | ')}`
+					);
+			}
+			fuzzyBenchmarkReport = {
+				metrics: evaluateRetrieval(evaluations),
+				ablation: {
+					lexical: evaluateRetrieval(ablationEvaluations.lexical),
+					fuzzy: evaluateRetrieval(ablationEvaluations.fuzzy),
+					dense: evaluateRetrieval(ablationEvaluations.dense)
+				},
+				ingestMs,
+				bytes,
+				cases: cases.length,
+				failures,
+				slowest: timings.sort((left, right) => right.ms - left.ms).slice(0, 5),
+				cost: {
+					databaseBytesBefore,
+					databaseBytesAfter,
+					databaseDeltaBytes: databaseBytesAfter - databaseBytesBefore,
+					browserStorageBytesBefore,
+					browserStorageBytesAfter,
+					browserStorageDeltaBytes: browserStorageBytesAfter - browserStorageBytesBefore,
+					sampledPeakMemoryBytes,
+					chunks: indexedChunks.length,
+					indexedTextBytes,
+					embeddingBytes: indexedChunks.length * (documentsStore.embeddingProfile?.dims ?? 0) * 4,
+					pages,
+					megabytesPerSecond: bytes / 1_048_576 / Math.max(ingestMs / 1000, 0.001),
+					pagesPerSecond: pages / Math.max(ingestMs / 1000, 0.001)
+				}
+			};
+			await refreshIndexDiagnostics();
+		} catch (error) {
+			fuzzyBenchmarkError = error instanceof Error ? error.message : String(error);
+		} finally {
+			fuzzyBenchmarking = false;
+		}
+	}
+
+	async function runMartinDiagnostic() {
+		const document = documentsStore.documents.find((item) => /compromis compromis/i.test(item.name));
+		if (!document) {
+			compromisDiagnostic = { error: 'Martin document not found' };
+			return;
+		}
+		const query = 'Quel est le prxi de vnete exct du bien Cpelle ?';
+		const hits = await documentsStore.retrieve(query, [document.id]);
+		compromisDiagnostic = {
+			answerBearing: hasAnswerBearingEvidence(query, hits),
+			hits: hits.map((hit) => ({
+				page: hit.page,
+				score: hit.score,
+				text: hit.text.slice(0, 180)
+			}))
+		};
+	}
 
 	async function handleFiles(files: FileList | null) {
 		if (!files) return;
@@ -83,6 +521,108 @@
 		}
 	}
 
+	async function runRecordStressBenchmark() {
+		benchmarking = true;
+		benchmarkReport = null;
+		try {
+			const fixtures = [
+				['/dev/record-stress/repeated-transfers.pdf', 'record-stress-v3.pdf', 'application/pdf'],
+				[
+					'/dev/record-stress/repeated-transfers.docx',
+					'record-stress-v3.docx',
+					'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+				],
+				['/dev/record-stress/repeated-transfers.txt', 'record-stress-v3.txt', 'text/plain']
+			] as const;
+			const documentIds: string[] = [];
+			for (const [url, name, mime] of fixtures) {
+				const bytes = await fetch(url).then((response) => response.arrayBuffer());
+				documentIds.push(await documentsStore.ingest(new File([bytes], name, { type: mime })));
+			}
+			const deadline = Date.now() + 120_000;
+			while (Date.now() < deadline) {
+				await documentsStore.refreshLibrary();
+				const rows = documentIds.map((id) => documentsStore.documents.find((doc) => doc.id === id));
+				const failed = rows.find((doc) => doc?.status === 'error');
+				if (failed)
+					throw new Error(`record-stress ingest failed: ${failed.name} (${failed.error})`);
+				if (rows.every((doc) => doc?.status === 'ready')) break;
+				await new Promise((resolve) => setTimeout(resolve, 250));
+			}
+			if (
+				documentIds.some(
+					(id) => documentsStore.documents.find((doc) => doc.id === id)?.status !== 'ready'
+				)
+			) {
+				throw new Error('record-stress ingest timed out');
+			}
+			const sentFacts = [
+				{ currency: 'EUR', valueMinor: 12000, recordId: 'TX-ALPHA-001' },
+				{ currency: 'EUR', valueMinor: 8000, recordId: 'TX-BRAVO-002' },
+				{ currency: 'EUR', valueMinor: 12000, recordId: 'TX-CHARLIE-003' }
+			];
+			benchmarkReport = await runIntelligenceBenchmark({
+				retrievalCases: [],
+				aggregateCases: documentIds.map((documentId) => ({
+					query: 'Quelle est la somme totale envoyée en juin ?',
+					documentIds: [documentId],
+					expected: [{ currency: 'EUR', valueMinor: 32000, count: 3 }],
+					expectedFacts: sentFacts
+				})),
+				retrieve: (query, ids) => documentsStore.retrieve(query, ids),
+				aggregate: (query, ids) => documentsStore.aggregate(query, ids)
+			});
+		} finally {
+			benchmarking = false;
+		}
+	}
+
+	async function runCrossDocumentStressBenchmark() {
+		benchmarking = true;
+		crossDocumentReport = null;
+		try {
+			const documentIds: string[] = [];
+			for (const fixture of CROSS_DOCUMENT_FIXTURES) {
+				documentIds.push(
+					await documentsStore.ingest(
+						new File([fixture.content], fixture.name, { type: fixture.mime })
+					)
+				);
+			}
+			const deadline = Date.now() + 120_000;
+			while (Date.now() < deadline) {
+				await documentsStore.refreshLibrary();
+				const rows = documentIds.map((id) => documentsStore.documents.find((doc) => doc.id === id));
+				const failed = rows.find((doc) => doc?.status === 'error');
+				if (failed)
+					throw new Error(`cross-document ingest failed: ${failed.name} (${failed.error})`);
+				if (rows.every((doc) => doc?.status === 'ready')) break;
+				await new Promise((resolve) => setTimeout(resolve, 250));
+			}
+			const retrievedNames: string[][] = [];
+			for (const test of CROSS_DOCUMENT_CASES) {
+				const hits = await documentsStore.retrieve(test.query, documentIds);
+				retrievedNames.push(
+					isWeakMatch(hits) || !hasAnswerBearingEvidence(test.query, hits)
+						? []
+						: [...new Set(hits.slice(0, 5).map((hit) => hit.documentName))]
+				);
+			}
+			crossDocumentReport = {
+				...scoreCrossDocumentEvidence(CROSS_DOCUMENT_CASES, retrievedNames),
+				failures: CROSS_DOCUMENT_CASES.flatMap((test, index) => {
+					const retrieved = retrievedNames[index] ?? [];
+					return test.relevantDocuments.every((name) => retrieved.includes(name)) &&
+						(test.relevantDocuments.length > 0 || retrieved.length === 0)
+						? []
+						: [{ query: test.query, expected: test.relevantDocuments, retrieved }];
+				})
+			};
+		} finally {
+			benchmarking = false;
+		}
+	}
+
 	async function runGenerationBenchmark() {
 		generationBenchmarking = true;
 		try {
@@ -129,6 +669,17 @@
 				>
 					{generationBenchmarking ? 'Measuring generation…' : 'Run generation benchmark'}
 				</Button>
+				<Button variant="outline" onclick={runCrossDocumentStressBenchmark} disabled={benchmarking}>
+					Run cross-document benchmark
+				</Button>
+				<Button variant="outline" onclick={repairEmptyIndexes} disabled={repairingIndexes}>
+					{repairingIndexes ? 'Repairing empty indexes…' : 'Repair empty indexes'}
+				</Button>
+				<Button variant="outline" onclick={runFuzzyBenchmark} disabled={fuzzyBenchmarking}>
+					{fuzzyBenchmarking ? 'Running fuzzy benchmark…' : 'Run fuzzy benchmark'}
+				</Button>
+				<Button variant="outline" onclick={runMartinDiagnostic}>Run Martin diagnostic</Button>
+				<Button variant="outline" onclick={resetFuzzyFixtures}>Reset fuzzy fixtures</Button>
 			</div>
 			{#if llmStore.lastMetrics}
 				<pre class="bg-muted overflow-auto rounded-md p-3 text-xs">{JSON.stringify(
@@ -140,6 +691,30 @@
 			{#if benchmarkReport}
 				<pre class="bg-muted overflow-auto rounded-md p-3 text-xs">{JSON.stringify(
 						benchmarkReport,
+						null,
+						2
+					)}</pre>
+			{/if}
+			{#if crossDocumentReport}
+				<pre class="bg-muted overflow-auto rounded-md p-3 text-xs">{JSON.stringify(
+						crossDocumentReport,
+						null,
+						2
+					)}</pre>
+			{/if}
+			{#if fuzzyBenchmarkReport}
+				<pre class="bg-muted overflow-auto rounded-md p-3 text-xs">{JSON.stringify(
+						fuzzyBenchmarkReport,
+						null,
+						2
+					)}</pre>
+			{/if}
+			{#if fuzzyBenchmarkError}
+				<p class="text-destructive text-sm">{fuzzyBenchmarkError}</p>
+			{/if}
+			{#if compromisDiagnostic}
+				<pre class="bg-muted overflow-auto rounded-md p-3 text-xs">{JSON.stringify(
+						compromisDiagnostic,
 						null,
 						2
 					)}</pre>
@@ -159,6 +734,23 @@
 		</p>
 	{:else}
 		<p class="text-muted-foreground text-sm">Opening local database…</p>
+	{/if}
+	{#if indexDiagnostics}
+		<pre class="bg-muted overflow-auto rounded-md p-3 text-xs">{JSON.stringify(
+				{
+					documents: indexDiagnostics.length,
+					chunks: indexDiagnostics.reduce((sum, row) => sum + row.chunks, 0),
+					empty: indexDiagnostics
+						.filter((row) => row.status === 'ready' && row.chunks === 0)
+						.map((row) => row.name),
+					stale: indexDiagnostics
+						.filter((row) => row.status === 'ready' && row.retrievalVersion < RETRIEVAL_VERSION)
+						.map((row) => row.name),
+					compromis: indexDiagnostics.filter((row) => /compromis/i.test(row.name))
+				},
+				null,
+				2
+			)}</pre>
 	{/if}
 
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -206,7 +798,9 @@
 					{#if ingest?.dedup}
 						<Badge variant="outline">already indexed</Badge>
 					{/if}
-					<Badge variant={statusVariant(doc.status)}>{doc.error ?? doc.status}</Badge>
+					<Badge variant={statusVariant(ingest?.status ?? doc.status)}
+						>{ingest?.error ?? ingest?.status ?? doc.error ?? doc.status}</Badge
+					>
 					<Button variant="ghost" size="sm" onclick={() => documentsStore.remove(doc.id)}>
 						Delete
 					</Button>

@@ -102,6 +102,12 @@ export function resolveTargetedCitations(
 	question: string
 ): { text: string; citations: CitationRef[] } {
 	if (!/\[\d{1,2}\]/.test(text) || !hits.length) return resolveCitations(text, hits);
+	// Coordinated questions and answers can contain several independently
+	// sourced facts. Collapsing every marker to one "best" passage would turn a
+	// correct multi-source answer into a misleading single citation.
+	if (/\b(et|ainsi que|and|as well as)\b/i.test(question) || /[;\n]/.test(text)) {
+		return resolveCitations(text, hits);
+	}
 	const grounding = `${question} ${text.replace(/\[\d{1,2}\]/g, '')}`;
 	const best = [...hits]
 		.map((hit) => ({ hit, support: queryCoverage(grounding, hit.text) }))

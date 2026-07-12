@@ -10,6 +10,8 @@ export interface RetrievalContext {
 	previousQuestion: string;
 	previousAnswer: string;
 	searchQuery: string;
+	/** Current question first so its date scope overrides the referenced turn. */
+	analysisQuery: string;
 	promptContext: string;
 }
 
@@ -20,7 +22,14 @@ function clean(text: string): string {
 /** Only carry prior turns when the current question actually refers back to them. */
 export function needsRetrievalContext(question: string): boolean {
 	const normalized = clean(question);
-	return FOLLOW_UP_REFERENCE.test(normalized) || ELLIPTICAL_FOLLOW_UP.test(normalized);
+	// In French subject-verb inversion, "est-elle" / "a-t-il" is grammar,
+	// not necessarily a reference to the previous turn. Treating it as one made
+	// explicit new questions inherit unrelated entities and retrieval terms.
+	const withoutInversion = normalized.replace(
+		/\b(?:est|sont|a|ont|avait|etaient|peut|peuvent|doit|doivent|sera|seront|fait|font)-(?:t-)?(?:il|elle|ils|elles)\b/giu,
+		''
+	);
+	return FOLLOW_UP_REFERENCE.test(withoutInversion) || ELLIPTICAL_FOLLOW_UP.test(normalized);
 }
 
 /**
@@ -66,6 +75,7 @@ export function buildRetrievalContext(
 		previousQuestion,
 		previousAnswer,
 		searchQuery: `${previousQuestion}\n${previousAnswer}\n${question}`,
+		analysisQuery: `${question}\nPrevious question: ${previousQuestion}`,
 		promptContext: `Previous question: ${previousQuestion}\nPrevious answer: ${previousAnswer}`
 	};
 }

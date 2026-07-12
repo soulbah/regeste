@@ -59,10 +59,32 @@ describe('buildRetrievalContext', () => {
 		}
 	});
 
+	it('does not mistake French subject-verb inversion for a contextual pronoun', () => {
+		expect(
+			needsRetrievalContext('La contenance cadastrale est-elle de 76 centiares, soit 76 m² ?')
+		).toBe(false);
+		expect(needsRetrievalContext('Le prêt a-t-il une garantie ?')).toBe(false);
+		expect(needsRetrievalContext('Et elle, quelle est sa superficie ?')).toBe(true);
+	});
+
 	it('keeps elliptical follow-ups', () => {
 		expect(needsRetrievalContext('Et son prix ?')).toBe(true);
 		expect(needsRetrievalContext('Quel est le numéro de ce destinataire ?')).toBe(true);
 		expect(needsRetrievalContext('What about their address?')).toBe(true);
+	});
+
+	it('puts the current aggregate scope before the referenced question', () => {
+		const current = 'Et en mai ?';
+		const context = buildRetrievalContext(
+			[
+				message('user', 'Combien ai-je envoyé en juin ?'),
+				message('assistant', 'La somme est 320,00 € [1][2][3].'),
+				message('user', current)
+			],
+			current
+		);
+		expect(context?.analysisQuery.startsWith('Et en mai ?')).toBe(true);
+		expect(context?.analysisQuery).toContain('Combien ai-je envoyé en juin ?');
 	});
 
 	it('ignores notices and returns no context before a completed exchange', () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { generationOptionsFor } from './generation';
+import { adaptGenerationOptions, generationOptionsFor } from './generation';
 
 describe('generationOptionsFor', () => {
 	it('uses short budgets for French and English facts', () => {
@@ -12,6 +12,17 @@ describe('generationOptionsFor', () => {
 
 	it('keeps a deliberate budget for synthesis', () => {
 		expect(generationOptionsFor('Compare les contrats', 'synthesis')).toEqual({
+			reasoning: 'off',
+			maxTokens: 420
+		});
+	});
+
+	it('prevents Lite CPU synthesis from spending its budget in hidden reasoning', () => {
+		expect(adaptGenerationOptions({ reasoning: 'on', maxTokens: 700 }, 'wllama')).toEqual({
+			reasoning: 'off',
+			maxTokens: 420
+		});
+		expect(adaptGenerationOptions({ reasoning: 'on', maxTokens: 700 }, 'webllm')).toEqual({
 			reasoning: 'on',
 			maxTokens: 700
 		});

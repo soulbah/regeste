@@ -12,7 +12,7 @@ import { detectTier } from './capability';
 import { downgrade, type Tier } from './tiers';
 import type { LlmApi } from './llm-worker';
 import type { WllamaApi } from './wllama-worker';
-import type { GenerationOptions } from './generation';
+import { adaptGenerationOptions, type GenerationOptions } from './generation';
 import type { GenerationResult } from './generation';
 import type { WebLlmClient } from './webllm-client';
 
@@ -127,7 +127,7 @@ class LlmStore {
 		try {
 			const result = await (
 				await getWorker(this.tier.engine)
-			).generate(messages, proxy(onDelta), options);
+			).generate(messages, proxy(onDelta), adaptGenerationOptions(options, this.tier.engine));
 			this.lastMetrics = {
 				ttftMs: result.ttftMs,
 				tokensPerSecond: result.tokensPerSecond,

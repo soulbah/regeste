@@ -194,5 +194,29 @@ export const MIGRATIONS: string[] = [
 		summary_json TEXT NOT NULL,
 		created_at INTEGER NOT NULL
 	);
+	`,
+
+	// v10 — record-aware financial facts (spec 026). Facts from repeated pages
+	// retain transaction identity/date so equal values remain distinct and
+	// temporal questions can filter before deterministic calculation.
+	`
+	ALTER TABLE document_facts ADD COLUMN record_key TEXT;
+	ALTER TABLE document_facts ADD COLUMN record_date TEXT;
+	ALTER TABLE document_facts ADD COLUMN record_id TEXT;
+	UPDATE document_facts
+	SET record_key = document_id || ':' || COALESCE(CAST(chunk_id AS TEXT), id)
+	WHERE record_key IS NULL;
+	CREATE INDEX idx_document_facts_record
+	ON document_facts(document_id, extractor_version, record_key, record_date);
+	`,
+
+	// v11 — independent typo/OCR-tolerant retrieval view (spec 027).
+	// Existing rows remain usable immediately; OPFS reindex upgrades their view atomically.
+	`
+	ALTER TABLE documents ADD COLUMN retrieval_version INTEGER NOT NULL DEFAULT 1;
+	ALTER TABLE chunks ADD COLUMN fuzzy_text TEXT;
+	UPDATE chunks SET fuzzy_text = search_text WHERE fuzzy_text IS NULL;
+	CREATE VIRTUAL TABLE chunks_fuzzy_fts USING fts5(fuzzy_text, content='chunks', content_rowid='id');
+	INSERT INTO chunks_fuzzy_fts(chunks_fuzzy_fts) VALUES('rebuild');
 	`
 ];

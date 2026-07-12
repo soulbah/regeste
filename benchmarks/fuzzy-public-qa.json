@@ -1,0 +1,149 @@
+{
+	"version": 1,
+	"cases": [
+		{
+			"id": "cfr-cobb",
+			"query": "Quelle méthode mesure l'absorption d'eau du carton-fibre ?",
+			"noisyQuery": "Quelle methode mesure l'absorbtion d eau du carton fibre ?",
+			"document": "cfr-fiberboard-boxes.pdf",
+			"locator": "page 1",
+			"evidenceContains": "Cobb method",
+			"answerable": true
+		},
+		{
+			"id": "cfr-section",
+			"query": "Que régit la section 178.516 ?",
+			"noisyQuery": "Que regit la sectoin 178.516 ?",
+			"document": "cfr-fiberboard-boxes.pdf",
+			"locator": "page 1",
+			"evidenceContains": "fiberboard boxes",
+			"answerable": true
+		},
+		{
+			"id": "fr-comments",
+			"query": "Quand les commentaires sur l'ICR sont-ils attendus ?",
+			"noisyQuery": "Qaund les comentaires sur l ICR sont ils attendus ?",
+			"document": "federal-register-two-column.pdf",
+			"locator": "page 1",
+			"evidenceContains": "Comments on this ICR",
+			"answerable": true
+		},
+		{
+			"id": "fr-effective",
+			"query": "Dans l'avis Federal Register sur l'ICR, quelle date d'entrée en vigueur est indiquée ?",
+			"noisyQuery": "Dans l avis Federal Regsiter sur l ICR quelle datte d entree en viguer est indiquee ?",
+			"document": "federal-register-two-column.pdf",
+			"locator": "page 3",
+			"evidenceContains": "Effective Date",
+			"answerable": true
+		},
+		{
+			"id": "nasa-author",
+			"query": "Quelle branche a préparé le rapport de planification ?",
+			"noisyQuery": "Quelle branche a prepare le raport de planifcation ?",
+			"document": "apollo-flight-planning-report.pdf",
+			"locator": "page 10",
+			"evidenceContains": "Flight Planning Branch",
+			"answerable": true
+		},
+		{
+			"id": "nasa-alsep",
+			"query": "Que signifie ALSEP dans la liste d'abréviations ?",
+			"noisyQuery": "Que signfie ALSEP dans la liste d abreviatons ?",
+			"document": "apollo-flight-planning-report.pdf",
+			"locator": "page 20",
+			"evidenceContains": "Apollo Lunar Surface Experiment Package",
+			"answerable": true
+		},
+		{
+			"id": "nasa-two-vehicles",
+			"query": "Quel effet a la planification de deux véhicules ?",
+			"noisyQuery": "Quel efet a la planifcation de deux vehicules ?",
+			"document": "apollo-flight-planning-report.pdf",
+			"locator": "page 15",
+			"evidenceContains": "increase in the number of operational and systems constraints",
+			"answerable": true
+		},
+		{
+			"id": "nasa-two-vehicles-hourly",
+			"query": "De combien la planification de deux véhicules augmente-t-elle l'information horaire ?",
+			"noisyQuery": "De combien la planifcation de deux vehicules augmente t elle l informatoin horaire ?",
+			"document": "apollo-flight-planning-report.pdf",
+			"locator": "page 27",
+			"evidenceContains": "more than doubles the information required during each hour",
+			"answerable": true
+		},
+		{
+			"id": "rfc-get",
+			"query": "Quelle section définit GET ?",
+			"noisyQuery": "Quelle sectoin definit GET ?",
+			"document": "rfc9110.txt",
+			"locator": "section 9.3.1",
+			"evidenceContains": "9.3.1.  GET",
+			"answerable": true
+		},
+		{
+			"id": "rfc-head",
+			"query": "HEAD transfère-t-il le contenu de la réponse ?",
+			"noisyQuery": "HEAD transfere t il le contneu de la reponse ?",
+			"document": "rfc9110.txt",
+			"locator": "section 9.3.2",
+			"evidenceContains": "server MUST NOT send content",
+			"answerable": true
+		},
+		{
+			"id": "rfc-content-length",
+			"query": "Content-Length peut-il être négatif ?",
+			"noisyQuery": "Contnet Lenght peut il etre negatif ?",
+			"document": "rfc9110.txt",
+			"locator": "section 8.6",
+			"evidenceContains": "decimal non-negative integer",
+			"answerable": true
+		},
+		{
+			"id": "rfc-accept-ranges",
+			"query": "Quelle section définit Accept-Ranges ?",
+			"noisyQuery": "Quelle section definit Accept Rnages ?",
+			"document": "rfc9110.txt",
+			"locator": "section 14.3",
+			"evidenceContains": "14.3.  Accept-Ranges",
+			"answerable": true
+		},
+		{
+			"id": "cross-format-rfc",
+			"query": "Dans quels deux formats le corpus contient-il RFC 9110 ?",
+			"noisyQuery": "Dans quels deux formtas le corpus contient il RFC9110 ?",
+			"document": "rfc9110.txt+rfc9110.pdf",
+			"locator": "TXT section 1; PDF section 1",
+			"evidenceContains": "HTTP Semantics",
+			"answerable": true
+		},
+		{
+			"id": "hard-negative-rfc",
+			"query": "Quel est le mot de passe recommandé par RFC 9110 ?",
+			"noisyQuery": "Quel est le mot de passe recomande par RFC9110 ?",
+			"document": null,
+			"locator": null,
+			"evidenceContains": null,
+			"answerable": false
+		},
+		{
+			"id": "hard-negative-nasa",
+			"query": "Quel était le groupe sanguin du responsable de la Flight Planning Branch ?",
+			"noisyQuery": "Quel etait le groupe sanguim du responsable Flight Planing Branch ?",
+			"document": null,
+			"locator": null,
+			"evidenceContains": null,
+			"answerable": false
+		},
+		{
+			"id": "near-id-cfr",
+			"query": "Que prévoit la section 178.561 ?",
+			"noisyQuery": "Que prevoit la section 178.561 ?",
+			"document": null,
+			"locator": null,
+			"evidenceContains": null,
+			"answerable": false
+		}
+	]
+}

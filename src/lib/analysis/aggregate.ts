@@ -1,96 +1,146 @@
-import { extractMoneyCandidates, requestedMoneyKind, type MoneyCandidate } from './money';
+import { extractFinancialRecords, type FinancialRecordFact } from './financial-records';
+import { requestedMoneyKind, type MoneyKind } from './money';
+import { analyzeQuestion, type AggregateOperation, type TemporalScope } from './query-router';
 import type { QuestionRoute, SearchHit } from '$lib/types';
 
-export const FACT_EXTRACTOR_VERSION = 'money-v1';
+export const FACT_EXTRACTOR_VERSION = 'money-v2';
 
-export interface DocumentMoneyFact extends MoneyCandidate {
-	documentId: string;
-	documentName: string;
-	chunkId: number;
-	page: number | null;
-	headingPath: string | null;
-	text: string;
-}
+export type DocumentMoneyFact = FinancialRecordFact;
 
 export interface AggregateResult {
-	operation: 'sum' | 'average' | 'minimum' | 'maximum' | 'count';
+	operation: AggregateOperation;
 	facts: DocumentMoneyFact[];
 	ambiguousDocuments: string[];
+	ambiguousRecords: string[];
 	groups: Array<{ currency: string; valueMinor: number; count: number }>;
+	recordsMatched: number;
+	count: number;
 }
 
-function operationFromQuestion(question: string): AggregateResult['operation'] {
-	if (/\b(moyenne|average)\b/i.test(question)) return 'average';
-	if (/\b(minimum|min(?:imum)?)\b/i.test(question)) return 'minimum';
-	if (/\b(maximum|max(?:imum)?)\b/i.test(question)) return 'maximum';
-	if (/\b(combien de|nombre|count)\b/i.test(question)) return 'count';
-	return 'sum';
+function matchesTemporal(date: string | null, scope: TemporalScope | null): boolean {
+	if (!scope) return true;
+	if (!date) return false;
+	if (scope.start && date < scope.start) return false;
+	if (scope.end && date > scope.end) return false;
+	const [year, month] = date.split('-').map(Number);
+	if (scope.year !== null && year !== scope.year) return false;
+	if (scope.month !== null && month !== scope.month) return false;
+	return true;
+}
+
+function factRecordKey(fact: DocumentMoneyFact): string {
+	return fact.recordKey || `${fact.documentId}:${fact.page ?? fact.headingPath ?? fact.chunkId}`;
+}
+
+function representative(facts: DocumentMoneyFact[]): DocumentMoneyFact | null {
+	for (const kind of [
+		'sent',
+		'total_ttc',
+		'debited',
+		'total',
+		'amount',
+		'received',
+		'fee'
+	] as MoneyKind[]) {
+		const found = facts.find((fact) => fact.kind === kind);
+		if (found) return found;
+	}
+	return facts[0] ?? null;
 }
 
 export function aggregateMoney(question: string, chunks: SearchHit[]): AggregateResult {
-	const candidates = chunks.flatMap((chunk) =>
-		extractMoneyCandidates(chunk.text).map((candidate) => ({
-			...candidate,
-			documentId: chunk.documentId,
-			documentName: chunk.documentName,
-			chunkId: chunk.chunkId,
-			page: chunk.page,
-			headingPath: chunk.headingPath,
-			text: chunk.text
-		}))
+	return aggregateMoneyFacts(
+		question,
+		extractFinancialRecords(chunks).flatMap((record) => record.facts)
 	);
-	return aggregateMoneyFacts(question, candidates);
 }
 
 export function aggregateMoneyFacts(
 	question: string,
 	candidates: DocumentMoneyFact[]
 ): AggregateResult {
-	const requested = requestedMoneyKind(question);
-	const operation = operationFromQuestion(question);
-	const byDocument = new Map<string, DocumentMoneyFact[]>();
+	const analysis = analyzeQuestion(question);
+	const requested = analysis.moneyRole ?? requestedMoneyKind(question);
+	const operation = analysis.operation ?? 'sum';
+	const byRecord = new Map<string, DocumentMoneyFact[]>();
 	for (const candidate of candidates) {
-		const list = byDocument.get(candidate.documentId) ?? [];
+		if (!matchesTemporal(candidate.recordDate, analysis.temporal)) continue;
+		const key = factRecordKey(candidate);
+		const list = byRecord.get(key) ?? [];
 		list.push(candidate);
-		byDocument.set(candidate.documentId, list);
+		byRecord.set(key, list);
 	}
+
 	const facts: DocumentMoneyFact[] = [];
-	const ambiguousDocuments: string[] = [];
-	for (const documentCandidates of byDocument.values()) {
-		const desired = requested
-			? documentCandidates.filter((candidate) => candidate.kind === requested)
-			: (['total_ttc', 'total', 'subtotal']
-					.map((kind) => documentCandidates.filter((candidate) => candidate.kind === kind))
-					.find((items) => items.length > 0) ?? []);
+	const ambiguousRecords: string[] = [];
+	const ambiguousDocuments = new Set<string>();
+	for (const [recordKey, recordCandidates] of byRecord) {
+		if (operation === 'count' && !requested) {
+			const selected = representative(recordCandidates);
+			if (selected) facts.push(selected);
+			continue;
+		}
+		let desired: DocumentMoneyFact[];
+		if (requested) {
+			desired = recordCandidates.filter((candidate) => candidate.kind === requested);
+		} else {
+			desired =
+				(['total_ttc', 'total', 'subtotal', 'amount'] as MoneyKind[])
+					.map((kind) => recordCandidates.filter((candidate) => candidate.kind === kind))
+					.find((items) => items.length > 0) ?? [];
+			if (!desired.length) {
+				const roles = new Set(recordCandidates.map((candidate) => candidate.kind));
+				if (roles.size === 1) desired = recordCandidates;
+			}
+		}
 		const distinct = desired.filter(
 			(item, index, all) =>
 				all.findIndex(
-					(other) => other.valueMinor === item.valueMinor && other.currency === item.currency
+					(other) =>
+						other.valueMinor === item.valueMinor &&
+						other.currency === item.currency &&
+						other.kind === item.kind
 				) === index
 		);
 		if (distinct.length !== 1) {
-			ambiguousDocuments.push(documentCandidates[0].documentName);
+			if (desired.length || (!requested && recordCandidates.length > 1)) {
+				ambiguousRecords.push(recordKey);
+				ambiguousDocuments.add(recordCandidates[0].documentName);
+			}
 			continue;
 		}
 		facts.push(distinct[0]);
 	}
-	const currencies = new Map<string, number[]>();
+
+	const currencies = new Map<string, DocumentMoneyFact[]>();
 	for (const fact of facts) {
 		const values = currencies.get(fact.currency) ?? [];
-		values.push(fact.valueMinor);
+		values.push(fact);
 		currencies.set(fact.currency, values);
 	}
-	const groups = [...currencies].map(([currency, values]) => {
-		let valueMinor: number;
-		if (operation === 'count') valueMinor = values.length * 100;
-		else if (operation === 'average')
-			valueMinor = Math.round(values.reduce((a, b) => a + b, 0) / values.length);
-		else if (operation === 'minimum') valueMinor = Math.min(...values);
-		else if (operation === 'maximum') valueMinor = Math.max(...values);
-		else valueMinor = values.reduce((a, b) => a + b, 0);
-		return { currency, valueMinor, count: values.length };
-	});
-	return { operation, facts, ambiguousDocuments, groups };
+	const groups =
+		operation === 'count'
+			? []
+			: [...currencies].map(([currency, values]) => {
+					const amounts = values.map((fact) => fact.valueMinor);
+					let valueMinor: number;
+					if (operation === 'average')
+						valueMinor = Math.round(amounts.reduce((a, b) => a + b, 0) / amounts.length);
+					else if (operation === 'minimum') valueMinor = Math.min(...amounts);
+					else if (operation === 'maximum') valueMinor = Math.max(...amounts);
+					else valueMinor = amounts.reduce((a, b) => a + b, 0);
+					return { currency, valueMinor, count: values.length };
+				});
+
+	return {
+		operation,
+		facts,
+		ambiguousDocuments: [...ambiguousDocuments],
+		ambiguousRecords,
+		groups,
+		recordsMatched: byRecord.size,
+		count: facts.length
+	};
 }
 
 export function isAggregateRoute(route: QuestionRoute): route is 'aggregate' {

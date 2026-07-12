@@ -35,3 +35,7 @@ static/ort/
 
 # Stray miniflare/workerd config debug dump (MINIFLARE_WORKERD_CONFIG_DEBUG)
 /1
+
+# Downloaded public benchmark documents (manifest + hashes are committed)
+/.benchmark-corpus/
+/static/dev/fuzzy-public/

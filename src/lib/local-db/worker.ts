@@ -7,6 +7,8 @@
 import { expose } from 'comlink';
 import { MIGRATIONS } from './schema';
 import { fuseCandidates } from '$lib/pipeline/retrieval';
+import { RETRIEVAL_VERSION } from '$lib/pipeline/retrieval-version';
+import { fuzzyIndexText, fuzzyQueryGrams } from '$lib/pipeline/fuzzy';
 import type {
 	ChatDocument,
 	Chunk,
@@ -82,6 +84,7 @@ async function init(): Promise<DbInfo> {
 
 	db.exec('PRAGMA foreign_keys = ON;');
 	const schemaVersion = migrate();
+	repairLegacyRetrievalViews();
 
 	return {
 		sqliteVersion: db.selectValue('SELECT sqlite_version()') as string,
@@ -90,6 +93,54 @@ async function init(): Promise<DbInfo> {
 		vfs: 'opfs-sahpool',
 		schemaVersion
 	};
+}
+
+/** v11 can open immediately after SQL migration, but old search_text lacks the
+ * filename and old fuzzy_text contains words rather than grams. Repair both
+ * local views atomically before queries; the slower OPFS structure rebuild can
+ * then continue without making legacy documents temporarily undiscoverable. */
+function repairLegacyRetrievalViews(): void {
+	if (db.selectValue("SELECT value FROM meta WHERE key = 'retrieval_views_v5'") === '1') return;
+	db.transaction(() => {
+		const rows = db.selectObjects(
+			`SELECT c.id, c.search_text, c.text, c.fuzzy_text, d.name AS document_name
+			 FROM chunks c JOIN documents d ON d.id = c.document_id`
+		);
+		for (const row of rows) {
+			const oldSearchText = row.search_text ?? row.text;
+			const oldFuzzyText = row.fuzzy_text ?? oldSearchText;
+			const documentName = String(row.document_name ?? '').trim();
+			const hasDocumentName =
+				documentName.length > 0 &&
+				String(oldSearchText).toLocaleLowerCase().includes(documentName.toLocaleLowerCase());
+			const nextSearchText =
+				documentName && !hasDocumentName ? `${documentName}\n${oldSearchText}` : oldSearchText;
+			const nextFuzzyText = fuzzyIndexText(nextSearchText);
+			db.exec({
+				sql: "INSERT INTO chunks_fts(chunks_fts, rowid, search_text) VALUES('delete', ?, ?)",
+				bind: [row.id, oldSearchText]
+			});
+			db.exec({
+				sql: "INSERT INTO chunks_fuzzy_fts(chunks_fuzzy_fts, rowid, fuzzy_text) VALUES('delete', ?, ?)",
+				bind: [row.id, oldFuzzyText]
+			});
+			db.exec({
+				sql: 'UPDATE chunks SET search_text = ?, fuzzy_text = ? WHERE id = ?',
+				bind: [nextSearchText, nextFuzzyText, row.id]
+			});
+			db.exec({
+				sql: 'INSERT INTO chunks_fts(rowid, search_text) VALUES (?, ?)',
+				bind: [row.id, nextSearchText]
+			});
+			db.exec({
+				sql: 'INSERT INTO chunks_fuzzy_fts(rowid, fuzzy_text) VALUES (?, ?)',
+				bind: [row.id, nextFuzzyText]
+			});
+		}
+		db.exec(
+			"INSERT INTO meta(key, value) VALUES ('retrieval_views_v5', '1') ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+		);
+	});
 }
 
 function migrate(): number {
@@ -123,6 +174,7 @@ function rowToDocument(r: any): LocalDocument {
 		error: r.error,
 		embeddingModel: r.embedding_model,
 		language: r.language ?? null,
+		retrievalVersion: r.retrieval_version ?? 1,
 		createdAt: r.created_at,
 		updatedAt: r.updated_at
 	};
@@ -173,12 +225,21 @@ function setDocumentStatus(
 	});
 }
 
-function deleteChunkIndexes(row: { id: number; text: string; search_text?: string | null }): void {
+function deleteChunkIndexes(row: {
+	id: number;
+	text: string;
+	search_text?: string | null;
+	fuzzy_text?: string | null;
+}): void {
 	db.exec({ sql: 'DELETE FROM chunks_vec WHERE rowid = ?', bind: [row.id] });
 	db.exec({ sql: 'DELETE FROM chunks_vec_v2 WHERE rowid = ?', bind: [row.id] });
 	db.exec({
 		sql: "INSERT INTO chunks_fts(chunks_fts, rowid, search_text) VALUES('delete', ?, ?)",
 		bind: [row.id, row.search_text ?? row.text]
+	});
+	db.exec({
+		sql: "INSERT INTO chunks_fuzzy_fts(chunks_fuzzy_fts, rowid, fuzzy_text) VALUES('delete', ?, ?)",
+		bind: [row.id, row.fuzzy_text ?? row.search_text ?? row.text]
 	});
 }
 
@@ -195,7 +256,7 @@ function deleteDocument(id: string): void {
 		// Real chunk text in the FTS delete: with a dummy value the terms would
 		// stay physically indexed — deleted documents must not linger on disk.
 		const rows = db.selectObjects(
-			'SELECT id, text, search_text FROM chunks WHERE document_id = ?',
+			'SELECT id, text, search_text, fuzzy_text FROM chunks WHERE document_id = ?',
 			[id]
 		);
 		for (const r of rows) deleteChunkIndexes(r);
@@ -208,7 +269,7 @@ function deleteDocument(id: string): void {
 function deleteChunks(documentId: string): void {
 	db.transaction(() => {
 		const rows = db.selectObjects(
-			'SELECT id, text, search_text FROM chunks WHERE document_id = ?',
+			'SELECT id, text, search_text, fuzzy_text FROM chunks WHERE document_id = ?',
 			[documentId]
 		);
 		for (const r of rows) deleteChunkIndexes(r);
@@ -240,7 +301,7 @@ function replaceDocument(
 			});
 		}
 		const rows = db.selectObjects(
-			'SELECT id, text, search_text FROM chunks WHERE document_id = ?',
+			'SELECT id, text, search_text, fuzzy_text FROM chunks WHERE document_id = ?',
 			[id]
 		);
 		for (const r of rows) deleteChunkIndexes(r);
@@ -249,19 +310,30 @@ function replaceDocument(
 		db.exec({ sql: 'DELETE FROM chunks WHERE document_id = ?', bind: [id] });
 		db.exec({
 			sql: `UPDATE documents SET hash = ?, name = ?, mime = ?, size = ?, pages = ?,
-			      language = ?, status = 'ready', error = NULL, updated_at = ? WHERE id = ?`,
-			bind: [meta.hash, meta.name, meta.mime, meta.size, meta.pages, language, Date.now(), id]
+			      language = ?, retrieval_version = ?, status = 'ready', error = NULL, updated_at = ? WHERE id = ?`,
+			bind: [
+				meta.hash,
+				meta.name,
+				meta.mime,
+				meta.size,
+				meta.pages,
+				language,
+				RETRIEVAL_VERSION,
+				Date.now(),
+				id
+			]
 		});
 		for (let i = 0; i < chunks.length; i++) {
 			const c = chunks[i];
 			db.exec({
-				sql: `INSERT INTO chunks(document_id, seq, text, search_text, page, heading_path, para_index, char_start, char_end)
-				      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				sql: `INSERT INTO chunks(document_id, seq, text, search_text, fuzzy_text, page, heading_path, para_index, char_start, char_end)
+				      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 				bind: [
 					id,
 					c.seq,
 					c.text,
 					c.searchText,
+					c.fuzzyText ?? c.searchText,
 					c.page,
 					c.headingPath,
 					c.paraIndex,
@@ -273,6 +345,10 @@ function replaceDocument(
 			db.exec({
 				sql: 'INSERT INTO chunks_fts(rowid, search_text) VALUES (?, ?)',
 				bind: [rowid, c.searchText]
+			});
+			db.exec({
+				sql: 'INSERT INTO chunks_fuzzy_fts(rowid, fuzzy_text) VALUES (?, ?)',
+				bind: [rowid, c.fuzzyText ?? c.searchText]
 			});
 			const vec = embeddings.subarray(i * dims, (i + 1) * dims);
 			insertVector(rowid, vec, dims);
@@ -324,13 +400,14 @@ function insertChunks(
 		for (let i = 0; i < chunks.length; i++) {
 			const c = chunks[i];
 			db.exec({
-				sql: `INSERT INTO chunks(document_id, seq, text, search_text, page, heading_path, para_index, char_start, char_end)
-				      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				sql: `INSERT INTO chunks(document_id, seq, text, search_text, fuzzy_text, page, heading_path, para_index, char_start, char_end)
+				      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 				bind: [
 					documentId,
 					c.seq,
 					c.text,
 					c.searchText,
+					c.fuzzyText ?? c.searchText,
 					c.page,
 					c.headingPath,
 					c.paraIndex,
@@ -343,9 +420,17 @@ function insertChunks(
 				sql: 'INSERT INTO chunks_fts(rowid, search_text) VALUES (?, ?)',
 				bind: [rowid, c.searchText]
 			});
+			db.exec({
+				sql: 'INSERT INTO chunks_fuzzy_fts(rowid, fuzzy_text) VALUES (?, ?)',
+				bind: [rowid, c.fuzzyText ?? c.searchText]
+			});
 			const vec = embeddings.subarray(i * dims, (i + 1) * dims);
 			insertVector(rowid, vec, dims);
 		}
+		db.exec({
+			sql: 'UPDATE documents SET retrieval_version = ?, updated_at = ? WHERE id = ?',
+			bind: [RETRIEVAL_VERSION, Date.now(), documentId]
+		});
 	});
 }
 
@@ -359,7 +444,7 @@ function reindexDocument(
 ): void {
 	db.transaction(() => {
 		const rows = db.selectObjects(
-			'SELECT id, text, search_text FROM chunks WHERE document_id = ?',
+			'SELECT id, text, search_text, fuzzy_text FROM chunks WHERE document_id = ?',
 			[documentId]
 		);
 		for (const row of rows) deleteChunkIndexes(row);
@@ -369,13 +454,14 @@ function reindexDocument(
 		for (let i = 0; i < chunks.length; i++) {
 			const chunk = chunks[i];
 			db.exec({
-				sql: `INSERT INTO chunks(document_id, seq, text, search_text, page, heading_path, para_index, char_start, char_end)
-				      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				sql: `INSERT INTO chunks(document_id, seq, text, search_text, fuzzy_text, page, heading_path, para_index, char_start, char_end)
+				      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 				bind: [
 					documentId,
 					chunk.seq,
 					chunk.text,
 					chunk.searchText,
+					chunk.fuzzyText ?? chunk.searchText,
 					chunk.page,
 					chunk.headingPath,
 					chunk.paraIndex,
@@ -388,11 +474,15 @@ function reindexDocument(
 				sql: 'INSERT INTO chunks_fts(rowid, search_text) VALUES (?, ?)',
 				bind: [rowid, chunk.searchText]
 			});
+			db.exec({
+				sql: 'INSERT INTO chunks_fuzzy_fts(rowid, fuzzy_text) VALUES (?, ?)',
+				bind: [rowid, chunk.fuzzyText ?? chunk.searchText]
+			});
 			insertVector(rowid, embeddings.subarray(i * dims, (i + 1) * dims), dims);
 		}
 		db.exec({
-			sql: `UPDATE documents SET embedding_model = ?, status = 'ready', error = NULL, updated_at = ? WHERE id = ?`,
-			bind: [embeddingModel, Date.now(), documentId]
+			sql: `UPDATE documents SET embedding_model = ?, retrieval_version = ?, status = 'ready', error = NULL, updated_at = ? WHERE id = ?`,
+			bind: [embeddingModel, RETRIEVAL_VERSION, Date.now(), documentId]
 		});
 	});
 }
@@ -444,8 +534,40 @@ function searchLexical(queryText: string, documentIds: string[] | null, limit = 
 		}));
 }
 
-/** Exact pre-filtered vector scan. At browser corpus sizes this stays cheap and
- * avoids the correctness bug caused by global top-k followed by filtering. */
+/** Character-gram candidates tolerate typos/OCR noise without altering the exact word index. */
+function searchFuzzy(queryText: string, documentIds: string[] | null, limit = 80): SearchHit[] {
+	const grams = fuzzyQueryGrams(queryText);
+	if (!grams.length) return [];
+	const scope = scopeSql(documentIds);
+	return db
+		.selectObjects(
+			`SELECT c.id AS chunk_id, c.document_id, d.name AS document_name, c.text, c.seq,
+			        c.page, c.heading_path, bm25(chunks_fuzzy_fts) AS fuzzy_score
+			 FROM chunks_fuzzy_fts
+			 JOIN chunks c ON c.id = chunks_fuzzy_fts.rowid
+			 JOIN documents d ON d.id = c.document_id
+			 WHERE chunks_fuzzy_fts MATCH ? AND d.status = 'ready'${scope.clause}
+			 ORDER BY fuzzy_score LIMIT ?`,
+			[grams.map((gram) => `"${gram.replaceAll('"', '')}"`).join(' OR '), ...scope.bind, limit]
+		)
+		.map((r: any) => ({
+			chunkId: r.chunk_id,
+			documentId: r.document_id,
+			documentName: r.document_name,
+			text: r.text,
+			seq: r.seq,
+			page: r.page,
+			headingPath: r.heading_path,
+			score: r.fuzzy_score,
+			fuzzyScore: r.fuzzy_score,
+			semanticScore: null,
+			lexicalScore: null
+		}));
+}
+
+/** Exact scoped KNN. Fetching `limit + outside-scope rows` from the global KNN
+ * is sufficient to guarantee the scoped top-k. Very narrow scopes retain the
+ * manual pre-filtered scan instead of asking vec0 for almost the whole table. */
 function searchVector(
 	queryEmbedding: Float32Array,
 	dims: number,
@@ -459,9 +581,40 @@ function searchVector(
 		queryEmbedding.byteLength
 	).slice();
 	const scope = scopeSql(documentIds);
-	return db
-		.selectObjects(
-			`SELECT c.id AS chunk_id, c.document_id, d.name AS document_name, c.text, c.seq,
+	const totalReady = Number(
+		db.selectValue(
+			`SELECT count(*) FROM ${table} v
+			 JOIN chunks c ON c.id = v.rowid JOIN documents d ON d.id = c.document_id
+			 WHERE d.status = 'ready'`
+		)
+	);
+	const scopedReady = documentIds?.length
+		? Number(
+				db.selectValue(
+					`SELECT count(*) FROM ${table} v
+					 JOIN chunks c ON c.id = v.rowid JOIN documents d ON d.id = c.document_id
+					 WHERE d.status = 'ready'${scope.clause}`,
+					scope.bind
+				)
+			)
+		: totalReady;
+	const knnK = Math.min(totalReady, limit + Math.max(0, totalReady - scopedReady));
+	const useKnn = totalReady > 0 && knnK < totalReady * 0.8;
+	const rows = useKnn
+		? db.selectObjects(
+				`WITH knn AS (
+				   SELECT rowid, distance FROM ${table} WHERE embedding MATCH ? AND k = ?
+				 )
+				 SELECT c.id AS chunk_id, c.document_id, d.name AS document_name, c.text, c.seq,
+				        c.page, c.heading_path, knn.distance
+				 FROM knn JOIN chunks c ON c.id = knn.rowid
+				 JOIN documents d ON d.id = c.document_id
+				 WHERE d.status = 'ready'${scope.clause}
+				 ORDER BY knn.distance LIMIT ?`,
+				[vecBlob, knnK, ...scope.bind, limit]
+			)
+		: db.selectObjects(
+				`SELECT c.id AS chunk_id, c.document_id, d.name AS document_name, c.text, c.seq,
 			        c.page, c.heading_path,
 			        vec_distance_cosine(v.embedding, ?) AS distance
 			 FROM ${table} v
@@ -469,9 +622,13 @@ function searchVector(
 			 JOIN documents d ON d.id = c.document_id
 			 WHERE d.status = 'ready'${scope.clause}
 			 ORDER BY distance LIMIT ?`,
-			[vecBlob, ...scope.bind, limit]
-		)
-		.map((r: any) => ({
+				[vecBlob, ...scope.bind, limit]
+			);
+	return rows.map((r: any) => {
+		const cosineSimilarity = useKnn
+			? 1 - (Number(r.distance) * Number(r.distance)) / 2
+			: 1 - Number(r.distance);
+		return {
 			chunkId: r.chunk_id,
 			documentId: r.document_id,
 			documentName: r.document_name,
@@ -479,10 +636,11 @@ function searchVector(
 			seq: r.seq,
 			page: r.page,
 			headingPath: r.heading_path,
-			score: 1 - Number(r.distance),
-			semanticScore: 1 - Number(r.distance),
+			score: cosineSimilarity,
+			semanticScore: cosineSimilarity,
 			lexicalScore: null
-		}));
+		};
+	});
 }
 
 function listChunksForDocuments(documentIds: string[]): SearchHit[] {
@@ -598,6 +756,10 @@ function countChunks(documentId: string): number {
 	return db.selectValue('SELECT count(*) FROM chunks WHERE document_id = ?', [
 		documentId
 	]) as number;
+}
+
+function databaseBytes(): number {
+	return Number(db.selectValue('PRAGMA page_count')) * Number(db.selectValue('PRAGMA page_size'));
 }
 
 // ── Chats / messages / attachments ──────────────────────────────────────────
@@ -1156,6 +1318,9 @@ export interface DocumentFactRow {
 	valueMinor: number;
 	currency: string;
 	confidence: number;
+	recordKey: string;
+	recordDate: string | null;
+	recordId: string | null;
 }
 
 function replaceDocumentFacts(
@@ -1168,6 +1333,9 @@ function replaceDocumentFacts(
 		valueMinor: number;
 		currency: string;
 		confidence: number;
+		recordKey: string;
+		recordDate: string | null;
+		recordId: string | null;
 	}>
 ): void {
 	db.transaction(() => {
@@ -1179,8 +1347,9 @@ function replaceDocumentFacts(
 			db.exec({
 				sql: `INSERT INTO document_facts(
 				        id, document_id, chunk_id, extractor_version, kind, label,
-				        value_minor, currency, confidence, created_at
-				      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				        value_minor, currency, confidence, record_key, record_date,
+				        record_id, created_at
+				      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 				bind: [
 					crypto.randomUUID(),
 					documentId,
@@ -1191,6 +1360,9 @@ function replaceDocumentFacts(
 					fact.valueMinor,
 					fact.currency,
 					fact.confidence,
+					fact.recordKey,
+					fact.recordDate,
+					fact.recordId,
 					Date.now()
 				]
 			});
@@ -1246,6 +1418,9 @@ function listMoneyFacts(
 			valueMinor: row.value_minor,
 			currency: row.currency,
 			confidence: row.confidence,
+			recordKey: row.record_key,
+			recordDate: row.record_date,
+			recordId: row.record_id,
 			documentName: row.document_name,
 			text: row.text ?? '',
 			page: row.page,
@@ -1271,7 +1446,10 @@ function listDocumentFacts(documentIds: string[], extractorVersion: string): Doc
 			label: r.label,
 			valueMinor: r.value_minor,
 			currency: r.currency,
-			confidence: r.confidence
+			confidence: r.confidence,
+			recordKey: r.record_key,
+			recordDate: r.record_date,
+			recordId: r.record_id
 		}));
 }
 
@@ -1351,10 +1529,12 @@ const api = {
 	documentDetail,
 	search,
 	searchLexical,
+	searchFuzzy,
 	searchVector,
 	listChunksForDocuments,
 	listNeighborChunks,
 	countChunks,
+	databaseBytes,
 	getChunk,
 	getDocument,
 	createChat,

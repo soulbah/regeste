@@ -552,5 +552,21 @@ export const fr: Record<keyof typeof en, string> = {
 	'notice.quota': 'Quota mensuel Assisted atteint. Il se réinitialise le mois prochain.',
 	'notice.signIn': 'Connectez-vous pour utiliser le mode Assisted.',
 	'notice.assistedDown': 'Le service Assisted est indisponible pour le moment.',
-	'notice.assistedUnreachable': 'Le service Assisted est injoignable. Vérifiez votre connexion.'
+	'notice.assistedUnreachable': 'Le service Assisted est injoignable. Vérifiez votre connexion.',
+
+	// Calculs exacts sur les documents
+	'aggregate.ambiguous':
+		'Plusieurs types de montants correspondent. Précisez si vous cherchez les montants envoyés, reçus, les frais ou les totaux débités.',
+	'aggregate.ambiguousCalculation': 'Type de montant à préciser',
+	'aggregate.none':
+		'Je n’ai trouvé aucun montant suffisamment fiable à calculer dans les documents sélectionnés.',
+	'aggregate.noneCalculation': 'Aucun montant retenu',
+	'aggregate.count': 'Le nombre d’opérations correspondantes est {count}. {citations}',
+	'aggregate.countCalculation': '{count} opération(s) correspondante(s)',
+	'aggregate.list': 'Les montants sont {values}.',
+	'aggregate.sum': 'La somme est',
+	'aggregate.average': 'La moyenne est',
+	'aggregate.minimum': 'Le minimum est',
+	'aggregate.maximum': 'Le maximum est',
+	'aggregate.excluded': '{count} document(s) ambigu(s) ont été exclus.'
 };

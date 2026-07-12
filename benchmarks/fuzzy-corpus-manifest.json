@@ -1,0 +1,76 @@
+{
+	"version": 1,
+	"outputDirectory": ".benchmark-corpus/fuzzy",
+	"files": [
+		{
+			"name": "apollo11-flight-plan.pdf",
+			"url": "https://www.nasa.gov/wp-content/uploads/static/apollo50th/pdf/a11final-fltpln.pdf",
+			"canonicalUrl": "https://www.nasa.gov/wp-content/uploads/static/history/alsj/a11/a11-fltplan.html",
+			"licenseUrl": "https://www.nasa.gov/nasa-brand-center/images-and-media/",
+			"use": "NASA public-use historical scan; landscape timelines, abbreviations and missing-page warning",
+			"format": "pdf",
+			"bytes": 10955047,
+			"sha256": "5563218d1e47166a5709d4d3072714c75fe928db0c14c37e1ee6b65c4df3c811"
+		},
+		{
+			"name": "apollo-flight-planning-report.pdf",
+			"url": "https://ntrs.nasa.gov/api/citations/19720024229/downloads/19720024229.pdf",
+			"canonicalUrl": "https://ntrs.nasa.gov/citations/19720024229",
+			"licenseUrl": "https://ntrs.nasa.gov/citations/19720024229",
+			"use": "NASA work of US Government, public use permitted; technical report and figures",
+			"format": "pdf",
+			"bytes": 2630266,
+			"sha256": "22b39858cd54d821400194fba2dbd6dbbdef827c5d48137ace99201eae2c1bc7"
+		},
+		{
+			"name": "federal-register-two-column.pdf",
+			"url": "https://www.govinfo.gov/content/pkg/FR-2025-12-12/pdf/2025-22609.pdf",
+			"canonicalUrl": "https://www.govinfo.gov/content/pkg/FR-2025-12-12/pdf/2025-22609.pdf",
+			"licenseUrl": "https://www.govinfo.gov/about/policies",
+			"use": "Official US Government two-column notice with headers, citations and line wrapping",
+			"format": "pdf",
+			"bytes": 216440,
+			"sha256": "a619a5c743c7329d89f4d3949ed9ee08b4f66eb445dc7ea86f99adc9f12d2780"
+		},
+		{
+			"name": "cfr-fiberboard-boxes.pdf",
+			"url": "https://www.govinfo.gov/content/pkg/CFR-2024-title49-vol3/pdf/CFR-2024-title49-vol3-sec178-516.pdf",
+			"canonicalUrl": "https://www.govinfo.gov/app/details/CFR-2024-title49-vol3/CFR-2024-title49-vol3-sec178-516",
+			"licenseUrl": "https://www.govinfo.gov/about/policies",
+			"use": "Official CFR section with exact legal identifiers, units, tables and amendments",
+			"format": "pdf",
+			"bytes": 175758,
+			"sha256": "49ff24d6f71c6f696fa5405555167d9eff7522761d26f325e5a935c6abda40d9"
+		},
+		{
+			"name": "rfc9110.txt",
+			"url": "https://www.rfc-editor.org/rfc/rfc9110.txt",
+			"canonicalUrl": "https://www.rfc-editor.org/info/rfc9110/",
+			"licenseUrl": "https://trustee.ietf.org/documents/trust-legal-provisions/",
+			"use": "Official plain-text rendition; headings, ABNF, acronyms and exact section references",
+			"format": "txt",
+			"bytes": 502941,
+			"sha256": "21c1cdce6ab0e5509b04d84a28000836c7a087cf786efe6f04877ebfff47232a"
+		},
+		{
+			"name": "rfc9110.pdf",
+			"url": "https://www.rfc-editor.org/rfc/rfc9110.pdf",
+			"canonicalUrl": "https://www.rfc-editor.org/info/rfc9110/",
+			"licenseUrl": "https://trustee.ietf.org/documents/trust-legal-provisions/",
+			"use": "Same RFC as PDF for cross-format evidence parity",
+			"format": "pdf",
+			"bytes": 2858365,
+			"sha256": "60b30efa1048900833d1758440247fe8ac85a3134f2327388dcb24e07d814c89"
+		},
+		{
+			"name": "sec-10k.htm",
+			"url": "https://www.sec.gov/Archives/edgar/data/1336917/000133691726000073/ua-20260331.htm",
+			"canonicalUrl": "https://www.sec.gov/Archives/edgar/data/1336917/000133691726000073/0001336917-26-000073-index.htm",
+			"licenseUrl": "https://www.sec.gov/about/privacy-information#copyright",
+			"use": "Official EDGAR iXBRL filing; development-only conversion to TXT/MD/DOCX for tables and repeated boilerplate",
+			"format": "html-source",
+			"bytes": 2446740,
+			"sha256": "4d37d6b61afa1c317169d8e8ad284d88697595c708558e900481fe39cbb76753"
+		}
+	]
+}

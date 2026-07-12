@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { questionLocale, routeQuestion } from './query-router';
+import { analyzeQuestion, questionLocale, routeQuestion } from './query-router';
 import { extractMoneyCandidates } from './money';
 import { aggregateMoney } from './aggregate';
 import type { SearchHit } from '$lib/types';
@@ -19,11 +19,29 @@ describe('query routing', () => {
 		expect(routeQuestion('Quelle est la somme TTC de toutes les factures ?')).toBe('aggregate');
 		expect(routeQuestion('Quel est le total de la facture F-102 ?')).toBe('targeted');
 		expect(routeQuestion('Compare les obligations des deux contrats')).toBe('synthesis');
+		expect(routeQuestion('Dresse un portrait complet de CR-204 sans confondre les sources')).toBe(
+			'synthesis'
+		);
+		expect(routeQuestion('Que sait-on de Camille dans tous les documents ?')).toBe('synthesis');
+		expect(
+			routeQuestion(
+				'Le prix et le montant du prêt sont-ils identiques ? Cite séparément les pages qui prouvent chaque montant.'
+			)
+		).toBe('synthesis');
 	});
 
 	it('keeps short French questions in French', () => {
 		expect(questionLocale('Quelle est la somme TTC de toutes les factures ?')).toBe('fr');
 		expect(questionLocale('What is the sum across all invoices?')).toBe('en');
+	});
+
+	it('lets a follow-up month override the previous aggregate month', () => {
+		const result = analyzeQuestion(
+			'Et en juillet ?\nPrevious question: Combien ai-je envoyé en juin ?'
+		);
+		expect(result.route).toBe('aggregate');
+		expect(result.moneyRole).toBe('sent');
+		expect(result.temporal?.month).toBe(7);
 	});
 });
 
@@ -32,6 +50,27 @@ describe('money extraction', () => {
 		expect(extractMoneyCandidates('Total TTC 1 234,56 €')[0].valueMinor).toBe(123456);
 		expect(extractMoneyCandidates('Amount due: USD 1,234.56')[0].valueMinor).toBe(123456);
 		expect(extractMoneyCandidates('Grand total (42,10 EUR)')[0].valueMinor).toBe(-4210);
+	});
+
+	it('keeps adjacent EUR and zero-decimal GNF values in their explicit currencies', () => {
+		const values = extractMoneyCandidates(
+			'Montant 149,04 € Montant reçu par le bénéficiaire 1 499 472 GNF'
+		);
+		expect(values).toMatchObject([
+			{ valueMinor: 14904, currency: 'EUR', kind: 'amount' },
+			{ valueMinor: 1499472, currency: 'GNF', kind: 'received' }
+		]);
+	});
+
+	it('reconstructs a received-amount label wrapped around the value line', () => {
+		const values = extractMoneyCandidates(
+			'Montant reçu par le\nMontant 149,04 € 1 499 472 GNF\nbénéficiaire\nTaux de change : 1 € = 10 060,8691 GNF'
+		);
+		expect(values).toMatchObject([
+			{ valueMinor: 14904, currency: 'EUR', kind: 'amount' },
+			{ valueMinor: 1499472, currency: 'GNF', kind: 'received' }
+		]);
+		expect(values).toHaveLength(2);
 	});
 });
 

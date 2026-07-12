@@ -1,0 +1,62 @@
+Transaction TX-ALPHA-001
+Date: 20 juin 2026
+Expediteur: Camille Exemple
+Montant 120,00 EUR Montant recu par le beneficiaire 1 200 000 GNF
+Frais de transfert 2,00 EUR
+Total 122,00 EUR
+Beneficiaire: Morgan Exemple
+Motif: Assistance familiale
+
+Transaction TX-BRAVO-002
+Date: 12 juin 2026
+Expediteur: Camille Exemple
+Montant 80,00 EUR Montant recu par le beneficiaire 800 000 GNF
+Frais de transfert 2,00 EUR
+Total 82,00 EUR
+Beneficiaire: Morgan Exemple
+Motif: Assistance familiale
+
+Transaction TX-CHARLIE-003
+Date: 08 juin 2026
+Expediteur: Camille Exemple
+Montant 120,00 EUR Montant recu par le beneficiaire 1 212 000 GNF
+Frais de transfert 2,00 EUR
+Total 122,00 EUR
+Beneficiaire: Morgan Exemple
+Motif: Assistance familiale
+
+Transaction TX-DELTA-004
+Date: 13 mai 2026
+Expediteur: Camille Exemple
+Montant 400,00 EUR Montant recu par le beneficiaire 4 120 000 GNF
+Frais de transfert 3,00 EUR
+Total 403,00 EUR
+Beneficiaire: Morgan Exemple
+Motif: Assistance familiale
+
+Transaction TX-ECHO-005
+Date: 09 mai 2026
+Expediteur: Camille Exemple
+Montant 90,00 EUR Montant recu par le beneficiaire 927 000 GNF
+Frais de transfert 1,00 EUR
+Total 91,00 EUR
+Beneficiaire: Morgan Exemple
+Motif: Assistance familiale
+
+Transaction TX-FOXTROT-006
+Date: 02 mai 2026
+Expediteur: Camille Exemple
+Montant 310,00 EUR Montant recu par le beneficiaire 3 193 000 GNF
+Frais de transfert 2,00 EUR
+Total 312,00 EUR
+Beneficiaire: Morgan Exemple
+Motif: Assistance familiale
+
+Transaction TX-GOLF-007
+Date: 20 avril 2026
+Expediteur: Camille Exemple
+Montant 250,00 EUR Montant recu par le beneficiaire 2 600 000 GNF
+Frais de transfert 0,00 EUR
+Total 250,00 EUR
+Beneficiaire: Morgan Exemple
+Motif: Assistance familiale

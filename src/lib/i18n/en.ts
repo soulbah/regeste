@@ -539,5 +539,21 @@ export const en = {
 	'notice.quota': 'Monthly Assisted quota reached. It resets next month.',
 	'notice.signIn': 'Sign in to use Assisted mode.',
 	'notice.assistedDown': 'The Assisted service is unavailable right now.',
-	'notice.assistedUnreachable': 'The Assisted service is unreachable. Check your connection.'
+	'notice.assistedUnreachable': 'The Assisted service is unreachable. Check your connection.',
+
+	// Exact document analytics
+	'aggregate.ambiguous':
+		'Several amount types match. Specify whether you need sent amounts, received amounts, fees, or debited totals.',
+	'aggregate.ambiguousCalculation': 'Amount type required',
+	'aggregate.none':
+		'I found no sufficiently reliable amount to calculate in the selected documents.',
+	'aggregate.noneCalculation': 'No amount retained',
+	'aggregate.count': 'The number of matching records is {count}. {citations}',
+	'aggregate.countCalculation': '{count} matching record(s)',
+	'aggregate.list': 'The amounts are {values}.',
+	'aggregate.sum': 'The sum is',
+	'aggregate.average': 'The average is',
+	'aggregate.minimum': 'The minimum is',
+	'aggregate.maximum': 'The maximum is',
+	'aggregate.excluded': '{count} ambiguous document(s) were excluded.'
 } as const;

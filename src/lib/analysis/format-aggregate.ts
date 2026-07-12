@@ -1,7 +1,26 @@
 import type { AggregateResult } from './aggregate';
+import { currencyScale } from './money';
+import { en } from '$lib/i18n/en';
+import { fr } from '$lib/i18n/fr';
+
+type AggregateMessageKey = Extract<keyof typeof en, `aggregate.${string}`>;
+
+function copy(
+	locale: 'fr' | 'en',
+	key: AggregateMessageKey,
+	params?: Record<string, string | number>
+): string {
+	let value = (locale === 'fr' ? fr : en)[key];
+	for (const [name, replacement] of Object.entries(params ?? {})) {
+		value = value.replaceAll(`{${name}}`, String(replacement));
+	}
+	return value;
+}
 
 function money(valueMinor: number, currency: string, locale: string): string {
-	return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(valueMinor / 100);
+	return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(
+		valueMinor / currencyScale(currency)
+	);
 }
 
 export function formatAggregateResult(
@@ -13,42 +32,40 @@ export function formatAggregateResult(
 } {
 	const language = locale === 'fr' ? 'fr-FR' : 'en-US';
 	if (!result.facts.length) {
+		if (result.ambiguousRecords.length) {
+			return {
+				text: copy(locale, 'aggregate.ambiguous'),
+				calculation: copy(locale, 'aggregate.ambiguousCalculation')
+			};
+		}
 		return {
-			text:
-				locale === 'fr'
-					? 'Je n’ai trouvé aucun montant suffisamment fiable à calculer dans les documents sélectionnés.'
-					: 'I found no sufficiently reliable amount to calculate in the selected documents.',
-			calculation: locale === 'fr' ? 'Aucun montant retenu' : 'No amount retained'
+			text: copy(locale, 'aggregate.none'),
+			calculation: copy(locale, 'aggregate.noneCalculation')
 		};
 	}
-	const labels = result.groups.map((group) =>
-		result.operation === 'count'
-			? `${group.count}`
-			: money(group.valueMinor, group.currency, language)
-	);
+	const labels = result.groups.map((group) => money(group.valueMinor, group.currency, language));
 	const citations = result.facts.map((_, index) => `[${index + 1}]`).join(' ');
-	const operation =
-		locale === 'fr'
-			? {
-					sum: 'La somme est',
-					average: 'La moyenne est',
-					minimum: 'Le minimum est',
-					maximum: 'Le maximum est',
-					count: 'Le nombre de montants est'
-				}[result.operation]
-			: {
-					sum: 'The sum is',
-					average: 'The average is',
-					minimum: 'The minimum is',
-					maximum: 'The maximum is',
-					count: 'The number of amounts is'
-				}[result.operation];
+	if (result.operation === 'count') {
+		return {
+			text: copy(locale, 'aggregate.count', { count: result.count, citations }),
+			calculation: copy(locale, 'aggregate.countCalculation', { count: result.count })
+		};
+	}
+	if (result.operation === 'list') {
+		const values = result.facts.map(
+			(fact, index) => `${money(fact.valueMinor, fact.currency, language)} [${index + 1}]`
+		);
+		return {
+			text: copy(locale, 'aggregate.list', { values: values.join(', ') }),
+			calculation: values.join(' · ')
+		};
+	}
+	const operation = copy(locale, `aggregate.${result.operation}`);
 	let text = `${operation} ${labels.join(locale === 'fr' ? ' et ' : ' and ')}. ${citations}`;
 	if (result.ambiguousDocuments.length) {
-		text +=
-			locale === 'fr'
-				? ` ${result.ambiguousDocuments.length} document(s) ambigu(s) ont été exclus.`
-				: ` ${result.ambiguousDocuments.length} ambiguous document(s) were excluded.`;
+		text += ` ${copy(locale, 'aggregate.excluded', {
+			count: result.ambiguousDocuments.length
+		})}`;
 	}
 	const calculation = result.groups
 		.map((group) => {

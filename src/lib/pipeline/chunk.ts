@@ -6,6 +6,7 @@
 // from the tail of the previous chunk within the same section only.
 
 import type { Chunk, ParsedBlock } from '$lib/types';
+import { extractAliases, fuzzyIndexText } from '$lib/pipeline/fuzzy';
 
 // Conservative browser budget: around 180–260 tokens for French/English prose.
 // Exact model tokenization still happens before inference; this bound prevents
@@ -75,6 +76,18 @@ export function chunkBlocks(blocks: ParsedBlock[], documentName = ''): Chunk[] {
 	}
 
 	for (const section of sections) {
+		const hasStructuralParent = section.some(
+			(block) => block.headingPath?.length || block.retrievalContext
+		);
+		// A PDF page number is a citation boundary, not a semantic parent. Copying
+		// its opening text into every child made the right page rank with the wrong
+		// evidence passage. Only genuine headings/table contexts are propagated.
+		const sectionOverview = hasStructuralParent
+			? section
+					.map((block) => block.retrievalContext ?? block.text)
+					.join('\n')
+					.slice(0, 600)
+			: '';
 		// Flatten section blocks into pieces no larger than the target.
 		const pieces: Piece[] = [];
 		for (const b of section) {
@@ -97,9 +110,24 @@ export function chunkBlocks(blocks: ParsedBlock[], documentName = ''): Chunk[] {
 			const b = first.block;
 			const text = buf.map((p) => p.text).join('\n');
 			const headingPath = b.headingPath?.join(' > ') ?? null;
+			const structuralContext = [
+				...new Set(buf.map((piece) => piece.block.retrievalContext).filter(Boolean))
+			].join('\n');
+			const aliases = extractAliases(`${headingPath ?? ''}\n${sectionOverview}\n${text}`).join(' ');
+			const searchText = [
+				documentName,
+				headingPath,
+				structuralContext,
+				sectionOverview,
+				aliases,
+				text
+			]
+				.filter(Boolean)
+				.join('\n');
 			chunks.push({
 				text,
-				searchText: [documentName, headingPath, text].filter(Boolean).join('\n'),
+				searchText,
+				fuzzyText: fuzzyIndexText(searchText),
 				seq: seq++,
 				page: b.page ?? null,
 				headingPath,

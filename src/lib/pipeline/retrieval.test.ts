@@ -33,6 +33,41 @@ describe('fuseCandidates', () => {
 	});
 });
 
+describe('fuzzy and multi-document safety', () => {
+	it('adds an independent fuzzy rank without displacing exact top evidence', () => {
+		const exact = { ...hit(1, 'contract', -1), text: 'Le contrat ZX-2048 expire en 2028.' };
+		const fuzzy = { ...hit(2, 'contract', -2), text: 'Le contrat ZX-2047 expire en 2029.' };
+		expect(refineCandidates([], [exact], 'Quand expire ZX-2048 ?', 2, [fuzzy])[0].chunkId).toBe(1);
+	});
+
+	it('lets a discriminating fuzzy candidate beat unrelated two-channel agreement', () => {
+		const compromis = {
+			...hit(1, 'compromis', -1),
+			documentName: 'Compromis Martin.pdf',
+			text: 'PRIX DE LA VENTE exact 146 000 euros'
+		};
+		const unrelated = { ...hit(2, 'lease', 0.8), text: 'Le locataire résilie son bail.' };
+		const result = refineCandidates(
+			[unrelated],
+			[unrelated],
+			'Quel est le prxi de vnete exct du bien Martin ?',
+			2,
+			[compromis]
+		);
+		expect(result[0].chunkId).toBe(1);
+	});
+
+	it('preserves one leading passage per document for synthesis', () => {
+		const ranked = [
+			{ ...hit(1, 'partie A', 1), documentId: 'a' },
+			{ ...hit(2, 'partie A bis', 0.9), documentId: 'a' },
+			{ ...hit(3, 'partie B', 0.8), documentId: 'b' }
+		];
+		const selected = selectWithNeighbors(ranked, [], 'Compare tous les documents', 2);
+		expect(new Set(selected.map((item) => item.documentId))).toEqual(new Set(['a', 'b']));
+	});
+});
+
 describe('retrieval refinement', () => {
 	it('expands real-estate questions to document vocabulary', () => {
 		expect(expandRetrievalQuery('Quel est le prix de la maison ?')).toContain(
@@ -41,6 +76,21 @@ describe('retrieval refinement', () => {
 		expect(expandRetrievalQuery('Quel est le montant du prêt ?')).toContain('emprunt financement');
 		expect(expandRetrievalQuery('Quelle est la superficie ?')).toContain(
 			'contenance mètres carrés'
+		);
+	});
+
+	it('expands typoed bilingual technical concepts without adding an answer', () => {
+		expect(expandRetrievalQuery('Quel est le prxi de vnete exct ?')).toContain(
+			'prix price vente sale montant amount euros'
+		);
+		expect(expandRetrievalQuery('Contnet Lenght peut il être négatif ?')).toContain(
+			'Content-Length content length field non-negative'
+		);
+		expect(expandRetrievalQuery('Quel efet a la planifcation de deux vehicules ?')).toContain(
+			'flight planning two vehicles effect'
+		);
+		expect(expandRetrievalQuery("Quelle datte d'entrée en viguer est indiquée ?")).toContain(
+			'effective date entry into force'
 		);
 	});
 
@@ -130,6 +180,28 @@ describe('retrieval refinement', () => {
 		);
 		expect(result.map((item) => item.chunkId)).toContain(21);
 		expect(result.filter((item) => item.text === anchor.text)).toHaveLength(1);
+	});
+
+	it('preserves near-identical record pages for exhaustive questions only', () => {
+		const repeated = (page: number, date: string, amount: string): SearchHit => ({
+			...hit(page, 'receipts', 0.04 - page * 0.001),
+			page,
+			seq: page - 1,
+			text: `Récépissé de transfert Expéditeur Exemple Bénéficiaire Exemple Conditions générales identiques Transaction ${date} Montant ${amount} EUR Total ${amount} EUR`
+		});
+		const pages = [
+			repeated(1, '20 juin 2026', '120,00'),
+			repeated(2, '12 juin 2026', '80,00'),
+			repeated(3, '08 juin 2026', '120,00')
+		];
+		expect(
+			selectWithNeighbors(pages, [], 'Quelle est la somme envoyée en juin ?', 8).map(
+				(item) => item.page
+			)
+		).toEqual([1, 2, 3]);
+		expect(
+			selectWithNeighbors(pages, [], 'Qui est le bénéficiaire ?', 8).map((item) => item.page)
+		).toHaveLength(1);
 	});
 
 	it('weights names and numbers as discriminating terms', () => {

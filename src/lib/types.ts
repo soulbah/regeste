@@ -25,6 +25,8 @@ export interface LocalDocument {
 	embeddingModel: string | null;
 	/** D2 — detected document language ('fr' | 'en'), null when undetected. */
 	language: string | null;
+	/** Local retrieval-view version; old documents are repaired from OPFS. */
+	retrievalVersion?: number;
 	createdAt: number;
 	updatedAt: number;
 }
@@ -41,6 +43,8 @@ export interface ParsedBlock {
 	/** Char offsets within the block's page (PDF) or the full document text (others). */
 	charStart: number;
 	charEnd: number;
+	/** Retrieval-only structural context, e.g. repeated table headers. */
+	retrievalContext?: string;
 }
 
 export interface ParsedDoc {
@@ -54,6 +58,8 @@ export interface Chunk {
 	text: string;
 	/** Retrieval-only representation enriched with document/section labels. */
 	searchText: string;
+	/** Retrieval-only character-gram representation. */
+	fuzzyText?: string;
 	seq: number;
 	page: number | null;
 	headingPath: string | null; // ' > '-joined
@@ -75,6 +81,7 @@ export interface SearchHit {
 	/** Raw component scores retained for calibration and honest refusals. */
 	semanticScore?: number | null;
 	lexicalScore?: number | null;
+	fuzzyScore?: number | null;
 }
 
 export type QuestionRoute = 'targeted' | 'synthesis' | 'aggregate';

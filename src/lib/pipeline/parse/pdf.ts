@@ -9,6 +9,7 @@
 // all-or-nothing `scanned_pdf` throw that discarded the whole document.
 
 import type { ParsedDoc, ParsedBlock } from '$lib/types';
+import { orderPdfText } from './pdf-layout';
 
 const SCANNED_MIN_CHARS_PER_PAGE = 50;
 
@@ -26,34 +27,21 @@ export async function parsePdf(data: ArrayBuffer): Promise<ParsedDoc> {
 
 	for (let pageNum = 1; pageNum <= doc.numPages; pageNum++) {
 		const page = await doc.getPage(pageNum);
+		const pageWidth = page.getViewport({ scale: 1 }).width;
 		const content = await page.getTextContent();
 		const positioned = content.items
 			.filter(
 				(item): item is (typeof content.items)[number] & { str: string; transform: number[] } =>
 					'str' in item && Array.isArray(item.transform)
 			)
-			.map((item) => ({ text: item.str.trim(), x: item.transform[4], y: item.transform[5] }))
+			.map((item) => ({
+				text: item.str.trim(),
+				x: item.transform[4],
+				y: item.transform[5],
+				width: 'width' in item && typeof item.width === 'number' ? item.width : 0
+			}))
 			.filter((item) => item.text.length > 0);
-		// Rebuild visual lines. Financial documents depend on labels staying next
-		// to their values; flat item concatenation loses that relationship.
-		const lines: Array<{ y: number; items: Array<{ text: string; x: number }> }> = [];
-		for (const item of positioned) {
-			let line = lines.find((candidate) => Math.abs(candidate.y - item.y) <= 2);
-			if (!line) {
-				line = { y: item.y, items: [] };
-				lines.push(line);
-			}
-			line.items.push({ text: item.text, x: item.x });
-		}
-		lines.sort((a, b) => b.y - a.y);
-		const lineTexts = lines.map((line) =>
-			line.items
-				.sort((a, b) => a.x - b.x)
-				.map((item) => item.text)
-				.join(' ')
-				.replace(/\s+/g, ' ')
-				.trim()
-		);
+		const lineTexts = orderPdfText(positioned, pageWidth);
 		const text = lineTexts.join('\n').trim();
 		if (text.length < SCANNED_MIN_CHARS_PER_PAGE) {
 			// Image-only page: OCR it later instead of keeping text crumbs.

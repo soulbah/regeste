@@ -22,8 +22,9 @@ import {
 	refineCandidates,
 	selectWithNeighbors
 } from '$lib/pipeline/retrieval';
-import { extractMoneyCandidates } from '$lib/analysis/money';
+import { RETRIEVAL_VERSION } from '$lib/pipeline/retrieval-version';
 import type { MoneyKind } from '$lib/analysis/money';
+import { extractFinancialRecords } from '$lib/analysis/financial-records';
 import {
 	aggregateMoneyFacts,
 	FACT_EXTRACTOR_VERSION,
@@ -78,6 +79,9 @@ class DocumentsStore {
 	 *  run multiple main-thread reads concurrently and jank the UI. */
 	private ocrChain: Promise<unknown> = Promise.resolve();
 	private ocrRepairStarted = false;
+	private interruptedRepairStarted = false;
+	private retrievalRepairStarted = false;
+	private processingIds = new Set<string>();
 	dbInfo = $state<DbInfo | null>(null);
 	dbError = $state<string | null>(null);
 	/** False until the first library load lands, so the UI can tell "loading"
@@ -95,7 +99,9 @@ class DocumentsStore {
 			this.dbInfo = info;
 			this.embeddingProfile = await detectEmbeddingProfile();
 			await this.refreshLibrary();
-			void this.repairOcrIndexes();
+			void this.repairInterruptedIngests()
+				.then(() => this.repairOcrIndexes())
+				.then(() => this.repairRetrievalIndexes());
 		} catch (err) {
 			this.dbError = err instanceof Error ? err.message : String(err);
 		} finally {
@@ -103,6 +109,61 @@ class DocumentsStore {
 			// settles, even if the database failed to open — an unresolved load
 			// would otherwise hang the page on skeletons forever.
 			this.libraryLoaded = true;
+		}
+	}
+
+	/** Rebuild deterministic retrieval views from the local original. The DB
+	 * version flips only inside the same transaction that swaps every index. */
+	private async repairRetrievalIndexes(): Promise<void> {
+		if (this.retrievalRepairStarted) return;
+		this.retrievalRepairStarted = true;
+		try {
+			const { db } = await getLocalDb();
+			for (const doc of this.documents.filter((item) => item.status === 'ready')) {
+				if (this.processingIds.has(doc.id) || this.ocrAborts[doc.id]) continue;
+				const chunkCount = await db.countChunks(doc.id);
+				if ((doc.retrievalVersion ?? 1) >= RETRIEVAL_VERSION && chunkCount > 0) continue;
+				await this.reindex(doc.id);
+			}
+		} finally {
+			this.retrievalRepairStarted = false;
+			await this.refreshLibrary();
+		}
+	}
+
+	/** Resume rows whose async browser work was cut by a reload/crash. Bytes
+	 * already persisted in OPFS are enough; embeddings/facts are rebuilt. */
+	private async repairInterruptedIngests(): Promise<void> {
+		if (this.interruptedRepairStarted) return;
+		this.interruptedRepairStarted = true;
+		try {
+			const { db } = await getLocalDb();
+			const interrupted = new Set<LocalDocument['status']>([
+				'received',
+				'parsing',
+				'chunking',
+				'embedding',
+				'scanned',
+				'ocr'
+			]);
+			for (const doc of this.documents.filter((item) => interrupted.has(item.status))) {
+				if (this.processingIds.has(doc.id) || this.ocrAborts[doc.id]) continue;
+				const data = await readOriginal(doc.hash);
+				if (!data) {
+					await db.setDocumentStatus(doc.id, 'error', { error: 'parse_failed' });
+					this.setIngest(doc.id, { status: 'error', phaseProgress: 0, error: 'parse_failed' });
+					continue;
+				}
+				await db.deleteChunks(doc.id);
+				await this.processDocument(
+					doc.id,
+					new File([data], doc.name, { type: doc.mime }),
+					doc.hash
+				);
+			}
+		} finally {
+			this.interruptedRepairStarted = false;
+			await this.refreshLibrary();
 		}
 	}
 
@@ -193,6 +254,16 @@ class DocumentsStore {
 		const hash = await sha256Hex(await file.arrayBuffer());
 		const existing = await db.getDocumentByHash(hash);
 		if (existing) {
+			if (
+				existing.status !== 'ready' &&
+				!this.processingIds.has(existing.id) &&
+				!this.ocrAborts[existing.id]
+			) {
+				await db.deleteChunks(existing.id);
+				await db.setDocumentStatus(existing.id, 'received');
+				this.setIngest(existing.id, { status: 'received', phaseProgress: 0 });
+				return { id: existing.id, hash, isNew: true };
+			}
 			this.setIngest(existing.id, { status: existing.status, phaseProgress: 1, dedup: true });
 			return { id: existing.id, hash, isNew: false };
 		}
@@ -219,6 +290,8 @@ class DocumentsStore {
 
 	/** Parse → chunk → embed → index one staged document (bytes re-read here). */
 	private async processDocument(id: string, file: File, hash: string): Promise<void> {
+		if (this.processingIds.has(id)) return;
+		this.processingIds.add(id);
 		const { db } = await getLocalDb();
 		try {
 			const data = await file.arrayBuffer();
@@ -286,6 +359,7 @@ class DocumentsStore {
 			this.setIngest(id, { status: 'error', phaseProgress: 0, error: code });
 			if (code === 'unknown') console.error('[folio] ingest failed:', err);
 		} finally {
+			this.processingIds.delete(id);
 			await this.refreshLibrary();
 		}
 	}
@@ -298,21 +372,47 @@ class DocumentsStore {
 		onInspect?: () => void
 	): Promise<SearchHit[]> {
 		const { db } = await getLocalDb();
-		const clean = expandRetrievalQuery(query.trim());
+		const embeddingQuery = query.trim();
+		const clean = expandRetrievalQuery(embeddingQuery);
 		const refinedQuery = expandRetrievalQuery(refinementQuery.trim());
-		const lexicalPromise = db.searchLexical(clean, documentIds, 80);
-		const { data, dims } = await getEmbedWorker().embed([clean], 'query');
-		const [lexical, semantic] = await Promise.all([
+		const lexicalPromise = db.searchLexical(clean, documentIds, 60);
+		const fuzzyPromise = db.searchFuzzy(clean, documentIds, 60);
+		const { data, dims } = await getEmbedWorker().embed([embeddingQuery], 'query');
+		const [lexical, fuzzy, semantic] = await Promise.all([
 			lexicalPromise,
-			db.searchVector(data, dims, documentIds, 80)
+			fuzzyPromise,
+			db.searchVector(data, dims, documentIds, 60)
 		]);
 		onInspect?.();
-		const ranked = refineCandidates(semantic, lexical, refinedQuery, 24);
+		const ranked = refineCandidates(semantic, lexical, refinedQuery, 24, fuzzy);
 		const neighbors = await db.listNeighborChunks(
 			ranked.slice(0, 12).map((hit) => hit.chunkId),
 			1
 		);
 		return selectWithNeighbors(ranked, neighbors, refinedQuery, 8);
+	}
+
+	/** Dev benchmark ablation: same candidates, isolated by retrieval channel. */
+	async retrieveChannelCandidates(
+		query: string,
+		documentIds: string[] | null = null
+	): Promise<Record<'lexical' | 'fuzzy' | 'dense', SearchHit[]>> {
+		const { db } = await getLocalDb();
+		const embeddingQuery = query.trim();
+		const expanded = expandRetrievalQuery(embeddingQuery);
+		const lexicalPromise = db.searchLexical(expanded, documentIds, 60);
+		const fuzzyPromise = db.searchFuzzy(expanded, documentIds, 60);
+		const { data, dims } = await getEmbedWorker().embed([embeddingQuery], 'query');
+		const [lexical, fuzzy, dense] = await Promise.all([
+			lexicalPromise,
+			fuzzyPromise,
+			db.searchVector(data, dims, documentIds, 60)
+		]);
+		return {
+			lexical: refineCandidates([], lexical, expanded, 10),
+			fuzzy: refineCandidates([], [], expanded, 10, fuzzy),
+			dense: refineCandidates(dense, [], expanded, 10)
+		};
 	}
 
 	/** Exhaustive local path for numerical questions: no top-k truncation. */
@@ -321,8 +421,18 @@ class DocumentsStore {
 		const cached = new Set(await db.listDocumentFactRunIds(documentIds, FACT_EXTRACTOR_VERSION));
 		for (const documentId of documentIds.filter((id) => !cached.has(id))) {
 			const chunks = await db.listChunksForDocuments([documentId]);
-			const facts = chunks.flatMap((chunk) =>
-				extractMoneyCandidates(chunk.text).map((fact) => ({ ...fact, chunkId: chunk.chunkId }))
+			const facts = extractFinancialRecords(chunks).flatMap((record) =>
+				record.facts.map((fact) => ({
+					kind: fact.kind,
+					label: fact.label,
+					valueMinor: fact.valueMinor,
+					currency: fact.currency,
+					confidence: fact.confidence,
+					chunkId: fact.chunkId,
+					recordKey: fact.recordKey,
+					recordDate: fact.recordDate,
+					recordId: fact.recordId
+				}))
 			);
 			await db.replaceDocumentFacts(documentId, FACT_EXTRACTOR_VERSION, facts);
 		}
@@ -331,7 +441,12 @@ class DocumentsStore {
 			query,
 			facts
 				.filter((fact) => fact.chunkId !== null)
-				.map((fact) => ({ ...fact, chunkId: fact.chunkId!, kind: fact.kind as MoneyKind }))
+				.map((fact) => ({
+					...fact,
+					chunkId: fact.chunkId!,
+					kind: fact.kind as MoneyKind,
+					raw: undefined
+				}))
 		);
 	}
 
@@ -356,19 +471,47 @@ class DocumentsStore {
 
 	/** D4 — rebuild chunks + embeddings from the OPFS original. */
 	async reindex(id: string): Promise<void> {
+		if (this.processingIds.has(id) || this.ocrAborts[id]) return;
+		this.processingIds.add(id);
 		const { db } = await getLocalDb();
 		const doc = await db.getDocument(id);
-		if (!doc) return;
+		if (!doc) {
+			this.processingIds.delete(id);
+			return;
+		}
+		const existingChunkCount = await db.countChunks(id);
 		const data = await readOriginal(doc.hash);
 		if (!data) {
 			this.setIngest(id, { status: 'error', phaseProgress: 0, error: 'parse_failed' });
+			if (existingChunkCount === 0) {
+				await db.setDocumentStatus(id, 'error', { error: 'parse_failed' });
+			}
+			this.processingIds.delete(id);
 			return;
 		}
 		try {
 			this.setIngest(id, { status: 'parsing', phaseProgress: 0 });
 			const parsed = await parseByName(doc.name, doc.mime, data);
+			let blocks = parsed.blocks;
+			const needsOcr = parsed.needsOcr ?? [];
+			if (needsOcr.length) {
+				this.setIngest(id, { status: 'ocr', phaseProgress: 0 });
+				const { ocrPages } = await import('$lib/pipeline/ocr');
+				const ocrBlocks = await ocrPages(data, needsOcr, (progress) => {
+					this.setIngest(id, {
+						status: 'ocr',
+						phaseProgress: progress.total ? progress.done / progress.total : 0
+					});
+				});
+				blocks = [...blocks, ...ocrBlocks].sort((a, b) => (a.page ?? 0) - (b.page ?? 0));
+			}
 			this.setIngest(id, { status: 'chunking', phaseProgress: 0 });
-			const chunks = chunkBlocks(parsed.blocks, doc.name);
+			const chunks = chunkBlocks(blocks, doc.name);
+			if (!chunks.length) {
+				throw Object.assign(new Error('No usable text after OCR'), {
+					code: 'scanned_pdf' as const
+				});
+			}
 			this.setIngest(id, { status: 'embedding', phaseProgress: 0 });
 			const {
 				data: vectors,
@@ -389,7 +532,9 @@ class DocumentsStore {
 		} catch (err) {
 			const code: IngestErrorCode = (err as { code?: IngestErrorCode }).code ?? 'unknown';
 			this.setIngest(id, { status: 'error', phaseProgress: 0, error: code });
+			if (existingChunkCount === 0) await db.setDocumentStatus(id, 'error', { error: code });
 		} finally {
+			this.processingIds.delete(id);
 			await this.refreshLibrary();
 		}
 	}

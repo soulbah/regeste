@@ -97,6 +97,19 @@ describe('resolveCitations', () => {
 		expect(result.citations[0].hit.page).toBe(1);
 	});
 
+	it('preserves separate citations for coordinated multi-fact questions', () => {
+		const price = { ...hit(1), text: 'Prix de vente 146 000 euros', page: 3 };
+		const loan = { ...hit(2), text: 'Montant du prêt 146 000 euros', page: 19 };
+		const result = resolveTargetedCitations(
+			'Le prix est 146 000 € [1] et le prêt est 146 000 € [2].',
+			[price, loan],
+			'Quel est le prix et quel est le prêt ?'
+		);
+		expect(result.citations.map((citation) => citation.hit.page)).toEqual([3, 19]);
+		expect(result.text).toContain('[1] et');
+		expect(result.text).toContain('[2]');
+	});
+
 	it('passes through text with no markers', () => {
 		const { text, citations } = resolveCitations('No idea.', [hit(1)]);
 		expect(text).toBe('No idea.');

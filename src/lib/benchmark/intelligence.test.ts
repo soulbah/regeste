@@ -39,9 +39,34 @@ describe('local intelligence benchmark harness', () => {
 		expect(report.recallAt5).toBe(1);
 		expect(report.aggregateExactMatch).toBe(1);
 		expect(report.citationCoverage).toBe(1);
+		expect(report.recordRecall).toBe(1);
+		expect(report.currencyRoleAccuracy).toBe(1);
 		expect(report.coldRetrievalMs).toBeGreaterThanOrEqual(0);
 		expect(report.warmRetrievalP95Ms).toBeGreaterThanOrEqual(0);
 		expect(report.ttftMs).toBe(210);
 		expect(report.tokensPerSecond).toBe(18.5);
+	});
+
+	it('does not award single-document citation coverage when record evidence is missing', async () => {
+		const oneRecord = corpus[0];
+		const report = await runIntelligenceBenchmark({
+			retrievalCases: [],
+			aggregateCases: [
+				{
+					query: 'Sum all records',
+					documentIds: [oneRecord.documentId],
+					expected: [{ currency: 'EUR', valueMinor: 100, count: 2 }],
+					expectedFacts: [
+						{ currency: 'EUR', valueMinor: 100, page: 1 },
+						{ currency: 'EUR', valueMinor: 200, page: 2 }
+					]
+				}
+			],
+			retrieve: async () => [],
+			aggregate: async () => aggregateMoney('Sum across all invoices', [oneRecord])
+		});
+		expect(report.recordRecall).toBe(0.5);
+		expect(report.citationCoverage).toBe(0.5);
+		expect(report.currencyRoleAccuracy).toBe(0.5);
 	});
 });

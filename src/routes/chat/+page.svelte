@@ -71,8 +71,10 @@
 	async function handleAttach(documentIds: string[]) {
 		const id = await chatsStore.create(mode ?? 'private');
 		await chatsStore.open(id);
-		goto(resolve(`/chat/${id}`));
 		await chatsStore.attachMany(id, documentIds);
+		// Do not expose the new chat until its sources are attached. A fast send
+		// after navigation could otherwise create a second, source-less chat.
+		await goto(resolve(`/chat/${id}`));
 	}
 </script>
 

@@ -11,12 +11,20 @@ export interface AggregateCase {
 	query: string;
 	documentIds: string[];
 	expected: Array<{ currency: string; valueMinor: number; count: number }>;
+	expectedFacts?: Array<{
+		currency: string;
+		valueMinor: number;
+		page?: number | null;
+		recordId?: string | null;
+	}>;
 }
 
 export interface IntelligenceBenchmarkReport {
 	recallAt5: number;
 	aggregateExactMatch: number;
 	citationCoverage: number;
+	recordRecall: number;
+	currencyRoleAccuracy: number;
 	coldRetrievalMs: number;
 	warmRetrievalP95Ms: number;
 	aggregateP95Ms: number;
@@ -54,6 +62,8 @@ export async function runIntelligenceBenchmark(input: {
 	let exact = 0;
 	let citedFacts = 0;
 	let expectedFacts = 0;
+	let recalledRecords = 0;
+	let attributedFacts = 0;
 	const aggregateTimes: number[] = [];
 	for (const test of input.aggregateCases) {
 		const started = performance.now();
@@ -65,8 +75,32 @@ export async function runIntelligenceBenchmark(input: {
 				.map((group) => `${group.currency}:${group.valueMinor}:${group.count}`)
 				.join('|');
 		if (normalized(result.groups) === normalized(test.expected)) exact++;
-		citedFacts += new Set(result.facts.map((fact) => fact.documentId)).size;
-		expectedFacts += test.documentIds.length;
+		if (test.expectedFacts) {
+			const usedLocations = new Set<number>();
+			for (const expected of test.expectedFacts) {
+				const locationIndex = result.facts.findIndex(
+					(fact, index) =>
+						!usedLocations.has(index) &&
+						(expected.page === undefined || fact.page === expected.page) &&
+						(expected.recordId === undefined || fact.recordId === expected.recordId)
+				);
+				if (locationIndex < 0) continue;
+				usedLocations.add(locationIndex);
+				recalledRecords++;
+				const fact = result.facts[locationIndex];
+				if (fact.currency === expected.currency && fact.valueMinor === expected.valueMinor) {
+					attributedFacts++;
+					if (fact.chunkId !== null && fact.chunkId !== undefined) citedFacts++;
+				}
+			}
+			expectedFacts += test.expectedFacts.length;
+		} else {
+			const covered = new Set(result.facts.map((fact) => fact.documentId)).size;
+			citedFacts += covered;
+			recalledRecords += covered;
+			attributedFacts += covered;
+			expectedFacts += test.documentIds.length;
+		}
 	}
 	const generation = input.generationMetrics
 		? await input.generationMetrics()
@@ -75,6 +109,8 @@ export async function runIntelligenceBenchmark(input: {
 		recallAt5: relevant ? recalled / relevant : 1,
 		aggregateExactMatch: input.aggregateCases.length ? exact / input.aggregateCases.length : 1,
 		citationCoverage: expectedFacts ? citedFacts / expectedFacts : 1,
+		recordRecall: expectedFacts ? recalledRecords / expectedFacts : 1,
+		currencyRoleAccuracy: expectedFacts ? attributedFacts / expectedFacts : 1,
 		coldRetrievalMs,
 		warmRetrievalP95Ms: p95(retrievalTimes),
 		aggregateP95Ms: p95(aggregateTimes),

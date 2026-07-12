@@ -64,6 +64,22 @@ describe('chunkBlocks', () => {
 		expect(chunks[0].charStart).toBe(0);
 	});
 
+	it('does not copy a PDF page opening into unrelated child chunks', () => {
+		const opening = `UNIQUE-PAGE-OPENING ${'alpha '.repeat(120)}`;
+		const ending = `UNIQUE-PAGE-ENDING ${'omega '.repeat(120)}`;
+		const chunks = chunkBlocks([
+			{ text: opening, page: 7, charStart: 0, charEnd: opening.length },
+			{
+				text: ending,
+				page: 7,
+				charStart: opening.length + 1,
+				charEnd: opening.length + 1 + ending.length
+			}
+		]);
+		expect(chunks).toHaveLength(2);
+		expect(chunks[1].searchText).not.toContain('UNIQUE-PAGE-OPENING');
+	});
+
 	it('splits oversized blocks and respects the target size', () => {
 		const big = para(1).repeat(10);
 		const chunks = chunkBlocks([{ text: big, page: 3, charStart: 0, charEnd: big.length }]);

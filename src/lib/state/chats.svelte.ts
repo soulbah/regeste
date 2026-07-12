@@ -13,6 +13,7 @@ import { buildRetrievalContext } from '$lib/retrieval-context';
 import { assistedPayloadBytes } from '$lib/assisted-payload';
 import { questionLocale, routeQuestion } from '$lib/analysis/query-router';
 import { formatAggregateResult } from '$lib/analysis/format-aggregate';
+import { hasAnswerBearingEvidence } from '$lib/pipeline/relevance';
 import {
 	SYSTEM_PROMPT,
 	buildUserPrompt,
@@ -309,12 +310,13 @@ class ChatsStore {
 			this.messages = await db.listMessages(chatId);
 			const context = buildRetrievalContext(this.messages, question);
 			const enabledDocs = this.chatDocuments.filter((d) => d.enabled && d.status === 'ready');
-			const route = routeQuestion(question);
+			const analysisQuestion = context?.analysisQuery ?? question;
+			const route = routeQuestion(analysisQuestion);
 			this.startWork(route, enabledDocs.length);
 			if (route === 'aggregate') {
 				await this.generateAggregate(
 					chatId,
-					question,
+					analysisQuestion,
 					enabledDocs.map((d) => d.id),
 					versionGroup
 				);
@@ -461,12 +463,13 @@ class ChatsStore {
 			const context = buildRetrievalContext(this.messages, question);
 
 			const enabledDocs = this.chatDocuments.filter((d) => d.enabled && d.status === 'ready');
-			const route = routeQuestion(question);
+			const analysisQuestion = context?.analysisQuery ?? question;
+			const route = routeQuestion(analysisQuestion);
 			this.startWork(route, enabledDocs.length);
 			if (route === 'aggregate') {
 				await this.generateAggregate(
 					chatId,
-					question,
+					analysisQuestion,
 					enabledDocs.map((d) => d.id)
 				);
 			} else {
@@ -478,6 +481,7 @@ class ChatsStore {
 						question,
 						() => this.advanceWork('inspect')
 					);
+					if (!hasAnswerBearingEvidence(question, hits)) hits = [];
 				}
 
 				if (enabledDocs.length) this.setWorkCount('inspect', hits.length);
