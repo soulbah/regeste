@@ -4,10 +4,10 @@ Check a task off ONLY after its Done-when commands pass. `[P]` = safe to run in 
 
 ## Phase 0 — Spike (gates) — DONE, both gates PASS (2026-07-11)
 
-Harness: `spike-ocr/` (plain Vite via `vite.spike.config.ts`, no CF adapter). Used
-the `ppu-paddle-ocr` SDK as a throwaway to isolate accuracy from plumbing.
+Harness (a plain-Vite `spike-ocr/`, no CF adapter, since removed): used the
+`ppu-paddle-ocr` SDK as a throwaway to isolate accuracy from plumbing.
 
-- [x] 0.1 Self-hosted PP-OCRv5 mobile ONNX (det 4.5 MB + latin_v5 rec 7.7 MB + dict), Apache-2.0, in `static/models/ocr/` (gitignored; fetch in spike-ocr/README).
+- [x] 0.1 Self-hosted PP-OCRv5 mobile ONNX (det 4.5 MB + latin_v5 rec 7.7 MB + dict), Apache-2.0, in `static/models/ocr/` (gitignored; fetched at install by `scripts/vendor-ocr-models.sh`).
 - [x] 0.2 GATE 1 (WebGPU): PP-OCRv5 det+rec ran on ORT's WebGPU provider and produced correct output; ~220 ms/page warm. Owner's real GPU is the definitive perf check.
 - [x] 0.3 GATE 2 (French): PASS on clean print — perfect `é è à ê û ç € —` + digits. Degraded synthetic loses accuracy (harsher than real scans); real-file testing via the harness upload. No fallback to Tesseract needed.
 

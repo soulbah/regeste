@@ -28,12 +28,9 @@ vite.config.ts.timestamp-*
 # Internal product docs (never published — strategy, roadmap, competitive analysis)
 docs/internal/
 
-# Vendored at install time from pinned packages (see package.json "vendor")
+# Vendored at install time (see package.json "vendor" + scripts/vendor-ocr-models.sh)
 static/vendor/
-
-# Spike 023 (OCR): the ORT wasm copy was a dead end (glue loads from CDN); the
-# model weights (static/models/ocr, Apache-2.0, ~12 MB) ARE committed as app
-# assets so on-device OCR works on any clone. Re-fetch via spike-ocr/README.md.
+static/models/
 static/ort/
 
 # Stray miniflare/workerd config debug dump (MINIFLARE_WORKERD_CONFIG_DEBUG)
