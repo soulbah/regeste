@@ -1,6 +1,7 @@
 import { extractMoneyCandidates, type MoneyCandidate, type MoneyKind } from './money';
 import { normalizeQuestion } from './query-router';
 import type { SearchHit } from '$lib/types';
+import { reliableForExactAnalytics } from '$lib/pipeline/ocr-quality';
 
 export interface FinancialRecordFact extends MoneyCandidate {
 	documentId: string;
@@ -108,6 +109,7 @@ function contextualKind(kind: MoneyKind, context: string): MoneyKind {
 export function extractFinancialRecords(chunks: SearchHit[]): FinancialRecord[] {
 	const locations = new Map<string, SearchHit[]>();
 	for (const chunk of chunks) {
+		if (!reliableForExactAnalytics(chunk)) continue;
 		const key = `${chunk.documentId}:${locationKey(chunk)}`;
 		const list = locations.get(key) ?? [];
 		list.push(chunk);

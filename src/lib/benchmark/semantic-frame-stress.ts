@@ -5,8 +5,9 @@ import type {
 	QueryScopeKind
 } from '$lib/nlu/semantic-frame';
 import type { QuestionRoute } from '$lib/types';
+import externalHeldOut from '../../../benchmarks/semantic-heldout.json';
 
-export interface SemanticExpectation {
+interface SemanticExpectation {
 	route: QuestionRoute;
 	operation?: AggregateOperation | null;
 	role?: FinancialRole | null;
@@ -17,6 +18,10 @@ export interface SemanticExpectation {
 
 export interface SemanticStressCase {
 	id: string;
+	baseId: string;
+	variant: string;
+	locale: 'fr' | 'en';
+	partition?: 'heldout';
 	category: 'mft' | 'invariance' | 'directional' | 'hard-negative' | 'semantic';
 	question: string;
 	expected: SemanticExpectation;
@@ -192,9 +197,61 @@ export function buildSemanticStressCorpus(): SemanticStressCase[] {
 	return BASES.flatMap((base) =>
 		TRANSFORMS.map(([variant, transform]) => ({
 			id: `${base.id}:${variant}`,
+			baseId: base.id,
+			variant,
+			locale: base.id.startsWith('en-') ? ('en' as const) : ('fr' as const),
 			category: base.category ?? (variant === 'plain' ? 'mft' : 'invariance'),
 			question: transform(base.question),
 			expected: base.expected
 		}))
 	);
+}
+
+export function buildSemanticBenchmarkCorpus(): SemanticStressCase[] {
+	return [
+		...buildSemanticStressCorpus(),
+		...externalHeldOut.cases.map((test): SemanticStressCase => ({
+			id: test.id,
+			baseId: test.id,
+			variant: 'external',
+			locale: test.id.startsWith('ext-en-') ? 'en' : 'fr',
+			partition: 'heldout',
+			category: test.clarification ? 'directional' : 'hard-negative',
+			question: test.question,
+			expected: {
+				route: test.route as QuestionRoute,
+				...('operation' in test ? { operation: test.operation as AggregateOperation } : {}),
+				...('role' in test ? { role: test.role as FinancialRole } : {}),
+				...('scope' in test ? { scope: test.scope as QueryScopeKind } : {}),
+				...('clarification' in test
+					? { clarification: test.clarification as ClarificationKind }
+					: {})
+			}
+		}))
+	];
+}
+
+function stableBucket(value: string): number {
+	let hash = 2166136261;
+	for (const character of value) {
+		hash ^= character.codePointAt(0) ?? 0;
+		hash = Math.imul(hash, 16777619);
+	}
+	return Math.abs(hash) % 5;
+}
+
+/** Split by base utterance before perturbation expansion: no case family can
+ * appear in calibration and held-out sets. */
+export function splitSemanticStressCorpus(cases = buildSemanticStressCorpus()): {
+	calibration: SemanticStressCase[];
+	heldOut: SemanticStressCase[];
+} {
+	const calibration: SemanticStressCase[] = [];
+	const heldOut: SemanticStressCase[] = [];
+	for (const test of cases) {
+		(test.partition === 'heldout' || stableBucket(test.baseId) >= 2 ? heldOut : calibration).push(
+			test
+		);
+	}
+	return { calibration, heldOut };
 }

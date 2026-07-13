@@ -33,6 +33,11 @@
 		type SemanticBenchmarkReport
 	} from '$lib/benchmark/semantic-metrics';
 	import publicQa from '../../../../benchmarks/fuzzy-public-qa.json';
+	import {
+		assertBenchmarkBounds,
+		benchmarkAsset,
+		validateBenchmarkBytes
+	} from '$lib/benchmark/assets';
 
 	type IndexDiagnostic = {
 		name: string;
@@ -265,9 +270,10 @@
 			let bytes = 0;
 			const ids = new SvelteMap<string, string>();
 			for (const [url, name, mime] of fixtures) {
-				const reusable = documentsStore.documents
-					.filter((document) => document.name === name && document.status === 'ready')
-					.sort((left, right) => right.size - left.size)[0];
+				const asset = benchmarkAsset(name);
+				const reusable = documentsStore.documents.find(
+					(document) => document.hash === asset.sha256 && document.status === 'ready'
+				);
 				if (reusable && (await db.countChunks(reusable.id)) > 0) {
 					ids.set(name, reusable.id);
 					continue;
@@ -280,10 +286,18 @@
 					);
 				}
 				const data = await response.arrayBuffer();
+				await validateBenchmarkBytes(asset, data);
 				bytes += data.byteLength;
 				ids.set(name, await documentsStore.ingest(new File([data], name, { type: mime })));
 			}
 			await waitUntilReady([...ids.values()]);
+			for (const [name, id] of ids) {
+				const document = documentsStore.documents.find((item) => item.id === id);
+				assertBenchmarkBounds(benchmarkAsset(name), {
+					pages: document?.pages ?? null,
+					chunks: await db.countChunks(id)
+				});
+			}
 			const memoryAfter = await sampleMemory();
 			if (memoryAfter !== null)
 				sampledPeakMemoryBytes = Math.max(sampledPeakMemoryBytes ?? 0, memoryAfter);

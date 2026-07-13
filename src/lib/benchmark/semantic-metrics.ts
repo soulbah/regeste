@@ -2,13 +2,26 @@ import { analyzeQuestion, normalizeQuestion, type SemanticFrame } from '$lib/ana
 import {
 	applySemanticDecision,
 	classifySemanticVectors,
-	SEMANTIC_MIN_MARGIN,
-	SEMANTIC_MIN_SCORE,
 	type EmbedQuestions,
 	type SemanticDecision
 } from '$lib/nlu/semantic-resolver';
-import { SEMANTIC_PROTOTYPES } from '$lib/nlu/prototypes';
-import { buildSemanticStressCorpus, type SemanticStressCase } from './semantic-frame-stress';
+import { getSemanticCalibration } from '$lib/nlu/semantic-calibration';
+import { SEMANTIC_PROTOTYPES, SEMANTIC_PROTOTYPE_VERSION } from '$lib/nlu/prototypes';
+import {
+	buildSemanticBenchmarkCorpus,
+	splitSemanticStressCorpus,
+	type SemanticStressCase
+} from './semantic-frame-stress';
+import baseline from '../../../benchmarks/semantic-baseline.json';
+import { benchmarkRuntimeProfile, type BenchmarkRuntimeProfile } from './runtime-profile';
+
+export interface ProportionInterval {
+	value: number;
+	lower95: number;
+	upper95: number;
+	numerator: number;
+	denominator: number;
+}
 
 export interface SemanticQualityMetrics {
 	cases: number;
@@ -25,11 +38,18 @@ export interface SemanticBenchmarkReport {
 	deterministic: SemanticQualityMetrics;
 	semanticRoute: SemanticQualityMetrics;
 	fused: SemanticQualityMetrics;
+	heldOut: SemanticQualityMetrics;
+	profile: { model: string; dims: number; prototypeVersion: number; calibrated: boolean };
+	runtime: BenchmarkRuntimeProfile;
+	coverage: ProportionInterval;
+	abstention: ProportionInterval;
+	categoryFailures: Record<string, string[]>;
+	baseline: { version: number; regressions: string[] };
 	fallbackCases: number;
 	rejectedSemanticCases: number;
 	latencyMs: { cold: number; p50: number; p95: number };
 	decisionDiagnostics: {
-		thresholds: { score: number; margin: number };
+		thresholds: { score: number | null; margin: number | null };
 		scoreP50: number;
 		scoreP95: number;
 		marginP50: number;
@@ -49,6 +69,24 @@ export interface SemanticBenchmarkReport {
 			score: number;
 			margin: number;
 		}>;
+	};
+}
+
+export function wilsonInterval(numerator: number, denominator: number): ProportionInterval {
+	if (!denominator) return { value: 0, lower95: 0, upper95: 0, numerator, denominator };
+	const z = 1.96;
+	const value = numerator / denominator;
+	const denominatorAdjustment = 1 + (z * z) / denominator;
+	const center = (value + (z * z) / (2 * denominator)) / denominatorAdjustment;
+	const margin =
+		(z / denominatorAdjustment) *
+		Math.sqrt((value * (1 - value)) / denominator + (z * z) / (4 * denominator * denominator));
+	return {
+		value,
+		lower95: Math.max(0, center - margin),
+		upper95: Math.min(1, center + margin),
+		numerator,
+		denominator
 	};
 }
 
@@ -123,13 +161,19 @@ function percentile(values: number[], fraction: number): number {
 export async function runSemanticBenchmark(
 	embed: EmbedQuestions
 ): Promise<SemanticBenchmarkReport> {
-	const cases = buildSemanticStressCorpus();
+	const cases = buildSemanticBenchmarkCorpus();
+	const split = splitSemanticStressCorpus(cases);
 	const deterministicFrames = cases.map((test) => analyzeQuestion(test.question));
 	const coldStart = performance.now();
 	const prototypes = await embed(
 		SEMANTIC_PROTOTYPES.map((prototype) => normalizeQuestion(prototype.text))
 	);
 	const cold = performance.now() - coldStart;
+	const calibrationProfile = getSemanticCalibration(
+		prototypes.model,
+		prototypes.dims,
+		SEMANTIC_PROTOTYPE_VERSION
+	);
 	const questionBatch = await embed(cases.map((test) => normalizeQuestion(test.question)));
 	const semanticFrames: SemanticFrame[] = [];
 	const fusedFrames: SemanticFrame[] = [];
@@ -145,15 +189,26 @@ export async function runSemanticBenchmark(
 			questionBatch.data.subarray(index * questionBatch.dims, (index + 1) * questionBatch.dims)
 		);
 		combined.set(prototypes.data, questionBatch.dims);
-		const decision = classifySemanticVectors(combined, questionBatch.dims);
+		const decision = classifySemanticVectors(
+			combined,
+			questionBatch.dims,
+			0,
+			1,
+			calibrationProfile?.predictionSetRadius ?? 0.03
+		);
 		decisions.push(decision);
 		scores.push(decision.score);
 		margins.push(decision.margin);
 		const semanticFrame = { ...deterministicFrames[index], route: decision.label };
 		semanticFrames.push(semanticFrame);
 		const fused =
-			deterministicFrames[index].confidence === 'low' && !deterministicFrames[index].clarification
-				? applySemanticDecision(deterministicFrames[index], decision)
+			calibrationProfile &&
+			deterministicFrames[index].confidence === 'low' &&
+			!deterministicFrames[index].clarification
+				? applySemanticDecision(deterministicFrames[index], decision, {
+						score: calibrationProfile.minScore,
+						margin: calibrationProfile.minMargin
+					})
 				: deterministicFrames[index];
 		if (fused.evidence.includes('semantic:rejected')) rejected++;
 		if (fused.source === 'fused') accepted++;
@@ -174,6 +229,14 @@ export async function runSemanticBenchmark(
 	const fallbackCases = deterministicFrames.filter(
 		(frame) => frame.confidence === 'low' && !frame.clarification
 	);
+	const heldOutIds = new Set(split.heldOut.map((test) => test.id));
+	const heldOutCases = cases.filter((test) => heldOutIds.has(test.id));
+	const heldOutFrames = fusedFrames.filter((_, index) => heldOutIds.has(cases[index].id));
+	const categoryFailures: Record<string, string[]> = {};
+	for (let index = 0; index < cases.length; index++) {
+		if (sameExpected(fusedFrames[index], cases[index])) continue;
+		(categoryFailures[cases[index].category] ??= []).push(cases[index].id);
+	}
 	const latencies: number[] = [];
 	for (const test of cases
 		.filter((_, index) => fallbackCases.includes(deterministicFrames[index]))
@@ -209,11 +272,53 @@ export async function runSemanticBenchmark(
 		deterministic: evaluateSemanticFrames(cases, deterministicFrames),
 		semanticRoute: evaluateSemanticFrames(cases, semanticFrames),
 		fused: evaluateSemanticFrames(cases, fusedFrames),
+		heldOut: evaluateSemanticFrames(heldOutCases, heldOutFrames),
+		profile: {
+			model: prototypes.model,
+			dims: prototypes.dims,
+			prototypeVersion: SEMANTIC_PROTOTYPE_VERSION,
+			calibrated: calibrationProfile !== null
+		},
+		runtime: benchmarkRuntimeProfile(),
+		coverage: wilsonInterval(accepted, fallbackCases.length),
+		abstention: wilsonInterval(rejected, fallbackCases.length),
+		categoryFailures,
+		baseline: {
+			version: baseline.version,
+			regressions: [
+				...(evaluateSemanticFrames(cases, fusedFrames).routeAccuracy <
+				baseline.minimum.fusedRouteAccuracy
+					? ['fusedRouteAccuracy']
+					: []),
+				...(evaluateSemanticFrames(heldOutCases, heldOutFrames).frameExactMatch <
+				baseline.minimum.heldOutFrameExactMatch
+					? ['heldOutFrameExactMatch']
+					: []),
+				...(evaluateSemanticFrames(cases, fusedFrames).slotAccuracy < baseline.minimum.slotAccuracy
+					? ['slotAccuracy']
+					: []),
+				...(evaluateSemanticFrames(cases, fusedFrames).clarificationPrecision <
+				baseline.minimum.clarificationPrecision
+					? ['clarificationPrecision']
+					: []),
+				...(evaluateSemanticFrames(cases, fusedFrames).clarificationRecall <
+				baseline.minimum.clarificationRecall
+					? ['clarificationRecall']
+					: []),
+				...(evaluateSemanticFrames(cases, fusedFrames).invarianceRate <
+				baseline.minimum.invarianceRate
+					? ['invarianceRate']
+					: [])
+			]
+		},
 		fallbackCases: fallbackCases.length,
 		rejectedSemanticCases: rejected,
 		latencyMs: { cold, p50: percentile(latencies, 0.5), p95: percentile(latencies, 0.95) },
 		decisionDiagnostics: {
-			thresholds: { score: SEMANTIC_MIN_SCORE, margin: SEMANTIC_MIN_MARGIN },
+			thresholds: {
+				score: calibrationProfile?.minScore ?? null,
+				margin: calibrationProfile?.minMargin ?? null
+			},
 			scoreP50: percentile(scores, 0.5),
 			scoreP95: percentile(scores, 0.95),
 			marginP50: percentile(margins, 0.5),

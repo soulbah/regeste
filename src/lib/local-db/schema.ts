@@ -218,5 +218,10 @@ export const MIGRATIONS: string[] = [
 	UPDATE chunks SET fuzzy_text = search_text WHERE fuzzy_text IS NULL;
 	CREATE VIRTUAL TABLE chunks_fuzzy_fts USING fts5(fuzzy_text, content='chunks', content_rowid='id');
 	INSERT INTO chunks_fuzzy_fts(chunks_fuzzy_fts) VALUES('rebuild');
+	`,
+
+	// v12 — page-level OCR quality provenance (spec 029). Native text stays NULL.
+	`
+	ALTER TABLE chunks ADD COLUMN ocr_confidence REAL;
 	`
 ];

@@ -9,6 +9,7 @@
 			"licenseUrl": "https://www.nasa.gov/nasa-brand-center/images-and-media/",
 			"use": "NASA public-use historical scan; landscape timelines, abbreviations and missing-page warning",
 			"format": "pdf",
+			"expectedPages": { "min": 100, "max": 200 },
 			"bytes": 10955047,
 			"sha256": "5563218d1e47166a5709d4d3072714c75fe928db0c14c37e1ee6b65c4df3c811"
 		},
@@ -19,6 +20,8 @@
 			"licenseUrl": "https://ntrs.nasa.gov/citations/19720024229",
 			"use": "NASA work of US Government, public use permitted; technical report and figures",
 			"format": "pdf",
+			"expectedPages": { "min": 45, "max": 55 },
+			"expectedChunks": { "min": 120, "max": 500 },
 			"bytes": 2630266,
 			"sha256": "22b39858cd54d821400194fba2dbd6dbbdef827c5d48137ace99201eae2c1bc7"
 		},
@@ -29,6 +32,8 @@
 			"licenseUrl": "https://www.govinfo.gov/about/policies",
 			"use": "Official US Government two-column notice with headers, citations and line wrapping",
 			"format": "pdf",
+			"expectedPages": { "min": 3, "max": 3 },
+			"expectedChunks": { "min": 3, "max": 30 },
 			"bytes": 216440,
 			"sha256": "a619a5c743c7329d89f4d3949ed9ee08b4f66eb445dc7ea86f99adc9f12d2780"
 		},
@@ -39,6 +44,8 @@
 			"licenseUrl": "https://www.govinfo.gov/about/policies",
 			"use": "Official CFR section with exact legal identifiers, units, tables and amendments",
 			"format": "pdf",
+			"expectedPages": { "min": 1, "max": 1 },
+			"expectedChunks": { "min": 1, "max": 12 },
 			"bytes": 175758,
 			"sha256": "49ff24d6f71c6f696fa5405555167d9eff7522761d26f325e5a935c6abda40d9"
 		},
@@ -49,6 +56,7 @@
 			"licenseUrl": "https://trustee.ietf.org/documents/trust-legal-provisions/",
 			"use": "Official plain-text rendition; headings, ABNF, acronyms and exact section references",
 			"format": "txt",
+			"expectedChunks": { "min": 500, "max": 1100 },
 			"bytes": 502941,
 			"sha256": "21c1cdce6ab0e5509b04d84a28000836c7a087cf786efe6f04877ebfff47232a"
 		},
@@ -59,6 +67,8 @@
 			"licenseUrl": "https://trustee.ietf.org/documents/trust-legal-provisions/",
 			"use": "Same RFC as PDF for cross-format evidence parity",
 			"format": "pdf",
+			"expectedPages": { "min": 190, "max": 200 },
+			"expectedChunks": { "min": 500, "max": 1100 },
 			"bytes": 2858365,
 			"sha256": "60b30efa1048900833d1758440247fe8ac85a3134f2327388dcb24e07d814c89"
 		},

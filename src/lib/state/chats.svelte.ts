@@ -13,6 +13,9 @@ import { buildClarificationContext, buildRetrievalContext } from '$lib/retrieval
 import { assistedPayloadBytes } from '$lib/assisted-payload';
 import { questionLocale } from '$lib/analysis/query-router';
 import { resolveQuestion, type EmbedQuestions } from '$lib/nlu/semantic-resolver';
+import { buildExecutionPlan } from '$lib/nlu/execution-plan';
+import { contextualClarification } from '$lib/nlu/clarification';
+import type { ClarificationKind } from '$lib/nlu/semantic-frame';
 import { formatAggregateResult } from '$lib/analysis/format-aggregate';
 import { parseRelatedQuestions } from '$lib/related-questions';
 import { hasAnswerBearingEvidence } from '$lib/pipeline/relevance';
@@ -148,23 +151,27 @@ class ChatsStore {
 
 	private async insertClarification(
 		chatId: string,
-		kind: 'scope' | 'financial_role' | 'intent',
+		kind: ClarificationKind,
 		locale: 'fr' | 'en',
 		versionGroup: string | null = null
 	): Promise<void> {
 		const { db } = await getLocalDb();
-		const key =
-			kind === 'financial_role'
-				? 'clarification.financialRole'
-				: kind === 'scope'
-					? 'clarification.scope'
-					: 'clarification.intent';
+		const key = {
+			scope: 'clarification.scope',
+			financial_role: 'clarification.financialRole',
+			intent: 'clarification.intent',
+			time: 'clarification.time',
+			entity: 'clarification.entity',
+			document: 'clarification.document',
+			unit_currency: 'clarification.unitCurrency',
+			multi_part: 'clarification.multiPart'
+		} as const;
 		const messageId = crypto.randomUUID();
 		await db.insertMessage({
 			id: messageId,
 			chatId,
 			role: 'assistant',
-			content: translate(locale, key),
+			content: translate(locale, key[kind]),
 			mode: 'private',
 			versionGroup
 		});
@@ -356,12 +363,16 @@ class ChatsStore {
 			const enabledDocs = this.chatDocuments.filter((d) => d.enabled && d.status === 'ready');
 			const analysisQuestion = context?.analysisQuery ?? question;
 			const frame = await resolveQuestion(analysisQuestion, this.embedQuestions);
-			if (frame.clarification) {
-				await this.insertClarification(chatId, frame.clarification, frame.locale, versionGroup);
+			const clarification = contextualClarification(analysisQuestion, frame, {
+				hasConversationContext: !!context,
+				documentCount: enabledDocs.length
+			});
+			if (clarification) {
+				await this.insertClarification(chatId, clarification, frame.locale, versionGroup);
 				this.messages = await db.listMessages(chatId);
 				return;
 			}
-			const route = frame.route;
+			const route = buildExecutionPlan(analysisQuestion, frame).route;
 			this.startWork(route, enabledDocs.length);
 			if (route === 'aggregate') {
 				await this.generateAggregate(
@@ -516,14 +527,18 @@ class ChatsStore {
 			const enabledDocs = this.chatDocuments.filter((d) => d.enabled && d.status === 'ready');
 			const analysisQuestion = context?.analysisQuery ?? question;
 			const frame = await resolveQuestion(analysisQuestion, this.embedQuestions);
-			if (frame.clarification) {
-				await this.insertClarification(chatId, frame.clarification, frame.locale);
+			const clarification = contextualClarification(analysisQuestion, frame, {
+				hasConversationContext: !!context,
+				documentCount: enabledDocs.length
+			});
+			if (clarification) {
+				await this.insertClarification(chatId, clarification, frame.locale);
 				await db.touchChat(chatId);
 				this.messages = await db.listMessages(chatId);
 				await this.refresh();
 				return;
 			}
-			const route = frame.route;
+			const route = buildExecutionPlan(analysisQuestion, frame).route;
 			this.startWork(route, enabledDocs.length);
 			if (route === 'aggregate') {
 				await this.generateAggregate(
@@ -905,14 +920,19 @@ class ChatsStore {
 	): Promise<'staged' | 'no-excerpts' | 'handled'> {
 		const context = this.retrievalContext(question);
 		const frame = await resolveQuestion(context?.analysisQuery ?? question, this.embedQuestions);
-		if (frame.clarification || frame.route === 'aggregate') {
+		const plan = buildExecutionPlan(context?.analysisQuery ?? question, frame);
+		const clarification = contextualClarification(context?.analysisQuery ?? question, frame, {
+			hasConversationContext: !!context,
+			documentCount: this.chatDocuments.filter((document) => document.enabled).length
+		});
+		if (clarification || plan.route === 'aggregate') {
 			await this.send(chatId, question);
 			return 'handled';
 		}
 		const hits = await this.retrieveForActive(
 			context?.searchQuery ?? question,
 			question,
-			frame.route
+			plan.route
 		);
 		if (!hits.length) return 'no-excerpts';
 		this.pendingAssisted = {
@@ -920,7 +940,7 @@ class ChatsStore {
 			question,
 			hits,
 			conversationContext: context?.promptContext ?? null,
-			route: frame.route
+			route: plan.route
 		};
 		return 'staged';
 	}

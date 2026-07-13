@@ -8,6 +8,7 @@
 import type { PaddleOcrService } from 'ppu-paddle-ocr/web';
 import type { ParsedBlock } from '$lib/types';
 import { OCR_MODEL } from './ocr-model';
+import { shouldRetryOcr } from './ocr-quality';
 
 export interface OcrProgress {
 	page: number;
@@ -18,6 +19,18 @@ export interface OcrProgress {
 // 300 DPI is the accuracy floor for accented French body text — never drop it to
 // save memory. One page in flight (~35 MB at this scale); pages are never batched.
 const OCR_DPI_SCALE = 300 / 72;
+function increaseContrast(canvas: OffscreenCanvas): void {
+	const context = canvas.getContext('2d');
+	if (!context) return;
+	const image = context.getImageData(0, 0, canvas.width, canvas.height);
+	for (let index = 0; index < image.data.length; index += 4) {
+		const gray =
+			image.data[index] * 0.299 + image.data[index + 1] * 0.587 + image.data[index + 2] * 0.114;
+		const contrasted = Math.max(0, Math.min(255, (gray - 128) * 1.35 + 128));
+		image.data[index] = image.data[index + 1] = image.data[index + 2] = contrasted;
+	}
+	context.putImageData(image, 0, 0);
+}
 
 let servicePromise: Promise<PaddleOcrService> | null = null;
 
@@ -76,9 +89,21 @@ export async function ocrPages(
 			// white margins, so distinct pages can collide and replay page 1's OCR
 			// result across the whole PDF. Each page is processed once here: bypass
 			// that cache and keep model/session reuse only.
-			const result = await svc.recognize(canvas, { flatten: true, noCache: true });
+			let result = await svc.recognize(canvas, { flatten: true, noCache: true });
+			if (shouldRetryOcr(result.confidence, 0)) {
+				increaseContrast(canvas);
+				const retry = await svc.recognize(canvas, { flatten: true, noCache: true });
+				if (retry.confidence > result.confidence) result = retry;
+			}
 			const text = (result.text ?? '').trim();
-			if (text) out.push({ text, page: pageNum, charStart: 0, charEnd: text.length });
+			if (text)
+				out.push({
+					text,
+					page: pageNum,
+					charStart: 0,
+					charEnd: text.length,
+					ocrConfidence: result.confidence
+				});
 
 			page.cleanup();
 			done++;

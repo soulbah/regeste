@@ -45,6 +45,8 @@ export interface ParsedBlock {
 	charEnd: number;
 	/** Retrieval-only structural context, e.g. repeated table headers. */
 	retrievalContext?: string;
+	/** Recognition confidence for OCR-originated text; absent for native text. */
+	ocrConfidence?: number;
 }
 
 export interface ParsedDoc {
@@ -66,6 +68,7 @@ export interface Chunk {
 	paraIndex: number | null;
 	charStart: number;
 	charEnd: number;
+	ocrConfidence?: number | null;
 }
 
 export interface SearchHit {
@@ -82,6 +85,7 @@ export interface SearchHit {
 	semanticScore?: number | null;
 	lexicalScore?: number | null;
 	fuzzyScore?: number | null;
+	ocrConfidence?: number | null;
 }
 
 export type QuestionRoute = 'targeted' | 'synthesis' | 'aggregate';
@@ -93,7 +97,16 @@ export interface MethodSummary {
 	passageCount: number;
 	reasoningUsed: boolean;
 	calculation?: string | null;
-	clarification?: 'scope' | 'financial_role' | 'intent' | null;
+	clarification?:
+		| 'scope'
+		| 'financial_role'
+		| 'intent'
+		| 'time'
+		| 'entity'
+		| 'document'
+		| 'unit_currency'
+		| 'multi_part'
+		| null;
 }
 
 export interface WorkStep {

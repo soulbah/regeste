@@ -1,6 +1,7 @@
 import manifest from '../benchmarks/fuzzy-corpus-manifest.json';
 import { mkdir } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
+import { fileTypeFromBuffer } from 'file-type';
 
 const MAX_FILE_BYTES = 32 * 1024 * 1024;
 const ALLOWED_HOSTS = new Set([
@@ -12,11 +13,36 @@ const ALLOWED_HOSTS = new Set([
 ]);
 const root = resolve(import.meta.dir, '..');
 const output = resolve(root, manifest.outputDirectory);
+const browserOutput = resolve(root, 'static/dev/fuzzy-public');
 
 function digest(bytes: Uint8Array): string {
 	const hash = new Bun.CryptoHasher('sha256');
 	hash.update(bytes);
 	return hash.digest('hex');
+}
+
+async function verifyType(
+	entry: (typeof manifest.files)[number],
+	bytes: Uint8Array
+): Promise<void> {
+	const detected = await fileTypeFromBuffer(bytes);
+	if (entry.format === 'pdf' && detected?.mime !== 'application/pdf') {
+		throw new Error(`Signature mismatch: ${entry.name} is ${detected?.mime ?? 'unknown'}`);
+	}
+	if (entry.format === 'txt') {
+		if (detected || bytes.includes(0))
+			throw new Error(`Signature mismatch: ${entry.name} is not text`);
+		new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+	}
+}
+
+async function publishBrowserFixture(
+	entry: (typeof manifest.files)[number],
+	bytes: Uint8Array
+): Promise<void> {
+	if (entry.format !== 'pdf' && entry.format !== 'txt') return;
+	await mkdir(browserOutput, { recursive: true });
+	await Bun.write(resolve(browserOutput, entry.name), bytes);
 }
 
 await mkdir(output, { recursive: true });
@@ -32,6 +58,8 @@ for (const entry of manifest.files) {
 	if (await existing.exists()) {
 		const bytes = new Uint8Array(await existing.arrayBuffer());
 		if (bytes.byteLength === entry.bytes && digest(bytes) === entry.sha256) {
+			await verifyType(entry, bytes);
+			await publishBrowserFixture(entry, bytes);
 			console.log(`verified ${entry.name}`);
 			continue;
 		}
@@ -47,7 +75,9 @@ for (const entry of manifest.files) {
 	if (bytes.byteLength !== entry.bytes || digest(bytes) !== entry.sha256) {
 		throw new Error(`Hash/size mismatch: ${entry.name}`);
 	}
+	await verifyType(entry, bytes);
 	await mkdir(dirname(path), { recursive: true });
 	await Bun.write(path, bytes);
+	await publishBrowserFixture(entry, bytes);
 	console.log(`downloaded ${entry.name}`);
 }

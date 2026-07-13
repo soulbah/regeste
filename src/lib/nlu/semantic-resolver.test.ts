@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SEMANTIC_PROTOTYPES } from './prototypes';
 import { normalizeQuestion } from './semantic-frame';
+import { GEMMA_EMBEDDING_MODEL } from '$lib/pipeline/embed-model';
 import {
 	resetSemanticPrototypeCache,
 	resolveQuestion,
@@ -9,16 +10,22 @@ import {
 
 function fakeEmbed(queryLabel: 'targeted' | 'synthesis' | 'aggregate' | 'oos'): EmbedQuestions {
 	return vi.fn(async (texts: string[]) => {
-		const dims = 3;
+		const dims = 256;
 		const vector = (text: string): number[] => {
 			const prototype = SEMANTIC_PROTOTYPES.find((item) => normalizeQuestion(item.text) === text);
 			const label = prototype?.label ?? queryLabel;
-			if (label === 'targeted') return [1, 0, 0];
-			if (label === 'synthesis') return [0, 1, 0];
-			if (label === 'aggregate') return [0, 0, 1];
-			return [0.577, 0.577, 0.577];
+			const values = Array<number>(dims).fill(0);
+			if (label === 'targeted') values[0] = 1;
+			else if (label === 'synthesis') values[1] = 1;
+			else if (label === 'aggregate') values[2] = 1;
+			else values[0] = values[1] = values[2] = 0.577;
+			return values;
 		};
-		return { data: new Float32Array(texts.flatMap(vector)), dims, model: 'fake' };
+		return {
+			data: new Float32Array(texts.flatMap(vector)),
+			dims,
+			model: GEMMA_EMBEDDING_MODEL
+		};
 	});
 }
 
@@ -52,5 +59,17 @@ describe('semantic question resolver', () => {
 			fakeEmbed('aggregate')
 		);
 		expect(result.route).toBe('targeted');
+	});
+
+	it('never mutates route for an uncalibrated embedding profile', async () => {
+		const embed = fakeEmbed('synthesis');
+		vi.mocked(embed).mockImplementationOnce(async (texts) => ({
+			data: new Float32Array(texts.length * 256),
+			dims: 256,
+			model: 'unknown/model'
+		}));
+		const result = await resolveQuestion('Raconte-moi ce qui ressort', embed);
+		expect(result).toMatchObject({ route: 'targeted', source: 'rules' });
+		expect(result.evidence.some((value) => value.startsWith('semantic:uncalibrated:'))).toBe(true);
 	});
 });

@@ -136,4 +136,12 @@ describe('deterministic aggregation', () => {
 		expect(result.facts).toHaveLength(0);
 		expect(result.ambiguousDocuments).toEqual(['a.pdf']);
 	});
+
+	it('excludes weak OCR amounts from exact arithmetic', () => {
+		const weak = { ...chunk(1, 'scan', 'Total TTC 900,00 EUR'), ocrConfidence: 0.61 };
+		const native = chunk(2, 'native', 'Total TTC 100,00 EUR');
+		const result = aggregateMoney('Somme TTC de toutes les factures', [weak, native]);
+		expect(result.facts.map((fact) => fact.documentId)).toEqual(['native']);
+		expect(result.groups).toEqual([{ currency: 'EUR', valueMinor: 10000, count: 1 }]);
+	});
 });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { analyzeQuestion } from '$lib/analysis/query-router';
 import { buildSemanticStressCorpus } from './semantic-frame-stress';
-import { evaluateSemanticFrames } from './semantic-metrics';
+import { evaluateSemanticFrames, wilsonInterval } from './semantic-metrics';
 
 describe('semantic benchmark metrics', () => {
 	it('reports perfect deterministic quality on the checked corpus', () => {
@@ -18,5 +18,13 @@ describe('semantic benchmark metrics', () => {
 			clarificationRecall: 1,
 			invarianceRate: 1
 		});
+	});
+});
+
+describe('semantic metric intervals', () => {
+	it('reports denominator and finite Wilson bounds', () => {
+		expect(wilsonInterval(90, 100)).toMatchObject({ value: 0.9, numerator: 90, denominator: 100 });
+		expect(wilsonInterval(90, 100).lower95).toBeGreaterThan(0.8);
+		expect(wilsonInterval(90, 100).upper95).toBeLessThan(1);
 	});
 });

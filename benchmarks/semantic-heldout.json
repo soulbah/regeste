@@ -1,0 +1,75 @@
+{
+	"version": 1,
+	"source": "independent-adversarial-pack",
+	"cases": [
+		{
+			"id": "ext-fr-01",
+			"question": "Additionne les commissions de chaque opération",
+			"route": "aggregate",
+			"operation": "sum",
+			"role": "fee"
+		},
+		{
+			"id": "ext-en-01",
+			"question": "Give the highest sent amount among every receipt",
+			"route": "aggregate",
+			"operation": "maximum",
+			"role": "sent"
+		},
+		{
+			"id": "ext-fr-02",
+			"question": "Quel montant a été reçu sur le reçu REC-884 ?",
+			"route": "targeted",
+			"scope": "record"
+		},
+		{
+			"id": "ext-en-02",
+			"question": "What appears on page 12?",
+			"route": "targeted",
+			"scope": "page"
+		},
+		{
+			"id": "ext-fr-03",
+			"question": "Confronte les versions et signale leurs contradictions",
+			"route": "synthesis"
+		},
+		{
+			"id": "ext-en-03",
+			"question": "Compare all sources and identify conflicts",
+			"route": "synthesis"
+		},
+		{
+			"id": "ext-fr-04",
+			"question": "Total",
+			"route": "targeted",
+			"operation": "sum",
+			"clarification": "scope"
+		},
+		{
+			"id": "ext-en-04",
+			"question": "Total across all selected files",
+			"route": "aggregate",
+			"operation": "sum",
+			"clarification": "financial_role"
+		},
+		{ "id": "ext-fr-05", "question": "Explique les obligations du locataire", "route": "targeted" },
+		{
+			"id": "ext-en-05",
+			"question": "Does the agreement contain a termination clause?",
+			"route": "targeted"
+		},
+		{
+			"id": "ext-fr-06",
+			"question": "Liste chaque taxe figurant dans les pièces jointes",
+			"route": "aggregate",
+			"operation": "list",
+			"role": "tax"
+		},
+		{
+			"id": "ext-en-06",
+			"question": "How many attached invoices are there?",
+			"route": "aggregate",
+			"operation": "count"
+		}
+	]
+}

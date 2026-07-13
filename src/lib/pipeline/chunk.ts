@@ -133,7 +133,13 @@ export function chunkBlocks(blocks: ParsedBlock[], documentName = ''): Chunk[] {
 				headingPath,
 				paraIndex: b.paraIndex ?? null,
 				charStart: first.charStart,
-				charEnd: last.charEnd
+				charEnd: last.charEnd,
+				ocrConfidence: (() => {
+					const values = buf
+						.map((piece) => piece.block.ocrConfidence)
+						.filter((value): value is number => value !== undefined);
+					return values.length ? Math.min(...values) : null;
+				})()
 			});
 		};
 		for (const piece of pieces) {

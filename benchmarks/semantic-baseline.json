@@ -1,0 +1,11 @@
+{
+	"version": 1,
+	"minimum": {
+		"fusedRouteAccuracy": 0.99,
+		"heldOutFrameExactMatch": 0.98,
+		"slotAccuracy": 1,
+		"clarificationPrecision": 1,
+		"clarificationRecall": 1,
+		"invarianceRate": 0.99
+	}
+}

@@ -326,8 +326,8 @@ function replaceDocument(
 		for (let i = 0; i < chunks.length; i++) {
 			const c = chunks[i];
 			db.exec({
-				sql: `INSERT INTO chunks(document_id, seq, text, search_text, fuzzy_text, page, heading_path, para_index, char_start, char_end)
-				      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				sql: `INSERT INTO chunks(document_id, seq, text, search_text, fuzzy_text, page, heading_path, para_index, char_start, char_end, ocr_confidence)
+				      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 				bind: [
 					id,
 					c.seq,
@@ -338,7 +338,8 @@ function replaceDocument(
 					c.headingPath,
 					c.paraIndex,
 					c.charStart,
-					c.charEnd
+					c.charEnd,
+					c.ocrConfidence ?? null
 				]
 			});
 			const rowid = db.selectValue('SELECT last_insert_rowid()') as number;
@@ -400,8 +401,8 @@ function insertChunks(
 		for (let i = 0; i < chunks.length; i++) {
 			const c = chunks[i];
 			db.exec({
-				sql: `INSERT INTO chunks(document_id, seq, text, search_text, fuzzy_text, page, heading_path, para_index, char_start, char_end)
-				      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				sql: `INSERT INTO chunks(document_id, seq, text, search_text, fuzzy_text, page, heading_path, para_index, char_start, char_end, ocr_confidence)
+				      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 				bind: [
 					documentId,
 					c.seq,
@@ -412,7 +413,8 @@ function insertChunks(
 					c.headingPath,
 					c.paraIndex,
 					c.charStart,
-					c.charEnd
+					c.charEnd,
+					c.ocrConfidence ?? null
 				]
 			});
 			const rowid = db.selectValue('SELECT last_insert_rowid()') as number;
@@ -454,8 +456,8 @@ function reindexDocument(
 		for (let i = 0; i < chunks.length; i++) {
 			const chunk = chunks[i];
 			db.exec({
-				sql: `INSERT INTO chunks(document_id, seq, text, search_text, fuzzy_text, page, heading_path, para_index, char_start, char_end)
-				      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				sql: `INSERT INTO chunks(document_id, seq, text, search_text, fuzzy_text, page, heading_path, para_index, char_start, char_end, ocr_confidence)
+				      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 				bind: [
 					documentId,
 					chunk.seq,
@@ -466,7 +468,8 @@ function reindexDocument(
 					chunk.headingPath,
 					chunk.paraIndex,
 					chunk.charStart,
-					chunk.charEnd
+					chunk.charEnd,
+					chunk.ocrConfidence ?? null
 				]
 			});
 			const rowid = db.selectValue('SELECT last_insert_rowid()') as number;
@@ -512,7 +515,7 @@ function searchLexical(queryText: string, documentIds: string[] | null, limit = 
 	return db
 		.selectObjects(
 			`SELECT c.id AS chunk_id, c.document_id, d.name AS document_name, c.text, c.seq,
-			        c.page, c.heading_path, bm25(chunks_fts) AS lexical_score
+			        c.page, c.heading_path, c.ocr_confidence, bm25(chunks_fts) AS lexical_score
 			 FROM chunks_fts
 			 JOIN chunks c ON c.id = chunks_fts.rowid
 			 JOIN documents d ON d.id = c.document_id
@@ -530,7 +533,8 @@ function searchLexical(queryText: string, documentIds: string[] | null, limit = 
 			headingPath: r.heading_path,
 			score: r.lexical_score,
 			lexicalScore: r.lexical_score,
-			semanticScore: null
+			semanticScore: null,
+			ocrConfidence: r.ocr_confidence
 		}));
 }
 
@@ -542,7 +546,7 @@ function searchFuzzy(queryText: string, documentIds: string[] | null, limit = 80
 	return db
 		.selectObjects(
 			`SELECT c.id AS chunk_id, c.document_id, d.name AS document_name, c.text, c.seq,
-			        c.page, c.heading_path, bm25(chunks_fuzzy_fts) AS fuzzy_score
+			        c.page, c.heading_path, c.ocr_confidence, bm25(chunks_fuzzy_fts) AS fuzzy_score
 			 FROM chunks_fuzzy_fts
 			 JOIN chunks c ON c.id = chunks_fuzzy_fts.rowid
 			 JOIN documents d ON d.id = c.document_id
@@ -561,7 +565,8 @@ function searchFuzzy(queryText: string, documentIds: string[] | null, limit = 80
 			score: r.fuzzy_score,
 			fuzzyScore: r.fuzzy_score,
 			semanticScore: null,
-			lexicalScore: null
+			lexicalScore: null,
+			ocrConfidence: r.ocr_confidence
 		}));
 }
 
@@ -606,7 +611,7 @@ function searchVector(
 				   SELECT rowid, distance FROM ${table} WHERE embedding MATCH ? AND k = ?
 				 )
 				 SELECT c.id AS chunk_id, c.document_id, d.name AS document_name, c.text, c.seq,
-				        c.page, c.heading_path, knn.distance
+				        c.page, c.heading_path, c.ocr_confidence, knn.distance
 				 FROM knn JOIN chunks c ON c.id = knn.rowid
 				 JOIN documents d ON d.id = c.document_id
 				 WHERE d.status = 'ready'${scope.clause}
@@ -615,7 +620,7 @@ function searchVector(
 			)
 		: db.selectObjects(
 				`SELECT c.id AS chunk_id, c.document_id, d.name AS document_name, c.text, c.seq,
-			        c.page, c.heading_path,
+			        c.page, c.heading_path, c.ocr_confidence,
 			        vec_distance_cosine(v.embedding, ?) AS distance
 			 FROM ${table} v
 			 JOIN chunks c ON c.id = v.rowid
@@ -638,7 +643,8 @@ function searchVector(
 			headingPath: r.heading_path,
 			score: cosineSimilarity,
 			semanticScore: cosineSimilarity,
-			lexicalScore: null
+			lexicalScore: null,
+			ocrConfidence: r.ocr_confidence
 		};
 	});
 }
@@ -649,7 +655,7 @@ function listChunksForDocuments(documentIds: string[]): SearchHit[] {
 	return db
 		.selectObjects(
 			`SELECT c.id AS chunk_id, c.document_id, d.name AS document_name, c.text, c.seq,
-			        c.page, c.heading_path
+			        c.page, c.heading_path, c.ocr_confidence
 			 FROM chunks c JOIN documents d ON d.id = c.document_id
 			 WHERE d.status = 'ready'${scope.clause}
 			 ORDER BY c.document_id, c.seq`,
@@ -665,7 +671,8 @@ function listChunksForDocuments(documentIds: string[]): SearchHit[] {
 			headingPath: r.heading_path,
 			score: 0,
 			semanticScore: null,
-			lexicalScore: null
+			lexicalScore: null,
+			ocrConfidence: r.ocr_confidence
 		}));
 }
 
@@ -679,7 +686,7 @@ function listNeighborChunks(chunkIds: number[], radius = 1): SearchHit[] {
 				SELECT document_id, seq FROM chunks WHERE id IN (${placeholders})
 			)
 			SELECT DISTINCT c.id AS chunk_id, c.document_id, d.name AS document_name,
-			       c.text, c.seq, c.page, c.heading_path
+			       c.text, c.seq, c.page, c.heading_path, c.ocr_confidence
 			FROM chunks c
 			JOIN documents d ON d.id = c.document_id
 			JOIN anchors a ON a.document_id = c.document_id AND abs(a.seq - c.seq) <= ?
@@ -697,7 +704,8 @@ function listNeighborChunks(chunkIds: number[], radius = 1): SearchHit[] {
 			headingPath: r.heading_path,
 			score: 0,
 			semanticScore: null,
-			lexicalScore: null
+			lexicalScore: null,
+			ocrConfidence: r.ocr_confidence
 		}));
 }
 

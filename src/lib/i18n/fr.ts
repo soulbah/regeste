@@ -375,6 +375,11 @@ export const fr: Record<keyof typeof en, string> = {
 		'Quel montant faut-il utiliser : envoyé, reçu, frais, taxes ou total débité ?',
 	'clarification.intent':
 		'Quel résultat souhaitez-vous obtenir à partir des documents sélectionnés ?',
+	'clarification.time': 'Quelle date ou période exacte faut-il utiliser ?',
+	'clarification.entity': 'De quelle personne ou de quel sujet précédent parlez-vous ?',
+	'clarification.document': 'Quel document ou quelle version faut-il utiliser ?',
+	'clarification.unitCurrency': 'Quelle devise ou unité cible faut-il utiliser ?',
+	'clarification.multiPart': 'À quelle partie faut-il répondre en premier ?',
 	'app.dbBusy':
 		'Vous avez déjà ceci ouvert dans un autre onglet. Fermez-le, puis rechargez cette page.',
 	'panel.backAria': 'Revenir aux documents',

@@ -362,6 +362,11 @@ export const en = {
 	'clarification.financialRole':
 		'Which amount should I use: sent, received, fees, taxes, or the total charged?',
 	'clarification.intent': 'What result do you want from the selected documents?',
+	'clarification.time': 'Which exact date or period should I use?',
+	'clarification.entity': 'Which person or earlier subject do you mean?',
+	'clarification.document': 'Which document or revision should I use?',
+	'clarification.unitCurrency': 'Which target currency or unit should I use?',
+	'clarification.multiPart': 'Which part should I answer first?',
 	'app.dbBusy': 'You already have this open in another tab. Close it there, then reload.',
 	'panel.backAria': 'Back to documents',
 	'panel.hideAria': 'Close the panel',

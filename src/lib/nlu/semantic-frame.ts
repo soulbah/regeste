@@ -5,7 +5,15 @@ export type AggregateOperation = 'sum' | 'average' | 'minimum' | 'maximum' | 'co
 export type FinancialRole =
 	'sent' | 'received' | 'fee' | 'debited' | 'total_ttc' | 'subtotal' | 'tax';
 export type QueryScopeKind = 'collection' | 'record' | 'page' | 'temporal' | 'unspecified';
-export type ClarificationKind = 'scope' | 'financial_role' | 'intent';
+export type ClarificationKind =
+	| 'scope'
+	| 'financial_role'
+	| 'intent'
+	| 'time'
+	| 'entity'
+	| 'document'
+	| 'unit_currency'
+	| 'multi_part';
 
 export interface TemporalScope {
 	start: string | null;
