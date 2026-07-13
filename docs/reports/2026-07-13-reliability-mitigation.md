@@ -78,8 +78,8 @@ cross-origin isolation enabled, EmbeddingGemma ONNX 256 dimensions, prototype v3
 | Invoice pack                                            |                                       all five quality gates 100% |
 | Cross-document pack                                     |                                evidence/completeness/absence 100% |
 | Fuzzy fused                                             |    Recall@5/10, MRR, nDCG, evidence, negatives and citations 100% |
-| Fuzzy ablation Recall@5                                 |                          lexical 82.29%; fuzzy 100%; dense 93.75% |
-| Fuzzy p95                                               |                                                         247.37 ms |
+| Fuzzy ablation Recall@5                                 |                            lexical 82.29%; fuzzy 100%; dense 100% |
+| Fuzzy p95                                               |                                                         351.55 ms |
 | Martin OCR                                             |                  answer-bearing; distinct relevant pages retained |
 
 The separate 12-case held-out file is versioned independently from the generated matrix, but it was
@@ -141,3 +141,47 @@ signature/hash/bound mismatches before scoring.
 - File signatures and hashes protect benchmark identity, not arbitrary user-document malware analysis.
   Folio still parses locally in the browser and never uploads files; full CDR/antivirus is outside this
   local-only product boundary.
+
+## Strict ablation follow-up
+
+The first pass stopped too early because fused quality was perfect while lexical and dense ablations were
+not. A case-level rerun exposed seven additional root problems:
+
+1. Isolated channels skipped neighbor expansion, deduplication and diversity selection used by production.
+2. The fused weak-score threshold was incorrectly applied to one-channel RRF, whose mathematical maximum
+   is lower.
+3. Query variants were merged by raw cosine values from different queries, although those scores are not
+   directly comparable; rank fusion now merges original and expanded dense queries.
+4. Plain TXT parsing discarded numbered section hierarchy; RFC-style headings now propagate to child
+   chunks and retrieval index v7 rebuilds persisted views.
+5. Evidence evaluation ignored `headingPath`, counting correct section citations as failures.
+6. Reranking indexed headings but then omitted them from candidate scoring; heading coverage is explicit.
+7. Negative evidence combined a password mention and a recommendation from unrelated passages, and even
+   interpreted “password is deprecated” as a password value. Value questions now require structured
+   label/value evidence in one passage.
+
+Two attempted changes were rejected by browser evidence: increasing fuzzy candidates 60→160 did not fix
+the missing section and raised p95 to 570.84 ms; a separate acronym fuzzy query regressed cross-format RFC.
+Neither remains in production. The accepted solution stores distinct heading grams for structural fuzzy
+queries while exact identifiers keep priority.
+
+Final 20-case public/controlled browser matrix:
+
+| Channel      | R@1 raw / ceiling / normalized | R@5/10            | MRR   | nDCG    | Complete evidence | Negatives | Citations |
+| ------------ | ------------------------------ | ----------------- | ----- | ------- | ----------------- | --------- | --------- |
+| Fused        | 92.708% / 92.708% / **100%**   | 100% / 100%       | 100%  | 100%    | 100%              | 100%      | 100%      |
+| Fuzzy only   | 92.708% / 92.708% / **100%**   | 100% / 100%       | 100%  | 99.081% | 100%              | 100%      | 100%      |
+| Dense only   | 92.708% / 92.708% / **100%**   | 100% / 100%       | 100%  | 100%    | 100%              | 100%      | 100%      |
+| Lexical only | 80.208% / 92.708% / 86.517%    | 82.292% / 82.292% | 87.5% | 83.616% | 75%               | 100%      | 75%       |
+
+Raw Recall@1 cannot reach 100% because one case requires three documents and another requires two; one
+rank can retrieve at most one relevant document. Reports now emit the ceiling and normalized value instead
+of presenting 92.708% as a defect. Lexical-only retains five expected misses: typo-only Cobb, French→English
+NASA wording, typoed three-document Malik synthesis, an exact hourly phrase, and two-format RFC diversity.
+Making that channel score 100% would require adding fuzzy or dense behavior and would invalidate the
+ablation. A versioned baseline now requires fused/fuzzy/dense critical metrics at their achieved gates,
+keeps a lexical floor, caps fused p95 at 600 ms, and prints every regression.
+
+Fresh v7 corpus rebuild cost 236.49 s and +6 MiB browser storage for 1,432 chunks / 248 PDF pages. Warm
+strict rerun p95 was 351.55 ms. Invoice, repeated-record, cross-document, Martin OCR and 372-case semantic
+packs remained green; browser console had no errors.

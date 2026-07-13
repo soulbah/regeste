@@ -25,6 +25,8 @@ describe('retrieval quality gate metrics', () => {
 			{ expectedIds: [], retrievedIds: [], answerable: false, latencyMs: 20 }
 		]);
 		expect(metrics.recallAt1).toBe(0.5);
+		expect(metrics.recallAt1Ceiling).toBe(0.75);
+		expect(metrics.recallAt1Normalized).toBeCloseTo(2 / 3);
 		expect(metrics.recallAt5).toBe(1);
 		expect(metrics.mrrAt10).toBe(0.75);
 		expect(metrics.completeEvidenceRate).toBe(0.5);

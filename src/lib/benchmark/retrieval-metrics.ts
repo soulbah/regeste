@@ -10,6 +10,8 @@ export interface RetrievalEvaluation {
 
 export interface RetrievalMetrics {
 	recallAt1: number;
+	recallAt1Ceiling: number;
+	recallAt1Normalized: number;
 	recallAt5: number;
 	recallAt10: number;
 	mrrAt10: number;
@@ -49,8 +51,14 @@ export function evaluateRetrieval(items: RetrievalEvaluation[]): RetrievalMetric
 		.map((item) => item.latencyMs)
 		.filter((value): value is number => value !== undefined)
 		.sort((a, b) => a - b);
+	const recallAt1 = mean(positives.map((item) => recallAt(item, 1)));
+	const recallAt1Ceiling = mean(
+		positives.map((item) => Math.min(1, 1 / Math.max(item.expectedIds.length, 1)))
+	);
 	return {
-		recallAt1: mean(positives.map((item) => recallAt(item, 1))),
+		recallAt1,
+		recallAt1Ceiling,
+		recallAt1Normalized: recallAt1Ceiling ? recallAt1 / recallAt1Ceiling : 1,
 		recallAt5: mean(positives.map((item) => recallAt(item, 5))),
 		recallAt10: mean(positives.map((item) => recallAt(item, 10))),
 		mrrAt10: mean(

@@ -4,6 +4,7 @@ import {
 	damerauLevenshtein,
 	extractAliases,
 	extractIdentifiers,
+	fuzzyHeadingIndexText,
 	fuzzyIndexText,
 	fuzzyQueryCoverage,
 	fuzzyQueryGrams,
@@ -33,6 +34,12 @@ describe('fuzzy retrieval views', () => {
 			characterGrams('microservice').filter((g) => characterGrams('micro service').includes(g))
 				.length
 		).toBeGreaterThan(8);
+	});
+	it('separates heading grams for structural queries', () => {
+		expect(fuzzyHeadingIndexText('9.3.1 GET')).toContain('hget');
+		expect(fuzzyQueryGrams('Quelle sectoin définit GET ?')).toContain('hget');
+		expect(fuzzyQueryGrams('Explique GET')).not.toContain('hget');
+		expect(fuzzyQueryGrams('Que prévoit la section 178.516 ?')).not.toContain('hsec');
 	});
 	it('handles insertion, deletion, substitution and transposition', () => {
 		expect(damerauLevenshtein('retrieval', 'retrieavl')).toBe(1);

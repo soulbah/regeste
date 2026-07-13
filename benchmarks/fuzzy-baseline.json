@@ -1,0 +1,44 @@
+{
+	"version": 1,
+	"minimum": {
+		"fused": {
+			"recallAt1Normalized": 1,
+			"recallAt5": 1,
+			"recallAt10": 1,
+			"mrrAt10": 1,
+			"ndcgAt10": 1,
+			"completeEvidenceRate": 1,
+			"negativePrecision": 1,
+			"citationAccuracy": 1
+		},
+		"fuzzy": {
+			"recallAt1Normalized": 1,
+			"recallAt5": 1,
+			"recallAt10": 1,
+			"mrrAt10": 1,
+			"ndcgAt10": 0.99,
+			"completeEvidenceRate": 1,
+			"negativePrecision": 1,
+			"citationAccuracy": 1
+		},
+		"dense": {
+			"recallAt1Normalized": 1,
+			"recallAt5": 1,
+			"recallAt10": 1,
+			"mrrAt10": 1,
+			"ndcgAt10": 1,
+			"completeEvidenceRate": 1,
+			"negativePrecision": 1,
+			"citationAccuracy": 1
+		},
+		"lexical": {
+			"recallAt5": 0.82,
+			"completeEvidenceRate": 0.75,
+			"negativePrecision": 1,
+			"citationAccuracy": 0.75
+		}
+	},
+	"maximum": {
+		"fusedP95LatencyMs": 600
+	}
+}

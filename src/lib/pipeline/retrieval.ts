@@ -9,6 +9,25 @@ import {
 
 const RRF_K = 60;
 
+/** Merge query-variant rankings without comparing cosine values from different queries. */
+export function mergeRankedCandidateLists(lists: SearchHit[][], limit = 60): SearchHit[] {
+	const byChunk = new Map<number, { hit: SearchHit; rankScore: number }>();
+	for (const hits of lists) {
+		for (let index = 0; index < hits.length; index++) {
+			const hit = hits[index];
+			const previous = byChunk.get(hit.chunkId);
+			byChunk.set(hit.chunkId, {
+				hit: !previous || hit.score > previous.hit.score ? hit : previous.hit,
+				rankScore: (previous?.rankScore ?? 0) + 1 / (RRF_K + index + 1)
+			});
+		}
+	}
+	return [...byChunk.values()]
+		.sort((left, right) => right.rankScore - left.rankScore || right.hit.score - left.hit.score)
+		.slice(0, limit)
+		.map((item) => item.hit);
+}
+
 const CONCEPT_EXPANSIONS: Array<[RegExp, string]> = [
 	[/\b(?:prix|price|cost)\b/iu, 'prix vente montant euros'],
 	[/\b(?:pr[eê]t|emprunt|loan|mortgage|financement)\b/iu, 'prêt emprunt financement montant'],
@@ -35,11 +54,11 @@ const APPROXIMATE_CONCEPT_EXPANSIONS: Array<{
 			['planning', 'planification'],
 			['vehicles', 'vehicules']
 		],
-		expansion: 'flight planning two vehicles effect'
+		expansion: 'flight planning two vehicles effect increase operational systems constraints'
 	},
 	{
 		required: [['information'], ['hour', 'horaire'], ['vehicles', 'vehicules']],
-		expansion: 'information required each hour two vehicles'
+		expansion: 'information required each hour two vehicles more than doubles'
 	},
 	{
 		required: [['date'], ['effective', 'vigueur']],
@@ -52,6 +71,14 @@ const APPROXIMATE_CONCEPT_EXPANSIONS: Array<{
 	{
 		required: [['head'], ['content', 'contenu'], ['response', 'reponse']],
 		expansion: 'HEAD request method response content GET'
+	},
+	{
+		required: [
+			['section', 'sectoin'],
+			['define', 'defines', 'definit'],
+			['get', 'head', 'post', 'put', 'delete', 'connect', 'options', 'trace']
+		],
+		expansion: 'request method definition semantics'
 	}
 ];
 
@@ -182,12 +209,14 @@ export function refineCandidates(
 		fuzzy
 	)
 		.map((hit) => {
-			const candidate = `${hit.documentName}\n${hit.text}`;
+			const candidate = `${hit.documentName}\n${hit.headingPath ?? ''}\n${hit.text}`;
+			const headingCoverage = hit.headingPath ? queryCoverage(query, hit.headingPath) : 0;
 			return {
 				...hit,
 				score:
 					(hit.score +
 						queryCoverage(query, candidate) * 0.008 +
+						headingCoverage * 0.02 +
 						fuzzyQueryCoverage(query, candidate) * 0.03) *
 					identifierCompatibility(query, candidate)
 			};

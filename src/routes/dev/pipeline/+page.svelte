@@ -33,6 +33,7 @@
 		type SemanticBenchmarkReport
 	} from '$lib/benchmark/semantic-metrics';
 	import publicQa from '../../../../benchmarks/fuzzy-public-qa.json';
+	import fuzzyBaseline from '../../../../benchmarks/fuzzy-baseline.json';
 	import {
 		assertBenchmarkBounds,
 		benchmarkAsset,
@@ -83,6 +84,8 @@
 		bytes: number;
 		cases: number;
 		failures: string[];
+		ablationFailures: Record<'lexical' | 'fuzzy' | 'dense', string[]>;
+		baseline: { version: number; regressions: string[] };
 		slowest: Array<{ id: string; ms: number }>;
 		cost: {
 			databaseBytesBefore: number;
@@ -367,6 +370,11 @@
 				dense: []
 			};
 			const failures: string[] = [];
+			const ablationFailures: Record<'lexical' | 'fuzzy' | 'dense', string[]> = {
+				lexical: [],
+				fuzzy: [],
+				dense: []
+			};
 			const timings: Array<{ id: string; ms: number }> = [];
 			for (const test of cases) {
 				const t0 = performance.now();
@@ -376,7 +384,7 @@
 				const answerBearing = !isWeakMatch(hits) && hasAnswerBearingEvidence(test.query, hits);
 				const normalizedEvidence = test.evidence.map(normalizeForFuzzy);
 				const matchedEvidence = normalizedEvidence.filter((needle) =>
-					hits.some((hit) => containsEvidence(hit.text, needle))
+					hits.some((hit) => containsEvidence(`${hit.headingPath ?? ''}\n${hit.text}`, needle))
 				);
 				const canonicalRfcId = ids.get('rfc9110.txt')!;
 				const canonicalize = (id: string) =>
@@ -408,10 +416,13 @@
 				for (const [channel, channelHits] of Object.entries(channels) as Array<
 					['lexical' | 'fuzzy' | 'dense', typeof hits]
 				>) {
-					const channelAnswerBearing =
-						!isWeakMatch(channelHits) && hasAnswerBearingEvidence(test.query, channelHits);
+					// Raw one-channel RRF peaks below production's two-channel weak-score
+					// threshold. Ablation measures evidence retrieval, not fused refusal calibration.
+					const channelAnswerBearing = hasAnswerBearingEvidence(test.query, channelHits);
 					const channelEvidence = normalizedEvidence.filter((needle) =>
-						channelHits.some((hit) => containsEvidence(hit.text, needle))
+						channelHits.some((hit) =>
+							containsEvidence(`${hit.headingPath ?? ''}\n${hit.text}`, needle)
+						)
 					);
 					const channelIds = channelAnswerBearing
 						? [...new Set(channelHits.map((hit) => canonicalize(hit.documentId)))]
@@ -432,6 +443,29 @@
 											expectedIds.includes(canonicalize(hit.documentId))
 									)))
 					});
+					const channelRecall = expectedIds.every((id) => channelIds.slice(0, 5).includes(id));
+					const channelCitation =
+						!test.answerable ||
+						(channelEvidence.length === normalizedEvidence.length &&
+							(!page ||
+								channelHits.some(
+									(hit) =>
+										hit.page === Number(page) && expectedIds.includes(canonicalize(hit.documentId))
+								)));
+					if (
+						(test.answerable && (!channelRecall || !channelCitation)) ||
+						(!test.answerable && channelIds.length)
+					) {
+						ablationFailures[channel].push(
+							`${test.id}: answerBearing=${channelAnswerBearing} recall5=${channelRecall} evidence=${channelEvidence.length}/${normalizedEvidence.length} citation=${channelCitation} top=${channelHits
+								.slice(0, 5)
+								.map(
+									(hit) =>
+										`${hit.documentName}@${hit.page ?? hit.headingPath ?? '-'}:${normalizeForFuzzy(hit.text).slice(0, 90)}`
+								)
+								.join(' | ')}`
+						);
+					}
 				}
 				evaluations.push({
 					expectedIds,
@@ -458,17 +492,32 @@
 							.join(' | ')}`
 					);
 			}
+			const metrics = evaluateRetrieval(evaluations);
+			const ablation = {
+				lexical: evaluateRetrieval(ablationEvaluations.lexical),
+				fuzzy: evaluateRetrieval(ablationEvaluations.fuzzy),
+				dense: evaluateRetrieval(ablationEvaluations.dense)
+			};
+			const profiles = { fused: metrics, ...ablation };
+			const baselineRegressions = Object.entries(fuzzyBaseline.minimum).flatMap(
+				([profile, minimums]) =>
+					Object.entries(minimums).flatMap(([metric, minimum]) =>
+						profiles[profile as keyof typeof profiles][metric as keyof RetrievalMetrics] < minimum
+							? [`${profile}.${metric}`]
+							: []
+					)
+			);
+			if (metrics.p95LatencyMs > fuzzyBaseline.maximum.fusedP95LatencyMs)
+				baselineRegressions.push('fused.p95LatencyMs');
 			fuzzyBenchmarkReport = {
-				metrics: evaluateRetrieval(evaluations),
-				ablation: {
-					lexical: evaluateRetrieval(ablationEvaluations.lexical),
-					fuzzy: evaluateRetrieval(ablationEvaluations.fuzzy),
-					dense: evaluateRetrieval(ablationEvaluations.dense)
-				},
+				metrics,
+				ablation,
 				ingestMs,
 				bytes,
 				cases: cases.length,
 				failures,
+				ablationFailures,
+				baseline: { version: fuzzyBaseline.version, regressions: baselineRegressions },
 				slowest: timings.sort((left, right) => right.ms - left.ms).slice(0, 5),
 				cost: {
 					databaseBytesBefore,

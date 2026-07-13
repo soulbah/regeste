@@ -107,4 +107,25 @@ describe('retrieval relevance', () => {
 			])
 		).toBe(false);
 	});
+
+	it('does not combine a password mention and recommendation from unrelated passages', () => {
+		expect(
+			hasAnswerBearingEvidence('Quel mot de passe recommande RFC9110 ?', [
+				{
+					...evidenceHit('RFC9110 discusses passwords in authentication systems.'),
+					documentName: 'rfc9110.pdf'
+				},
+				{
+					...evidenceHit('RFC9110 contains implementation recommendations.'),
+					chunkId: 2,
+					documentName: 'rfc9110.pdf'
+				}
+			])
+		).toBe(false);
+		expect(
+			hasAnswerBearingEvidence('Quel est le mot de passe recommandé ?', [
+				evidenceHit('Le mot de passe recommandé est Silex-2026.')
+			])
+		).toBe(true);
+	});
 });

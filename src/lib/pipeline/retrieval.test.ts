@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	expandRetrievalQuery,
 	fuseCandidates,
+	mergeRankedCandidateLists,
 	queryCoverage,
 	refineCandidates,
 	selectWithNeighbors
@@ -20,6 +21,17 @@ const hit = (chunkId: number, documentId: string, score: number): SearchHit => (
 });
 
 describe('fuseCandidates', () => {
+	it('merges query variants by rank instead of incomparable cosine magnitude', () => {
+		const originalBest = hit(1, 'original', 0.51);
+		const expandedBest = hit(2, 'expanded', 0.91);
+		const agreed = hit(3, 'agreed', 0.5);
+		const result = mergeRankedCandidateLists([
+			[originalBest, agreed],
+			[expandedBest, { ...agreed, score: 0.8 }]
+		]);
+		expect(result.map((item) => item.chunkId)).toEqual([3, 2, 1]);
+	});
+
 	it('rewards agreement and keeps raw scores', () => {
 		const result = fuseCandidates([hit(1, 'a', 0.8), hit(2, 'a', 0.7)], [hit(2, 'a', -4)]);
 		expect(result[0].chunkId).toBe(2);
@@ -38,6 +50,22 @@ describe('fuzzy and multi-document safety', () => {
 		const exact = { ...hit(1, 'contract', -1), text: 'Le contrat ZX-2048 expire en 2028.' };
 		const fuzzy = { ...hit(2, 'contract', -2), text: 'Le contrat ZX-2047 expire en 2029.' };
 		expect(refineCandidates([], [exact], 'Quand expire ZX-2048 ?', 2, [fuzzy])[0].chunkId).toBe(1);
+	});
+
+	it('uses structural heading context during reranking', () => {
+		const get = {
+			...hit(1, 'rfc', -1),
+			headingPath: '9 Methods > 9.3 Method Definitions > 9.3.1 GET',
+			text: 'Requests transfer of a current selected representation.'
+		};
+		const put = {
+			...hit(2, 'rfc', -2),
+			headingPath: '9 Methods > 9.3 Method Definitions > 9.3.4 PUT',
+			text: 'The PUT method differs from GET.'
+		};
+		expect(refineCandidates([], [], 'Quelle section définit GET ?', 2, [put, get])[0].chunkId).toBe(
+			1
+		);
 	});
 
 	it('lets a discriminating fuzzy candidate beat unrelated two-channel agreement', () => {
@@ -91,6 +119,9 @@ describe('retrieval refinement', () => {
 		);
 		expect(expandRetrievalQuery("Quelle datte d'entrée en viguer est indiquée ?")).toContain(
 			'effective date entry into force'
+		);
+		expect(expandRetrievalQuery('Quelle sectoin definit GET ?')).toContain(
+			'request method definition semantics'
 		);
 	});
 

@@ -162,9 +162,28 @@ export function hasAnswerBearingEvidence(query: string, hits: SearchHit[]): bool
 	}
 	if (
 		/\b(?:mot de passe|password)\b/.test(normalized) &&
-		!/(?:mot de passe|password|passwd)/.test(normalizeForFuzzy(candidateText))
+		!eligibleHits.some((hit) => {
+			const hitTokens = new Set(normalizedTokens(`${hit.documentName}\n${hit.text}`));
+			const hasPassword = ['password', 'passwd', 'passe'].some((term) => hitTokens.has(term));
+			const asksRecommendation = /\b(?:recommand\w*|recommend\w*)\b/.test(normalized);
+			const hasRecommendation = [...hitTokens].some((term) =>
+				/^(?:recommand|recommend)/.test(term)
+			);
+			return hasPassword && (!asksRecommendation || hasRecommendation);
+		})
 	)
 		return false;
+	if (/^(?:quel.*mot de passe|what.*password)\b/.test(normalized)) {
+		const labeledValue = /(?:mot de passe|password)\s*(?:recommand[\p{L}]*\s*)?[:=]\s*\S{3,}/iu;
+		const structuredCopulaValue =
+			/(?:mot de passe|password)\s*(?:recommand[\p{L}]*\s*)?(?:est|is)\s+\S*(?:\d|[._@#$%!?-])\S*/iu;
+		if (
+			!eligibleHits.some(
+				(hit) => labeledValue.test(hit.text) || structuredCopulaValue.test(hit.text)
+			)
+		)
+			return false;
+	}
 	if (
 		/\b(?:groupe sangu\w*|blood type)\b/.test(normalized) &&
 		!/(?:groupe sangu\w*|blood type)/.test(normalizeForFuzzy(candidateText))

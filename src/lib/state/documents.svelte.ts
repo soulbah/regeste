@@ -19,6 +19,7 @@ import {
 } from '$lib/pipeline/embed-model';
 import {
 	expandRetrievalQuery,
+	mergeRankedCandidateLists,
 	refineCandidates,
 	selectWithNeighbors
 } from '$lib/pipeline/retrieval';
@@ -392,12 +393,18 @@ class DocumentsStore {
 		const refinedQuery = expandRetrievalQuery(refinementQuery.trim());
 		const lexicalPromise = db.searchLexical(clean, documentIds, 60);
 		const fuzzyPromise = db.searchFuzzy(clean, documentIds, 60);
-		const { data, dims } = await getEmbedWorker().embed([embeddingQuery], 'query');
-		const [lexical, fuzzy, semantic] = await Promise.all([
+		const denseQueries = clean === embeddingQuery ? [embeddingQuery] : [embeddingQuery, clean];
+		const { data, dims } = await getEmbedWorker().embed(denseQueries, 'query');
+		const [lexical, fuzzy, denseLists] = await Promise.all([
 			lexicalPromise,
 			fuzzyPromise,
-			db.searchVector(data, dims, documentIds, 60)
+			Promise.all(
+				denseQueries.map((_, index) =>
+					db.searchVector(data.subarray(index * dims, (index + 1) * dims), dims, documentIds, 60)
+				)
+			)
 		]);
+		const semantic = mergeRankedCandidateLists(denseLists);
 		onInspect?.();
 		const ranked = refineCandidates(semantic, lexical, refinedQuery, 24, fuzzy);
 		const neighbors = await db.listNeighborChunks(
@@ -417,16 +424,31 @@ class DocumentsStore {
 		const expanded = expandRetrievalQuery(embeddingQuery);
 		const lexicalPromise = db.searchLexical(expanded, documentIds, 60);
 		const fuzzyPromise = db.searchFuzzy(expanded, documentIds, 60);
-		const { data, dims } = await getEmbedWorker().embed([embeddingQuery], 'query');
-		const [lexical, fuzzy, dense] = await Promise.all([
+		const denseQueries =
+			expanded === embeddingQuery ? [embeddingQuery] : [embeddingQuery, expanded];
+		const { data, dims } = await getEmbedWorker().embed(denseQueries, 'query');
+		const [lexical, fuzzy, denseLists] = await Promise.all([
 			lexicalPromise,
 			fuzzyPromise,
-			db.searchVector(data, dims, documentIds, 60)
+			Promise.all(
+				denseQueries.map((_, index) =>
+					db.searchVector(data.subarray(index * dims, (index + 1) * dims), dims, documentIds, 60)
+				)
+			)
 		]);
+		const dense = mergeRankedCandidateLists(denseLists);
+		const finalize = async (ranked: SearchHit[]) => {
+			const broad = ranked.slice(0, 24);
+			const neighbors = await db.listNeighborChunks(
+				broad.slice(0, 12).map((hit) => hit.chunkId),
+				1
+			);
+			return selectWithNeighbors(broad, neighbors, expanded, 10);
+		};
 		return {
-			lexical: refineCandidates([], lexical, expanded, 10),
-			fuzzy: refineCandidates([], [], expanded, 10, fuzzy),
-			dense: refineCandidates(dense, [], expanded, 10)
+			lexical: await finalize(refineCandidates([], lexical, expanded, 24)),
+			fuzzy: await finalize(refineCandidates([], [], expanded, 24, fuzzy)),
+			dense: await finalize(refineCandidates(dense, [], expanded, 24))
 		};
 	}
 

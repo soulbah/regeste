@@ -36,9 +36,17 @@ export function fuzzyIndexText(text: string): string {
 	return characterGrams(text, 3, 4096).join(' ');
 }
 
+/** Separate heading grams let structural queries prefer title matches over body mentions. */
+export function fuzzyHeadingIndexText(text: string): string {
+	return characterGrams(text)
+		.filter((gram) => /^[\p{L}\p{N}]{3}$/u.test(gram))
+		.map((gram) => `h${gram}`)
+		.join(' ');
+}
+
 /** Keep grams from every significant query token; a global prefix cap would
  * silently drop late discriminators such as a person's name. */
-export function fuzzyQueryGrams(text: string, perToken = 5, limit = 40): string[] {
+export function fuzzyQueryGrams(text: string, perToken = 6, limit = 96): string[] {
 	const tokens = [
 		...new Set(
 			normalizeForFuzzy(text)
@@ -53,7 +61,13 @@ export function fuzzyQueryGrams(text: string, perToken = 5, limit = 40): string[
 		for (const gram of (interior.length ? interior : grams).slice(0, perToken))
 			if (!out.includes(gram)) out.push(gram);
 	}
-	return out.slice(-limit);
+	const normal = out.slice(0, limit);
+	const structural =
+		extractIdentifiers(text).length === 0 &&
+		/\b(?:section|sectoin|chapitre|chapter|heading|titre)\b/i.test(normalizeForFuzzy(text))
+			? normal.filter((gram) => /^[\p{L}\p{N}]{3}$/u.test(gram)).map((gram) => `h${gram}`)
+			: [];
+	return [...normal, ...structural];
 }
 
 export function extractIdentifiers(text: string): string[] {

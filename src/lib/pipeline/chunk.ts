@@ -6,7 +6,7 @@
 // from the tail of the previous chunk within the same section only.
 
 import type { Chunk, ParsedBlock } from '$lib/types';
-import { extractAliases, fuzzyIndexText } from '$lib/pipeline/fuzzy';
+import { extractAliases, fuzzyHeadingIndexText, fuzzyIndexText } from '$lib/pipeline/fuzzy';
 
 // Conservative browser budget: around 180–260 tokens for French/English prose.
 // Exact model tokenization still happens before inference; this bound prevents
@@ -127,7 +127,12 @@ export function chunkBlocks(blocks: ParsedBlock[], documentName = ''): Chunk[] {
 			chunks.push({
 				text,
 				searchText,
-				fuzzyText: fuzzyIndexText(searchText),
+				fuzzyText: [
+					fuzzyIndexText(searchText),
+					headingPath ? fuzzyHeadingIndexText(headingPath) : ''
+				]
+					.filter(Boolean)
+					.join(' '),
 				seq: seq++,
 				page: b.page ?? null,
 				headingPath,
