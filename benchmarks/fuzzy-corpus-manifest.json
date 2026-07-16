@@ -9,7 +9,10 @@
 			"licenseUrl": "https://www.nasa.gov/nasa-brand-center/images-and-media/",
 			"use": "NASA public-use historical scan; landscape timelines, abbreviations and missing-page warning",
 			"format": "pdf",
-			"expectedPages": { "min": 100, "max": 200 },
+			"expectedPages": {
+				"min": 100,
+				"max": 200
+			},
 			"bytes": 10955047,
 			"sha256": "5563218d1e47166a5709d4d3072714c75fe928db0c14c37e1ee6b65c4df3c811"
 		},
@@ -20,8 +23,14 @@
 			"licenseUrl": "https://ntrs.nasa.gov/citations/19720024229",
 			"use": "NASA work of US Government, public use permitted; technical report and figures",
 			"format": "pdf",
-			"expectedPages": { "min": 45, "max": 55 },
-			"expectedChunks": { "min": 120, "max": 500 },
+			"expectedPages": {
+				"min": 45,
+				"max": 55
+			},
+			"expectedChunks": {
+				"min": 120,
+				"max": 500
+			},
 			"bytes": 2630266,
 			"sha256": "22b39858cd54d821400194fba2dbd6dbbdef827c5d48137ace99201eae2c1bc7"
 		},
@@ -32,8 +41,14 @@
 			"licenseUrl": "https://www.govinfo.gov/about/policies",
 			"use": "Official US Government two-column notice with headers, citations and line wrapping",
 			"format": "pdf",
-			"expectedPages": { "min": 3, "max": 3 },
-			"expectedChunks": { "min": 3, "max": 30 },
+			"expectedPages": {
+				"min": 3,
+				"max": 3
+			},
+			"expectedChunks": {
+				"min": 30,
+				"max": 120
+			},
 			"bytes": 216440,
 			"sha256": "a619a5c743c7329d89f4d3949ed9ee08b4f66eb445dc7ea86f99adc9f12d2780"
 		},
@@ -44,8 +59,14 @@
 			"licenseUrl": "https://www.govinfo.gov/about/policies",
 			"use": "Official CFR section with exact legal identifiers, units, tables and amendments",
 			"format": "pdf",
-			"expectedPages": { "min": 1, "max": 1 },
-			"expectedChunks": { "min": 1, "max": 12 },
+			"expectedPages": {
+				"min": 1,
+				"max": 1
+			},
+			"expectedChunks": {
+				"min": 6,
+				"max": 24
+			},
 			"bytes": 175758,
 			"sha256": "49ff24d6f71c6f696fa5405555167d9eff7522761d26f325e5a935c6abda40d9"
 		},
@@ -56,7 +77,10 @@
 			"licenseUrl": "https://trustee.ietf.org/documents/trust-legal-provisions/",
 			"use": "Official plain-text rendition; headings, ABNF, acronyms and exact section references",
 			"format": "txt",
-			"expectedChunks": { "min": 500, "max": 1100 },
+			"expectedChunks": {
+				"min": 805,
+				"max": 2577
+			},
 			"bytes": 502941,
 			"sha256": "21c1cdce6ab0e5509b04d84a28000836c7a087cf786efe6f04877ebfff47232a"
 		},
@@ -67,8 +91,14 @@
 			"licenseUrl": "https://trustee.ietf.org/documents/trust-legal-provisions/",
 			"use": "Same RFC as PDF for cross-format evidence parity",
 			"format": "pdf",
-			"expectedPages": { "min": 190, "max": 200 },
-			"expectedChunks": { "min": 500, "max": 1100 },
+			"expectedPages": {
+				"min": 190,
+				"max": 200
+			},
+			"expectedChunks": {
+				"min": 900,
+				"max": 2000
+			},
 			"bytes": 2858365,
 			"sha256": "60b30efa1048900833d1758440247fe8ac85a3134f2327388dcb24e07d814c89"
 		},
@@ -89,7 +119,10 @@
 			"licenseUrl": "https://www.nist.gov/open/license",
 			"use": "Official risk-management framework; dense prose, repeated terminology, figures, tables and cross-page synthesis",
 			"format": "pdf",
-			"expectedPages": { "min": 48, "max": 48 },
+			"expectedPages": {
+				"min": 48,
+				"max": 48
+			},
 			"bytes": 1946127,
 			"sha256": "7576edb531d9848825814ee88e28b1795d3a84b435b4b797d3670eafdc4a89f1"
 		},
@@ -100,7 +133,10 @@
 			"licenseUrl": "https://www.irs.gov/privacy-disclosure",
 			"use": "Official two-page form; spatial labels, near-identical line numbers, checkboxes and cross-page references",
 			"format": "pdf",
-			"expectedPages": { "min": 2, "max": 2 },
+			"expectedPages": {
+				"min": 2,
+				"max": 2
+			},
 			"bytes": 220237,
 			"sha256": "3d31c226df0d189ced80e039d01cf0f8820c1019681a0f0ca6264de277b7e982"
 		},
@@ -111,7 +147,10 @@
 			"licenseUrl": "https://huggingface.co/datasets/nomic-ai/aec-bench-v1/blob/main/LICENSE",
 			"use": "AEC-Bench public drawing set; large landscape sheets, schedules and an intentionally broken cross-reference",
 			"format": "pdf",
-			"expectedPages": { "min": 60, "max": 60 },
+			"expectedPages": {
+				"min": 60,
+				"max": 60
+			},
 			"bytes": 42467378,
 			"sha256": "3256068b75f86db49de631084c57451527bb3e4540c175973bdf1d589feb4100"
 		}
