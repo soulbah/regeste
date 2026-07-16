@@ -101,6 +101,10 @@ function expandedSlot(slot: string): string {
 	if (/\b(?:dispositif|securite|protection|device|security)\w*\b/u.test(normalized))
 		additions.push('dispositif securite protection alarme camera detecteur device security alarm');
 	if (/\b(?:sinistre|claim)\w*\b/u.test(normalized)) additions.push('sinistre claim historique');
+	if (/\b(?:hotel|hotels)\b/u.test(normalized))
+		additions.push('hotel hebergement nuit nuits accommodation lodging night');
+	if (/\b(?:souscripteur|subscriber|nomme|nommee|named)\b/u.test(normalized))
+		additions.push('nom prenom souscripteur identite name subscriber identity');
 	if (/\b(?:resili|cancel|terminat)\w*\b/u.test(normalized))
 		additions.push('resiliation resilie cancelled terminated');
 	if (/\b(?:assurance actuelle|currently insured|current insurance)\b/u.test(normalized))
@@ -117,13 +121,11 @@ function expandedSlot(slot: string): string {
 function labelValueFacts(hits: SearchHit[]): LabelValueFact[] {
 	const facts: LabelValueFact[] = [];
 	for (const [order, hit] of hits.entries()) {
-		const rows = [
-			...logicalLines(hit.text),
-			...hit.text
-				.split(/\n+/u)
-				.map((line) => line.trim())
-				.filter((line) => line.length >= 4)
-		];
+		const lines = hit.text
+			.split(/\n+/u)
+			.map((line) => line.trim())
+			.filter((line) => line.length >= 1);
+		const rows = [...logicalLines(hit.text), ...lines.filter((line) => line.length >= 4)];
 		for (const raw of rows) {
 			const text = raw.replace(/^(?:[-•●✓✗!]\s*)/u, '').trim();
 			// Logical blocks may contain several OCR form rows. Individual lines
@@ -134,6 +136,23 @@ function labelValueFacts(hits: SearchHit[]): LabelValueFact[] {
 			const match = colon ?? question;
 			if (!match) continue;
 			facts.push({ hit, label: match[1].trim(), value: match[2].trim(), text, order });
+		}
+		// PDF form layers often place the label and its value on separate visual
+		// lines ("Prénom et Nom :" / "Camille Moreau"). Bind them when the label
+		// line carries no inline value and the next line is not itself a label.
+		for (let index = 0; index < lines.length - 1; index++) {
+			const label = /^(?:[-•●✓✗!]\s*)?(.{3,180}?)\s*:\s*$/u.exec(lines[index])?.[1]?.trim();
+			if (!label) continue;
+			const value = lines[index + 1].trim();
+			if (
+				!value ||
+				value.length > 220 ||
+				/[:：]\s*$/u.test(value) ||
+				/^[-•●✓✗!]\s/u.test(value) ||
+				/^\d{1,3}[.)]\s/u.test(value)
+			)
+				continue;
+			facts.push({ hit, label, value, text: `${label} : ${value}`, order });
 		}
 	}
 	const structural = [...hits]
@@ -265,20 +284,77 @@ function buildFormAnswer(question: string, hits: SearchHit[]): string | null {
 		return null;
 	const slots = splitQueryClauses(question);
 	if (slots.length < 2) return null;
-	const facts = labelValueFacts(hits);
+	// A declared-form fact carries a concrete value (number, yes/no, unit, short
+	// entry) — a glossary definition ("Période subséquente : Période se situant
+	// après…") is prose, not a declaration.
+	const facts = labelValueFacts(hits).filter(
+		(fact) =>
+			fact.value.length <= 60 || /(?:\d|\boui\b|\bnon\b|\byes\b|\bno\b|m²|m2|€)/iu.test(fact.value)
+	);
 	if (facts.length < 2) return null;
 	const chosen: Array<{ slot: string; fact: LabelValueFact; score: number }> = [];
+	// Exact token overlap outranks approximate matching: a fuzzy near-miss
+	// ("données" ~ "donne") on an unrelated prose label must never displace the
+	// label that literally contains the requested word. Assignment is global
+	// greedy — the strongest slot/label pair claims its fact first, so a shared
+	// token ("construction") cannot let an earlier slot steal a later slot's row.
+	const rankedBySlot = new Map(
+		slots.map((slot) => {
+			const expanded = expandedSlot(slot);
+			// First subject noun of the slot, skipping request verbs and metric
+			// words; matched as a whole token so "donne" never rides inside
+			// "données".
+			const firstTerm =
+				(normalizeQuestion(slot).match(/[\p{L}\p{N}]{4,}/gu) ?? []).find(
+					(term) =>
+						!METRIC_SLOT_TERM.test(term) &&
+						!/^(?:donne|donner|donnez|resume|resumer|recapitule|indique|indiquez|give|state|summarize|list)$/u.test(
+							term
+						)
+				) ?? '';
+			return [
+				slot,
+				facts
+					.map((fact) => ({
+						fact,
+						exact:
+							Math.max(queryCoverage(slot, fact.label), queryCoverage(expanded, fact.label)) +
+							(firstTerm &&
+							(normalizeQuestion(fact.label).match(/[\p{L}\p{N}]+/gu) ?? []).some(
+								(token) => token === firstTerm
+							)
+								? 0.3
+								: 0),
+						score: Math.max(coverage(slot, fact.label), coverage(expanded, fact.label))
+					}))
+					.sort(
+						(left, right) =>
+							right.score + 0.5 * right.exact - (left.score + 0.5 * left.exact) ||
+							left.fact.order - right.fact.order
+					)
+			] as const;
+		})
+	);
+	const minimumScoreFor = (slot: string) =>
+		/\b(?:construit|construction|periode|built)\b/u.test(normalizeQuestion(slot)) ? 0.2 : 0.3;
+	const pairs = slots
+		.flatMap((slot) =>
+			rankedBySlot
+				.get(slot)!
+				.filter((candidate) => candidate.score >= minimumScoreFor(slot))
+				.map((candidate) => ({ slot, ...candidate }))
+		)
+		.sort((left, right) => right.score + 0.5 * right.exact - (left.score + 0.5 * left.exact));
+	const assignedSlots = new Set<string>();
+	for (const pair of pairs) {
+		if (assignedSlots.has(pair.slot) || chosen.some((current) => current.fact === pair.fact))
+			continue;
+		assignedSlots.add(pair.slot);
+		chosen.push({ slot: pair.slot, fact: pair.fact, score: pair.score });
+	}
 	for (const slot of slots) {
-		const expanded = expandedSlot(slot);
-		const normalizedSlot = normalizeQuestion(slot);
-		const minimumScore = /\b(?:construit|construction|periode|built)\b/u.test(normalizedSlot)
-			? 0.2
-			: 0.3;
-		const ranked = facts
-			.map((fact) => ({ fact, score: coverage(expanded, fact.label) }))
-			.sort((left, right) => right.score - left.score || left.fact.order - right.fact.order);
-		if (!ranked[0] || ranked[0].score < minimumScore) continue;
-		chosen.push({ slot, ...ranked[0] });
+		if (!assignedSlots.has(slot)) continue;
+		const ranked = rankedBySlot.get(slot)!;
 		if (/\b(?:quels|quelles|which|what)\b/u.test(normalizeQuestion(slot))) {
 			const topChunkId = ranked[0].fact.hit.chunkId;
 			for (const related of ranked
@@ -291,7 +367,7 @@ function buildFormAnswer(question: string, hits: SearchHit[]): string | null {
 								/^(?:oui|non|yes|no)$/u.test(normalizeQuestion(candidate.fact.value)))) &&
 						!chosen.some((current) => current.fact === candidate.fact)
 				)
-				.slice(0, 2))
+				.slice(0, 4))
 				chosen.push({ slot, ...related });
 		}
 		if (!/\b(?:dependance|outbuilding)\w*\b/u.test(normalizeQuestion(slot))) continue;
@@ -566,7 +642,9 @@ function buildCoLocatedMultiFactAnswer(question: string, hits: SearchHit[]): str
 				.at(-1) ?? ''
 	);
 	const measurePattern = new RegExp(
-		`\\b(?:\\d+|${Object.keys(SMALL_NUMBER_VALUES).join('|')})\\s*(?:\\(\\s*\\d+\\s*\\)\\s*)?(?:%|€|eur|jours?|mois|ans?|annees?|days?|months?|years?)\\b`,
+		`\\b(?:\\d+|${Object.keys(SMALL_NUMBER_VALUES).join('|')})\\s*(?:\\(\\s*\\d+\\s*\\)\\s*)?(?:%|€|eur|jours?|mois|ans?|annees?|days?|months?|years?)\\b` +
+			// Contact numbers and long identifiers are co-located values too.
+			String.raw`|(?:\+?\d[\d  ]{7,}\d)`,
 		'giu'
 	);
 	const candidates = hits
@@ -672,6 +750,121 @@ function significantSlot(slot: string): boolean {
 	);
 }
 
+/** Question words and bare metric nouns anchor nothing by themselves: they
+ * describe WHAT to report about each requested subject, not a subject. */
+const METRIC_SLOT_TERM =
+	/^(?:quel|quels|quelle|quelles|what|which|combien|comment|how|much|many|long|temps|reponse|reponses|answer|answers|plafond|plafonds|limite|limites|montant|montants|duree|durees|delai|delais|jour|jours|mois|nuit|nuits|an|ans|annee|annees|heure|heures|semaine|semaines|amount|amounts|limit|limits|duration|durations|deadline|deadlines|day|days|month|months|year|years|night|nights|hour|hours|week|weeks)$/u;
+
+function distinctiveSlotTerms(slot: string): string[] {
+	return (normalizeQuestion(slot).match(/[\p{L}\p{N}]+/gu) ?? []).filter(
+		(term) => term.length >= 4 && !METRIC_SLOT_TERM.test(term)
+	);
+}
+
+function containsTermish(normalizedText: string, term: string): boolean {
+	if (normalizedText.includes(term)) return true;
+	if (term.length < 6) return false;
+	const prefix = term.slice(0, 6);
+	return (normalizedText.match(/[\p{L}\p{N}]+/gu) ?? []).some((token) => token.startsWith(prefix));
+}
+
+const MEASURE_NUMBER_PATTERN = String.raw`(?:\d[\d \u00a0.,]*|\b(?:un|une|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|onze|douze|treize|quatorze|quinze|seize|vingt|trente|quarante|cinquante|soixante|cent|one|two|three|four|five|six|seven|eight|nine|ten|fourteen|fifteen|twenty|thirty)\b)`;
+
+const MEASURE_UNIT_BY_KIND = {
+	money: String.raw`(?:€|eur\b|euros?\b)`,
+	duration: String.raw`(?:jours?\b|mois\b|ans?\b|annees?\b|heures?\b|semaines?\b|nuits?\b|days?\b|months?\b|years?\b|hours?\b|weeks?\b|nights?\b)`,
+	other: String.raw`%`
+} as const;
+type MeasureKind = keyof typeof MEASURE_UNIT_BY_KIND;
+
+/** The measure kind a question requests: a "délai" is a duration, never a
+ * neighboring price or deductible; a "plafond" is an amount. */
+function requestedMeasureKinds(question: string): MeasureKind[] {
+	const normalized = normalizeQuestion(question);
+	const kinds: MeasureKind[] = [];
+	if (
+		/\b(?:delai|delais|duree|durees|prescription|preavis|combien de temps|how long|deadline)\b/u.test(
+			normalized
+		)
+	)
+		kinds.push('duration');
+	if (
+		/\b(?:plafond|plafonds|montant|montants|prix|prime|franchise|cout|couts|amount|price|premium|deductible|cost)\b/u.test(
+			normalized
+		)
+	)
+		kinds.push('money');
+	return kinds;
+}
+
+/** Character positions of concrete measure values (amounts, durations). */
+function measurePositions(normalizedText: string, kinds: readonly MeasureKind[] = []): number[] {
+	const unitPattern =
+		kinds.length === 1
+			? MEASURE_UNIT_BY_KIND[kinds[0]]
+			: `(?:${Object.values(MEASURE_UNIT_BY_KIND).join('|')})`;
+	return [
+		...normalizedText.matchAll(new RegExp(`${MEASURE_NUMBER_PATTERN}\\s*${unitPattern}`, 'giu'))
+	].map((match) => match.index);
+}
+
+function termPositions(normalizedText: string, terms: readonly string[]): number[] {
+	const positions: number[] = [];
+	for (const term of terms) {
+		let at = normalizedText.indexOf(term);
+		while (at >= 0) {
+			positions.push(at);
+			at = normalizedText.indexOf(term, at + 1);
+		}
+		if (term.length >= 6) {
+			const prefixPattern = new RegExp(String.raw`\b${term.slice(0, 6)}\p{L}*`, 'gu');
+			for (const match of normalizedText.matchAll(prefixPattern)) positions.push(match.index);
+		}
+	}
+	return positions;
+}
+
+/** How tightly the slot's subject binds to a measure inside the unit: 1 when a
+ * value sits next to the subject word, approaching 0 as it drifts away. */
+function measureBindingProximity(
+	normalizedText: string,
+	terms: readonly string[],
+	kinds: readonly MeasureKind[] = []
+): number {
+	if (!terms.length) return 0;
+	const measures = measurePositions(normalizedText, kinds);
+	const anchors = termPositions(normalizedText, terms);
+	if (!measures.length || !anchors.length) return 0;
+	const distance = Math.min(
+		...anchors.flatMap((anchor) => measures.map((measure) => Math.abs(measure - anchor)))
+	);
+	return 1 / (1 + distance / 60);
+}
+
+/** True when the unit's nearest measure to the slot subject lives inside an
+ * exception clause (introduced by "toutefois", "par exception", …). */
+function nearestMeasureInExceptionScope(
+	normalizedText: string,
+	terms: readonly string[],
+	kinds: readonly MeasureKind[] = []
+): boolean {
+	const measures = measurePositions(normalizedText, kinds);
+	const anchors = termPositions(normalizedText, terms);
+	if (!measures.length) return false;
+	const nearest = anchors.length
+		? measures.reduce((best, measure) =>
+				Math.min(...anchors.map((anchor) => Math.abs(measure - anchor))) <
+				Math.min(...anchors.map((anchor) => Math.abs(best - anchor)))
+					? measure
+					: best
+			)
+		: measures[0];
+	const preceding = normalizedText.slice(Math.max(0, nearest - 140), nearest);
+	return /\b(?:toutefois|cependant|neanmoins|par exception|par derogation|portee? a|sauf|however|except|nevertheless)\b/u.test(
+		preceding
+	);
+}
+
 function buildMultiFactAnswer(question: string, hits: SearchHit[]): string | null {
 	const slots = enumeratedQuestionSlots(question);
 	const temporalPair =
@@ -683,15 +876,29 @@ function buildMultiFactAnswer(question: string, hits: SearchHit[]): string | nul
 	const factValue =
 		/(?:\d|€|%|\b(?:oui|non|yes|no|illimit\w*|unlimited|jour|jours|mois|an|ans|annee|annees|day|days|month|months|year|years)\b)/iu;
 	const units = evidenceUnits(hits).filter((unit) => factValue.test(normalizeQuestion(unit.text)));
+	const measureKinds = requestedMeasureKinds(question);
+	const slotsInfo = slots.map((slot) => ({ slot, distinctive: distinctiveSlotTerms(slot) }));
+	// A slot made only of question/metric words ("Quels plafonds") qualifies the
+	// anchored slots instead of demanding its own passage.
+	const anchored = slotsInfo.filter((info) => info.distinctive.length > 0);
+	const effectiveSlots = anchored.length >= 2 ? anchored : slotsInfo;
 	const chosen: EvidenceUnit[] = [];
 	let matchedSlots = 0;
-	for (const slot of slots) {
+	for (const info of effectiveSlots) {
+		const slot = info.slot;
 		const normalizedSlot = normalizeQuestion(slot);
 		const requiresDate = /\b(?:date|prise d effet|effective date)\b/u.test(normalizedSlot);
 		const requiresMoney =
 			/\b(?:prix|prime|paiement|franchise|plafond|biens|relogement|responsabilite|amount|price|premium|payment|deductible|limit)\b/u.test(
 				normalizedSlot
 			);
+		const generalRule = /\b(?:en general|in general|normalement|habituellement|par defaut)\b/u.test(
+			normalizedSlot
+		);
+		const competitorTerms = effectiveSlots
+			.filter((other) => other !== info)
+			.flatMap((other) => other.distinctive)
+			.filter((term) => !info.distinctive.includes(term));
 		const terminalTerm =
 			(normalizedSlot.match(/[\p{L}\p{N}]+/gu) ?? []).filter((term) => term.length >= 4).at(-1) ??
 			'';
@@ -716,13 +923,44 @@ function buildMultiFactAnswer(question: string, hits: SearchHit[]): string | nul
 				return labelAt >= 0 && /\d[\d\s.,]*\s*€/u.test(text.slice(labelAt, labelAt + 180));
 			})
 			.map((unit) => {
+				const normalizedText = normalizeQuestion(unit.text);
 				const numbers = unit.text.match(/\d+(?:[.,]\d+)?/gu)?.length ?? 0;
+				// Periodicity slots ("le prix mensuel") anchor on the periodicity
+				// word: the money filter above already proved the unit's relevance.
+				const anchorTerms = [
+					...distinctiveSlotTerms(expandedSlot(slot)),
+					...(requiresMoney && /\b(?:mensuel|par mois|monthly|per month)\b/u.test(normalizedSlot)
+						? ['mois', 'mensuel', 'monthly', 'month']
+						: []),
+					...(requiresMoney && /\b(?:annuel|annuelle|annual|yearly)\b/u.test(normalizedSlot)
+						? ['annuel', 'annuelle', 'annual', 'yearly']
+						: [])
+				];
+				const subjectPresent =
+					!anchorTerms.length || anchorTerms.some((term) => containsTermish(normalizedText, term));
+				const binding = measureBindingProximity(normalizedText, anchorTerms, measureKinds);
+				const competitorBinding = measureBindingProximity(
+					normalizedText,
+					competitorTerms,
+					measureKinds
+				);
 				return {
 					unit,
 					numbers,
 					score:
-						coverage(expandedSlot(slot), unit.text) +
-						(/:\s*[^\n]{0,160}\d/u.test(unit.text) ? 0.06 : 0)
+						Math.max(coverage(slot, unit.text), coverage(expandedSlot(slot), unit.text)) +
+						(/:\s*[^\n]{0,160}\d/u.test(unit.text) ? 0.06 : 0) +
+						0.24 * binding -
+						// A unit that only shares metric vocabulary ("délai", "plafond")
+						// with the slot answers a different subject.
+						(subjectPresent ? 0 : 0.22) -
+						// Another requested subject sits closer to this unit's value:
+						// the value belongs to that subject, not this slot.
+						(competitorBinding > binding ? 0.25 : 0) -
+						(generalRule &&
+						nearestMeasureInExceptionScope(normalizedText, info.distinctive, measureKinds)
+							? 0.3
+							: 0)
 				};
 			})
 			.sort(
@@ -743,10 +981,41 @@ function buildMultiFactAnswer(question: string, hits: SearchHit[]): string | nul
 		)
 			chosen.push(best.unit);
 	}
-	if (matchedSlots < slots.length || chosen.length < Math.min(3, slots.length)) return null;
+	if (matchedSlots < effectiveSlots.length || !chosen.length) return null;
 	return chosen
 		.map((unit) => `${unit.text.replace(/^[-•●✓✗!]\s*/u, '').trim()} ${citation(unit.hit, hits)}`)
 		.join('\n');
+}
+
+/** A question anchored to an explicit multi-digit value ("plus de 90 jours")
+ * is answered by the clause carrying that exact value, plus its structural
+ * continuation when the clause ends on an unfinished list or sentence. */
+function buildNumberAnchoredAnswer(question: string, hits: SearchHit[]): string | null {
+	const normalizedQuestion = normalizeQuestion(question);
+	const anchor = /\b(\d{2,})\b/u.exec(normalizedQuestion)?.[1];
+	if (!anchor) return null;
+	const candidates = evidenceUnits(hits)
+		.filter((unit) => new RegExp(String.raw`\b${anchor}\b`, 'u').test(normalizeQuestion(unit.text)))
+		.map((unit) => ({ unit, score: coverage(question, unit.text) }))
+		.sort((left, right) => right.score - left.score || left.unit.order - right.unit.order);
+	if (!candidates[0] || candidates[0].score < 0.3) return null;
+	const selected = candidates[0].unit;
+	let text = selected.text.replace(/^[-•●✓✗!]\s*/u, '').trim();
+	let markers = citation(selected.hit, hits);
+	if (/[:;,]$/u.test(text) || !/[.!?]$/u.test(text)) {
+		const continuation = hits.find(
+			(hit) =>
+				hit.documentId === selected.hit.documentId &&
+				hit.seq !== undefined &&
+				selected.hit.seq !== undefined &&
+				hit.seq === selected.hit.seq + 1
+		);
+		if (continuation) {
+			text = `${text} ${continuation.text.trim()}`;
+			markers += citation(continuation, hits);
+		}
+	}
+	return `${text} ${markers}`;
 }
 
 function buildQualifiedMissingAttribute(question: string, hits: SearchHit[]): string | null {
@@ -789,7 +1058,7 @@ function buildScenarioAnswer(question: string, hits: SearchHit[]): string | null
 	)
 		return null;
 	if (
-		!/\b(?:couvert|couverte|couverts|couverture|assure|assuree|eligible|covered|coverage|insured|eligible)\b/u.test(
+		!/\b(?:couvert|couverte|couverts|couverture|assure|assuree|eligible|covered|coverage|insured|eligible|fonctionne|applique|appliquent|valable|applies|apply|valid)\b/u.test(
 			normalized
 		)
 	)
@@ -799,7 +1068,7 @@ function buildScenarioAnswer(question: string, hits: SearchHit[]): string | null
 	);
 	if (!queryTerms.length) return null;
 	const units = evidenceUnits(hits).filter((unit) =>
-		/\b(?:couvr\w*|assur\w*|eligible|pas couvert|non couvert|n est pas couvert|covered|insured|eligible|not covered)\b/u.test(
+		/\b(?:couvr\w*|assur\w*|eligible|pas couvert|non couvert|n est pas couvert|covered|insured|eligible|not covered|accord\w*|garanti\w*|s appliquent?|applique\w*|granted|applies)\b/u.test(
 			normalizeQuestion(unit.text)
 		)
 	);
@@ -1019,6 +1288,7 @@ export function buildDeterministicExtractiveAnswer(
 		buildMultiFactAnswer(question, hits) ??
 		buildListAnswer(question, hits) ??
 		buildNumberedExplanation(question, hits) ??
+		buildNumberAnchoredAnswer(question, hits) ??
 		buildScenarioAnswer(question, hits)
 	);
 }

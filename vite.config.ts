@@ -10,11 +10,15 @@ import fuzzyManifest from './benchmarks/fuzzy-corpus-manifest.json';
 import type { Plugin } from 'vite';
 
 const FUZZY_FIXTURE_PREFIX = '/dev/fuzzy-public/';
+const PRIVATE_FIXTURE_PREFIX = '/dev/private-fixtures/';
 const fuzzyFixtureDirectory = resolve(import.meta.dirname, fuzzyManifest.outputDirectory);
+const privateFixtureDirectory = resolve(import.meta.dirname, '.benchmark-corpus/private');
 const fuzzyFixtureNames = new Set(fuzzyManifest.files.map((file) => file.name));
 
 /** Public research fixtures are dev inputs, not deployable application assets.
- * Serve them from the ignored benchmark cache only while Vite is running. */
+ * Serve them from the ignored benchmark cache only while Vite is running.
+ * Private local fixtures (never committed, never deployed) are exposed the
+ * same way so the dev benchmark page can ingest them without manual upload. */
 function localBenchmarkFixtures(): Plugin {
 	return {
 		name: 'folio-local-benchmark-fixtures',
@@ -23,10 +27,14 @@ function localBenchmarkFixtures(): Plugin {
 			server.middlewares.use(async (req, res, next) => {
 				try {
 					const pathname = new URL(req.url ?? '/', 'http://localhost').pathname;
-					if (!pathname.startsWith(FUZZY_FIXTURE_PREFIX)) return next();
-					const name = decodeURIComponent(pathname.slice(FUZZY_FIXTURE_PREFIX.length));
-					if (!fuzzyFixtureNames.has(name)) return next();
-					const path = resolve(fuzzyFixtureDirectory, name);
+					const isPrivate = pathname.startsWith(PRIVATE_FIXTURE_PREFIX);
+					if (!pathname.startsWith(FUZZY_FIXTURE_PREFIX) && !isPrivate) return next();
+					const name = decodeURIComponent(
+						pathname.slice((isPrivate ? PRIVATE_FIXTURE_PREFIX : FUZZY_FIXTURE_PREFIX).length)
+					);
+					if (name.includes('/') || name.includes('..')) return next();
+					if (!isPrivate && !fuzzyFixtureNames.has(name)) return next();
+					const path = resolve(isPrivate ? privateFixtureDirectory : fuzzyFixtureDirectory, name);
 					const metadata = await stat(path);
 					res.statusCode = 200;
 					res.setHeader('Content-Length', metadata.size);

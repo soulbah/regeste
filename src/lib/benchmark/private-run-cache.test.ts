@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
 	appendPrivateRunResult,
+	buildConsolidatedReport,
 	compactPrivateRunResult,
 	humanReviewSummary,
 	loadGenerationCache,
 	loadPrivateRunCheckpoint,
 	privateGenerationCacheKey,
+	remainingCheckpointCases,
 	saveGenerationCache,
 	savePrivateRunCheckpoint,
 	type PrivateRunCheckpoint
@@ -148,5 +150,86 @@ describe('private benchmark run persistence', () => {
 		expect(next.humanReviews).toEqual({ prior: review });
 		expect(next.completed).toBe(1);
 		expect(next.results.map((item) => item.id)).toEqual(['one']);
+	});
+
+	it('resumes only the missing suffix and never re-runs the saved prefix', () => {
+		const cases = [{ id: 'one' }, { id: 'two' }, { id: 'three' }];
+		const checkpoint: PrivateRunCheckpoint = {
+			version: 1,
+			runId: 'run',
+			documentName: 'local.pdf',
+			documentHash: 'hash',
+			retrievalVersion: 12,
+			model: 'model',
+			total: 3,
+			completed: 2,
+			startedAt: 1,
+			updatedAt: 2,
+			results: [
+				{ id: 'one' } as PrivateRunCheckpoint['results'][number],
+				{ id: 'two' } as PrivateRunCheckpoint['results'][number]
+			],
+			humanReviews: {}
+		};
+		expect(remainingCheckpointCases(cases, checkpoint).map((test) => test.id)).toEqual(['three']);
+	});
+
+	it('consolidates automatic gates with explicit human corrections', () => {
+		const result = (id: string, passed: boolean) =>
+			({
+				id,
+				question: `${id}?`,
+				expectedOutcome: 'answer',
+				answer: 'answer [1]',
+				passed,
+				retrievalPassed: true,
+				pageRecallPassed: true,
+				answerGroupTriagePassed: true,
+				answerPassed: passed,
+				citationPassed: true,
+				answerBearing: true,
+				alternateQueries: [],
+				rawRetrievedPages: [1],
+				retrievedPages: [1],
+				citedPages: [1],
+				missingPageGroups: [],
+				missingAnswerGroups: [],
+				unexpectedAnswerGroups: [],
+				rawRetrievedEvidence: [],
+				generationSkipped: false,
+				retrievalMs: 1,
+				generationMs: 1
+			}) satisfies PrivateRunCheckpoint['results'][number];
+		const checkpoint: PrivateRunCheckpoint = {
+			version: 1,
+			runId: 'run',
+			documentName: 'local.pdf',
+			documentHash: 'hash',
+			retrievalVersion: 12,
+			model: 'model',
+			total: 4,
+			completed: 4,
+			startedAt: 1,
+			updatedAt: 2,
+			results: [
+				result('auto-pass', true),
+				result('auto-fail-product', false),
+				result('auto-fail-oracle', false),
+				result('auto-pass-human-fail', true)
+			],
+			humanReviews: {
+				'auto-fail-oracle': { verdict: 'oracle-invalid', note: 'oracle too strict', reviewedAt: 3 },
+				'auto-pass-human-fail': { verdict: 'fail', note: 'wrong rationale', reviewedAt: 3 }
+			}
+		};
+		const report = buildConsolidatedReport(checkpoint);
+		expect(report.complete).toBe(true);
+		expect(report.automatic.passed).toBe(2);
+		// oracle-invalid rescues auto-fail-oracle; human fail overrides auto-pass-human-fail.
+		expect(report.humanCorrect.passed).toBe(2);
+		expect(report.automaticFailureIds).toEqual(['auto-fail-product', 'auto-fail-oracle']);
+		expect(report.humanFailureIds).toEqual(['auto-fail-product', 'auto-pass-human-fail']);
+		expect(report.oracleInvalidIds).toEqual(['auto-fail-oracle']);
+		expect(report.results[2].humanVerdict).toBe('oracle-invalid');
 	});
 });

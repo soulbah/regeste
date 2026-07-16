@@ -532,7 +532,7 @@ export async function runPrivateDocumentStress(input: {
 			: groundedRefusal(test.question);
 		const resolved =
 			route === 'synthesis'
-				? resolveCitations(raw, hits)
+				? resolveCitations(raw, hits, test.question)
 				: resolveTargetedCitations(raw, hits, test.question);
 		const missingAnswerGroups =
 			expectedOutcome === 'refusal'

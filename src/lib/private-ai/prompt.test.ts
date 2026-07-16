@@ -278,6 +278,24 @@ describe('buildUserPrompt', () => {
 	});
 });
 
+describe('buildEvidenceInventory', () => {
+	it('rebinds a form label split from its value across visual lines', async () => {
+		const { buildEvidenceInventory } = await import('./prompt');
+		const inventory = buildEvidenceInventory(
+			'Donne le nom, la date et le lieu de naissance du souscripteur.',
+			[
+				{
+					...hit(1),
+					text: 'Identification du souscripteur :\nPrénom et Nom :\nCamille Moreau\nDate de naissance :\n03/04/1991',
+					page: 69
+				}
+			]
+		);
+		expect(inventory).toContain('Prénom et Nom : Camille Moreau');
+		expect(inventory).toContain('Date de naissance : 03/04/1991');
+	});
+});
+
 describe('stripThink / isThinking', () => {
 	it('removes closed think blocks', async () => {
 		const { stripThink } = await import('./prompt');
@@ -462,6 +480,27 @@ describe('resolveCitations', () => {
 		const result = resolveTargetedCitations(
 			"L'assistance couvre l'alimentation en gaz naturel après compteur [1].",
 			[electricity, gas],
+			"Quelle partie de l'alimentation en gaz est couverte par l'assistance ?"
+		);
+		expect(result.citations[0].hit.page).toBe(39);
+	});
+
+	it('never lets a question-echoing definition outrank the clause the answer quotes', () => {
+		const definition = {
+			...hit(1),
+			text: "Dysfonctionnement de l'installation gaz : défaillance ou panne complète du système d'alimentation en gaz à l'intérieur de Votre Domicile, le rendant inhabitable. L'assistance intervient pour ces évènements couverts.",
+			page: 32,
+			score: 9
+		};
+		const clause = {
+			...hit(2),
+			text: "Intervention d'un spécialiste du Gaz : Sont couvertes les alimentations en gaz naturel après compteur.",
+			page: 39,
+			score: 1
+		};
+		const result = resolveTargetedCitations(
+			"L'assistance couvre les alimentations en gaz naturel après compteur [1].",
+			[definition, clause],
 			"Quelle partie de l'alimentation en gaz est couverte par l'assistance ?"
 		);
 		expect(result.citations[0].hit.page).toBe(39);

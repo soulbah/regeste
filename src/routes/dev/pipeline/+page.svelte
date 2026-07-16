@@ -56,10 +56,12 @@
 	import { yieldToMain } from '$lib/pipeline/embed-batches';
 	import {
 		appendPrivateRunResult,
+		buildConsolidatedReport,
 		humanReviewSummary,
 		loadGenerationCache,
 		loadPrivateRunCheckpoint,
 		privateGenerationCacheKey,
+		remainingCheckpointCases,
 		saveGenerationCache,
 		savePrivateRunCheckpoint,
 		sha256Text,
@@ -178,6 +180,7 @@
 	let privateDocumentBenchmarkStage = $state<'routing' | 'retrieval' | 'generation'>('retrieval');
 	let privateDocumentBenchmarkReport = $state<unknown>(null);
 	let privateBenchmarkMatrixText = $state('');
+	let privateConsolidatedReport = $state<unknown>(null);
 	let privateRunCheckpoint = $state<PrivateRunCheckpoint | null>(null);
 	let privateReviewIndex = $state(0);
 	let privateReviewNote = $state('');
@@ -649,7 +652,7 @@
 		return enforceAnswerInvariants(question, answer);
 	}
 
-	async function runClipboardPrivateDocumentBenchmark() {
+	async function runClipboardPrivateDocumentBenchmark(resume = false) {
 		if (llmStore.status !== 'ready') {
 			privateDocumentBenchmarkReport = { error: `Private model is ${llmStore.status}` };
 			return;
@@ -677,22 +680,42 @@
 					model
 				})
 			);
+			// Resume continues the saved prefix of the exact same run configuration.
+			// Any change to matrix, document, retrieval pipeline or model produces a
+			// different runId, so a stale checkpoint can never silently pollute it.
+			const saved = privateRunCheckpoint;
+			const resumed =
+				resume && saved !== null && saved.runId === runId && saved.completed < saved.total;
+			if (resume && !resumed) {
+				throw new Error(
+					saved === null
+						? 'No saved checkpoint to resume'
+						: saved.runId !== runId
+							? 'Saved checkpoint belongs to a different run configuration'
+							: 'Saved checkpoint is already complete'
+				);
+			}
 			const previousReviews =
 				privateRunCheckpoint?.runId === runId ? privateRunCheckpoint.humanReviews : {};
-			let checkpoint: PrivateRunCheckpoint = {
-				version: 1,
-				runId,
-				documentName: document.name,
-				documentHash: document.hash,
-				retrievalVersion: document.retrievalVersion ?? 1,
-				model,
-				total: matrix.cases.length,
-				completed: 0,
-				startedAt: Date.now(),
-				updatedAt: Date.now(),
-				results: [],
-				humanReviews: previousReviews
-			};
+			let checkpoint: PrivateRunCheckpoint = resumed
+				? saved!
+				: {
+						version: 1,
+						runId,
+						documentName: document.name,
+						documentHash: document.hash,
+						retrievalVersion: document.retrievalVersion ?? 1,
+						model,
+						total: matrix.cases.length,
+						completed: 0,
+						startedAt: Date.now(),
+						updatedAt: Date.now(),
+						results: [],
+						humanReviews: previousReviews
+					};
+			const casesToRun = resumed
+				? remainingCheckpointCases(matrix.cases, checkpoint)
+				: matrix.cases;
 			privateRunCheckpoint = checkpoint;
 			savePrivateRunCheckpoint(localStorage, checkpoint);
 			let generationCacheHits = 0;
@@ -716,9 +739,9 @@
 				return pending;
 			};
 			const testByQuestion = new Map(matrix.cases.map((test) => [test.question, test]));
-			privateDocumentBenchmarkProgress = { completed: 0, total: matrix.cases.length };
+			privateDocumentBenchmarkProgress = { completed: 0, total: casesToRun.length };
 			const prepared = await preparePrivateBenchmarkPrimary(
-				matrix.cases.map((test) => test.question),
+				casesToRun.map((test) => test.question),
 				document,
 				'primary',
 				(phase, completed, total) => {
@@ -728,7 +751,7 @@
 			);
 			const report = await runPrivateDocumentStress({
 				documentId: document.id,
-				cases: matrix.cases,
+				cases: casesToRun,
 				retrieve: async (question, documentIds, route) => {
 					const key = privateRetrievalCacheKey('production', document, question, route);
 					let pending = privateRetrievalCache.get(key);
@@ -794,20 +817,30 @@
 					privateDocumentBenchmarkStage = 'generation';
 					privateDocumentBenchmarkProgress = { completed, total };
 				},
-				onResult: (result, completed) => {
+				onResult: (result) => {
 					const latestReviews =
 						privateRunCheckpoint?.runId === checkpoint.runId
 							? privateRunCheckpoint.humanReviews
 							: {};
-					checkpoint = appendPrivateRunResult(checkpoint, result, latestReviews, completed);
+					// Count against the whole checkpoint, not this (possibly resumed)
+					// sub-run, so the saved prefix is extended rather than overwritten.
+					checkpoint = appendPrivateRunResult(
+						checkpoint,
+						result,
+						latestReviews,
+						checkpoint.results.length + 1
+					);
 					privateRunCheckpoint = checkpoint;
 					savePrivateRunCheckpoint(localStorage, checkpoint);
 				}
 			});
 			const { db } = await getLocalDb();
+			privateConsolidatedReport = buildConsolidatedReport(checkpoint);
 			privateDocumentBenchmarkReport = {
 				metricKind: 'automatic-lexical-triage',
 				semanticReviewRequired: true,
+				resumed,
+				completedBefore: resumed ? matrix.cases.length - casesToRun.length : 0,
 				total: report.total,
 				automaticPassed: report.passed,
 				retrievalPassed: report.retrievalPassed,
@@ -854,6 +887,21 @@
 		} finally {
 			privateDocumentBenchmarking = false;
 		}
+	}
+
+	/** One machine-readable consolidated report over the complete checkpoint
+	 * (saved prefix + resumed suffix + human reviews), shown and downloaded. */
+	function exportPrivateConsolidatedReport() {
+		if (!privateRunCheckpoint) return;
+		const report = buildConsolidatedReport(privateRunCheckpoint);
+		privateConsolidatedReport = report;
+		const blob = new Blob([JSON.stringify(report, null, '\t')], { type: 'application/json' });
+		const url = URL.createObjectURL(blob);
+		const anchor = document.createElement('a');
+		anchor.href = url;
+		anchor.download = `private-benchmark-consolidated-${report.runId.slice(0, 12)}-${report.completed}of${report.total}.json`;
+		anchor.click();
+		URL.revokeObjectURL(url);
 	}
 
 	function reviewPrivateResult(verdict: PrivateHumanVerdict) {
@@ -1818,7 +1866,7 @@
 				</Button>
 				<Button
 					variant="outline"
-					onclick={runClipboardPrivateDocumentBenchmark}
+					onclick={() => runClipboardPrivateDocumentBenchmark(false)}
 					disabled={privateDocumentBenchmarking ||
 						privateChannelBenchmarking ||
 						llmStore.status !== 'ready' ||
@@ -1829,6 +1877,27 @@
 						: llmStore.status === 'ready'
 							? 'Run private document benchmark'
 							: 'Private model loading…'}
+				</Button>
+				<Button
+					variant="outline"
+					onclick={() => runClipboardPrivateDocumentBenchmark(true)}
+					disabled={privateDocumentBenchmarking ||
+						privateChannelBenchmarking ||
+						llmStore.status !== 'ready' ||
+						!privateBenchmarkMatrixText.trim() ||
+						!privateRunCheckpoint ||
+						privateRunCheckpoint.completed >= privateRunCheckpoint.total}
+				>
+					{privateRunCheckpoint && privateRunCheckpoint.completed < privateRunCheckpoint.total
+						? `Resume private benchmark (${privateRunCheckpoint.completed}/${privateRunCheckpoint.total})`
+						: 'Resume private benchmark'}
+				</Button>
+				<Button
+					variant="outline"
+					onclick={exportPrivateConsolidatedReport}
+					disabled={privateDocumentBenchmarking || !privateRunCheckpoint}
+				>
+					Export consolidated report
 				</Button>
 			</div>
 			{#if clipboardImportStatus}
@@ -1938,6 +2007,15 @@
 					data-testid="private-channel-report"
 					class="bg-muted overflow-auto rounded-md p-3 text-xs">{JSON.stringify(
 						privateChannelReport,
+						null,
+						2
+					)}</pre>
+			{/if}
+			{#if privateConsolidatedReport}
+				<pre
+					data-testid="private-consolidated-report"
+					class="bg-muted overflow-auto rounded-md p-3 text-xs">{JSON.stringify(
+						privateConsolidatedReport,
 						null,
 						2
 					)}</pre>

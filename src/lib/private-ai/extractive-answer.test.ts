@@ -55,6 +55,22 @@ describe('deterministic extractive answers', () => {
 		expect(answer).toContain('dépendances : Oui');
 	});
 
+	it('binds a form label to its value on the following visual line', () => {
+		const answer = buildDeterministicExtractiveAnswer(
+			'Donne le nom, la date et le lieu de naissance du souscripteur.',
+			[
+				hit(
+					1,
+					'Identification du souscripteur :\nPrénom et Nom :\nCamille Moreau\nDate de naissance :\n03/04/1991\nLieu de naissance :\nBastia, France',
+					69
+				)
+			]
+		);
+		expect(answer).toContain('Camille Moreau');
+		expect(answer).toContain('03/04/1991');
+		expect(answer).toContain('Bastia');
+	});
+
 	it('compares selected statuses with a recommendation deterministically', () => {
 		const answer = buildDeterministicExtractiveAnswer(
 			'La liste des options choisies et le conseil final sont-ils cohérents ? Explique l’écart.',

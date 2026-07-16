@@ -163,7 +163,29 @@ export function buildEvidenceInventory(
 			.split(/(?<=[.!?;:])\s+(?=[\p{Lu}\d«“"'’●•✓✗!-])/gu)
 			.map((sentence) => sentence.trim())
 			.filter((sentence) => sentence.length >= 25 && sentence.length <= 500);
-		for (const text of [...lines, ...sentences]) {
+		// PDF form layers often split a label from its value across visual lines
+		// ("Prénom et Nom :" / "Camille Moreau"). Rebind them so the inventory
+		// carries complete facts instead of dangling labels.
+		const rawLines = hit.text
+			.split(/\n+/u)
+			.map((line) => line.trim())
+			.filter(Boolean);
+		const pairedRows: string[] = [];
+		for (let index = 0; index < rawLines.length - 1; index++) {
+			const label = /^(?:[-•●✓✗!]\s*)?(.{3,180}?)\s*:\s*$/u.exec(rawLines[index])?.[1]?.trim();
+			if (!label) continue;
+			const value = rawLines[index + 1];
+			if (
+				!value ||
+				value.length > 220 ||
+				/[:：]\s*$/u.test(value) ||
+				/^[-•●✓✗!]\s/u.test(value) ||
+				/^\d{1,3}[.)]\s/u.test(value)
+			)
+				continue;
+			pairedRows.push(`${label} : ${value}`);
+		}
+		for (const text of [...lines, ...sentences, ...pairedRows]) {
 			const normalized = normalizeQuestion(text);
 			const labelValue = /[:?]\s*\S/u.test(text) || /^[-•●✓✗!]\s+/u.test(text);
 			const continuation =
@@ -201,6 +223,33 @@ export function buildEvidenceInventory(
 			hit: anchor,
 			text,
 			utility: score(text) + 0.7,
+			order: hits.indexOf(anchor),
+			extraCitations: [next]
+		});
+	}
+
+	// A clause split at a chunk boundary ("dans un délai d'un mois à compter de
+	// la" | "publication de l'arrêté…") must reach the model as one fact.
+	for (const anchor of structural) {
+		if (/[.!?»]\s*$/u.test(anchor.text.trim())) continue;
+		const next = structural.find(
+			(hit) =>
+				hit.documentId === anchor.documentId &&
+				hit.seq! === anchor.seq! + 1 &&
+				(hit.page === null || anchor.page === null || Math.abs(hit.page - anchor.page) <= 1)
+		);
+		if (!next) continue;
+		const tail = logicalEvidenceLines(anchor.text).at(-1) ?? '';
+		const head = next.text
+			.trim()
+			.split(/(?<=[.!?;])\s+/u, 1)[0]
+			.trim();
+		if (!tail || !head) continue;
+		const text = `${tail} ${head}`.slice(0, 420);
+		items.push({
+			hit: anchor,
+			text,
+			utility: score(text) + 0.35,
 			order: hits.indexOf(anchor),
 			extraCitations: [next]
 		});
@@ -545,14 +594,74 @@ export function compactCitationMarkers(text: string, citationCount: number): str
 	return text.replace(/\[(\d{1,2})\]/g, (_, raw: string) => `[${compact.get(Number(raw))}]`);
 }
 
+/** Bind each substantive line of an uncited answer to the passage that best
+ * supports its actual words. A grounded answer the model forgot to cite is a
+ * provenance defect, not a reason to present sourced facts as unsourced. */
+function bindUncitedAnswerParts(
+	text: string,
+	hits: SearchHit[],
+	question: string
+): { text: string; citations: CitationRef[] } | null {
+	const parts = text
+		.split(/\n+/u)
+		.map((part) => part.trim())
+		.filter(Boolean);
+	const citations: CitationRef[] = [];
+	const numberByChunk = new Map<number, number>();
+	const lines: string[] = [];
+	for (const part of parts) {
+		const content = part.replace(/^(?:\d{1,2}[.)]\s*|[-•●]\s*)/u, '');
+		if (content.length < 12) {
+			lines.push(part);
+			continue;
+		}
+		const best = hits
+			.map((hit) => ({
+				hit,
+				answerSupport: citationGroundingCoverage(content, hit.text),
+				support: citationGroundingCoverage(`${question} ${content}`, hit.text)
+			}))
+			.sort(
+				(left, right) =>
+					right.answerSupport - left.answerSupport ||
+					right.support - left.support ||
+					right.hit.score - left.hit.score
+			)[0];
+		// A bare yes/no adds no content words of its own; the clause matching the
+		// question's scenario is its legitimate source.
+		const bareVerdict =
+			/^(?:oui|non|yes|no)\b/u.test(normalizeQuestion(content)) && content.length <= 140;
+		if (!best || (best.answerSupport < 0.2 && !(bareVerdict && best.support >= 0.25))) {
+			lines.push(part);
+			continue;
+		}
+		let marker = numberByChunk.get(best.hit.chunkId);
+		if (marker === undefined) {
+			marker = numberByChunk.size + 1;
+			numberByChunk.set(best.hit.chunkId, marker);
+			citations.push({ n: marker, hit: best.hit });
+		}
+		lines.push(`${part} [${marker}]`);
+	}
+	if (!citations.length) return null;
+	return { text: lines.join('\n'), citations };
+}
+
 /**
  * Validate [n] markers against the retrieved set. Returns the cleaned text
  * (invalid markers removed) and the ordered unique list of valid citations.
+ * With a question, an uncited grounded answer gets its citations rebound from
+ * evidence support instead of being returned unsourced.
  */
 export function resolveCitations(
 	text: string,
-	hits: SearchHit[]
+	hits: SearchHit[],
+	question: string | null = null
 ): { text: string; citations: CitationRef[] } {
+	if (question !== null && hits.length && !/\[\d{1,2}\]/.test(text) && !isRefusalLike(text)) {
+		const bound = bindUncitedAnswerParts(text, hits, question);
+		if (bound) return bound;
+	}
 	const sourceNumbers = [
 		...new Set(
 			[...text.matchAll(/\[(\d{1,2})\]/g)]
@@ -599,16 +708,35 @@ export function resolveTargetedCitations(
 		? candidatesWithAnswerSignals
 		: hits;
 	if (!/\[\d{1,2}\]/.test(text)) {
+		// The citation must support the words actually written. Question-term
+		// overlap is only a tiebreaker: a clause merely *about* the same topic
+		// (a definition, a neighboring category) must never outrank the passage
+		// the answer was extracted from.
 		const supporting = citationCandidates
 			.map((hit) => ({
 				hit,
 				support: citationGroundingCoverage(`${question} ${text}`, hit.text),
 				answerSupport: citationGroundingCoverage(text, hit.text)
 			}))
-			.sort((left, right) => right.support - left.support || right.hit.score - left.hit.score)[0];
-		if (supporting && (candidatesWithAnswerSignals.length > 0 || supporting.answerSupport >= 0.2))
+			.sort(
+				(left, right) =>
+					right.answerSupport - left.answerSupport ||
+					right.support - left.support ||
+					right.hit.score - left.hit.score
+			)[0];
+		// A bare yes/no adds no content words of its own; the clause matching the
+		// question's scenario is its legitimate source.
+		const bareVerdict =
+			/^(?:oui|non|yes|no)\b/u.test(normalizeQuestion(text)) &&
+			text.replace(/\[\d{1,2}\]/g, '').trim().length <= 140;
+		if (
+			supporting &&
+			(candidatesWithAnswerSignals.length > 0 ||
+				supporting.answerSupport >= 0.2 ||
+				(bareVerdict && supporting.support >= 0.25))
+		)
 			return { text: `${text.trimEnd()} [1]`, citations: [{ n: 1, hit: supporting.hit }] };
-		return resolveCitations(text, hits);
+		return resolveCitations(text, hits, question);
 	}
 	// Coordinated questions and answers can contain several independently
 	// sourced facts. Collapsing every marker to one "best" passage would turn a
@@ -620,10 +748,18 @@ export function resolveTargetedCitations(
 	) {
 		return resolveCitations(text, hits);
 	}
-	const grounding = `${question} ${text.replace(/\[\d{1,2}\]/g, '')}`;
+	const answerText = text.replace(/\[\d{1,2}\]/g, '');
+	const grounding = `${question} ${answerText}`;
 	const best = [...citationCandidates]
-		.map((hit) => ({ hit, support: citationGroundingCoverage(grounding, hit.text) }))
-		.sort((a, b) => b.support - a.support || b.hit.score - a.hit.score)[0];
+		.map((hit) => ({
+			hit,
+			answerSupport: citationGroundingCoverage(answerText, hit.text),
+			support: citationGroundingCoverage(grounding, hit.text)
+		}))
+		.sort(
+			(a, b) =>
+				b.answerSupport - a.answerSupport || b.support - a.support || b.hit.score - a.hit.score
+		)[0];
 	if (!best || best.support === 0) return resolveCitations(text, hits);
 	return {
 		text: text.replace(/(?:\s*\[\d{1,2}\])+/g, ' [1]'),

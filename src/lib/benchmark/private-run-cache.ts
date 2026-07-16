@@ -175,6 +175,101 @@ export function loadPrivateRunCheckpoint(
 	}
 }
 
+/** Cases a resumed run still has to execute: everything the saved checkpoint
+ * has not completed yet. Resume never re-runs or overwrites the saved prefix. */
+export function remainingCheckpointCases<T extends { id: string }>(
+	cases: readonly T[],
+	checkpoint: PrivateRunCheckpoint
+): T[] {
+	const completed = new Set(checkpoint.results.map((result) => result.id));
+	return cases.filter((test) => !completed.has(test.id));
+}
+
+export interface ConsolidatedPrivateRunReport {
+	kind: 'private-benchmark-consolidated';
+	version: number;
+	runId: string;
+	documentName: string;
+	documentHash: string;
+	retrievalVersion: number;
+	model: string;
+	startedAt: number;
+	updatedAt: number;
+	total: number;
+	completed: number;
+	complete: boolean;
+	automatic: {
+		passed: number;
+		retrievalPassed: number;
+		pageRecallPassed: number;
+		answerGroupTriagePassed: number;
+		answerPassed: number;
+		citationPassed: number;
+		score: number;
+	};
+	humanReview: ReturnType<typeof humanReviewSummary>;
+	/** Automatic result corrected by explicit human verdicts: `pass` and
+	 * `oracle-invalid` count as humanly correct+sourced, `fail` never does,
+	 * unreviewed cases keep their automatic verdict. */
+	humanCorrect: { passed: number; score: number };
+	automaticFailureIds: string[];
+	humanFailureIds: string[];
+	oracleInvalidIds: string[];
+	results: Array<
+		CompactPrivateRunResult & {
+			humanVerdict: PrivateHumanVerdict | null;
+			humanNote: string | null;
+		}
+	>;
+}
+
+export function buildConsolidatedReport(
+	checkpoint: PrivateRunCheckpoint
+): ConsolidatedPrivateRunReport {
+	const results = checkpoint.results.map((result) => ({
+		...result,
+		humanVerdict: checkpoint.humanReviews[result.id]?.verdict ?? null,
+		humanNote: checkpoint.humanReviews[result.id]?.note ?? null
+	}));
+	const humanlyCorrect = (result: (typeof results)[number]) =>
+		result.humanVerdict === null ? result.passed : result.humanVerdict !== 'fail';
+	const denominator = Math.max(results.length, 1);
+	return {
+		kind: 'private-benchmark-consolidated',
+		version: PRIVATE_RUN_CACHE_VERSION,
+		runId: checkpoint.runId,
+		documentName: checkpoint.documentName,
+		documentHash: checkpoint.documentHash,
+		retrievalVersion: checkpoint.retrievalVersion,
+		model: checkpoint.model,
+		startedAt: checkpoint.startedAt,
+		updatedAt: checkpoint.updatedAt,
+		total: checkpoint.total,
+		completed: checkpoint.completed,
+		complete: checkpoint.completed === checkpoint.total,
+		automatic: {
+			passed: results.filter((result) => result.passed).length,
+			retrievalPassed: results.filter((result) => result.retrievalPassed).length,
+			pageRecallPassed: results.filter((result) => result.pageRecallPassed).length,
+			answerGroupTriagePassed: results.filter((result) => result.answerGroupTriagePassed).length,
+			answerPassed: results.filter((result) => result.answerPassed).length,
+			citationPassed: results.filter((result) => result.citationPassed).length,
+			score: results.filter((result) => result.passed).length / denominator
+		},
+		humanReview: humanReviewSummary(checkpoint),
+		humanCorrect: {
+			passed: results.filter(humanlyCorrect).length,
+			score: results.filter(humanlyCorrect).length / denominator
+		},
+		automaticFailureIds: results.filter((result) => !result.passed).map((result) => result.id),
+		humanFailureIds: results.filter((result) => !humanlyCorrect(result)).map((result) => result.id),
+		oracleInvalidIds: results
+			.filter((result) => result.humanVerdict === 'oracle-invalid')
+			.map((result) => result.id),
+		results
+	};
+}
+
 export function humanReviewSummary(checkpoint: PrivateRunCheckpoint): {
 	reviewed: number;
 	passed: number;

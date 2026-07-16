@@ -804,7 +804,7 @@ class ChatsStore {
 			grounded && !stopped
 				? route === 'targeted'
 					? resolveTargetedCitations(raw, hits, question)
-					: resolveCitations(raw, hits)
+					: resolveCitations(raw, hits, question)
 				: { text: raw, citations: [] };
 
 		const messageId = crypto.randomUUID();
@@ -964,7 +964,7 @@ class ChatsStore {
 		const { text: cleaned, citations } = isNotice
 			? { text: failed ?? t('notice.stopped'), citations: [] }
 			: grounded
-				? resolveCitations(raw.trim(), hits)
+				? resolveCitations(raw.trim(), hits, question)
 				: { text: raw.trim(), citations: [] };
 
 		const messageId = crypto.randomUUID();
