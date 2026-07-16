@@ -8,7 +8,13 @@ import { expose } from 'comlink';
 import { MIGRATIONS } from './schema';
 import { fuseCandidates } from '$lib/pipeline/retrieval';
 import { RETRIEVAL_VERSION } from '$lib/pipeline/retrieval-version';
-import { fuzzyIndexText, fuzzyQueryGrams } from '$lib/pipeline/fuzzy';
+import {
+	fuzzyIndexText,
+	fuzzyQueryGrams,
+	lexicalIndexText,
+	lexicalStemTokens,
+	significantQueryTokens
+} from '$lib/pipeline/fuzzy';
 import type {
 	ChatDocument,
 	Chunk,
@@ -95,12 +101,11 @@ async function init(): Promise<DbInfo> {
 	};
 }
 
-/** v11 can open immediately after SQL migration, but old search_text lacks the
- * filename and old fuzzy_text contains words rather than grams. Repair both
- * local views atomically before queries; the slower OPFS structure rebuild can
- * then continue without making legacy documents temporarily undiscoverable. */
+/** Search views can evolve independently of the stored/displayed chunk. Repair
+ * them atomically on open so old documents gain filename, fuzzy and stemmed
+ * lexical recall without waiting for a costly dense re-embedding. */
 function repairLegacyRetrievalViews(): void {
-	if (db.selectValue("SELECT value FROM meta WHERE key = 'retrieval_views_v5'") === '1') return;
+	if (db.selectValue("SELECT value FROM meta WHERE key = 'retrieval_views_v6'") === '1') return;
 	db.transaction(() => {
 		const rows = db.selectObjects(
 			`SELECT c.id, c.search_text, c.text, c.fuzzy_text, d.name AS document_name
@@ -130,7 +135,7 @@ function repairLegacyRetrievalViews(): void {
 			});
 			db.exec({
 				sql: 'INSERT INTO chunks_fts(rowid, search_text) VALUES (?, ?)',
-				bind: [row.id, nextSearchText]
+				bind: [row.id, lexicalIndexText(nextSearchText)]
 			});
 			db.exec({
 				sql: 'INSERT INTO chunks_fuzzy_fts(rowid, fuzzy_text) VALUES (?, ?)',
@@ -138,7 +143,7 @@ function repairLegacyRetrievalViews(): void {
 			});
 		}
 		db.exec(
-			"INSERT INTO meta(key, value) VALUES ('retrieval_views_v5', '1') ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+			"INSERT INTO meta(key, value) VALUES ('retrieval_views_v6', '1') ON CONFLICT(key) DO UPDATE SET value = excluded.value"
 		);
 	});
 }
@@ -235,7 +240,7 @@ function deleteChunkIndexes(row: {
 	db.exec({ sql: 'DELETE FROM chunks_vec_v2 WHERE rowid = ?', bind: [row.id] });
 	db.exec({
 		sql: "INSERT INTO chunks_fts(chunks_fts, rowid, search_text) VALUES('delete', ?, ?)",
-		bind: [row.id, row.search_text ?? row.text]
+		bind: [row.id, lexicalIndexText(row.search_text ?? row.text)]
 	});
 	db.exec({
 		sql: "INSERT INTO chunks_fuzzy_fts(chunks_fuzzy_fts, rowid, fuzzy_text) VALUES('delete', ?, ?)",
@@ -345,7 +350,7 @@ function replaceDocument(
 			const rowid = db.selectValue('SELECT last_insert_rowid()') as number;
 			db.exec({
 				sql: 'INSERT INTO chunks_fts(rowid, search_text) VALUES (?, ?)',
-				bind: [rowid, c.searchText]
+				bind: [rowid, lexicalIndexText(c.searchText)]
 			});
 			db.exec({
 				sql: 'INSERT INTO chunks_fuzzy_fts(rowid, fuzzy_text) VALUES (?, ?)',
@@ -420,7 +425,7 @@ function insertChunks(
 			const rowid = db.selectValue('SELECT last_insert_rowid()') as number;
 			db.exec({
 				sql: 'INSERT INTO chunks_fts(rowid, search_text) VALUES (?, ?)',
-				bind: [rowid, c.searchText]
+				bind: [rowid, lexicalIndexText(c.searchText)]
 			});
 			db.exec({
 				sql: 'INSERT INTO chunks_fuzzy_fts(rowid, fuzzy_text) VALUES (?, ?)',
@@ -475,7 +480,7 @@ function reindexDocument(
 			const rowid = db.selectValue('SELECT last_insert_rowid()') as number;
 			db.exec({
 				sql: 'INSERT INTO chunks_fts(rowid, search_text) VALUES (?, ?)',
-				bind: [rowid, chunk.searchText]
+				bind: [rowid, lexicalIndexText(chunk.searchText)]
 			});
 			db.exec({
 				sql: 'INSERT INTO chunks_fuzzy_fts(rowid, fuzzy_text) VALUES (?, ?)',
@@ -492,10 +497,7 @@ function reindexDocument(
 
 /** Make arbitrary user input safe for FTS5 MATCH: quoted prefix tokens OR-free. */
 function toFtsQuery(q: string): string {
-	const tokens = q
-		.split(/[^\p{L}\p{N}]+/u)
-		.filter((t) => t.length > 1)
-		.slice(0, 12);
+	const tokens = [...new Set([...significantQueryTokens(q), ...lexicalStemTokens(q)])].slice(0, 24);
 	if (!tokens.length) return '""';
 	return tokens.map((t) => `"${t.replaceAll('"', '')}"`).join(' OR ');
 }
@@ -515,7 +517,7 @@ function searchLexical(queryText: string, documentIds: string[] | null, limit = 
 	return db
 		.selectObjects(
 			`SELECT c.id AS chunk_id, c.document_id, d.name AS document_name, c.text, c.seq,
-			        c.page, c.heading_path, c.ocr_confidence, bm25(chunks_fts) AS lexical_score
+			        c.page, c.heading_path, c.para_index, c.ocr_confidence, bm25(chunks_fts) AS lexical_score
 			 FROM chunks_fts
 			 JOIN chunks c ON c.id = chunks_fts.rowid
 			 JOIN documents d ON d.id = c.document_id
@@ -529,6 +531,7 @@ function searchLexical(queryText: string, documentIds: string[] | null, limit = 
 			documentName: r.document_name,
 			text: r.text,
 			seq: r.seq,
+			paraIndex: r.para_index,
 			page: r.page,
 			headingPath: r.heading_path,
 			score: r.lexical_score,
@@ -536,6 +539,13 @@ function searchLexical(queryText: string, documentIds: string[] | null, limit = 
 			semanticScore: null,
 			ocrConfidence: r.ocr_confidence
 		}));
+}
+
+function searchLexicalMany(
+	requests: Array<{ queryText: string; documentIds: string[] | null }>,
+	limit = 80
+): SearchHit[][] {
+	return requests.map((request) => searchLexical(request.queryText, request.documentIds, limit));
 }
 
 /** Character-gram candidates tolerate typos/OCR noise without altering the exact word index. */
@@ -546,7 +556,7 @@ function searchFuzzy(queryText: string, documentIds: string[] | null, limit = 80
 	return db
 		.selectObjects(
 			`SELECT c.id AS chunk_id, c.document_id, d.name AS document_name, c.text, c.seq,
-			        c.page, c.heading_path, c.ocr_confidence, bm25(chunks_fuzzy_fts) AS fuzzy_score
+			        c.page, c.heading_path, c.para_index, c.ocr_confidence, bm25(chunks_fuzzy_fts) AS fuzzy_score
 			 FROM chunks_fuzzy_fts
 			 JOIN chunks c ON c.id = chunks_fuzzy_fts.rowid
 			 JOIN documents d ON d.id = c.document_id
@@ -560,6 +570,7 @@ function searchFuzzy(queryText: string, documentIds: string[] | null, limit = 80
 			documentName: r.document_name,
 			text: r.text,
 			seq: r.seq,
+			paraIndex: r.para_index,
 			page: r.page,
 			headingPath: r.heading_path,
 			score: r.fuzzy_score,
@@ -570,21 +581,19 @@ function searchFuzzy(queryText: string, documentIds: string[] | null, limit = 80
 		}));
 }
 
-/** Exact scoped KNN. Fetching `limit + outside-scope rows` from the global KNN
- * is sufficient to guarantee the scoped top-k. Very narrow scopes retain the
- * manual pre-filtered scan instead of asking vec0 for almost the whole table. */
-function searchVector(
-	queryEmbedding: Float32Array,
-	dims: number,
-	documentIds: string[] | null,
+function searchFuzzyMany(
+	requests: Array<{ queryText: string; documentIds: string[] | null }>,
 	limit = 80
-): SearchHit[] {
-	const table = dims === 256 ? 'chunks_vec_v2' : 'chunks_vec';
-	const vecBlob = new Uint8Array(
-		queryEmbedding.buffer,
-		queryEmbedding.byteOffset,
-		queryEmbedding.byteLength
-	).slice();
+): SearchHit[][] {
+	return requests.map((request) => searchFuzzy(request.queryText, request.documentIds, limit));
+}
+
+interface VectorScopeStats {
+	totalReady: number;
+	scopedReady: number;
+}
+
+function vectorScopeStats(table: string, documentIds: string[] | null): VectorScopeStats {
 	const scope = scopeSql(documentIds);
 	const totalReady = Number(
 		db.selectValue(
@@ -603,6 +612,27 @@ function searchVector(
 				)
 			)
 		: totalReady;
+	return { totalReady, scopedReady };
+}
+
+/** Exact scoped KNN. Fetching `limit + outside-scope rows` from the global KNN
+ * is sufficient to guarantee the scoped top-k. Very narrow scopes retain the
+ * manual pre-filtered scan instead of asking vec0 for almost the whole table. */
+function searchVector(
+	queryEmbedding: Float32Array,
+	dims: number,
+	documentIds: string[] | null,
+	limit = 80,
+	stats?: VectorScopeStats
+): SearchHit[] {
+	const table = dims === 256 ? 'chunks_vec_v2' : 'chunks_vec';
+	const vecBlob = new Uint8Array(
+		queryEmbedding.buffer,
+		queryEmbedding.byteOffset,
+		queryEmbedding.byteLength
+	).slice();
+	const scope = scopeSql(documentIds);
+	const { totalReady, scopedReady } = stats ?? vectorScopeStats(table, documentIds);
 	const knnK = Math.min(totalReady, limit + Math.max(0, totalReady - scopedReady));
 	const useKnn = totalReady > 0 && knnK < totalReady * 0.8;
 	const rows = useKnn
@@ -611,7 +641,7 @@ function searchVector(
 				   SELECT rowid, distance FROM ${table} WHERE embedding MATCH ? AND k = ?
 				 )
 				 SELECT c.id AS chunk_id, c.document_id, d.name AS document_name, c.text, c.seq,
-				        c.page, c.heading_path, c.ocr_confidence, knn.distance
+				        c.page, c.heading_path, c.para_index, c.ocr_confidence, knn.distance
 				 FROM knn JOIN chunks c ON c.id = knn.rowid
 				 JOIN documents d ON d.id = c.document_id
 				 WHERE d.status = 'ready'${scope.clause}
@@ -620,7 +650,7 @@ function searchVector(
 			)
 		: db.selectObjects(
 				`SELECT c.id AS chunk_id, c.document_id, d.name AS document_name, c.text, c.seq,
-			        c.page, c.heading_path, c.ocr_confidence,
+				        c.page, c.heading_path, c.para_index, c.ocr_confidence,
 			        vec_distance_cosine(v.embedding, ?) AS distance
 			 FROM ${table} v
 			 JOIN chunks c ON c.id = v.rowid
@@ -639,6 +669,7 @@ function searchVector(
 			documentName: r.document_name,
 			text: r.text,
 			seq: r.seq,
+			paraIndex: r.para_index,
 			page: r.page,
 			headingPath: r.heading_path,
 			score: cosineSimilarity,
@@ -649,13 +680,41 @@ function searchVector(
 	});
 }
 
+function searchVectorMany(
+	queryEmbeddings: Float32Array,
+	dims: number,
+	documentIdsByQuery: Array<string[] | null>,
+	limit = 80
+): SearchHit[][] {
+	if (queryEmbeddings.length !== dims * documentIdsByQuery.length) {
+		throw new Error('Vector search batch shape mismatch');
+	}
+	const table = dims === 256 ? 'chunks_vec_v2' : 'chunks_vec';
+	const statsByScope = new Map<string, VectorScopeStats>();
+	return documentIdsByQuery.map((documentIds, index) => {
+		const key = JSON.stringify(documentIds ? [...documentIds].sort() : null);
+		let stats = statsByScope.get(key);
+		if (!stats) {
+			stats = vectorScopeStats(table, documentIds);
+			statsByScope.set(key, stats);
+		}
+		return searchVector(
+			queryEmbeddings.subarray(index * dims, (index + 1) * dims),
+			dims,
+			documentIds,
+			limit,
+			stats
+		);
+	});
+}
+
 function listChunksForDocuments(documentIds: string[]): SearchHit[] {
 	if (!documentIds.length) return [];
 	const scope = scopeSql(documentIds);
 	return db
 		.selectObjects(
 			`SELECT c.id AS chunk_id, c.document_id, d.name AS document_name, c.text, c.seq,
-			        c.page, c.heading_path, c.ocr_confidence
+			        c.page, c.heading_path, c.para_index, c.ocr_confidence
 			 FROM chunks c JOIN documents d ON d.id = c.document_id
 			 WHERE d.status = 'ready'${scope.clause}
 			 ORDER BY c.document_id, c.seq`,
@@ -667,6 +726,7 @@ function listChunksForDocuments(documentIds: string[]): SearchHit[] {
 			documentName: r.document_name,
 			text: r.text,
 			seq: r.seq,
+			paraIndex: r.para_index,
 			page: r.page,
 			headingPath: r.heading_path,
 			score: 0,
@@ -686,13 +746,14 @@ function listNeighborChunks(chunkIds: number[], radius = 1): SearchHit[] {
 				SELECT document_id, seq FROM chunks WHERE id IN (${placeholders})
 			)
 			SELECT DISTINCT c.id AS chunk_id, c.document_id, d.name AS document_name,
-			       c.text, c.seq, c.page, c.heading_path, c.ocr_confidence
+			       c.text, c.seq, c.page, c.heading_path, c.para_index, c.ocr_confidence
 			FROM chunks c
 			JOIN documents d ON d.id = c.document_id
-			JOIN anchors a ON a.document_id = c.document_id AND abs(a.seq - c.seq) <= ?
+			JOIN anchors a ON a.document_id = c.document_id
+				AND c.seq BETWEEN a.seq - ? AND a.seq + ?
 			WHERE d.status = 'ready'
 			ORDER BY c.document_id, c.seq`,
-			[...chunkIds, radius]
+			[...chunkIds, radius, radius]
 		)
 		.map((r: any) => ({
 			chunkId: r.chunk_id,
@@ -700,11 +761,55 @@ function listNeighborChunks(chunkIds: number[], radius = 1): SearchHit[] {
 			documentName: r.document_name,
 			text: r.text,
 			seq: r.seq,
+			paraIndex: r.para_index,
 			page: r.page,
 			headingPath: r.heading_path,
 			score: 0,
 			semanticScore: null,
 			lexicalScore: null,
+			ocrConfidence: r.ocr_confidence
+		}));
+}
+
+/** Replace retrieval-only structural parents with their precise citation
+ * children. Parents contribute recall/routing only and never enter prompts. */
+function listChildChunksForParents(parentIds: number[]): SearchHit[] {
+	if (!parentIds.length) return [];
+	const placeholders = parentIds.map(() => '?').join(',');
+	return db
+		.selectObjects(
+			`WITH parents AS (
+				SELECT id, document_id, page, heading_path, char_start, char_end
+				FROM chunks WHERE id IN (${placeholders}) AND para_index = -1
+			)
+			SELECT DISTINCT p.id AS parent_chunk_id, c.id AS chunk_id, c.document_id,
+			       d.name AS document_name, c.text, c.seq, c.page, c.heading_path,
+			       c.para_index, c.ocr_confidence
+			FROM parents p
+			JOIN chunks c ON c.document_id = p.document_id
+			 AND COALESCE(c.para_index, 0) != -1
+			 AND c.char_end >= p.char_start AND c.char_start <= p.char_end
+			 AND ((p.page IS NOT NULL AND c.page = p.page)
+			   OR (p.page IS NULL AND c.page IS NULL AND c.heading_path IS p.heading_path))
+			JOIN documents d ON d.id = c.document_id
+			WHERE d.status = 'ready'
+			ORDER BY p.id, c.seq`,
+			parentIds
+		)
+		.map((r: any) => ({
+			chunkId: r.chunk_id,
+			parentChunkId: r.parent_chunk_id,
+			documentId: r.document_id,
+			documentName: r.document_name,
+			text: r.text,
+			seq: r.seq,
+			paraIndex: r.para_index,
+			page: r.page,
+			headingPath: r.heading_path,
+			score: 0,
+			semanticScore: null,
+			lexicalScore: null,
+			fuzzyScore: null,
 			ocrConfidence: r.ocr_confidence
 		}));
 }
@@ -1537,10 +1642,14 @@ const api = {
 	documentDetail,
 	search,
 	searchLexical,
+	searchLexicalMany,
 	searchFuzzy,
+	searchFuzzyMany,
 	searchVector,
+	searchVectorMany,
 	listChunksForDocuments,
 	listNeighborChunks,
+	listChildChunksForParents,
 	countChunks,
 	databaseBytes,
 	getChunk,

@@ -23,11 +23,29 @@ describe('query routing', () => {
 			'synthesis'
 		);
 		expect(routeQuestion('Que sait-on de Camille dans tous les documents ?')).toBe('synthesis');
+		expect(routeQuestion('Quels droits sont prévus sur les données personnelles ?')).toBe(
+			'synthesis'
+		);
+		expect(routeQuestion('Cite les onze événements ouvrant assistance')).toBe('synthesis');
+		expect(routeQuestion('Qui sont les vendeurs ?')).toBe('synthesis');
+		expect(routeQuestion('Liste les frais')).toBe('aggregate');
 		expect(
 			routeQuestion(
 				'Le prix et le montant du prêt sont-ils identiques ? Cite séparément les pages qui prouvent chaque montant.'
 			)
 		).toBe('synthesis');
+	});
+
+	it('does not confuse French cost questions with English count', () => {
+		for (const question of [
+			'Quel est le coût du prêt ?',
+			'Combien coute la maison ?',
+			'Combien coûte cette acquisition ?'
+		]) {
+			const analysis = analyzeQuestion(question);
+			expect(analysis.route).toBe('targeted');
+			expect(analysis.operation).toBeNull();
+		}
 	});
 
 	it.each([

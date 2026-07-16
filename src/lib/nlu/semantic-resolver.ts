@@ -1,5 +1,10 @@
 import type { QuestionRoute } from '$lib/types';
-import { analyzeQuestion, normalizeQuestion, type SemanticFrame } from './semantic-frame';
+import {
+	analyzeQuestion,
+	hasCoordinatedFactQuestions,
+	normalizeQuestion,
+	type SemanticFrame
+} from './semantic-frame';
 import { SEMANTIC_PROTOTYPES, SEMANTIC_PROTOTYPE_VERSION } from './prototypes';
 import { getSemanticCalibration, semanticProfileKey } from './semantic-calibration';
 
@@ -65,14 +70,15 @@ export function classifySemanticVectors(
 	};
 }
 
-async function semanticDecision(
-	question: string,
+async function semanticDecisions(
+	questions: string[],
 	embed: EmbedQuestions
-): Promise<SemanticDecision & { model: string; dims: number }> {
-	// The first call embeds query + anchors together. Later calls only embed the
-	// query and reuse anchors for the exact model/dimension profile.
-	const first = await embed([normalizeQuestion(question)]);
-	const key = `${SEMANTIC_PROTOTYPE_VERSION}:${first.model}:${first.dims}`;
+): Promise<Array<SemanticDecision & { model: string; dims: number }>> {
+	// Embed every uncertain query in one worker job. The embed worker already
+	// slices that job into model-sized batches; issuing one job per question only
+	// added queue latency because inference is intentionally serialized.
+	const queries = await embed(questions.map(normalizeQuestion));
+	const key = `${SEMANTIC_PROTOTYPE_VERSION}:${queries.model}:${queries.dims}`;
 	let cached = prototypeCache.get(key);
 	if (!cached) {
 		const batch = await embed(
@@ -81,30 +87,34 @@ async function semanticDecision(
 		cached = { data: batch.data, dims: batch.dims };
 		prototypeCache.set(key, cached);
 	}
-	if (cached.dims !== first.dims)
-		return {
+	if (cached.dims !== queries.dims)
+		return questions.map(() => ({
 			label: 'targeted',
 			score: 0,
 			margin: 0,
 			candidates: ['targeted', 'synthesis', 'aggregate'],
-			model: first.model,
-			dims: first.dims
-		};
-	const combined = new Float32Array((SEMANTIC_PROTOTYPES.length + 1) * first.dims);
-	combined.set(first.data.subarray(0, first.dims));
-	combined.set(cached.data, first.dims);
-	const calibration = getSemanticCalibration(first.model, first.dims, SEMANTIC_PROTOTYPE_VERSION);
-	return {
+			model: queries.model,
+			dims: queries.dims
+		}));
+	const combined = new Float32Array((questions.length + SEMANTIC_PROTOTYPES.length) * queries.dims);
+	combined.set(queries.data.subarray(0, questions.length * queries.dims));
+	combined.set(cached.data, questions.length * queries.dims);
+	const calibration = getSemanticCalibration(
+		queries.model,
+		queries.dims,
+		SEMANTIC_PROTOTYPE_VERSION
+	);
+	return questions.map((_, queryRow) => ({
 		...classifySemanticVectors(
 			combined,
-			first.dims,
-			0,
-			1,
+			queries.dims,
+			queryRow,
+			questions.length,
 			calibration?.predictionSetRadius ?? 0.03
 		),
-		model: first.model,
-		dims: first.dims
-	};
+		model: queries.model,
+		dims: queries.dims
+	}));
 }
 
 /** Resolve only uncertain frames. Deterministic high-confidence slots never
@@ -113,29 +123,53 @@ export async function resolveQuestion(
 	question: string,
 	embed?: EmbedQuestions
 ): Promise<SemanticFrame> {
-	const frame = analyzeQuestion(question);
-	if (!embed || frame.confidence !== 'low' || frame.clarification) return frame;
-	const decision = await semanticDecision(question, embed);
-	const calibration = getSemanticCalibration(
-		decision.model,
-		decision.dims,
-		SEMANTIC_PROTOTYPE_VERSION
+	return (await resolveQuestions([question], embed))[0];
+}
+
+/** Resolve a benchmark or UI batch without changing single-question behavior. */
+export async function resolveQuestions(
+	questions: string[],
+	embed?: EmbedQuestions
+): Promise<SemanticFrame[]> {
+	const frames = questions.map(analyzeQuestion);
+	if (!embed) return frames;
+	const uncertain = frames
+		.map((frame, index) => ({ frame, index }))
+		.filter(({ frame }) => frame.confidence === 'low' && !frame.clarification);
+	if (!uncertain.length) return frames;
+	const decisions = await semanticDecisions(
+		uncertain.map(({ index }) => questions[index]),
+		embed
 	);
-	if (!calibration) {
-		return {
-			...frame,
-			decisionScore: Math.max(frame.decisionScore, decision.score),
-			decisionMargin: decision.margin,
-			evidence: [
-				...frame.evidence,
-				`semantic:uncalibrated:${semanticProfileKey(decision.model, decision.dims, SEMANTIC_PROTOTYPE_VERSION)}`
-			]
-		};
+	const resolved = [...frames];
+	for (let offset = 0; offset < uncertain.length; offset++) {
+		const { frame, index } = uncertain[offset];
+		const decision = decisions[offset];
+		const calibration = getSemanticCalibration(
+			decision.model,
+			decision.dims,
+			SEMANTIC_PROTOTYPE_VERSION
+		);
+		if (!calibration) {
+			resolved[index] = {
+				...frame,
+				decisionScore: Math.max(frame.decisionScore, decision.score),
+				decisionMargin: decision.margin,
+				evidence: [
+					...frame.evidence,
+					`semantic:uncalibrated:${semanticProfileKey(decision.model, decision.dims, SEMANTIC_PROTOTYPE_VERSION)}`
+				]
+			};
+			continue;
+		}
+		resolved[index] = applySemanticDecision(
+			frame,
+			decision,
+			{ score: calibration.minScore, margin: calibration.minMargin },
+			questions[index]
+		);
 	}
-	return applySemanticDecision(frame, decision, {
-		score: calibration.minScore,
-		margin: calibration.minMargin
-	});
+	return resolved;
 }
 
 export function applySemanticDecision(
@@ -144,14 +178,23 @@ export function applySemanticDecision(
 	thresholds: { score: number; margin: number } = {
 		score: SEMANTIC_MIN_SCORE,
 		margin: SEMANTIC_MIN_MARGIN
-	}
+	},
+	question = ''
 ): SemanticFrame {
 	const accepted =
 		decision.score >= thresholds.score &&
 		decision.margin >= thresholds.margin &&
 		decision.candidates.length === 1;
+	const coordinatedFacts = hasCoordinatedFactQuestions(question);
+	const protectsExplicitFact =
+		frame.route === 'targeted' &&
+		frame.answerShape === 'fact' &&
+		!coordinatedFacts &&
+		decision.label === 'synthesis';
 	const safeRoute =
-		accepted && (decision.label !== 'aggregate' || frame.operation !== null)
+		accepted &&
+		!protectsExplicitFact &&
+		(decision.label !== 'aggregate' || frame.operation !== null)
 			? decision.label
 			: frame.route;
 	return {

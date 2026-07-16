@@ -90,6 +90,8 @@ const OPERATION_CONCEPTS: Record<AggregateOperation, string[]> = {
 	maximum: ['maximum', 'maximale', 'plus grand', 'plus eleve', 'highest', 'largest'],
 	count: ['combien de', 'nombre de', 'how many', 'count'],
 	list: [
+		'recapitule',
+		'resume',
 		'liste',
 		'lister',
 		'detaille',
@@ -212,6 +214,11 @@ function phraseMatches(q: string, phrase: string, fuzzyLimit = 2): boolean {
 		)
 			return true;
 		const max = Math.min(fuzzyLimit, Math.floor(phrase.length / 5));
+		// Short words are collision-prone across languages (`coût` -> `cout`
+		// versus English `count`). A token *shorter* than a short concept is
+		// likely a different, shorter word reached by deletion — reject it. A
+		// *longer* token (`frais` -> `farais`) is a typo of the concept; keep it.
+		if (phrase.length <= 5 && token.length < phrase.length) return false;
 		return max > 0 && token.length >= 4 && damerauLevenshtein(token, phrase, max) <= max;
 	});
 }
@@ -314,6 +321,24 @@ function targetsSingleRecord(q: string, identifiers: string[]): boolean {
 	);
 }
 
+/** Detect questions that explicitly request several independent facts.
+ * This is structural on purpose: route breadth must not depend on a growing
+ * list of document-domain words. */
+export function hasCoordinatedFactQuestions(question: string): boolean {
+	const q = normalizeQuestion(question);
+	const hasCoordinator = /(?:,|;|\b(?:et|and)\b)/u.test(q);
+	if (!hasCoordinator) return false;
+	const interrogatives =
+		q.match(
+			/\b(?:qui|quel|quelle|quels|quelles|ou|quand|combien|comment|who|what|which|where|when|how)\b/gu
+		) ?? [];
+	if (interrogatives.length >= 2) return true;
+	const coordinatedSegments = q
+		.split(/\s*(?:,|;|\b(?:et|and)\b)\s*/u)
+		.filter((segment) => words(segment).length >= 1);
+	return coordinatedSegments.length >= 3;
+}
+
 export function analyzeQuestion(question: string): SemanticFrame {
 	const q = normalizeQuestion(question);
 	const temporal = parseTemporalScope(q);
@@ -327,7 +352,12 @@ export function analyzeQuestion(question: string): SemanticFrame {
 		) || /\b(?:numero|number|date|montant|amount|destinataire|recipient)\b/.test(q)
 			? 'fact'
 			: 'explanation';
-	const operations = matchingConcepts(q, OPERATION_CONCEPTS);
+	let operations = matchingConcepts(q, OPERATION_CONCEPTS);
+	// “How long” asks for a duration value. Treating it as “how many” routes a
+	// single fact to arithmetic aggregation and loses the answer-bearing page.
+	if (/\b(?:combien de temps|how long)\b/u.test(q)) {
+		operations = operations.filter((operation) => operation !== 'count');
+	}
 	let roles = matchingConcepts(q, ROLE_CONCEPTS, 1);
 	// "transfer(s)" names a record, not the direction of money. Its one-edit
 	// proximity to French "transféré" must not create a sent-role conflict.
@@ -338,7 +368,9 @@ export function analyzeQuestion(question: string): SemanticFrame {
 	) {
 		roles = roles.filter((role) => role !== 'sent');
 	}
-	const synthesis = SYNTHESIS_CONCEPTS.some((concept) => phraseMatches(q, concept));
+	const coordinatedFacts = hasCoordinatedFactQuestions(q);
+	const synthesis =
+		coordinatedFacts || SYNTHESIS_CONCEPTS.some((concept) => phraseMatches(q, concept));
 	const collection = COLLECTION_CONCEPTS.some((concept) => phraseMatches(q, concept));
 	const operationPriority: AggregateOperation[] = [
 		'average',
@@ -349,6 +381,19 @@ export function analyzeQuestion(question: string): SemanticFrame {
 		'sum'
 	];
 	let operation = operationPriority.find((candidate) => operations.includes(candidate)) ?? null;
+	// Plural interrogatives express an answer shape, independently of the
+	// document domain: "Quels droits…", "Quelles garanties…", "Qui sont les…".
+	// Keep this structural instead of growing a vocabulary of listable nouns.
+	if (!operation && /^(?:quels|quelles|qui sont les|who are the)\b/u.test(q)) operation = 'list';
+	// The imperative "Cite/Citez les X" is an exhaustive-list request; the noun
+	// "cité" (city) is not — it is preceded by a determiner ("la cité …").
+	if (
+		!operation &&
+		(/\bcitez\b/u.test(q) ||
+			(/\bcite\b/u.test(q) &&
+				!/\b(?:la|une|cette|leur|votre|notre|sa|ma|ta|des|de la) cite\b/u.test(q)))
+	)
+		operation = 'list';
 	const moneyRole = roles.length === 1 ? roles[0] : null;
 	// Quantity questions over one recognized measure are sums, not counts.
 	if (!operation && moneyRole && /\b(?:combien|how much)\b/.test(q)) operation = 'sum';
@@ -362,18 +407,23 @@ export function analyzeQuestion(question: string): SemanticFrame {
 				: temporal
 					? 'temporal'
 					: 'unspecified';
-	const mathematicallyAggregate =
+	const financiallyAggregate =
 		operation === 'average' ||
 		operation === 'minimum' ||
 		operation === 'maximum' ||
 		operation === 'count' ||
-		operation === 'list' ||
+		(operation === 'list' && moneyRole !== null) ||
 		(operation === 'sum' && moneyRole !== null && !singleRecord && !page);
-	const route: QuestionRoute = synthesis
-		? 'synthesis'
-		: operation && !singleRecord && !page && (collection || !!temporal || mathematicallyAggregate)
-			? 'aggregate'
-			: 'targeted';
+	// A list over the whole document is exhaustive only when it isn't already
+	// scoped to one record or page ("résumé de la facture F-102" stays targeted).
+	const exhaustiveDocumentList =
+		operation === 'list' && moneyRole === null && !singleRecord && !page;
+	const route: QuestionRoute =
+		synthesis || exhaustiveDocumentList
+			? 'synthesis'
+			: operation && !singleRecord && !page && (collection || !!temporal || financiallyAggregate)
+				? 'aggregate'
+				: 'targeted';
 	const clarification: ClarificationKind | null =
 		roles.length > 1 && !synthesis
 			? 'financial_role'
@@ -384,6 +434,7 @@ export function analyzeQuestion(question: string): SemanticFrame {
 				: null;
 	const evidence = [
 		...(synthesis ? ['route:synthesis'] : []),
+		...(coordinatedFacts ? ['structure:coordinated-facts'] : []),
 		...operations.map((value) => `operation:${value}`),
 		...roles.map((value) => `role:${value}`),
 		...(scopeKind !== 'unspecified' ? [`scope:${scopeKind}`] : []),
@@ -413,7 +464,7 @@ export function analyzeQuestion(question: string): SemanticFrame {
 		scope: { kind: scopeKind, explicit: scopeKind !== 'unspecified' },
 		locale: detectLocale(question),
 		referencesPrevious: referencesPrevious(question),
-		exhaustive: collection || !!temporal || mathematicallyAggregate,
+		exhaustive: collection || !!temporal || financiallyAggregate || exhaustiveDocumentList,
 		answerShape,
 		confidence,
 		decisionScore,

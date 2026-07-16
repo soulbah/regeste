@@ -60,7 +60,7 @@ async function generate(
 			messages,
 			stream: true,
 			abortSignal: aborter.signal,
-			temperature: 0.2,
+			temperature: options.temperature ?? 0.2,
 			max_tokens: options.maxTokens,
 			// Qwen3 thinks by default; grounded QA doesn't need it and CPU
 			// tokens are expensive. stripThink upstream catches any leak.

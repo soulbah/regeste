@@ -12,6 +12,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'disabled.needUrl': "Renseignez d'abord l'URL de base.",
 	'disabled.emptyMessage': "Écrivez d'abord un message.",
 	'disabled.indexing': 'Ce document est encore en cours de préparation.',
+	'disabled.indexingChat': 'Attendez que le premier document soit prêt.',
 	'disabled.needEmail': "Saisissez d'abord un email valide.",
 	'disabled.selectExcerpts': 'Sélectionnez au moins un passage.',
 	'disabled.selectDoc': 'Sélectionnez au moins un document.',
@@ -62,6 +63,12 @@ export const fr: Record<keyof typeof en, string> = {
 	'composer.followUp': 'Poser une question de suivi…',
 	'composer.attachFrom': 'Joindre depuis vos documents',
 	'composer.footer': 'Les réponses citent vos documents',
+	'composer.preparingOne': 'Préparation de {name}',
+	'composer.preparingMany': 'Préparation de {count} documents',
+	'composer.preparingStep': '{phase}, étape {step} sur 4',
+	'composer.preparingAvailable': '{count} prêt, vous pouvez déjà poser une question',
+	'composer.documentsReady': 'Vos documents sont prêts pour la recherche',
+	'composer.waitPlaceholder': 'Attendez que votre document soit prêt…',
 
 	// Preset actions (R3)
 	'actions.menu': 'Actions',

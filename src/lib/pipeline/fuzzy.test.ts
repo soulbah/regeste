@@ -9,12 +9,63 @@ import {
 	fuzzyQueryCoverage,
 	fuzzyQueryGrams,
 	identifierCompatibility,
-	normalizeForFuzzy
+	lexicalIndexText,
+	lexicalStemTokens,
+	normalizeForFuzzy,
+	phraseQueryCoverage,
+	significantQueryTokens,
+	stemmedQueryCoverage
 } from './fuzzy';
 
 describe('fuzzy retrieval views', () => {
 	it('normalizes accents, ligatures, apostrophes and line-break hyphenation', () => {
 		expect(normalizeForFuzzy('L’Œuvre re-\nçue à Noël')).toBe('l oeuvre recue a noel');
+	});
+	it('removes library stopwords while keeping discriminating French and English terms', () => {
+		expect(significantQueryTokens('Qui est assuré par ce devis et avec qui ?')).toEqual([
+			'assure',
+			'devis'
+		]);
+		expect(
+			significantQueryTokens('À quelle date et heure la couverture commence-t-elle ?')
+		).toEqual(['date', 'heure', 'couverture', 'commence']);
+		expect(significantQueryTokens('Who is covered by this insurance quote?')).toEqual([
+			'covered',
+			'insurance',
+			'quote'
+		]);
+	});
+	it('preserves stopword components inside meaningful hyphenated compounds', () => {
+		expect(significantQueryTokens('Que se passe-t-il en cas de sous-assurance ?')).toEqual(
+			expect.arrayContaining(['sous', 'assurance'])
+		);
+	});
+	it('bridges French and English inflections without domain-specific aliases', () => {
+		const underinsurance = lexicalStemTokens('sous-assurance');
+		const underinsured = lexicalStemTokens('sous-assuré');
+		const supplies = lexicalStemTokens('alimentations');
+		const supply = lexicalStemTokens('alimentation');
+		const policies = lexicalStemTokens('insurance policies');
+		const policy = lexicalStemTokens('insurance policy');
+
+		expect(underinsurance.filter((stem) => underinsured.includes(stem))).not.toHaveLength(0);
+		expect(supplies.filter((stem) => supply.includes(stem))).not.toHaveLength(0);
+		expect(policies.filter((stem) => policy.includes(stem))).not.toHaveLength(0);
+		expect(lexicalIndexText('sous-assuré')).toContain('frstemassur');
+	});
+	it('scores morphology and complete phrases independently of the tested domain', () => {
+		expect(stemmedQueryCoverage('alimentations couvertes', 'alimentation couverte')).toBe(1);
+		expect(
+			phraseQueryCoverage(
+				'alimentation en gaz naturel après compteur',
+				'alimentations en gaz naturel après compteur'
+			)
+		).toBeGreaterThan(
+			phraseQueryCoverage(
+				'alimentation en gaz naturel après compteur',
+				'installations électriques situées après compteur alimentation électricité'
+			)
+		);
 	});
 	it('recognizes several realistic transpositions without rewarding unrelated text', () => {
 		const query = 'Quel est le prxi de vnete exct du bien Martin ?';

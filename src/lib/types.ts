@@ -52,8 +52,10 @@ export interface ParsedBlock {
 export interface ParsedDoc {
 	blocks: ParsedBlock[];
 	pages: number | null;
-	/** 1-based page numbers with no extractable text — image-only, OCR candidates (spec 023). */
+	/** 1-based page numbers with sparse or structurally unreliable text. */
 	needsOcr?: number[];
+	/** Suspicious native text retained only if full-page OCR cannot improve it. */
+	ocrFallbackBlocks?: ParsedBlock[];
 }
 
 export interface Chunk {
@@ -73,8 +75,12 @@ export interface Chunk {
 
 export interface SearchHit {
 	chunkId: number;
+	/** Structural parent that recalled this precise child, when expanded. */
+	parentChunkId?: number;
 	/** Document-local order, used only for bounded neighbor expansion. */
 	seq?: number;
+	/** -1 marks retrieval-only parent chunks; they must never enter prompts. */
+	paraIndex?: number | null;
 	documentId: string;
 	documentName: string;
 	text: string;

@@ -118,7 +118,7 @@ function truncateAndNormalize(tensor: Tensor, targetDims: number): Float32Array 
 	return data;
 }
 
-async function embed(
+async function runEmbed(
 	texts: string[],
 	kind: 'passage' | 'query',
 	onProgress?: (p: EmbedProgress) => void
@@ -150,6 +150,12 @@ async function embed(
 			tensor.dispose();
 		}
 		onProgress?.({ phase: 'embed', progress: Math.min(1, (i + batch.length) / prefixed.length) });
+		// A large benchmark query job can contain hundreds of variants. Yield
+		// between model batches so Chromium can service rendering/devtools work;
+		// inference remains serialized and the model/session is never duplicated.
+		if (i + batch.length < prefixed.length) {
+			await new Promise<void>((resolve) => setTimeout(resolve, 0));
+		}
 	}
 	const total = out.reduce((n, a) => n + a.length, 0);
 	const data = new Float32Array(total);
@@ -164,6 +170,49 @@ async function embed(
 		device: embedder.profile.device,
 		model: embedder.profile.model
 	};
+}
+
+interface EmbedJob {
+	texts: string[];
+	kind: 'passage' | 'query';
+	onProgress?: (p: EmbedProgress) => void;
+	resolve: (result: Awaited<ReturnType<typeof runEmbed>>) => void;
+	reject: (reason: unknown) => void;
+}
+
+const queryJobs: EmbedJob[] = [];
+const passageJobs: EmbedJob[] = [];
+let draining = false;
+
+async function drainJobs(): Promise<void> {
+	if (draining) return;
+	draining = true;
+	try {
+		while (queryJobs.length || passageJobs.length) {
+			const job = queryJobs.shift() ?? passageJobs.shift()!;
+			try {
+				job.resolve(await runEmbed(job.texts, job.kind, job.onProgress));
+			} catch (error) {
+				job.reject(error);
+			}
+		}
+	} finally {
+		draining = false;
+	}
+}
+
+/** Serialize model inference, but always serve queued user queries before the
+ * next low-priority passage batch. This avoids unsafe concurrent model calls. */
+function embed(
+	texts: string[],
+	kind: 'passage' | 'query',
+	onProgress?: (p: EmbedProgress) => void
+): Promise<Awaited<ReturnType<typeof runEmbed>>> {
+	return new Promise((resolve, reject) => {
+		const job = { texts, kind, onProgress, resolve, reject };
+		(kind === 'query' ? queryJobs : passageJobs).push(job);
+		void drainJobs();
+	});
 }
 
 const api = { embed };

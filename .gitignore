@@ -39,3 +39,6 @@ static/ort/
 # Downloaded public benchmark documents (manifest + hashes are committed)
 /.benchmark-corpus/
 /static/dev/fuzzy-public/
+
+# Local benchmark scratch data and downloaded third-party corpora
+/tmp/

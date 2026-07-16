@@ -3,6 +3,7 @@ import { analyzeQuestion } from '$lib/analysis/query-router';
 export interface GenerationOptions {
 	reasoning: 'off' | 'on';
 	maxTokens: number;
+	temperature?: number;
 }
 
 export interface GenerationResult {
@@ -16,7 +17,7 @@ export function generationOptionsFor(
 	question: string,
 	route: 'targeted' | 'synthesis'
 ): GenerationOptions {
-	if (route === 'synthesis') return { reasoning: 'off', maxTokens: 420 };
+	if (route === 'synthesis') return { reasoning: 'off', maxTokens: 420, temperature: 0 };
 	const frame = analyzeQuestion(question);
 	const shortFact =
 		frame.answerShape === 'fact' ||
@@ -24,7 +25,7 @@ export function generationOptionsFor(
 		frame.identifiers.length > 0 ||
 		frame.scope.kind === 'page' ||
 		frame.temporal !== null;
-	return { reasoning: 'off', maxTokens: shortFact ? 160 : 320 };
+	return { reasoning: 'off', maxTokens: shortFact ? 160 : 320, temperature: 0 };
 }
 
 /** CPU Qwen can spend its entire synthesis budget inside <think> and produce
@@ -35,6 +36,6 @@ export function adaptGenerationOptions(
 	engine: 'webllm' | 'wllama'
 ): GenerationOptions {
 	return engine === 'wllama' && options.reasoning === 'on'
-		? { reasoning: 'off', maxTokens: Math.min(options.maxTokens, 420) }
+		? { ...options, reasoning: 'off', maxTokens: Math.min(options.maxTokens, 420) }
 		: options;
 }

@@ -11,14 +11,18 @@ import { extractAliases, fuzzyHeadingIndexText, fuzzyIndexText } from '$lib/pipe
 // Conservative browser budget: around 180–260 tokens for French/English prose.
 // Exact model tokenization still happens before inference; this bound prevents
 // dense pages from compressing several unrelated facts into one embedding.
-export const CHUNK_TARGET_CHARS = 1000;
-export const CHUNK_OVERLAP_CHARS = 120;
+export const CHUNK_TARGET_CHARS = 650;
+export const STRUCTURED_CHUNK_TARGET_CHARS = 450;
+export const CHUNK_OVERLAP_CHARS = 80;
+export const PARENT_CHUNK_MIN_CHARS = 900;
+export const PARENT_CHUNK_MAX_CHARS = 1500;
 
 interface Piece {
 	text: string;
 	block: ParsedBlock;
 	charStart: number;
 	charEnd: number;
+	target: number;
 }
 
 function sectionKey(b: ParsedBlock): string {
@@ -44,7 +48,8 @@ export function splitSentences(
 			window.lastIndexOf('. '),
 			window.lastIndexOf('.\n'),
 			window.lastIndexOf('! '),
-			window.lastIndexOf('? ')
+			window.lastIndexOf('? '),
+			window.lastIndexOf('\n')
 		);
 		if (cut > max * 0.4)
 			cut += 1; // keep the punctuation
@@ -63,6 +68,39 @@ export function splitSentences(
 	return out.filter((p) => p.text.trim().length > 0);
 }
 
+export function chunkTargetForBlock(text: string): number {
+	const lines = text.split(/\r?\n/).filter((line) => line.trim().length > 0);
+	if (lines.length < 4) return CHUNK_TARGET_CHARS;
+	const structured = lines.filter(
+		(line) =>
+			/^\s*\d+[a-z]?\b/iu.test(line) ||
+			/\b\d+[a-z]?\s*$/iu.test(line) ||
+			/\|[^|]+\|/u.test(line) ||
+			/\.{3,}/u.test(line)
+	).length;
+	return structured >= Math.max(3, Math.ceil(lines.length * 0.35))
+		? STRUCTURED_CHUNK_TARGET_CHARS
+		: CHUNK_TARGET_CHARS;
+}
+
+/** Compact page/section parent used for multi-field retrieval. Children remain
+ * the precise citation units; the parent lets one embedding represent fields
+ * that would otherwise be split across several unrelated vectors. */
+export function parentSectionText(text: string): string {
+	if (text.length <= PARENT_CHUNK_MAX_CHARS) return text;
+	const informative = text
+		.split(/\r?\n/)
+		.map((line) => line.trim())
+		.filter(
+			(line) =>
+				line.length >= 3 && line.length <= 240 && (/[:€%\d]/u.test(line) || /^[-•✓!✗]/u.test(line))
+		)
+		.join('\n');
+	if (informative.length >= 200) return informative.slice(0, PARENT_CHUNK_MAX_CHARS);
+	const half = Math.floor(PARENT_CHUNK_MAX_CHARS / 2);
+	return `${text.slice(0, half)}\n…\n${text.slice(-half)}`;
+}
+
 export function chunkBlocks(blocks: ParsedBlock[], documentName = ''): Chunk[] {
 	const chunks: Chunk[] = [];
 	let seq = 0;
@@ -76,6 +114,7 @@ export function chunkBlocks(blocks: ParsedBlock[], documentName = ''): Chunk[] {
 	}
 
 	for (const section of sections) {
+		const childStart = chunks.length;
 		const hasStructuralParent = section.some(
 			(block) => block.headingPath?.length || block.retrievalContext
 		);
@@ -91,11 +130,24 @@ export function chunkBlocks(blocks: ParsedBlock[], documentName = ''): Chunk[] {
 		// Flatten section blocks into pieces no larger than the target.
 		const pieces: Piece[] = [];
 		for (const b of section) {
-			if (b.text.length <= CHUNK_TARGET_CHARS) {
-				pieces.push({ text: b.text, block: b, charStart: b.charStart, charEnd: b.charEnd });
+			const target = chunkTargetForBlock(b.text);
+			if (b.text.length <= target) {
+				pieces.push({
+					text: b.text,
+					block: b,
+					charStart: b.charStart,
+					charEnd: b.charEnd,
+					target
+				});
 			} else {
-				for (const part of splitSentences(b.text, b.charStart, CHUNK_TARGET_CHARS)) {
-					pieces.push({ text: part.text, block: b, charStart: part.start, charEnd: part.end });
+				for (const part of splitSentences(b.text, b.charStart, target)) {
+					pieces.push({
+						text: part.text,
+						block: b,
+						charStart: part.start,
+						charEnd: part.end,
+						target
+					});
 				}
 			}
 		}
@@ -148,7 +200,8 @@ export function chunkBlocks(blocks: ParsedBlock[], documentName = ''): Chunk[] {
 			});
 		};
 		for (const piece of pieces) {
-			if (bufLen + piece.text.length > CHUNK_TARGET_CHARS && buf.length) {
+			const bufferTarget = Math.min(piece.target, ...buf.map((item) => item.target));
+			if (bufLen + piece.text.length > bufferTarget && buf.length) {
 				flush();
 				// Overlap: carry the tail piece if it is small enough.
 				const tail = buf[buf.length - 1];
@@ -159,6 +212,64 @@ export function chunkBlocks(blocks: ParsedBlock[], documentName = ''): Chunk[] {
 			bufLen += piece.text.length;
 		}
 		flush();
+
+		const sectionChildren = chunks.slice(childStart);
+		const fullSectionLength = sectionChildren.reduce((sum, child) => sum + child.text.length, 0);
+		if (fullSectionLength >= PARENT_CHUNK_MIN_CHARS && sectionChildren.length > 1) {
+			// A single page-sized parent can exceed the embedding model's useful
+			// input and hide facts near the end. Build overlapping child windows:
+			// retrieval stays broad, while generation still receives precise children.
+			let windowStart = 0;
+			while (windowStart < sectionChildren.length - 1) {
+				let windowEnd = windowStart;
+				let windowChars = 0;
+				while (windowEnd < sectionChildren.length) {
+					const next = sectionChildren[windowEnd];
+					if (
+						windowEnd > windowStart + 1 &&
+						windowChars + next.text.length > PARENT_CHUNK_MAX_CHARS
+					)
+						break;
+					windowChars += next.text.length;
+					windowEnd++;
+				}
+				const window = sectionChildren.slice(windowStart, windowEnd);
+				const first = window[0];
+				const last = window[window.length - 1];
+				const text = parentSectionText(window.map((child) => child.text).join('\n'));
+				const headingPath = first.headingPath;
+				const structuralContext = [
+					...new Set(section.map((block) => block.retrievalContext).filter(Boolean))
+				].join('\n');
+				const searchText = [documentName, headingPath, structuralContext, text]
+					.filter(Boolean)
+					.join('\n');
+				chunks.push({
+					text,
+					searchText,
+					fuzzyText: [
+						fuzzyIndexText(searchText),
+						headingPath ? fuzzyHeadingIndexText(headingPath) : ''
+					]
+						.filter(Boolean)
+						.join(' '),
+					seq: seq++,
+					page: first.page,
+					headingPath,
+					paraIndex: -1,
+					charStart: first.charStart,
+					charEnd: last.charEnd,
+					ocrConfidence: (() => {
+						const values = window
+							.map((child) => child.ocrConfidence)
+							.filter((value): value is number => value !== null && value !== undefined);
+						return values.length ? Math.min(...values) : null;
+					})()
+				});
+				if (windowEnd >= sectionChildren.length) break;
+				windowStart = Math.max(windowStart + 1, windowEnd - 1);
+			}
+		}
 	}
 
 	return chunks.filter((c) => c.text.trim().length >= 20);

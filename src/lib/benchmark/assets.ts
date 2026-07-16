@@ -39,6 +39,18 @@ const CONTROLLED: readonly BenchmarkAsset[] = [
 		format: 'txt',
 		bytes: 139,
 		sha256: 'bcf5b72a884f95812a0d98b4225af88ba194daab1dcd465f77f0b9b8f460f1e7'
+	},
+	{
+		name: 'tatqa-contract-sales.md',
+		format: 'txt',
+		bytes: 778,
+		sha256: 'd210a301fa6744a7fb3c4ed3515ae71df7530f0326ade08fa63bf896a0d4a67b'
+	},
+	{
+		name: 'finqa-payment-networks.txt',
+		format: 'txt',
+		bytes: 629,
+		sha256: '7f0ad19af09371799c6f331c13f49b3e414afe05914c743d08b689e2a5c89eb3'
 	}
 ] as const;
 

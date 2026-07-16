@@ -5,7 +5,8 @@ describe('generationOptionsFor', () => {
 	it('uses short budgets for French and English facts', () => {
 		expect(generationOptionsFor('Qui est le destinataire ?', 'targeted')).toEqual({
 			reasoning: 'off',
-			maxTokens: 160
+			maxTokens: 160,
+			temperature: 0
 		});
 		expect(generationOptionsFor('What is their account number?', 'targeted').maxTokens).toBe(160);
 	});
@@ -13,7 +14,8 @@ describe('generationOptionsFor', () => {
 	it('keeps a deliberate budget for synthesis', () => {
 		expect(generationOptionsFor('Compare les contrats', 'synthesis')).toEqual({
 			reasoning: 'off',
-			maxTokens: 420
+			maxTokens: 420,
+			temperature: 0
 		});
 	});
 

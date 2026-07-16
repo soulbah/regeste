@@ -136,6 +136,7 @@ const BASES: BaseCase[] = [
 		['fr-hard-1', 'Explique la clause de résiliation'],
 		['fr-hard-2', 'Le contrat mentionne-t-il une assurance ?'],
 		['fr-hard-3', 'Écris un résumé de la facture F-102'],
+		['fr-hard-4', 'Quelle est la cité de naissance ?'],
 		['en-hard-1', 'Explain the termination clause'],
 		['en-hard-2', 'Does the contract mention insurance?'],
 		['en-hard-3', 'Write a summary of invoice F-102']

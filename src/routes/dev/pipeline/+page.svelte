@@ -1,14 +1,16 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { SvelteMap } from 'svelte/reactivity';
-	import { replaceState } from '$app/navigation';
+	import { goto, replaceState } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
+	import { Textarea } from '$lib/components/ui/textarea';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Progress } from '$lib/components/ui/progress';
 	import * as Card from '$lib/components/ui/card';
 	import { documentsStore } from '$lib/state/documents.svelte';
+	import { chatsStore } from '$lib/state/chats.svelte';
 	import {
 		runIntelligenceBenchmark,
 		type IntelligenceBenchmarkReport
@@ -39,6 +41,50 @@
 		benchmarkAsset,
 		validateBenchmarkBytes
 	} from '$lib/benchmark/assets';
+	import { runMartinAnswerStress, runMartinStress } from '$lib/benchmark/compromis-stress';
+	import {
+		PUBLIC_ANSWER_STRESS_CASES,
+		runPublicAnswerStress
+	} from '$lib/benchmark/public-answer-stress';
+	import {
+		answerMatchesStressOracle,
+		assertPrivateDocumentStressPages,
+		parsePrivateDocumentStressMatrix,
+		runPrivateDocumentRetrievalStress,
+		runPrivateDocumentStress
+	} from '$lib/benchmark/private-document-stress';
+	import { yieldToMain } from '$lib/pipeline/embed-batches';
+	import {
+		appendPrivateRunResult,
+		humanReviewSummary,
+		loadGenerationCache,
+		loadPrivateRunCheckpoint,
+		privateGenerationCacheKey,
+		saveGenerationCache,
+		savePrivateRunCheckpoint,
+		sha256Text,
+		type PrivateHumanVerdict,
+		type PrivateRunCheckpoint
+	} from '$lib/benchmark/private-run-cache';
+	import type { SearchHit } from '$lib/types';
+	import { generationOptionsFor } from '$lib/private-ai/generation';
+	import {
+		crossLingualQueryVariants,
+		retrieveWithLocalQueryFallback
+	} from '$lib/pipeline/query-translation';
+	import { resolveQuestion, resolveQuestions } from '$lib/nlu/semantic-resolver';
+	import { buildExecutionPlan } from '$lib/nlu/execution-plan';
+	import { RETRIEVAL_PIPELINE_VERSION } from '$lib/pipeline/retrieval';
+	import { buildDeterministicExtractiveAnswer } from '$lib/private-ai/extractive-answer';
+	import {
+		buildVerificationPrompt,
+		buildVerificationUserPrompt,
+		enforceAnswerInvariants,
+		GROUNDED_VERIFICATION_VERSION,
+		needsGroundedVerification,
+		stripThink,
+		SYSTEM_PROMPT
+	} from '$lib/private-ai/prompt';
 
 	type IndexDiagnostic = {
 		name: string;
@@ -55,11 +101,16 @@
 		'near-identifiers-table.docx',
 		'malik-profile-note.txt',
 		'http-semantics.md',
+		'tatqa-contract-sales.md',
+		'finqa-payment-networks.txt',
 		'cfr-fiberboard-boxes.pdf',
 		'federal-register-two-column.pdf',
 		'apollo-flight-planning-report.pdf',
 		'rfc9110.txt',
-		'rfc9110.pdf'
+		'rfc9110.pdf',
+		'nist-ai-rmf-1.0.pdf',
+		'irs-form-1040-2025.pdf',
+		'aec-addendum-drawings.pdf'
 	];
 
 	let fileInput = $state<HTMLInputElement | null>(null);
@@ -81,6 +132,8 @@
 		metrics: RetrievalMetrics;
 		ablation: Record<'lexical' | 'fuzzy' | 'dense', RetrievalMetrics>;
 		ingestMs: number;
+		queryRewriteMs: number;
+		queryRewriteCount: number;
 		bytes: number;
 		cases: number;
 		failures: string[];
@@ -105,11 +158,76 @@
 	} | null>(null);
 	let fuzzyBenchmarkError = $state<string | null>(null);
 	let compromisDiagnostic = $state<unknown>(null);
+	let compromisReindexReport = $state<unknown>(null);
+	let compromisAnswerBenchmarking = $state(false);
+	let compromisAnswerProgress = $state({ completed: 0, total: 44 });
+	let compromisAnswerReport = $state<unknown>(null);
+	let publicAnswerBenchmarking = $state(false);
+	let publicAnswerProgress = $state({ completed: 0, total: PUBLIC_ANSWER_STRESS_CASES.length });
+	let publicAnswerReport = $state<unknown>(null);
+	let queryRewriteDiagnostic = $state<unknown>(null);
 	let semanticBenchmarking = $state(false);
 	let semanticBenchmarkReport = $state<SemanticBenchmarkReport | null>(null);
 	let semanticBenchmarkError = $state<string | null>(null);
+	let clipboardImportStatus = $state<string | null>(null);
+	let privateDocumentBenchmarking = $state(false);
+	let privateChannelBenchmarking = $state(false);
+	let privateChannelProgress = $state({ completed: 0, total: 0 });
+	let privateChannelReport = $state<unknown>(null);
+	let privateDocumentBenchmarkProgress = $state({ completed: 0, total: 0 });
+	let privateDocumentBenchmarkStage = $state<'routing' | 'retrieval' | 'generation'>('retrieval');
+	let privateDocumentBenchmarkReport = $state<unknown>(null);
+	let privateBenchmarkMatrixText = $state('');
+	let privateRunCheckpoint = $state<PrivateRunCheckpoint | null>(null);
+	let privateReviewIndex = $state(0);
+	let privateReviewNote = $state('');
+	let privateGenerationCache = new SvelteMap<string, string>();
+	function privateBenchmarkStageLabel(stage: 'routing' | 'retrieval' | 'generation'): string {
+		if (stage === 'routing') return 'Routing';
+		if (stage === 'retrieval') return 'Retrieving';
+		return 'Generating';
+	}
+	let privateReviewResult = $derived(privateRunCheckpoint?.results[privateReviewIndex] ?? null);
+	let privateReviewSummary = $derived(
+		privateRunCheckpoint ? humanReviewSummary(privateRunCheckpoint) : null
+	);
+	type PrivateRetrievalCache = Map<
+		string,
+		Promise<{ hits: SearchHit[]; alternateQueries: string[] }>
+	>;
+	type PrivateRouteCache = Map<string, Promise<'targeted' | 'synthesis'>>;
+	const hotData = import.meta.hot?.data as
+		| {
+				privateRetrievalCache?: PrivateRetrievalCache;
+				privateRouteCache?: PrivateRouteCache;
+		  }
+		| undefined;
+	const privateRetrievalCache: PrivateRetrievalCache =
+		hotData?.privateRetrievalCache ?? new SvelteMap();
+	const privateRouteCache: PrivateRouteCache = hotData?.privateRouteCache ?? new SvelteMap();
+	if (import.meta.hot) {
+		import.meta.hot.data.privateRetrievalCache = privateRetrievalCache;
+		import.meta.hot.data.privateRouteCache = privateRouteCache;
+	}
 
 	onMount(async () => {
+		privateGenerationCache = new SvelteMap(loadGenerationCache(localStorage));
+		privateRunCheckpoint = loadPrivateRunCheckpoint(localStorage);
+		if (privateRunCheckpoint) {
+			privateReviewIndex = Math.max(
+				0,
+				privateRunCheckpoint.results.findIndex(
+					(result) => !privateRunCheckpoint?.humanReviews[result.id]
+				)
+			);
+			privateDocumentBenchmarkReport = {
+				restoredCheckpoint: true,
+				runId: privateRunCheckpoint.runId,
+				completed: privateRunCheckpoint.completed,
+				total: privateRunCheckpoint.total,
+				humanReview: humanReviewSummary(privateRunCheckpoint)
+			};
+		}
 		await documentsStore.init();
 		await refreshIndexDiagnostics();
 		llmStore.init();
@@ -170,6 +288,595 @@
 			await documentsStore.remove(document.id);
 		}
 		await refreshIndexDiagnostics();
+	}
+
+	async function runIngestUxScenario() {
+		const name = 'aec-addendum-drawings.pdf';
+		const existing = documentsStore.documents.find((document) => document.name === name);
+		if (existing) await documentsStore.remove(existing.id);
+		const response = await fetch('/dev/fuzzy-public/aec-addendum-drawings.pdf');
+		if (!response.ok) throw new Error(`Fixture request failed (${response.status})`);
+		const file = new File([await response.arrayBuffer()], name, { type: 'application/pdf' });
+		const chatId = await chatsStore.create('private');
+		await chatsStore.open(chatId);
+		const [documentId] = await documentsStore.ingestMany([file]);
+		await chatsStore.attach(chatId, documentId);
+		await goto(resolve(`/chat/${chatId}`));
+	}
+
+	async function importPdfFromClipboard() {
+		clipboardImportStatus = 'Reading clipboard…';
+		try {
+			const items = await navigator.clipboard.read();
+			const item = items.find((candidate) => candidate.types.includes('application/pdf'));
+			if (!item) throw new Error('Clipboard does not contain a PDF');
+			const blob = await item.getType('application/pdf');
+			const documentId = await documentsStore.ingest(
+				new File([blob], 'clipboard-document.pdf', { type: 'application/pdf' })
+			);
+			clipboardImportStatus = `Import started: ${documentId}`;
+		} catch (error) {
+			clipboardImportStatus = error instanceof Error ? error.message : String(error);
+		}
+	}
+
+	function privateRetrievalCacheKey(
+		kind: 'primary' | 'production',
+		document: { id: string; retrievalVersion?: number },
+		question: string,
+		route: 'targeted' | 'synthesis'
+	) {
+		return JSON.stringify([
+			kind,
+			RETRIEVAL_PIPELINE_VERSION,
+			document.id,
+			document.retrievalVersion ?? 1,
+			question,
+			route
+		]);
+	}
+
+	// Matches the embed worker's measured model batch. Smaller benchmark batches
+	// repeatedly under-filled the same serialized inference session; larger jobs
+	// are still split safely by the worker and yield between model batches.
+	const PRIVATE_RETRIEVAL_BATCH_SIZE = 16;
+
+	async function preparePrivateBenchmarkPrimary(
+		questions: string[],
+		document: { id: string; retrievalVersion?: number },
+		cacheKind: 'primary' | 'production',
+		onPreparationProgress?: (
+			phase: 'routing' | 'retrieval',
+			completed: number,
+			total: number
+		) => void
+	) {
+		const diagnosticsByQuestion = new SvelteMap<
+			string,
+			import('$lib/state/documents.svelte').RetrievalDiagnostic
+		>();
+		const retrievalBatches: import('$lib/state/documents.svelte').RetrievalBatchTiming[] = [];
+		onPreparationProgress?.('routing', 0, questions.length);
+		const routeStartedAt = performance.now();
+		const routes = await Promise.all(
+			questions.map((question) => privateRouteCache.get(question) ?? null)
+		);
+		const missingRouteIndexes = routes
+			.map((route, index) => (route ? -1 : index))
+			.filter((index) => index >= 0);
+		if (missingRouteIndexes.length) {
+			const frames = await resolveQuestions(
+				missingRouteIndexes.map((index) => questions[index]),
+				(texts) => documentsStore.embedQueries(texts)
+			);
+			for (let offset = 0; offset < missingRouteIndexes.length; offset++) {
+				const index = missingRouteIndexes[offset];
+				const route: 'targeted' | 'synthesis' =
+					buildExecutionPlan(questions[index], frames[offset]).route === 'synthesis'
+						? 'synthesis'
+						: 'targeted';
+				const pending = Promise.resolve(route);
+				privateRouteCache.set(questions[index], pending);
+				routes[index] = await pending;
+			}
+		}
+		onPreparationProgress?.('routing', questions.length, questions.length);
+		const routeMs = performance.now() - routeStartedAt;
+		const retrievalStartedAt = performance.now();
+		const cached = await Promise.all(
+			questions.map((question, index) => {
+				const route = routes[index]!;
+				return (
+					privateRetrievalCache.get(
+						privateRetrievalCacheKey(cacheKind, document, question, route)
+					) ?? null
+				);
+			})
+		);
+		const missingIndexes = cached
+			.map((result, index) => (result ? -1 : index))
+			.filter((index) => index >= 0);
+		onPreparationProgress?.(
+			'retrieval',
+			questions.length - missingIndexes.length,
+			questions.length
+		);
+		if (missingIndexes.length) {
+			// A single 117-query fan-out monopolizes OPFS/vec0 and freezes progress.
+			// Bounded batches keep one model job efficient while yielding UI control.
+			for (let offset = 0; offset < missingIndexes.length; offset += PRIVATE_RETRIEVAL_BATCH_SIZE) {
+				const indexes = missingIndexes.slice(offset, offset + PRIVATE_RETRIEVAL_BATCH_SIZE);
+				const hits = await documentsStore.retrieveMany(
+					indexes.map((index) => ({
+						query: questions[index],
+						documentIds: [document.id],
+						refinementQuery: questions[index],
+						route: routes[index]!,
+						onDiagnostic: (diagnostic) => diagnosticsByQuestion.set(questions[index], diagnostic)
+					})),
+					(timing) => retrievalBatches.push(timing)
+				);
+				for (let batchOffset = 0; batchOffset < indexes.length; batchOffset++) {
+					const index = indexes[batchOffset];
+					const result = Promise.resolve({ hits: hits[batchOffset], alternateQueries: [] });
+					privateRetrievalCache.set(
+						privateRetrievalCacheKey(cacheKind, document, questions[index], routes[index]!),
+						result
+					);
+					cached[index] = await result;
+				}
+				onPreparationProgress?.(
+					'retrieval',
+					questions.length - missingIndexes.length + offset + indexes.length,
+					questions.length
+				);
+				if (offset + indexes.length < missingIndexes.length) await yieldToMain();
+			}
+		}
+		return {
+			routeByQuestion: new Map(questions.map((question, index) => [question, routes[index]!])),
+			retrievalByQuestion: new Map(questions.map((question, index) => [question, cached[index]!])),
+			preparation: {
+				routeMs,
+				retrievalMs: performance.now() - retrievalStartedAt,
+				newRoutes: missingRouteIndexes.length,
+				newRetrievals: missingIndexes.length,
+				batchSize: PRIVATE_RETRIEVAL_BATCH_SIZE,
+				batches: retrievalBatches
+			},
+			diagnosticsByQuestion
+		};
+	}
+
+	function compactRetrievalResult(
+		result: {
+			test: { id: string; question: string };
+			route: string;
+			hits: SearchHit[];
+			rawHits: SearchHit[];
+			answerBearing: boolean;
+			retrievedPages: Array<number | null>;
+			rawRetrievedPages: Array<number | null>;
+			missingPageGroups: number[][];
+			pageRecallPassed: boolean;
+			answerGroupTriagePassed: boolean;
+			retrievalPassed: boolean;
+			retrievalMs: number;
+		},
+		includeEvidence = false
+	) {
+		return {
+			id: result.test.id,
+			question: result.test.question,
+			route: result.route,
+			answerBearing: result.answerBearing,
+			retrievedPages: result.retrievedPages,
+			rawRetrievedPages: result.rawRetrievedPages,
+			missingPageGroups: result.missingPageGroups,
+			pageRecallPassed: result.pageRecallPassed,
+			answerGroupTriagePassed: result.answerGroupTriagePassed,
+			retrievalPassed: result.retrievalPassed,
+			retrievalMs: result.retrievalMs,
+			...(includeEvidence
+				? {
+						evidence: result.rawHits.map((hit) => ({
+							page: hit.page,
+							text: hit.text.slice(0, 600)
+						}))
+					}
+				: {})
+		};
+	}
+
+	async function runClipboardPrivateRetrievalBenchmark() {
+		privateDocumentBenchmarking = true;
+		privateDocumentBenchmarkStage = 'retrieval';
+		privateDocumentBenchmarkReport = null;
+		try {
+			const startedAt = performance.now();
+			const matrix = parsePrivateDocumentStressMatrix(
+				JSON.parse(privateBenchmarkMatrixText) as unknown
+			);
+			const document = documentsStore.documents.find(
+				(candidate) => candidate.name === matrix.documentName && candidate.status === 'ready'
+			);
+			if (!document) throw new Error(`Ready document not found: ${matrix.documentName}`);
+			assertPrivateDocumentStressPages(matrix, document.pages);
+			privateDocumentBenchmarkProgress = { completed: 0, total: matrix.cases.length };
+			const prepared = await preparePrivateBenchmarkPrimary(
+				matrix.cases.map((test) => test.question),
+				document,
+				'primary',
+				(phase, completed, total) => {
+					privateDocumentBenchmarkStage = phase;
+					privateDocumentBenchmarkProgress = { completed, total };
+				}
+			);
+			const report = await runPrivateDocumentRetrievalStress({
+				documentId: document.id,
+				cases: matrix.cases,
+				concurrency: 8,
+				retrieve: async (question) => prepared.retrievalByQuestion.get(question)!,
+				resolveRoute: async (question) => prepared.routeByQuestion.get(question) ?? 'targeted',
+				onProgress: (completed, total) => (privateDocumentBenchmarkProgress = { completed, total })
+			});
+			privateDocumentBenchmarkReport = {
+				metricKind: 'automatic-lexical-triage',
+				semanticReviewRequired: true,
+				mode: 'retrieval-only-primary',
+				total: report.total,
+				passed: report.passed,
+				pageRecallPassed: report.pageRecallPassed,
+				answerGroupTriagePassed: report.answerGroupTriagePassed,
+				score: report.score,
+				summedRetrievalMs: report.elapsedRetrievalMs,
+				preparation: prepared.preparation,
+				failures: report.failures.map((result) => ({
+					...compactRetrievalResult(result, true),
+					diagnostic: prepared.diagnosticsByQuestion.get(result.test.question)
+				})),
+				results: report.results.map((result) => compactRetrievalResult(result)),
+				elapsedMs: performance.now() - startedAt
+			};
+		} catch (error) {
+			privateDocumentBenchmarkReport = {
+				error: error instanceof Error ? error.message : String(error)
+			};
+		} finally {
+			privateDocumentBenchmarking = false;
+		}
+	}
+
+	async function runPrivateChannelDiagnostic() {
+		privateChannelBenchmarking = true;
+		privateChannelReport = null;
+		try {
+			const startedAt = performance.now();
+			const matrix = parsePrivateDocumentStressMatrix(
+				JSON.parse(privateBenchmarkMatrixText) as unknown
+			);
+			const document = documentsStore.documents.find(
+				(candidate) => candidate.name === matrix.documentName && candidate.status === 'ready'
+			);
+			if (!document) throw new Error(`Ready document not found: ${matrix.documentName}`);
+			assertPrivateDocumentStressPages(matrix, document.pages);
+			privateChannelProgress = { completed: 0, total: matrix.cases.length };
+			const frames = await resolveQuestions(
+				matrix.cases.map((test) => test.question),
+				(texts) => documentsStore.embedQueries(texts)
+			);
+			const results = [];
+			for (let index = 0; index < matrix.cases.length; index++) {
+				const test = matrix.cases[index];
+				const route: 'targeted' | 'synthesis' =
+					buildExecutionPlan(test.question, frames[index]).route === 'synthesis'
+						? 'synthesis'
+						: 'targeted';
+				const channels = await documentsStore.retrieveChannelCandidates(
+					test.question,
+					[document.id],
+					[],
+					route
+				);
+				results.push({
+					id: test.id,
+					question: test.question,
+					route,
+					expectedPageGroups: test.pageGroups,
+					channels: Object.fromEntries(
+						Object.entries(channels).map(([channel, hits]) => {
+							const pages = hits.map((hit) => hit.page);
+							return [
+								channel,
+								{
+									answerBearing: hasAnswerBearingEvidence(test.question, hits),
+									missingPageGroups: test.pageGroups.filter(
+										(group) => !group.some((page) => pages.includes(page))
+									),
+									hits: hits.map((hit) => ({
+										page: hit.page,
+										score: hit.score,
+										text: hit.text.slice(0, 240)
+									}))
+								}
+							];
+						})
+					)
+				});
+				privateChannelProgress = { completed: index + 1, total: matrix.cases.length };
+				if (index + 1 < matrix.cases.length) await yieldToMain();
+			}
+			privateChannelReport = {
+				total: results.length,
+				results,
+				elapsedMs: performance.now() - startedAt
+			};
+		} catch (error) {
+			privateChannelReport = { error: error instanceof Error ? error.message : String(error) };
+		} finally {
+			privateChannelBenchmarking = false;
+		}
+	}
+
+	async function verifyBenchmarkAnswer(
+		question: string,
+		route: 'targeted' | 'synthesis',
+		hits: SearchHit[],
+		draft: string
+	): Promise<string> {
+		const options = generationOptionsFor(question, route);
+		let answer = draft;
+		if (needsGroundedVerification(question, answer)) {
+			const verified = stripThink(
+				await llmStore.generate(
+					[
+						{ role: 'system', content: SYSTEM_PROMPT },
+						{
+							role: 'user',
+							content: buildVerificationPrompt(
+								question,
+								buildVerificationUserPrompt(question, hits),
+								answer
+							)
+						}
+					],
+					() => {},
+					options
+				)
+			);
+			if (verified.trim()) answer = verified;
+		}
+		return enforceAnswerInvariants(question, answer);
+	}
+
+	async function runClipboardPrivateDocumentBenchmark() {
+		if (llmStore.status !== 'ready') {
+			privateDocumentBenchmarkReport = { error: `Private model is ${llmStore.status}` };
+			return;
+		}
+		privateDocumentBenchmarking = true;
+		privateDocumentBenchmarkStage = 'retrieval';
+		privateDocumentBenchmarkReport = null;
+		try {
+			const startedAt = performance.now();
+			const matrix = parsePrivateDocumentStressMatrix(
+				JSON.parse(privateBenchmarkMatrixText) as unknown
+			);
+			const document = documentsStore.documents.find(
+				(candidate) => candidate.name === matrix.documentName && candidate.status === 'ready'
+			);
+			if (!document) throw new Error(`Ready document not found: ${matrix.documentName}`);
+			assertPrivateDocumentStressPages(matrix, document.pages);
+			const model = llmStore.tier!.model;
+			const runId = await sha256Text(
+				JSON.stringify({
+					matrix,
+					documentHash: document.hash,
+					retrievalVersion: document.retrievalVersion ?? 1,
+					retrievalPipelineVersion: RETRIEVAL_PIPELINE_VERSION,
+					model
+				})
+			);
+			const previousReviews =
+				privateRunCheckpoint?.runId === runId ? privateRunCheckpoint.humanReviews : {};
+			let checkpoint: PrivateRunCheckpoint = {
+				version: 1,
+				runId,
+				documentName: document.name,
+				documentHash: document.hash,
+				retrievalVersion: document.retrievalVersion ?? 1,
+				model,
+				total: matrix.cases.length,
+				completed: 0,
+				startedAt: Date.now(),
+				updatedAt: Date.now(),
+				results: [],
+				humanReviews: previousReviews
+			};
+			privateRunCheckpoint = checkpoint;
+			savePrivateRunCheckpoint(localStorage, checkpoint);
+			let generationCacheHits = 0;
+			let newGenerations = 0;
+			let extractiveAnswers = 0;
+			let rewriteQueue: Promise<void> = Promise.resolve();
+			const serializedRewrite = (
+				messages: Array<{ role: 'system' | 'user'; content: string }>
+			): Promise<string> => {
+				const pending = rewriteQueue.then(() =>
+					llmStore.generate(messages, () => {}, {
+						reasoning: 'off',
+						maxTokens: 96,
+						temperature: 0
+					})
+				);
+				rewriteQueue = pending.then(
+					() => undefined,
+					() => undefined
+				);
+				return pending;
+			};
+			const testByQuestion = new Map(matrix.cases.map((test) => [test.question, test]));
+			privateDocumentBenchmarkProgress = { completed: 0, total: matrix.cases.length };
+			const prepared = await preparePrivateBenchmarkPrimary(
+				matrix.cases.map((test) => test.question),
+				document,
+				'primary',
+				(phase, completed, total) => {
+					privateDocumentBenchmarkStage = phase;
+					privateDocumentBenchmarkProgress = { completed, total };
+				}
+			);
+			const report = await runPrivateDocumentStress({
+				documentId: document.id,
+				cases: matrix.cases,
+				retrieve: async (question, documentIds, route) => {
+					const key = privateRetrievalCacheKey('production', document, question, route);
+					let pending = privateRetrievalCache.get(key);
+					if (pending) return pending;
+					pending = retrieveWithLocalQueryFallback({
+						query: question,
+						documentLanguages: [document.language],
+						rewrite: serializedRewrite,
+						retrieve: (alternateQueries) =>
+							alternateQueries.length
+								? documentsStore.retrieve(
+										question,
+										documentIds,
+										question,
+										undefined,
+										route,
+										alternateQueries
+									)
+								: Promise.resolve(prepared.retrievalByQuestion.get(question)!.hits)
+					});
+					privateRetrievalCache.set(key, pending);
+					return pending;
+				},
+				generate: async (messages, question, route, hits) => {
+					const extractive = buildDeterministicExtractiveAnswer(question, hits);
+					if (extractive) {
+						extractiveAnswers++;
+						return enforceAnswerInvariants(question, extractive);
+					}
+					const options = generationOptionsFor(question, route);
+					const cacheKey = await privateGenerationCacheKey({
+						model,
+						documentHash: document.hash,
+						retrievalVersion: document.retrievalVersion ?? 1,
+						question,
+						route,
+						options: {
+							...options,
+							verificationVersion: needsGroundedVerification(question)
+								? GROUNDED_VERIFICATION_VERSION
+								: 0
+						},
+						messages
+					});
+					const cached = privateGenerationCache.get(cacheKey);
+					const test = testByQuestion.get(question);
+					if (cached !== undefined && test && answerMatchesStressOracle(test, cached)) {
+						generationCacheHits++;
+						return cached;
+					}
+					newGenerations++;
+					const draft = stripThink(await llmStore.generate(messages, () => {}, options));
+					const corrected = await verifyBenchmarkAnswer(question, route, hits, draft);
+					privateGenerationCache.set(cacheKey, corrected);
+					saveGenerationCache(localStorage, privateGenerationCache);
+					return corrected;
+				},
+				resolveRoute: async (question) => prepared.routeByQuestion.get(question) ?? 'targeted',
+				retrievalConcurrency: 4,
+				skipGenerationOnRetrievalFailure: true,
+				onProgress: (completed, total) => (privateDocumentBenchmarkProgress = { completed, total }),
+				onGenerationProgress: (completed, total) => {
+					privateDocumentBenchmarkStage = 'generation';
+					privateDocumentBenchmarkProgress = { completed, total };
+				},
+				onResult: (result, completed) => {
+					const latestReviews =
+						privateRunCheckpoint?.runId === checkpoint.runId
+							? privateRunCheckpoint.humanReviews
+							: {};
+					checkpoint = appendPrivateRunResult(checkpoint, result, latestReviews, completed);
+					privateRunCheckpoint = checkpoint;
+					savePrivateRunCheckpoint(localStorage, checkpoint);
+				}
+			});
+			const { db } = await getLocalDb();
+			privateDocumentBenchmarkReport = {
+				metricKind: 'automatic-lexical-triage',
+				semanticReviewRequired: true,
+				total: report.total,
+				automaticPassed: report.passed,
+				retrievalPassed: report.retrievalPassed,
+				pageRecallPassed: report.pageRecallPassed,
+				answerGroupTriagePassed: report.answerGroupTriagePassed,
+				answerPassed: report.answerPassed,
+				citationPassed: report.citationPassed,
+				automaticScore: report.score,
+				failures: report.failures,
+				preparation: prepared.preparation,
+				generationCache: {
+					hits: generationCacheHits,
+					misses: newGenerations,
+					extractive: extractiveAnswers
+				},
+				humanReview: humanReviewSummary(checkpoint),
+				answers: report.results.map((result) => ({
+					id: result.id,
+					question: result.question,
+					expectedOutcome: result.expectedOutcome,
+					answer: result.answer,
+					rawRetrievedPages: result.rawRetrievedPages,
+					citedPages: result.citedPages,
+					retrievedPages: result.retrievedPages,
+					passed: result.passed,
+					retrievalPassed: result.retrievalPassed,
+					pageRecallPassed: result.pageRecallPassed,
+					answerGroupTriagePassed: result.answerGroupTriagePassed,
+					answerPassed: result.answerPassed,
+					citationPassed: result.citationPassed,
+					generationMs: result.generationMs
+				})),
+				document: {
+					pages: document.pages,
+					chunks: await db.countChunks(document.id),
+					retrievalVersion: document.retrievalVersion ?? 1
+				},
+				elapsedMs: performance.now() - startedAt
+			};
+		} catch (error) {
+			privateDocumentBenchmarkReport = {
+				error: error instanceof Error ? error.message : String(error)
+			};
+		} finally {
+			privateDocumentBenchmarking = false;
+		}
+	}
+
+	function reviewPrivateResult(verdict: PrivateHumanVerdict) {
+		if (!privateRunCheckpoint || !privateReviewResult) return;
+		const reviewed = {
+			...privateRunCheckpoint,
+			updatedAt: Date.now(),
+			humanReviews: {
+				...privateRunCheckpoint.humanReviews,
+				[privateReviewResult.id]: {
+					verdict,
+					note: privateReviewNote.trim(),
+					reviewedAt: Date.now()
+				}
+			}
+		};
+		privateRunCheckpoint = reviewed;
+		savePrivateRunCheckpoint(localStorage, reviewed);
+		privateReviewNote = '';
+		const nextUnreviewed = reviewed.results.findIndex(
+			(result, index) => index > privateReviewIndex && !reviewed.humanReviews[result.id]
+		);
+		privateReviewIndex = nextUnreviewed >= 0 ? nextUnreviewed : privateReviewIndex;
 	}
 
 	async function repairEmptyIndexes() {
@@ -251,6 +958,12 @@
 				],
 				['/dev/fuzzy-stress/malik-profile-note.txt', 'malik-profile-note.txt', 'text/plain'],
 				['/dev/fuzzy-stress/http-semantics.md', 'http-semantics.md', 'text/markdown'],
+				['/dev/fuzzy-stress/tatqa-contract-sales.md', 'tatqa-contract-sales.md', 'text/markdown'],
+				[
+					'/dev/fuzzy-stress/finqa-payment-networks.txt',
+					'finqa-payment-networks.txt',
+					'text/plain'
+				],
 				[
 					'/dev/fuzzy-public/cfr-fiberboard-boxes.pdf',
 					'cfr-fiberboard-boxes.pdf',
@@ -267,7 +980,14 @@
 					'application/pdf'
 				],
 				['/dev/fuzzy-public/rfc9110.txt', 'rfc9110.txt', 'text/plain'],
-				['/dev/fuzzy-public/rfc9110.pdf', 'rfc9110.pdf', 'application/pdf']
+				['/dev/fuzzy-public/rfc9110.pdf', 'rfc9110.pdf', 'application/pdf'],
+				['/dev/fuzzy-public/nist-ai-rmf-1.0.pdf', 'nist-ai-rmf-1.0.pdf', 'application/pdf'],
+				['/dev/fuzzy-public/irs-form-1040-2025.pdf', 'irs-form-1040-2025.pdf', 'application/pdf'],
+				[
+					'/dev/fuzzy-public/aec-addendum-drawings.pdf',
+					'aec-addendum-drawings.pdf',
+					'application/pdf'
+				]
 			] as const;
 			const started = performance.now();
 			let bytes = 0;
@@ -354,11 +1074,56 @@
 					answerable: false,
 					locator: null
 				},
+				{
+					id: 'tatqa-total-sales-2019',
+					query: 'Quel est le total des ventes en 2019 ?',
+					documents: ['tatqa-contract-sales.md'],
+					evidence: ['Total sales $1,496.5'],
+					answerable: true,
+					locator: null
+				},
+				{
+					id: 'tatqa-other-change',
+					query: 'Quelle est la variation de Other entre 2018 et 2019 ?',
+					documents: ['tatqa-contract-sales.md'],
+					evidence: ['Other 44.1 56.7'],
+					answerable: true,
+					locator: null
+				},
+				{
+					id: 'finqa-american-express-average',
+					query: 'Quel volume de paiement moyen par transaction a American Express ?',
+					documents: ['finqa-payment-networks.txt'],
+					evidence: ['American Express 637 647 5.0 86'],
+					answerable: true,
+					locator: null
+				},
+				{
+					id: 'financial-two-document-evidence',
+					query:
+						'Donne le total des ventes 2019 et les données American Express nécessaires au volume moyen par transaction.',
+					documents: ['tatqa-contract-sales.md', 'finqa-payment-networks.txt'],
+					evidence: ['Total sales $1,496.5', 'American Express 637 647 5.0'],
+					answerable: true,
+					locator: null
+				},
+				{
+					id: 'financial-table-negative',
+					query: 'Quel est le nom du PDG de Discover dans ce tableau ?',
+					documents: [],
+					evidence: [],
+					answerable: false,
+					locator: null
+				},
 				...publicQa.cases.map((item) => ({
 					id: item.id,
 					query: item.noisyQuery,
 					documents: item.document?.split('+') ?? [],
-					evidence: item.evidenceContains ? [item.evidenceContains] : [],
+					evidence: item.evidenceContains
+						? Array.isArray(item.evidenceContains)
+							? item.evidenceContains
+							: [item.evidenceContains]
+						: [],
 					answerable: item.answerable,
 					locator: item.locator
 				}))
@@ -376,12 +1141,44 @@
 				dense: []
 			};
 			const timings: Array<{ id: string; ms: number }> = [];
+			let queryRewriteMs = 0;
+			let queryRewriteCount = 0;
 			for (const test of cases) {
+				const rewriteStarted = performance.now();
+				const alternateQueries =
+					llmStore.status === 'ready'
+						? await crossLingualQueryVariants(
+								test.query,
+								[...ids.values()].map(
+									(id) =>
+										documentsStore.documents.find((document) => document.id === id)?.language ??
+										null
+								),
+								(messages) =>
+									llmStore.generate(messages, () => {}, {
+										reasoning: 'off',
+										maxTokens: 96,
+										temperature: 0
+									})
+							)
+						: [];
+				if (alternateQueries.length) {
+					queryRewriteMs += performance.now() - rewriteStarted;
+					queryRewriteCount++;
+				}
 				const t0 = performance.now();
-				const hits = await documentsStore.retrieve(test.query, [...ids.values()]);
+				const hits = await documentsStore.retrieve(
+					test.query,
+					[...ids.values()],
+					test.query,
+					undefined,
+					undefined,
+					alternateQueries
+				);
 				const latencyMs = performance.now() - t0;
 				timings.push({ id: test.id, ms: Math.round(latencyMs) });
-				const answerBearing = !isWeakMatch(hits) && hasAnswerBearingEvidence(test.query, hits);
+				const answerBearing =
+					!isWeakMatch(hits) && hasAnswerBearingEvidence(test.query, hits, alternateQueries);
 				const normalizedEvidence = test.evidence.map(normalizeForFuzzy);
 				const matchedEvidence = normalizedEvidence.filter((needle) =>
 					hits.some((hit) => containsEvidence(`${hit.headingPath ?? ''}\n${hit.text}`, needle))
@@ -410,15 +1207,21 @@
 								(hit) =>
 									hit.page === Number(page) && expectedIds.includes(canonicalize(hit.documentId))
 							)));
-				const channels = await documentsStore.retrieveChannelCandidates(test.query, [
-					...ids.values()
-				]);
+				const channels = await documentsStore.retrieveChannelCandidates(
+					test.query,
+					[...ids.values()],
+					alternateQueries
+				);
 				for (const [channel, channelHits] of Object.entries(channels) as Array<
 					['lexical' | 'fuzzy' | 'dense', typeof hits]
 				>) {
 					// Raw one-channel RRF peaks below production's two-channel weak-score
 					// threshold. Ablation measures evidence retrieval, not fused refusal calibration.
-					const channelAnswerBearing = hasAnswerBearingEvidence(test.query, channelHits);
+					const channelAnswerBearing = hasAnswerBearingEvidence(
+						test.query,
+						channelHits,
+						alternateQueries
+					);
 					const channelEvidence = normalizedEvidence.filter((needle) =>
 						channelHits.some((hit) =>
 							containsEvidence(`${hit.headingPath ?? ''}\n${hit.text}`, needle)
@@ -513,6 +1316,8 @@
 				metrics,
 				ablation,
 				ingestMs,
+				queryRewriteMs: Math.round(queryRewriteMs),
+				queryRewriteCount,
 				bytes,
 				cases: cases.length,
 				failures,
@@ -549,16 +1354,175 @@
 			compromisDiagnostic = { error: 'Martin document not found' };
 			return;
 		}
-		const query = 'Quel est le prxi de vnete exct du bien Cpelle ?';
-		const hits = await documentsStore.retrieve(query, [document.id]);
-		compromisDiagnostic = {
-			answerBearing: hasAnswerBearingEvidence(query, hits),
-			hits: hits.map((hit) => ({
-				page: hit.page,
-				score: hit.score,
-				text: hit.text.slice(0, 180)
-			}))
-		};
+		compromisDiagnostic = await runMartinStress({
+			documentId: document.id,
+			retrieve: (question, documentIds) => documentsStore.retrieve(question, documentIds)
+		});
+	}
+
+	async function runMartinReindexDiagnostic() {
+		const document = documentsStore.documents.find((item) => /compromis compromis/i.test(item.name));
+		if (!document) {
+			compromisReindexReport = { error: 'Martin document not found' };
+			return;
+		}
+		await documentsStore.reindex(document.id);
+		compromisReindexReport = documentsStore.ingests[document.id] ?? { error: 'No ingest state' };
+		await refreshIndexDiagnostics();
+	}
+
+	async function runAssuranceReindexDiagnostic() {
+		const document = documentsStore.documents.find((item) =>
+			/assurance habitation devis/i.test(item.name)
+		);
+		if (!document) {
+			compromisReindexReport = { error: 'Assurance document not found' };
+			return;
+		}
+		await documentsStore.reindex(document.id);
+		privateRetrievalCache.clear();
+		compromisReindexReport = documentsStore.ingests[document.id] ?? { error: 'No ingest state' };
+		await refreshIndexDiagnostics();
+	}
+
+	async function runMartinAnswerBenchmark() {
+		const document = documentsStore.documents.find((item) => /compromis compromis/i.test(item.name));
+		if (!document || llmStore.status !== 'ready') {
+			compromisAnswerReport = {
+				error: !document ? 'Martin document not found' : `Private model is ${llmStore.status}`
+			};
+			return;
+		}
+		compromisAnswerBenchmarking = true;
+		compromisAnswerProgress = { completed: 0, total: 44 };
+		compromisAnswerReport = null;
+		try {
+			compromisAnswerReport = await runMartinAnswerStress({
+				documentId: document.id,
+				retrieve: (question, documentIds) => documentsStore.retrieve(question, documentIds),
+				generate: async (messages, question, hits) => {
+					const extractive = buildDeterministicExtractiveAnswer(question, hits);
+					if (extractive) return enforceAnswerInvariants(question, extractive);
+					const options = generationOptionsFor(question, 'targeted');
+					const draft = stripThink(await llmStore.generate(messages, () => {}, options));
+					return verifyBenchmarkAnswer(question, 'targeted', hits, draft);
+				},
+				onProgress: (completed, total) => (compromisAnswerProgress = { completed, total })
+			});
+		} finally {
+			compromisAnswerBenchmarking = false;
+		}
+	}
+
+	async function runPublicAnswerBenchmark(caseIds: string[] | null = null) {
+		if (llmStore.status !== 'ready') {
+			publicAnswerReport = { error: `Private model is ${llmStore.status}` };
+			return;
+		}
+		const names = new Set(FUZZY_FIXTURE_NAMES);
+		const documents = documentsStore.documents.filter(
+			(document) => names.has(document.name) && document.status === 'ready'
+		);
+		if (documents.length !== FUZZY_FIXTURE_NAMES.length) {
+			publicAnswerReport = {
+				error: `Expected ${FUZZY_FIXTURE_NAMES.length} ready fixtures, found ${documents.length}`
+			};
+			return;
+		}
+		publicAnswerBenchmarking = true;
+		const cases = caseIds
+			? PUBLIC_ANSWER_STRESS_CASES.filter((item) => caseIds.includes(item.id))
+			: PUBLIC_ANSWER_STRESS_CASES;
+		publicAnswerProgress = { completed: 0, total: cases.length };
+		publicAnswerReport = null;
+		try {
+			publicAnswerReport = await runPublicAnswerStress({
+				cases,
+				documentIds: documents.map((document) => document.id),
+				retrieve: async (question, documentIds) => {
+					const alternateQueries = await crossLingualQueryVariants(
+						question,
+						documents.map((document) => document.language),
+						(messages) =>
+							llmStore.generate(messages, () => {}, {
+								reasoning: 'off',
+								maxTokens: 96,
+								temperature: 0
+							})
+					);
+					const hits = await documentsStore.retrieve(
+						question,
+						documentIds,
+						question,
+						undefined,
+						undefined,
+						alternateQueries
+					);
+					return { hits, alternateQueries };
+				},
+				generate: async (messages, question, route, hits) => {
+					const extractive = buildDeterministicExtractiveAnswer(question, hits);
+					if (extractive) return enforceAnswerInvariants(question, extractive);
+					const options = generationOptionsFor(question, route);
+					const draft = stripThink(await llmStore.generate(messages, () => {}, options));
+					return verifyBenchmarkAnswer(question, route, hits, draft);
+				},
+				resolveRoute: async (question) => {
+					const frame = await resolveQuestion(question, (texts) =>
+						documentsStore.embedQueries(texts)
+					);
+					return buildExecutionPlan(question, frame).route === 'synthesis'
+						? 'synthesis'
+						: 'targeted';
+				},
+				onProgress: (completed, total) => (publicAnswerProgress = { completed, total })
+			});
+		} finally {
+			publicAnswerBenchmarking = false;
+		}
+	}
+
+	async function runQueryRewriteDiagnostic() {
+		const questions = [
+			'Le cadre est il obligatoir et propre a un sectuer ?',
+			'A quelle ligen du 1040 calcule t on le revneu total ?',
+			'Quelles lignes distinguent le remboursemnt demande du montant du ?'
+		];
+		const documents = documentsStore.documents.filter(
+			(document) => FUZZY_FIXTURE_NAMES.includes(document.name) && document.status === 'ready'
+		);
+		const results = [];
+		for (const question of questions) {
+			const alternateQueries = await crossLingualQueryVariants(
+				question,
+				documents.map((document) => document.language),
+				(messages) =>
+					llmStore.generate(messages, () => {}, {
+						reasoning: 'off',
+						maxTokens: 96,
+						temperature: 0
+					})
+			);
+			const hits = await documentsStore.retrieve(
+				question,
+				documents.map((document) => document.id),
+				question,
+				undefined,
+				undefined,
+				alternateQueries
+			);
+			results.push({
+				question,
+				alternateQueries,
+				answerBearing: hasAnswerBearingEvidence(question, hits, alternateQueries),
+				hits: hits.map((hit) => ({
+					document: hit.documentName,
+					page: hit.page,
+					text: hit.text.slice(0, 360)
+				}))
+			});
+		}
+		queryRewriteDiagnostic = results;
 	}
 
 	async function handleFiles(files: FileList | null) {
@@ -768,6 +1732,28 @@
 				>
 					{generationBenchmarking ? 'Measuring generation…' : 'Run generation benchmark'}
 				</Button>
+				<Button
+					variant="outline"
+					onclick={() =>
+						runPublicAnswerBenchmark([
+							'irs-total-income',
+							'irs-refund-owed',
+							'tatqa-change',
+							'cross-document-arithmetic'
+						])}
+					disabled={publicAnswerBenchmarking}
+				>
+					Run public answer regressions
+				</Button>
+				<Button
+					variant="outline"
+					onclick={() => runPublicAnswerBenchmark()}
+					disabled={publicAnswerBenchmarking}
+				>
+					{publicAnswerBenchmarking
+						? `Answering public ${publicAnswerProgress.completed}/${publicAnswerProgress.total}…`
+						: 'Run public answer benchmark'}
+				</Button>
 				<Button variant="outline" onclick={runCrossDocumentStressBenchmark} disabled={benchmarking}>
 					Run cross-document benchmark
 				</Button>
@@ -778,6 +1764,18 @@
 					{fuzzyBenchmarking ? 'Running fuzzy benchmark…' : 'Run fuzzy benchmark'}
 				</Button>
 				<Button variant="outline" onclick={runMartinDiagnostic}>Run Martin diagnostic</Button>
+				<Button variant="outline" onclick={runMartinReindexDiagnostic}>Re-index Martin</Button>
+				<Button variant="outline" onclick={runAssuranceReindexDiagnostic}>Re-index Assurance</Button
+				>
+				<Button
+					variant="outline"
+					onclick={runMartinAnswerBenchmark}
+					disabled={compromisAnswerBenchmarking}
+				>
+					{compromisAnswerBenchmarking
+						? `Answering ${compromisAnswerProgress.completed}/${compromisAnswerProgress.total}…`
+						: 'Run Martin answer benchmark'}
+				</Button>
 				<Button
 					variant="outline"
 					onclick={runSemanticRoutingBenchmark}
@@ -786,7 +1784,56 @@
 					{semanticBenchmarking ? 'Running semantic benchmark…' : 'Run semantic benchmark'}
 				</Button>
 				<Button variant="outline" onclick={resetFuzzyFixtures}>Reset fuzzy fixtures</Button>
+				<Button variant="outline" onclick={runIngestUxScenario}>Run ingest UX scenario</Button>
+				<Button variant="outline" onclick={runQueryRewriteDiagnostic}>Run rewrite diagnostic</Button
+				>
+				<Button variant="outline" onclick={importPdfFromClipboard}>Import clipboard PDF</Button>
+				<Textarea
+					aria-label="Private document benchmark JSON"
+					placeholder="Paste private document benchmark JSON…"
+					class="min-h-20 min-w-80 font-mono text-xs"
+					bind:value={privateBenchmarkMatrixText}
+				/>
+				<Button
+					variant="outline"
+					onclick={runClipboardPrivateRetrievalBenchmark}
+					disabled={privateDocumentBenchmarking ||
+						privateChannelBenchmarking ||
+						!privateBenchmarkMatrixText.trim()}
+				>
+					{privateDocumentBenchmarking
+						? `${privateBenchmarkStageLabel(privateDocumentBenchmarkStage)} ${privateDocumentBenchmarkProgress.completed}/${privateDocumentBenchmarkProgress.total}…`
+						: 'Run fast retrieval gate'}
+				</Button>
+				<Button
+					variant="outline"
+					onclick={runPrivateChannelDiagnostic}
+					disabled={privateDocumentBenchmarking ||
+						privateChannelBenchmarking ||
+						!privateBenchmarkMatrixText.trim()}
+				>
+					{privateChannelBenchmarking
+						? `Comparing ${privateChannelProgress.completed}/${privateChannelProgress.total}…`
+						: 'Compare retrieval channels'}
+				</Button>
+				<Button
+					variant="outline"
+					onclick={runClipboardPrivateDocumentBenchmark}
+					disabled={privateDocumentBenchmarking ||
+						privateChannelBenchmarking ||
+						llmStore.status !== 'ready' ||
+						!privateBenchmarkMatrixText.trim()}
+				>
+					{privateDocumentBenchmarking
+						? `${privateBenchmarkStageLabel(privateDocumentBenchmarkStage)} ${privateDocumentBenchmarkProgress.completed}/${privateDocumentBenchmarkProgress.total}…`
+						: llmStore.status === 'ready'
+							? 'Run private document benchmark'
+							: 'Private model loading…'}
+				</Button>
 			</div>
+			{#if clipboardImportStatus}
+				<p class="text-muted-foreground font-mono text-xs">{clipboardImportStatus}</p>
+			{/if}
 			{#if llmStore.lastMetrics}
 				<pre class="bg-muted overflow-auto rounded-md p-3 text-xs">{JSON.stringify(
 						llmStore.lastMetrics,
@@ -819,8 +1866,46 @@
 				<p class="text-destructive text-sm">{fuzzyBenchmarkError}</p>
 			{/if}
 			{#if compromisDiagnostic}
-				<pre class="bg-muted overflow-auto rounded-md p-3 text-xs">{JSON.stringify(
+				<pre
+					data-testid="compromis-stress-report"
+					class="bg-muted overflow-auto rounded-md p-3 text-xs">{JSON.stringify(
 						compromisDiagnostic,
+						null,
+						2
+					)}</pre>
+			{/if}
+			{#if compromisReindexReport}
+				<pre
+					data-testid="compromis-reindex-report"
+					class="bg-muted overflow-auto rounded-md p-3 text-xs">{JSON.stringify(
+						compromisReindexReport,
+						null,
+						2
+					)}</pre>
+			{/if}
+			{#if compromisAnswerReport}
+				<pre
+					data-testid="compromis-answer-report"
+					class="bg-muted overflow-auto rounded-md p-3 text-xs">{JSON.stringify(
+						compromisAnswerReport,
+						null,
+						2
+					)}</pre>
+			{/if}
+			{#if publicAnswerReport}
+				<pre
+					data-testid="public-answer-report"
+					class="bg-muted overflow-auto rounded-md p-3 text-xs">{JSON.stringify(
+						publicAnswerReport,
+						null,
+						2
+					)}</pre>
+			{/if}
+			{#if queryRewriteDiagnostic}
+				<pre
+					data-testid="query-rewrite-report"
+					class="bg-muted overflow-auto rounded-md p-3 text-xs">{JSON.stringify(
+						queryRewriteDiagnostic,
 						null,
 						2
 					)}</pre>
@@ -838,6 +1923,88 @@
 				<p data-testid="semantic-benchmark-error" class="text-destructive text-sm">
 					{semanticBenchmarkError}
 				</p>
+			{/if}
+			{#if privateDocumentBenchmarkReport}
+				<pre
+					data-testid="private-document-benchmark-report"
+					class="bg-muted overflow-auto rounded-md p-3 text-xs">{JSON.stringify(
+						privateDocumentBenchmarkReport,
+						null,
+						2
+					)}</pre>
+			{/if}
+			{#if privateChannelReport}
+				<pre
+					data-testid="private-channel-report"
+					class="bg-muted overflow-auto rounded-md p-3 text-xs">{JSON.stringify(
+						privateChannelReport,
+						null,
+						2
+					)}</pre>
+			{/if}
+			{#if privateRunCheckpoint && privateReviewResult && privateReviewSummary}
+				<div data-testid="private-human-review" class="space-y-3 rounded-md border p-4">
+					<div class="flex flex-wrap items-center justify-between gap-2">
+						<div>
+							<p class="font-medium">Human source review</p>
+							<p class="text-muted-foreground text-xs">
+								{privateReviewSummary.reviewed}/{privateRunCheckpoint.total} reviewed ·
+								{privateReviewSummary.passed} pass · {privateReviewSummary.failed} product fail ·
+								{privateReviewSummary.oracleInvalid} oracle issue
+							</p>
+						</div>
+						<div class="flex gap-2">
+							<Button
+								variant="outline"
+								disabled={privateReviewIndex === 0}
+								onclick={() => (privateReviewIndex = Math.max(0, privateReviewIndex - 1))}
+								>Previous</Button
+							>
+							<Button
+								variant="outline"
+								disabled={privateReviewIndex >= privateRunCheckpoint.results.length - 1}
+								onclick={() =>
+									(privateReviewIndex = Math.min(
+										privateRunCheckpoint!.results.length - 1,
+										privateReviewIndex + 1
+									))}>Next</Button
+							>
+						</div>
+					</div>
+					<p class="text-sm font-medium">
+						{privateReviewIndex + 1}. {privateReviewResult.question}
+					</p>
+					<p class="text-sm">{privateReviewResult.answer}</p>
+					<pre class="bg-muted max-h-72 overflow-auto rounded-md p-3 text-xs">{JSON.stringify(
+							{
+								automatic: {
+									passed: privateReviewResult.passed,
+									retrieval: privateReviewResult.retrievalPassed,
+									answer: privateReviewResult.answerPassed,
+									citation: privateReviewResult.citationPassed
+								},
+								retrievedPages: privateReviewResult.retrievedPages,
+								citedPages: privateReviewResult.citedPages,
+								evidence: privateReviewResult.rawRetrievedEvidence
+							},
+							null,
+							2
+						)}</pre>
+					<Textarea
+						aria-label="Human review note"
+						placeholder="Source-based review note…"
+						bind:value={privateReviewNote}
+					/>
+					<div class="flex flex-wrap gap-2">
+						<Button onclick={() => reviewPrivateResult('pass')}>Human pass</Button>
+						<Button variant="destructive" onclick={() => reviewPrivateResult('fail')}
+							>Product fail</Button
+						>
+						<Button variant="outline" onclick={() => reviewPrivateResult('oracle-invalid')}
+							>Oracle issue</Button
+						>
+					</div>
+				</div>
 			{/if}
 		</Card.Content>
 	</Card.Root>
@@ -866,7 +2033,8 @@
 					stale: indexDiagnostics
 						.filter((row) => row.status === 'ready' && row.retrievalVersion < RETRIEVAL_VERSION)
 						.map((row) => row.name),
-					compromis: indexDiagnostics.filter((row) => /compromis/i.test(row.name))
+					compromis: indexDiagnostics.filter((row) => /compromis/i.test(row.name)),
+					ingests: documentsStore.ingests
 				},
 				null,
 				2

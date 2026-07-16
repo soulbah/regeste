@@ -144,6 +144,96 @@
 			"locator": null,
 			"evidenceContains": null,
 			"answerable": false
+		},
+		{
+			"id": "nist-four-functions",
+			"query": "Quelles sont les quatre fonctions du cœur de l'AI RMF ?",
+			"noisyQuery": "Quelles sont les 4 fonctons du coeur de l AI RMF ?",
+			"document": "nist-ai-rmf-1.0.pdf",
+			"locator": "page 25",
+			"evidenceContains": "GOVERN MAP MEASURE MANAGE",
+			"answerable": true
+		},
+		{
+			"id": "nist-not-checklist",
+			"query": "Les actions du Core forment-elles une checklist ordonnée ?",
+			"noisyQuery": "Les actons du Core forment elles une cheklist ordonee ?",
+			"document": "nist-ai-rmf-1.0.pdf",
+			"locator": "page 25",
+			"evidenceContains": "Actions do not constitute a checklist",
+			"answerable": true
+		},
+		{
+			"id": "nist-framework-attributes",
+			"query": "Le cadre est-il obligatoire et propre à un secteur ?",
+			"noisyQuery": "Le cadre est il obligatoir et propre a un sectuer ?",
+			"document": "nist-ai-rmf-1.0.pdf",
+			"locator": "page 7",
+			"evidenceContains": "voluntary rights preserving non sector specific",
+			"answerable": true
+		},
+		{
+			"id": "nist-trustworthy-characteristics",
+			"query": "Quelles caractéristiques définissent une IA digne de confiance selon le cadre ?",
+			"noisyQuery": "Quelles caracteristques definisent une IA digne de confaince selon le cadre ?",
+			"document": "nist-ai-rmf-1.0.pdf",
+			"locator": "page 17",
+			"evidenceContains": "valid and reliable safe secure and resilient accountable and transparent explainable and interpretable privacy enhanced fair",
+			"answerable": true
+		},
+		{
+			"id": "irs-total-income-line",
+			"query": "À quelle ligne du formulaire 1040 calcule-t-on le revenu total ?",
+			"noisyQuery": "A quelle ligen du 1040 calcule t on le revneu total ?",
+			"document": "irs-form-1040-2025.pdf",
+			"locator": "page 1",
+			"evidenceContains": "This is your total income",
+			"answerable": true
+		},
+		{
+			"id": "irs-taxable-income-line",
+			"query": "Quelle ligne donne le taxable income et comment est-il calculé ?",
+			"noisyQuery": "Quelle ligen donne le taxble income et coment est il calcule ?",
+			"document": "irs-form-1040-2025.pdf",
+			"locator": "page 2",
+			"evidenceContains": "15 Subtract line 14 from line 11b",
+			"answerable": true
+		},
+		{
+			"id": "irs-refund-vs-owed",
+			"query": "Quelles lignes distinguent le remboursement demandé du montant dû ?",
+			"noisyQuery": "Quelles lignes distinguent le remboursemnt demande du montant du ?",
+			"document": "irs-form-1040-2025.pdf",
+			"locator": "page 2",
+			"evidenceContains": ["Amount of line 34 you want refunded", "This is the amount you owe"],
+			"answerable": true
+		},
+		{
+			"id": "irs-digital-assets",
+			"query": "Quelles opérations sur actifs numériques déclenchent la question oui/non ?",
+			"noisyQuery": "Quelles operatons sur actifs numerques declenchent la question oui non ?",
+			"document": "irs-form-1040-2025.pdf",
+			"locator": "page 1",
+			"evidenceContains": "receive reward award payment sell exchange otherwise dispose",
+			"answerable": true
+		},
+		{
+			"id": "aec-broken-reference",
+			"query": "Quel détail est référencé pour le gravier crushed basalt 1/4 inch minus ?",
+			"noisyQuery": "Quel detail est reference pour le gravier cruhsed baslat 1/4 inch minus ?",
+			"document": "aec-addendum-drawings.pdf",
+			"locator": "page 12",
+			"evidenceContains": "CRUSHED BASALT GRAVEL 1/4 MINUS 1/LP103",
+			"answerable": true
+		},
+		{
+			"id": "aec-missing-target",
+			"query": "Le détail 1/LP103 référencé par le crushed basalt existe-t-il dans le jeu de plans ?",
+			"noisyQuery": "Le detail 1 LP103 reference par le cruhsed basalt existe t il dans les plans ?",
+			"document": null,
+			"locator": null,
+			"evidenceContains": null,
+			"answerable": false
 		}
 	]
 }

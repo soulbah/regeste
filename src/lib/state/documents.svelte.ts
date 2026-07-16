@@ -10,21 +10,39 @@ import { sha256Hex } from '$lib/pipeline/hash';
 import { chunkBlocks } from '$lib/pipeline/chunk';
 import { detectLanguage } from '$lib/pipeline/language';
 import { parseByName } from '$lib/pipeline/parse';
+import { mergeParsedWithOcr } from '$lib/pipeline/pdf-text-quality';
 import { readOriginal } from '$lib/opfs';
 import type { EmbedApi } from '$lib/pipeline/embed-worker';
+import type { RetrievalRankingApi } from '$lib/pipeline/retrieval-ranking-worker';
+import type {
+	FinalRankingInput,
+	FusionRankingInput,
+	FusionRankingOutput,
+	InitialRankingInput,
+	RankedChannels
+} from '$lib/pipeline/retrieval-ranking';
+import { embedPassagesInBatches, waitForBackgroundIdle } from '$lib/pipeline/embed-batches';
 import {
 	detectEmbeddingProfile,
 	type EmbedProgress,
 	type EmbeddingProfile
 } from '$lib/pipeline/embed-model';
 import {
-	expandRetrievalQuery,
+	denseRetrievalQueryVariants,
+	expandChannelCandidatesWithNeighbors,
+	expandStructuralParents,
 	mergeRankedCandidateLists,
+	neighborsForAnchors,
 	refineCandidates,
+	isNumericAnswerQuestion,
+	retrievalQueryVariants,
 	selectWithNeighbors
 } from '$lib/pipeline/retrieval';
 import { RETRIEVAL_VERSION } from '$lib/pipeline/retrieval-version';
+import { embeddingPhaseProgress } from '$lib/ingest-readiness';
+import { QueryEmbeddingCache } from '$lib/pipeline/query-embedding-cache';
 import type { MoneyKind } from '$lib/analysis/money';
+import { analyzeQuestion } from '$lib/analysis/query-router';
 import { extractFinancialRecords } from '$lib/analysis/financial-records';
 import {
 	aggregateMoneyFacts,
@@ -40,6 +58,10 @@ import type {
 } from '$lib/types';
 
 let embedApi: Remote<EmbedApi> | null = null;
+const rankingWorkers: Array<{
+	worker: Worker;
+	api: Remote<RetrievalRankingApi>;
+}> = [];
 const OCR_INDEX_VERSION = 2;
 const OCR_INDEX_VERSION_KEY = 'folio:ocr-index-version';
 function getEmbedWorker(): Remote<EmbedApi> {
@@ -50,6 +72,30 @@ function getEmbedWorker(): Remote<EmbedApi> {
 		embedApi = wrap<EmbedApi>(worker);
 	}
 	return embedApi;
+}
+
+function rankingConcurrency(): number {
+	return Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 4) - 2));
+}
+
+function getRankingWorkers(count: number) {
+	const desired = Math.min(Math.max(1, count), rankingConcurrency());
+	while (rankingWorkers.length < desired) {
+		const worker = new Worker(new URL('../pipeline/retrieval-ranking-worker.ts', import.meta.url), {
+			type: 'module'
+		});
+		rankingWorkers.push({ worker, api: wrap<RetrievalRankingApi>(worker) });
+	}
+	return rankingWorkers.slice(0, desired);
+}
+
+async function mapRankingWorkers<T, R>(
+	inputs: T[],
+	call: (api: Remote<RetrievalRankingApi>, input: T) => Promise<R>
+): Promise<R[]> {
+	if (!inputs.length) return [];
+	const pool = getRankingWorkers(inputs.length);
+	return Promise.all(inputs.map((input, index) => call(pool[index % pool.length].api, input)));
 }
 
 async function storeOriginal(hash: string, data: ArrayBuffer): Promise<void> {
@@ -71,10 +117,56 @@ export interface IngestState {
 	status: LocalDocument['status'];
 	phaseProgress: number;
 	error?: IngestErrorCode;
+	diagnostic?: string;
 	dedup?: boolean;
 }
 
+export interface RetrievalRequest {
+	query: string;
+	documentIds?: string[] | null;
+	refinementQuery?: string;
+	onInspect?: () => void;
+	route?: QuestionRoute;
+	alternateQueries?: string[];
+	onDiagnostic?: (diagnostic: RetrievalDiagnostic) => void;
+}
+
+export interface RetrievalDiagnostic {
+	channels: Record<'semantic' | 'lexical' | 'fuzzy', RetrievalDiagnosticHit[]>;
+	fused: RetrievalDiagnosticHit[];
+	neighbors: RetrievalDiagnosticHit[];
+	final: RetrievalDiagnosticHit[];
+}
+
+export interface RetrievalBatchTiming {
+	requests: number;
+	sparseVariants: number;
+	denseVariants: number;
+	embeddingMs: number;
+	candidateSearchMs: number;
+	preFusionNeighborsMs: number;
+	channelNeighborsMs: number;
+	initialRankingMs: number;
+	fusionRankingMs: number;
+	finalRankingMs: number;
+	rankingWorkers: number;
+	rankingMs: number;
+	totalMs: number;
+}
+
+interface RetrievalDiagnosticHit {
+	chunkId: number;
+	page: number | null;
+	score: number;
+	text: string;
+}
+
+function diagnosticHit(hit: SearchHit): RetrievalDiagnosticHit {
+	return { chunkId: hit.chunkId, page: hit.page, score: hit.score, text: hit.text.slice(0, 320) };
+}
+
 class DocumentsStore {
+	private queryEmbeddings = new QueryEmbeddingCache();
 	documents = $state<LocalDocument[]>([]);
 	library = $state<LibraryDocument[]>([]);
 	/** P3 — documentId → last time excerpts of it left the device. */
@@ -104,8 +196,19 @@ class DocumentsStore {
 	async embedQueries(
 		texts: string[]
 	): Promise<{ data: Float32Array; dims: number; model: string }> {
-		const { data, dims, model } = await getEmbedWorker().embed(texts, 'query');
-		return { data, dims, model };
+		return this.queryEmbeddings.embed(texts, async (missing) => {
+			const { data, dims, model } = await getEmbedWorker().embed(missing, 'query');
+			return { data, dims, model };
+		});
+	}
+
+	private async embedPassages(texts: string[], onProgress?: (progress: EmbedProgress) => void) {
+		return embedPassagesInBatches(
+			texts,
+			(batch, report) =>
+				getEmbedWorker().embed(batch, 'passage', report ? proxy(report) : undefined),
+			onProgress
+		);
 	}
 
 	async init(): Promise<void> {
@@ -138,6 +241,7 @@ class DocumentsStore {
 				if (this.processingIds.has(doc.id) || this.ocrAborts[doc.id]) continue;
 				const chunkCount = await db.countChunks(doc.id);
 				if ((doc.retrievalVersion ?? 1) >= RETRIEVAL_VERSION && chunkCount > 0) continue;
+				await waitForBackgroundIdle();
 				await this.reindex(doc.id);
 			}
 		} finally {
@@ -334,21 +438,24 @@ class DocumentsStore {
 
 			let embeddingModel: string | undefined;
 			if (chunks.length) {
-				this.setIngest(id, { status: 'embedding', phaseProgress: 0 });
+				// Mixed PDFs get a searchable partial index before image pages are read.
+				// That preliminary pass is internal: exposing Preparing here would make
+				// the user-facing pipeline jump backwards to Reading when OCR starts.
+				const visibleStatus = needsOcr.length ? 'parsing' : 'embedding';
+				this.setIngest(id, { status: visibleStatus, phaseProgress: 0 });
 				await db.setDocumentStatus(id, 'embedding');
 				const {
 					data: vectors,
 					dims,
 					model
-				} = await getEmbedWorker().embed(
+				} = await this.embedPassages(
 					chunks.map((c) => c.searchText),
-					'passage',
-					proxy((p: EmbedProgress) => {
+					(p: EmbedProgress) => {
 						this.setIngest(id, {
-							status: 'embedding',
-							phaseProgress: p.phase === 'embed' ? p.progress : p.progress * 0.5
+							status: visibleStatus,
+							phaseProgress: needsOcr.length ? 0 : embeddingPhaseProgress(p.phase, p.progress)
 						});
-					})
+					}
 				);
 				await db.insertChunks(id, chunks, vectors, dims);
 				embeddingModel = model;
@@ -385,70 +492,307 @@ class DocumentsStore {
 		documentIds: string[] | null = null,
 		refinementQuery = query,
 		onInspect?: () => void,
-		route?: QuestionRoute
+		route?: QuestionRoute,
+		alternateQueries: string[] = []
 	): Promise<SearchHit[]> {
+		return (
+			await this.retrieveMany([
+				{ query, documentIds, refinementQuery, onInspect, route, alternateQueries }
+			])
+		)[0];
+	}
+
+	/** Batch hybrid retrieval. Query embeddings share one worker job; the worker
+	 * still applies its safe internal batch size and serial model execution. */
+	async retrieveMany(
+		requests: RetrievalRequest[],
+		onBatchTiming?: (timing: RetrievalBatchTiming) => void
+	): Promise<SearchHit[][]> {
+		if (!requests.length) return [];
+		const totalStartedAt = performance.now();
 		const { db } = await getLocalDb();
-		const embeddingQuery = query.trim();
-		const clean = expandRetrievalQuery(embeddingQuery);
-		const refinedQuery = expandRetrievalQuery(refinementQuery.trim());
-		const lexicalPromise = db.searchLexical(clean, documentIds, 60);
-		const fuzzyPromise = db.searchFuzzy(clean, documentIds, 60);
-		const denseQueries = clean === embeddingQuery ? [embeddingQuery] : [embeddingQuery, clean];
-		const { data, dims } = await getEmbedWorker().embed(denseQueries, 'query');
-		const [lexical, fuzzy, denseLists] = await Promise.all([
+		const prepared = requests.map((request) => {
+			const embeddingQuery = request.query.trim();
+			const alternateQueries = request.alternateQueries ?? [];
+			const evidenceQuery = request.refinementQuery?.trim() || embeddingQuery;
+			return {
+				...request,
+				documentIds: request.documentIds ?? null,
+				route: request.route ?? analyzeQuestion(evidenceQuery).route,
+				sparseQueryVariants: [
+					...retrievalQueryVariants(embeddingQuery),
+					...alternateQueries.flatMap(retrievalQueryVariants)
+				].filter((variant, index, all) => all.indexOf(variant) === index),
+				denseQueryVariants: denseRetrievalQueryVariants(
+					embeddingQuery,
+					request.route,
+					alternateQueries
+				),
+				// Recall variants may be deliberately broad, translated or typo-tolerant.
+				// Evidence ranking must stay anchored to the user's actual information
+				// need; otherwise expansion terms can promote an unrelated passage.
+				evidenceQuery
+			};
+		});
+		const flattenedSparse = prepared.flatMap((request, requestIndex) =>
+			request.sparseQueryVariants.map((variant) => ({ requestIndex, variant }))
+		);
+		const flattenedDense = prepared.flatMap((request, requestIndex) =>
+			request.denseQueryVariants.map((variant) => ({ requestIndex, variant }))
+		);
+		const lexicalPromise = db.searchLexicalMany(
+			flattenedSparse.map(({ requestIndex, variant }) => ({
+				queryText: variant,
+				documentIds: prepared[requestIndex].documentIds
+			})),
+			60
+		);
+		const fuzzyPromise = db.searchFuzzyMany(
+			flattenedSparse.map(({ requestIndex, variant }) => ({
+				queryText: variant,
+				documentIds: prepared[requestIndex].documentIds
+			})),
+			60
+		);
+		const embeddingStartedAt = performance.now();
+		const { data, dims } = await this.embedQueries(flattenedDense.map(({ variant }) => variant));
+		const embeddingMs = performance.now() - embeddingStartedAt;
+		const [lexicalLists, fuzzyLists, denseLists] = await Promise.all([
 			lexicalPromise,
 			fuzzyPromise,
-			Promise.all(
-				denseQueries.map((_, index) =>
-					db.searchVector(data.subarray(index * dims, (index + 1) * dims), dims, documentIds, 60)
-				)
+			db.searchVectorMany(
+				data,
+				dims,
+				flattenedDense.map(({ requestIndex }) => prepared[requestIndex].documentIds),
+				60
 			)
 		]);
-		const semantic = mergeRankedCandidateLists(denseLists);
-		onInspect?.();
-		const ranked = refineCandidates(semantic, lexical, refinedQuery, 24, fuzzy);
-		const neighbors = await db.listNeighborChunks(
-			ranked.slice(0, 12).map((hit) => hit.chunkId),
-			1
+		const candidateSearchMs = performance.now() - totalStartedAt;
+		const candidateSets = prepared.map((request, requestIndex) => {
+			const sparseIndexes = flattenedSparse
+				.map((item, index) => (item.requestIndex === requestIndex ? index : -1))
+				.filter((index) => index >= 0);
+			const denseIndexes = flattenedDense
+				.map((item, index) => (item.requestIndex === requestIndex ? index : -1))
+				.filter((index) => index >= 0);
+			return {
+				request,
+				semantic: mergeRankedCandidateLists(denseIndexes.map((index) => denseLists[index])),
+				lexical: mergeRankedCandidateLists(sparseIndexes.map((index) => lexicalLists[index])),
+				fuzzy: mergeRankedCandidateLists(sparseIndexes.map((index) => fuzzyLists[index]))
+			};
+		});
+		const preFusionAnchorIds = [
+			...new Set(
+				candidateSets.flatMap(({ semantic, lexical, fuzzy }) =>
+					[...semantic.slice(0, 48), ...lexical.slice(0, 48), ...fuzzy.slice(0, 48)].map(
+						(hit) => hit.chunkId
+					)
+				)
+			)
+		];
+		const preFusionNeighborsStartedAt = performance.now();
+		const preFusionNeighbors = preFusionAnchorIds.length
+			? await db.listNeighborChunks(preFusionAnchorIds, 1)
+			: [];
+		const preFusionNeighborsMs = performance.now() - preFusionNeighborsStartedAt;
+		const rankingStartedAt = performance.now();
+		const initialRankingStartedAt = performance.now();
+		const initialChannels = await mapRankingWorkers<InitialRankingInput, RankedChannels>(
+			candidateSets.map(({ request, semantic, lexical, fuzzy }) => ({
+				query: request.evidenceQuery,
+				route: request.route,
+				semantic,
+				lexical,
+				fuzzy,
+				neighbors: preFusionNeighbors
+			})),
+			(api, input) => api.rankInitialChannels(input) as unknown as Promise<RankedChannels>
 		);
-		return selectWithNeighbors(ranked, neighbors, refinedQuery, 8, route);
+		const initialRankingMs = performance.now() - initialRankingStartedAt;
+		const channelRankedSets = initialChannels.map((channels, index) => ({
+			request: candidateSets[index].request,
+			...channels
+		}));
+		const channelNeighborAnchorIds = [
+			...new Set(
+				channelRankedSets.flatMap(({ request, semantic, lexical, fuzzy }) => {
+					const limit = request.route === 'synthesis' ? 24 : 12;
+					return [
+						...semantic.slice(0, limit),
+						...lexical.slice(0, limit),
+						...fuzzy.slice(0, limit)
+					].map((hit) => hit.chunkId);
+				})
+			)
+		];
+		const channelNeighborsStartedAt = performance.now();
+		const channelNeighbors = channelNeighborAnchorIds.length
+			? await db.listNeighborChunks(channelNeighborAnchorIds, 1)
+			: [];
+		const channelNeighborsMs = performance.now() - channelNeighborsStartedAt;
+
+		const fusionRankingStartedAt = performance.now();
+		const fusedSets = await mapRankingWorkers<FusionRankingInput, FusionRankingOutput>(
+			channelRankedSets.map(({ request, semantic, lexical, fuzzy }) => {
+				const limit = request.route === 'synthesis' ? 24 : 12;
+				const anchors = [
+					...semantic.slice(0, limit),
+					...lexical.slice(0, limit),
+					...fuzzy.slice(0, limit)
+				];
+				return {
+					query: request.evidenceQuery,
+					route: request.route,
+					semantic,
+					lexical,
+					fuzzy,
+					neighbors: neighborsForAnchors(channelNeighbors, anchors)
+				};
+			}),
+			(api, input) => api.packAndFuseChannels(input) as unknown as Promise<FusionRankingOutput>
+		);
+		const fusionRankingMs = performance.now() - fusionRankingStartedAt;
+		for (const { request } of channelRankedSets) request.onInspect?.();
+		const rankedSets = await Promise.all(
+			fusedSets.map(async ({ coarseRanked }, index) => {
+				const request = channelRankedSets[index].request;
+				const candidateLimit =
+					request.route === 'synthesis' || isNumericAnswerQuestion(request.evidenceQuery) ? 48 : 24;
+				const structuralChildren = await db.listChildChunksForParents(
+					coarseRanked.filter((hit) => hit.paraIndex === -1).map((hit) => hit.chunkId)
+				);
+				const ranked = expandStructuralParents(
+					coarseRanked,
+					structuralChildren,
+					request.evidenceQuery,
+					candidateLimit
+				);
+				const neighbors = await db.listNeighborChunks(
+					ranked.slice(0, request.route === 'synthesis' ? 24 : 12).map((hit) => hit.chunkId),
+					analyzeQuestion(request.evidenceQuery).answerShape === 'explanation'
+						? 8
+						: request.route === 'synthesis'
+							? 8
+							: 1
+				);
+				return { ranked, neighbors };
+			})
+		);
+		const finalRankingStartedAt = performance.now();
+		const results = await mapRankingWorkers<FinalRankingInput, SearchHit[]>(
+			rankedSets.map(({ ranked, neighbors }, index) => ({
+				query: channelRankedSets[index].request.evidenceQuery,
+				route: channelRankedSets[index].request.route,
+				ranked,
+				neighbors
+			})),
+			(api, input) => api.packFinalEvidence(input) as unknown as Promise<SearchHit[]>
+		);
+		const finalRankingMs = performance.now() - finalRankingStartedAt;
+		for (let index = 0; index < results.length; index++) {
+			const request = channelRankedSets[index].request;
+			const fused = fusedSets[index];
+			request.onDiagnostic?.({
+				channels: {
+					semantic: fused.semantic.map(diagnosticHit),
+					lexical: fused.lexical.map(diagnosticHit),
+					fuzzy: fused.fuzzy.map(diagnosticHit)
+				},
+				fused: fused.coarseRanked.map(diagnosticHit),
+				neighbors: rankedSets[index].neighbors.map(diagnosticHit),
+				final: results[index].map(diagnosticHit)
+			});
+		}
+		onBatchTiming?.({
+			requests: requests.length,
+			sparseVariants: flattenedSparse.length,
+			denseVariants: flattenedDense.length,
+			embeddingMs,
+			candidateSearchMs,
+			preFusionNeighborsMs,
+			channelNeighborsMs,
+			initialRankingMs,
+			fusionRankingMs,
+			finalRankingMs,
+			rankingWorkers: Math.min(requests.length, rankingConcurrency()),
+			rankingMs: performance.now() - rankingStartedAt,
+			totalMs: performance.now() - totalStartedAt
+		});
+		return results;
 	}
 
 	/** Dev benchmark ablation: same candidates, isolated by retrieval channel. */
 	async retrieveChannelCandidates(
 		query: string,
-		documentIds: string[] | null = null
+		documentIds: string[] | null = null,
+		alternateQueries: string[] = [],
+		route: QuestionRoute = analyzeQuestion(query).route
 	): Promise<Record<'lexical' | 'fuzzy' | 'dense', SearchHit[]>> {
 		const { db } = await getLocalDb();
 		const embeddingQuery = query.trim();
-		const expanded = expandRetrievalQuery(embeddingQuery);
-		const lexicalPromise = db.searchLexical(expanded, documentIds, 60);
-		const fuzzyPromise = db.searchFuzzy(expanded, documentIds, 60);
-		const denseQueries =
-			expanded === embeddingQuery ? [embeddingQuery] : [embeddingQuery, expanded];
-		const { data, dims } = await getEmbedWorker().embed(denseQueries, 'query');
-		const [lexical, fuzzy, denseLists] = await Promise.all([
+		const evidenceQuery = embeddingQuery;
+		const queryVariants = [
+			...retrievalQueryVariants(embeddingQuery),
+			...alternateQueries.flatMap(retrievalQueryVariants)
+		].filter((variant, index, all) => all.indexOf(variant) === index);
+		const denseVariants = denseRetrievalQueryVariants(embeddingQuery, route, alternateQueries);
+		const lexicalPromise = Promise.all(
+			queryVariants.map((variant) => db.searchLexical(variant, documentIds, 60))
+		);
+		const fuzzyPromise = Promise.all(
+			queryVariants.map((variant) => db.searchFuzzy(variant, documentIds, 60))
+		);
+		const { data, dims } = await this.embedQueries(denseVariants);
+		const [lexicalLists, fuzzyLists, denseLists] = await Promise.all([
 			lexicalPromise,
 			fuzzyPromise,
 			Promise.all(
-				denseQueries.map((_, index) =>
+				denseVariants.map((_, index) =>
 					db.searchVector(data.subarray(index * dims, (index + 1) * dims), dims, documentIds, 60)
 				)
 			)
 		]);
-		const dense = mergeRankedCandidateLists(denseLists);
+		let lexical = mergeRankedCandidateLists(lexicalLists);
+		let fuzzy = mergeRankedCandidateLists(fuzzyLists);
+		let dense = mergeRankedCandidateLists(denseLists);
+		const preFusionAnchorIds = [
+			...new Set(
+				[...lexical.slice(0, 48), ...fuzzy.slice(0, 48), ...dense.slice(0, 48)].map(
+					(hit) => hit.chunkId
+				)
+			)
+		];
+		const preFusionNeighbors = preFusionAnchorIds.length
+			? await db.listNeighborChunks(preFusionAnchorIds, 1)
+			: [];
+		lexical = expandChannelCandidatesWithNeighbors(lexical, preFusionNeighbors, evidenceQuery);
+		fuzzy = expandChannelCandidatesWithNeighbors(fuzzy, preFusionNeighbors, evidenceQuery);
+		dense = expandChannelCandidatesWithNeighbors(dense, preFusionNeighbors, evidenceQuery);
 		const finalize = async (ranked: SearchHit[]) => {
-			const broad = ranked.slice(0, 24);
+			const candidateLimit =
+				route === 'synthesis' || isNumericAnswerQuestion(evidenceQuery) ? 48 : 24;
+			const broad = ranked.slice(0, candidateLimit);
 			const neighbors = await db.listNeighborChunks(
-				broad.slice(0, 12).map((hit) => hit.chunkId),
-				1
+				broad.slice(0, route === 'synthesis' ? 24 : 12).map((hit) => hit.chunkId),
+				analyzeQuestion(evidenceQuery).answerShape === 'explanation'
+					? 8
+					: route === 'synthesis'
+						? 8
+						: 1
 			);
-			return selectWithNeighbors(broad, neighbors, expanded, 10);
+			return selectWithNeighbors(
+				broad,
+				neighbors,
+				evidenceQuery,
+				route === 'synthesis' ? 16 : 10,
+				route
+			);
 		};
 		return {
-			lexical: await finalize(refineCandidates([], lexical, expanded, 24)),
-			fuzzy: await finalize(refineCandidates([], [], expanded, 24, fuzzy)),
-			dense: await finalize(refineCandidates(dense, [], expanded, 24))
+			lexical: await finalize(refineCandidates([], lexical, evidenceQuery, 48, [], route)),
+			fuzzy: await finalize(refineCandidates([], [], evidenceQuery, 48, fuzzy, route)),
+			dense: await finalize(refineCandidates(dense, [], evidenceQuery, 48, [], route))
 		};
 	}
 
@@ -540,7 +884,7 @@ class DocumentsStore {
 						phaseProgress: progress.total ? progress.done / progress.total : 0
 					});
 				});
-				blocks = [...blocks, ...ocrBlocks].sort((a, b) => (a.page ?? 0) - (b.page ?? 0));
+				blocks = mergeParsedWithOcr(parsed, ocrBlocks);
 			}
 			this.setIngest(id, { status: 'chunking', phaseProgress: 0 });
 			const chunks = chunkBlocks(blocks, doc.name);
@@ -554,22 +898,27 @@ class DocumentsStore {
 				data: vectors,
 				dims,
 				model
-			} = await getEmbedWorker().embed(
+			} = await this.embedPassages(
 				chunks.map((c) => c.searchText),
-				'passage',
-				proxy((p: EmbedProgress) => {
+				(p: EmbedProgress) => {
 					this.setIngest(id, {
 						status: 'embedding',
-						phaseProgress: p.phase === 'embed' ? p.progress : p.progress * 0.5
+						phaseProgress: embeddingPhaseProgress(p.phase, p.progress)
 					});
-				})
+				}
 			);
 			await db.reindexDocument(id, chunks, vectors, dims, model);
 			this.setIngest(id, { status: 'ready', phaseProgress: 1 });
 		} catch (err) {
 			const code: IngestErrorCode = (err as { code?: IngestErrorCode }).code ?? 'unknown';
-			this.setIngest(id, { status: 'error', phaseProgress: 0, error: code });
+			this.setIngest(id, {
+				status: 'error',
+				phaseProgress: 0,
+				error: code,
+				diagnostic: err instanceof Error ? `${err.name}: ${err.message}` : String(err)
+			});
 			if (existingChunkCount === 0) await db.setDocumentStatus(id, 'error', { error: code });
+			console.error('[folio] re-index failed:', code, err);
 		} finally {
 			this.processingIds.delete(id);
 			await this.refreshLibrary();
@@ -578,7 +927,7 @@ class DocumentsStore {
 
 	/**
 	 * Spec 023 — automatic on-device OCR of a `scanned` document. Re-parses to find
-	 * the image-only pages, OCRs them on the main thread, splices the recognized
+	 * the image-only pages, OCRs them in a dedicated worker, splices the recognized
 	 * text back at its page number, then re-chunks + re-embeds the merged document
 	 * through the existing pipeline. Cancellable; nothing leaves the device.
 	 */
@@ -620,7 +969,7 @@ class DocumentsStore {
 
 			// Merge OCR text pages with the extractable text pages, in page order,
 			// so citations and the viewer resolve to the right location.
-			const merged = [...parsed.blocks, ...ocrBlocks].sort((a, b) => (a.page ?? 0) - (b.page ?? 0));
+			const merged = mergeParsedWithOcr(parsed, ocrBlocks);
 			this.setIngest(id, { status: 'chunking', phaseProgress: 0 });
 			const chunks = chunkBlocks(merged, doc.name);
 			if (!chunks.length) {
@@ -644,15 +993,14 @@ class DocumentsStore {
 				data: vectors,
 				dims,
 				model
-			} = await getEmbedWorker().embed(
+			} = await this.embedPassages(
 				chunks.map((c) => c.searchText),
-				'passage',
-				proxy((p: EmbedProgress) => {
+				(p: EmbedProgress) => {
 					this.setIngest(id, {
 						status: 'embedding',
-						phaseProgress: p.phase === 'embed' ? p.progress : p.progress * 0.5
+						phaseProgress: embeddingPhaseProgress(p.phase, p.progress)
 					});
-				})
+				}
 			);
 			await db.deleteChunks(id);
 			await db.insertChunks(id, chunks, vectors, dims);
@@ -693,7 +1041,13 @@ class DocumentsStore {
 		const hash = await sha256Hex(data);
 		try {
 			const parsed = await parseByName(file.name, file.type, data);
-			const chunks = chunkBlocks(parsed.blocks, file.name);
+			let blocks = parsed.blocks;
+			const needsOcr = parsed.needsOcr ?? [];
+			if (needsOcr.length) {
+				const { ocrPages } = await import('$lib/pipeline/ocr');
+				blocks = mergeParsedWithOcr(parsed, await ocrPages(data, needsOcr));
+			}
+			const chunks = chunkBlocks(blocks, file.name);
 			if (!chunks.length) {
 				throw Object.assign(new Error('No usable text'), { code: 'parse_failed' as const });
 			}
@@ -701,12 +1055,9 @@ class DocumentsStore {
 				data: vectors,
 				dims,
 				model
-			} = await getEmbedWorker().embed(
-				chunks.map((c) => c.searchText),
-				'passage'
-			);
+			} = await this.embedPassages(chunks.map((c) => c.searchText));
 			const language = detectLanguage(
-				parsed.blocks
+				blocks
 					.slice(0, 12)
 					.map((b) => b.text)
 					.join(' ')

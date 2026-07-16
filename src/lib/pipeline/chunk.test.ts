@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { CHUNK_TARGET_CHARS, chunkBlocks, splitSentences } from './chunk';
+import {
+	CHUNK_TARGET_CHARS,
+	PARENT_CHUNK_MAX_CHARS,
+	STRUCTURED_CHUNK_TARGET_CHARS,
+	chunkBlocks,
+	chunkTargetForBlock,
+	splitSentences
+} from './chunk';
 import type { ParsedBlock } from '$lib/types';
 
 const para = (n: number) => `Sentence ${n} of the paragraph. `.repeat(8).trim();
@@ -12,6 +19,15 @@ describe('splitSentences', () => {
 			expect(text.slice(p.start - 1000, p.end - 1000)).toBe(p.text);
 			expect(p.text.length).toBeLessThanOrEqual(500);
 		}
+	});
+
+	it('prefers line boundaries for dense forms', () => {
+		const text = Array.from(
+			{ length: 20 },
+			(_, index) => `${index + 1} Form field ${'x'.repeat(45)}`
+		).join('\n');
+		const parts = splitSentences(text, 0, 220);
+		expect(parts.every((part) => part.text.endsWith('\n') || part.end === text.length)).toBe(true);
 	});
 });
 
@@ -76,18 +92,54 @@ describe('chunkBlocks', () => {
 				charEnd: opening.length + 1 + ending.length
 			}
 		]);
-		expect(chunks).toHaveLength(2);
-		expect(chunks[1].searchText).not.toContain('UNIQUE-PAGE-OPENING');
+		const children = chunks.filter((chunk) => chunk.paraIndex !== -1);
+		expect(children.length).toBeGreaterThanOrEqual(2);
+		expect(
+			children
+				.filter((chunk) => chunk.text.includes('UNIQUE-PAGE-ENDING'))
+				.every((chunk) => !chunk.searchText.includes('UNIQUE-PAGE-OPENING'))
+		).toBe(true);
+		expect(chunks.find((chunk) => chunk.paraIndex === -1)?.searchText).toContain(
+			'UNIQUE-PAGE-OPENING'
+		);
+	});
+
+	it('builds overlapping bounded parents instead of one truncated page parent', () => {
+		const text = Array.from(
+			{ length: 12 },
+			(_, index) => `Field ${index}: ${String(index).repeat(20)} ${'detail '.repeat(20)}`
+		).join('\n');
+		const parents = chunkBlocks([{ text, page: 4, charStart: 0, charEnd: text.length }]).filter(
+			(chunk) => chunk.paraIndex === -1
+		);
+
+		expect(parents.length).toBeGreaterThan(1);
+		expect(parents.every((parent) => parent.text.length <= PARENT_CHUNK_MAX_CHARS)).toBe(true);
+		expect(parents[0].charEnd).toBeGreaterThanOrEqual(parents[1].charStart);
 	});
 
 	it('splits oversized blocks and respects the target size', () => {
 		const big = para(1).repeat(10);
 		const chunks = chunkBlocks([{ text: big, page: 3, charStart: 0, charEnd: big.length }]);
 		expect(chunks.length).toBeGreaterThan(1);
-		for (const c of chunks) {
+		for (const c of chunks.filter((chunk) => chunk.paraIndex !== -1)) {
 			expect(c.text.length).toBeLessThanOrEqual(CHUNK_TARGET_CHARS + 1);
 			expect(c.page).toBe(3);
 		}
+	});
+
+	it('uses smaller evidence windows for form and table layouts', () => {
+		const form = Array.from(
+			{ length: 12 },
+			(_, index) => `${index + 1} Add lines ${index} and ${index + 1} ........ ${index + 1}`
+		).join('\n');
+		expect(chunkTargetForBlock(form)).toBe(STRUCTURED_CHUNK_TARGET_CHARS);
+		expect(
+			chunkBlocks([{ text: form.repeat(3), page: 1, charStart: 0, charEnd: form.length * 3 }])
+				.filter((chunk) => chunk.paraIndex !== -1)
+				.every((chunk) => chunk.text.length <= STRUCTURED_CHUNK_TARGET_CHARS + 1)
+		).toBe(true);
+		expect(chunkTargetForBlock(para(1))).toBe(CHUNK_TARGET_CHARS);
 	});
 
 	it('drops empty/near-empty chunks', () => {

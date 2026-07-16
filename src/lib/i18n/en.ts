@@ -9,6 +9,7 @@ export const en = {
 	'disabled.needUrl': 'Enter the base URL first.',
 	'disabled.emptyMessage': 'Write a message first.',
 	'disabled.indexing': 'This document is still being prepared.',
+	'disabled.indexingChat': 'Wait until the first document is ready.',
 	'disabled.needEmail': 'Enter a valid email first.',
 	'disabled.selectExcerpts': 'Select at least one excerpt.',
 	'disabled.selectDoc': 'Select at least one document.',
@@ -59,6 +60,12 @@ export const en = {
 	'composer.followUp': 'Ask a follow-up…',
 	'composer.attachFrom': 'Attach from your documents',
 	'composer.footer': 'Answers cite your documents',
+	'composer.preparingOne': 'Preparing {name}',
+	'composer.preparingMany': 'Preparing {count} documents',
+	'composer.preparingStep': '{phase}, step {step} of 4',
+	'composer.preparingAvailable': '{count} ready, you can ask a question now',
+	'composer.documentsReady': 'Your documents are ready to search',
+	'composer.waitPlaceholder': 'Wait until your document is ready…',
 
 	// Preset actions (R3) — read-only templates, sent as normal questions
 	'actions.menu': 'Actions',

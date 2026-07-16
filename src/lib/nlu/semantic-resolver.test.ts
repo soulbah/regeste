@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SEMANTIC_PROTOTYPES } from './prototypes';
-import { normalizeQuestion } from './semantic-frame';
+import { analyzeQuestion, normalizeQuestion } from './semantic-frame';
 import { GEMMA_EMBEDDING_MODEL } from '$lib/pipeline/embed-model';
 import {
 	resetSemanticPrototypeCache,
 	resolveQuestion,
+	resolveQuestions,
 	type EmbedQuestions
 } from './semantic-resolver';
 
@@ -39,6 +40,18 @@ describe('semantic question resolver', () => {
 		expect(embed).not.toHaveBeenCalled();
 	});
 
+	it('resolves uncertain questions in one query embedding job', async () => {
+		const embed = fakeEmbed('synthesis');
+		const results = await resolveQuestions(
+			['Raconte-moi ce qui ressort de ces pièces', 'Donne-moi une vue générale'],
+			embed
+		);
+		expect(results.map((result) => result.route)).toEqual(['synthesis', 'synthesis']);
+		expect(embed).toHaveBeenCalledTimes(2);
+		expect(vi.mocked(embed).mock.calls[0][0]).toHaveLength(2);
+		expect(vi.mocked(embed).mock.calls[1][0]).toHaveLength(SEMANTIC_PROTOTYPES.length);
+	});
+
 	it('fuses confident semantic evidence for a free-form synthesis', async () => {
 		const result = await resolveQuestion(
 			'Raconte-moi ce qui ressort de ces pièces',
@@ -59,6 +72,42 @@ describe('semantic question resolver', () => {
 			fakeEmbed('aggregate')
 		);
 		expect(result.route).toBe('targeted');
+	});
+
+	it('never turns an explicit singular fact question into a synthesis', async () => {
+		const result = await resolveQuestion(
+			"Quelle partie de l'alimentation en gaz est couverte ?",
+			fakeEmbed('synthesis')
+		);
+		expect(result.route).toBe('targeted');
+	});
+
+	it('routes independent coordinated facts broadly without domain vocabulary', () => {
+		expect(
+			analyzeQuestion("Qui assure l'assistance et sur quel territoire s'applique-t-elle ?")
+		).toMatchObject({ route: 'synthesis', operation: null });
+		expect(
+			analyzeQuestion(
+				'Quel historique de sinistre, résiliation et assurance actuelle est déclaré ?'
+			)
+		).toMatchObject({ route: 'synthesis' });
+		expect(analyzeQuestion("Quelle partie de l'alimentation en gaz est couverte ?")).toMatchObject({
+			route: 'targeted'
+		});
+	});
+
+	it('treats how-long questions as facts rather than counts', () => {
+		expect(analyzeQuestion('Combien de temps la réparation est-elle garantie ?')).toMatchObject({
+			route: 'targeted',
+			operation: null
+		});
+		expect(analyzeQuestion('How long is the repair guaranteed?')).toMatchObject({
+			route: 'targeted',
+			operation: null
+		});
+		expect(analyzeQuestion('Combien de réparations sont garanties ?')).toMatchObject({
+			operation: 'count'
+		});
 	});
 
 	it('never mutates route for an uncalibrated embedding profile', async () => {

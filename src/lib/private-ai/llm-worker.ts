@@ -36,7 +36,7 @@ async function generate(
 	const chunks = await engine.chat.completions.create({
 		messages,
 		stream: true,
-		temperature: 0.2,
+		temperature: options.temperature ?? 0.2,
 		max_tokens: options.maxTokens,
 		extra_body: { enable_thinking: options.reasoning === 'on' },
 		stream_options: { include_usage: true }

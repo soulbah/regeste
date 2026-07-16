@@ -10,8 +10,47 @@
 
 import type { ParsedDoc, ParsedBlock } from '$lib/types';
 import { orderPdfText } from './pdf-layout';
+import { assessPdfTextLayer } from '../pdf-text-quality';
 
-const SCANNED_MIN_CHARS_PER_PAGE = 50;
+export function isLikelyPdfSectionHeading(line: string, nextLine = ''): boolean {
+	const text = line.trim();
+	const words = text.match(/[\p{L}\p{N}]+/gu) ?? [];
+	if (
+		text.length < 3 ||
+		text.length > 100 ||
+		words.length === 0 ||
+		words.length > 12 ||
+		nextLine.trim().length < 20 ||
+		/[.;,]$/u.test(text) ||
+		/(?:https?:\/\/|www\.|@)/iu.test(text)
+	)
+		return false;
+	if (/[?:]$/u.test(text)) return true;
+	const letters = [...text].filter((character) => /\p{L}/u.test(character));
+	const uppercase = letters.filter((character) => /\p{Lu}/u.test(character)).length;
+	if (letters.length >= 3 && uppercase / letters.length >= 0.75) return true;
+	const titleWords = words.filter((word) => /^\p{Lu}/u.test(word)).length;
+	return words.length <= 8 && titleWords / words.length >= 0.7;
+}
+
+export function pageBlocks(lineTexts: string[], page: number): ParsedBlock[] {
+	const blocks: ParsedBlock[] = [];
+	let offset = 0;
+	let heading: string | null = null;
+	for (let index = 0; index < lineTexts.length; index++) {
+		const line = lineTexts[index];
+		if (isLikelyPdfSectionHeading(line, lineTexts[index + 1] ?? '')) heading = line.trim();
+		blocks.push({
+			text: line,
+			page,
+			headingPath: heading ? [heading] : undefined,
+			charStart: offset,
+			charEnd: offset + line.length
+		});
+		offset += line.length + 1;
+	}
+	return blocks;
+}
 
 export async function parsePdf(data: ArrayBuffer): Promise<ParsedDoc> {
 	const pdfjs = await import('pdfjs-dist');
@@ -24,6 +63,7 @@ export async function parsePdf(data: ArrayBuffer): Promise<ParsedDoc> {
 	const doc = await loadingTask.promise;
 	const blocks: ParsedBlock[] = [];
 	const needsOcr: number[] = [];
+	const ocrFallbackBlocks: ParsedBlock[] = [];
 
 	for (let pageNum = 1; pageNum <= doc.numPages; pageNum++) {
 		const page = await doc.getPage(pageNum);
@@ -43,24 +83,21 @@ export async function parsePdf(data: ArrayBuffer): Promise<ParsedDoc> {
 			.filter((item) => item.text.length > 0);
 		const lineTexts = orderPdfText(positioned, pageWidth);
 		const text = lineTexts.join('\n').trim();
-		if (text.length < SCANNED_MIN_CHARS_PER_PAGE) {
-			// Image-only page: OCR it later instead of keeping text crumbs.
+		const quality = assessPdfTextLayer(text);
+		if (quality.reason) {
 			needsOcr.push(pageNum);
+			if (quality.reason !== 'sparse') ocrFallbackBlocks.push(...pageBlocks(lineTexts, pageNum));
 		} else {
-			let offset = 0;
-			for (const line of lineTexts) {
-				blocks.push({
-					text: line,
-					page: pageNum,
-					charStart: offset,
-					charEnd: offset + line.length
-				});
-				offset += line.length + 1;
-			}
+			blocks.push(...pageBlocks(lineTexts, pageNum));
 		}
 		page.cleanup();
 	}
 	await loadingTask.destroy();
 
-	return { blocks, pages: doc.numPages, needsOcr };
+	return {
+		blocks,
+		pages: doc.numPages,
+		needsOcr,
+		ocrFallbackBlocks: ocrFallbackBlocks.length ? ocrFallbackBlocks : undefined
+	};
 }

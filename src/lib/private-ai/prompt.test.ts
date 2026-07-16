@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
 	buildUserPrompt,
+	buildAnswerCoverageContract,
+	buildEvidenceInventory,
+	buildVerificationPrompt,
+	buildVerificationUserPrompt,
+	citationGroundingCoverage,
 	compactCitationMarkers,
+	enforceAnswerInvariants,
+	needsGroundedVerification,
 	resolveCitations,
 	resolveTargetedCitations
 } from './prompt';
@@ -36,6 +43,239 @@ describe('buildUserPrompt', () => {
 		expect(p).toContain('Requested financial role: sent.');
 		expect(p).toContain('do not substitute sent, received, fees, tax, subtotal, or total/debited');
 	});
+
+	it('requires exact structural identifiers and surfaces references near a queried identifier', () => {
+		const drawing = {
+			...hit(1),
+			text: 'CRUSHED BASALT GRAVEL 1/4 MINUS 1/LP103'
+		};
+		const prompt = buildUserPrompt('Quel détail est référencé pour le gravier 1/4 inch minus ?', [
+			drawing
+		]);
+		expect(prompt).toContain('start with the exact requested line, section, sheet, detail');
+		expect(prompt).toContain('Exact nearby references copied from the excerpts: 1/LP103');
+	});
+
+	it('preserves requested direction for changes', () => {
+		expect(buildUserPrompt('Variation de 2018 à 2019 ?', [hit(1)])).toContain(
+			'Requested direction: 2018 is the start and 2019 is the end. Compute end minus start'
+		);
+	});
+
+	it('turns substantial coordinated requests into an explicit answer checklist', () => {
+		const prompt = buildUserPrompt(
+			'Donne le total des ventes 2019 et le volume moyen par transaction American Express.',
+			[hit(1)]
+		);
+		expect(prompt).toContain('Requested parts (answer each one separately):');
+		expect(prompt).toContain('1. Donne le total des ventes 2019');
+		expect(prompt).toContain('2. le volume moyen par transaction American Express.');
+		expect(prompt).toContain('Never mix numbers between parts or documents');
+	});
+
+	it('selects only structural, directional and multi-part answers for a verification pass', () => {
+		expect(needsGroundedVerification('Quelle ligne contient le remboursement ?')).toBe(true);
+		expect(needsGroundedVerification('Variation de 2018 à 2019 ?')).toBe(true);
+		expect(
+			needsGroundedVerification(
+				'Donne le total des ventes 2019 et le volume moyen par transaction American Express.'
+			)
+		).toBe(true);
+		expect(needsGroundedVerification('Qui est le vendeur ?')).toBe(false);
+		expect(needsGroundedVerification('Qui est assuré par ce devis et avec qui ?')).toBe(false);
+		expect(needsGroundedVerification('Quels sont tous mes droits sur mes données ?')).toBe(true);
+		expect(needsGroundedVerification('Mon ordinateur volé dans un café est-il couvert ?')).toBe(
+			true
+		);
+		expect(needsGroundedVerification('Quel écart entre la prime annoncée et le total ?')).toBe(
+			true
+		);
+	});
+
+	it('does not verify simple questions with a "de … à" span or a leading framing clause', () => {
+		expect(needsGroundedVerification('Quel est le montant de la prime à verser ?')).toBe(false);
+		expect(needsGroundedVerification('Combien de jours a-t-il pour répondre ?')).toBe(false);
+		expect(needsGroundedVerification('Selon vous, qui est le vendeur ?')).toBe(false);
+		expect(needsGroundedVerification('D’après le contrat, quel est le prix de vente ?')).toBe(
+			false
+		);
+	});
+
+	it('does not inject part or direction constraints on a framed simple question', () => {
+		const prompt = buildUserPrompt('Selon vous, qui est le vendeur ?', [hit(1)]);
+		expect(prompt).not.toContain('Requested parts');
+		expect(prompt).not.toContain('start-to-end direction');
+		expect(prompt).not.toContain('Requested direction');
+	});
+
+	it('keeps an identity companion as one answer frame', () => {
+		const prompt = buildUserPrompt('Qui est assuré par ce devis et avec qui ?', [hit(1)]);
+		expect(prompt).not.toContain('Requested parts');
+	});
+
+	it('asks the verifier to correct rather than critique the draft', () => {
+		const prompt = buildVerificationPrompt('Quelle ligne ?', 'Excerpts: source', 'Ligne 34 [1].');
+		expect(prompt).toContain('Return only the corrected answer');
+		expect(prompt).toContain('exact form/output identifiers');
+		expect(prompt).toContain('difference is non-zero');
+		expect(prompt).toContain('Treat the draft as untrusted');
+		expect(prompt).toContain('A duration cannot be replaced by a price');
+		expect(prompt).toContain('exact starting event');
+	});
+
+	it('derives a structured coverage contract from the question', () => {
+		expect(
+			buildAnswerCoverageContract(
+				'Résume type, surface, période de construction, matériau et dépendances.'
+			)
+		).toContain('Answer each requested slot separately');
+		expect(buildAnswerCoverageContract('Dans quel délai déclarer le sinistre ?')).toContain(
+			'exact starting event/trigger'
+		);
+		expect(buildAnswerCoverageContract("Quel est le nom de l'enfant couvert ?")).toContain(
+			'name is not specified'
+		);
+	});
+
+	it('extracts label-value facts and exact scenario sentences before generation', () => {
+		const form = {
+			...hit(1),
+			seq: 10,
+			text:
+				'- Quel type de logement avez-vous : Maison\n' +
+				'- Quel type de logement souhaitez-vous assurer : Résidence principale\n' +
+				'- Assurance scolaire : non ajouté'
+		};
+		const scenario = {
+			...hit(2),
+			seq: 11,
+			text: "Si quelqu'un s'empare de votre ordinateur portable à un café, ce n'est pas couvert."
+		};
+		expect(buildEvidenceInventory('Quel type de logement est déclaré ?', [form])).toContain(
+			'Quel type de logement avez-vous : Maison [1]'
+		);
+		expect(
+			buildEvidenceInventory('Mon ordinateur volé dans un café est-il couvert ?', [scenario])
+		).toContain('ordinateur portable à un café');
+	});
+
+	it('joins a form label with a short answer split into the next child chunk', () => {
+		const label = {
+			...hit(1),
+			page: 66,
+			seq: 10,
+			text: 'Avez-vous actuellement une assurance habitation pour ce logement :'
+		};
+		const value = {
+			...hit(2),
+			page: 66,
+			seq: 12,
+			text: "Oui\n- Depuis combien de temps avez-vous votre contrat actuel ? moins d'un an"
+		};
+		const inventory = buildEvidenceInventory('Quelle assurance actuelle est déclarée ?', [
+			label,
+			value
+		]);
+		expect(inventory).toContain('assurance habitation pour ce logement : Oui [1][2]');
+	});
+
+	it('compacts verification evidence without changing original citation numbers', () => {
+		const hits = Array.from({ length: 10 }, (_, index) => ({
+			...hit(index + 1),
+			seq: index + 1,
+			text: `Unrelated policy boilerplate ${index}. ${'padding '.repeat(80)}`
+		}));
+		hits[6] = {
+			...hits[6],
+			page: 16,
+			text: 'Si votre logement devient inhabitable, les dépenses supplémentaires sont couvertes.'
+		};
+		hits[7] = {
+			...hits[7],
+			page: 16,
+			text: "La prise en charge dure au maximum un an et s'élève à 2 000 €."
+		};
+		const prompt = buildVerificationUserPrompt(
+			'Pendant combien de temps et jusqu’à quel montant le logement inhabitable est-il couvert ?',
+			hits
+		);
+		expect(prompt).toContain('[7] (Contract.pdf · page 16)');
+		expect(prompt).toContain('[8] (Contract.pdf · page 16)');
+		expect(prompt).toContain('au maximum un an');
+	});
+
+	it('keeps a decisive same-section continuation ahead of topical noise', () => {
+		const hits = [
+			{
+				...hit(1),
+				page: 24,
+				seq: 24,
+				text: 'Justificatifs généraux pour une demande d’indemnisation.'
+			},
+			{
+				...hit(2),
+				page: 5,
+				seq: 5,
+				text: 'Le complément de reconstruction peut atteindre 25 % après dépréciation.'
+			},
+			{
+				...hit(3),
+				page: 5,
+				seq: 6,
+				text: 'Il est payé après les travaux et sur présentation des factures.'
+			}
+		];
+		const prompt = buildVerificationUserPrompt(
+			'Comment fonctionne le complément de reconstruction de 25 % ?',
+			hits
+		);
+		expect(prompt).toContain('[2] (Contract.pdf · page 5)');
+		expect(prompt).toContain('[3] (Contract.pdf · page 5)');
+	});
+
+	it('verifies deadlines, exact details and qualified refusals', () => {
+		expect(needsGroundedVerification('Dans quel délai faut-il déclarer le sinistre ?')).toBe(true);
+		expect(needsGroundedVerification("Quel est le nom de l'enfant couvert ?")).toBe(true);
+		expect(
+			needsGroundedVerification(
+				'La garantie est-elle ajoutée ?',
+				"Je n'ai pas trouvé assez d'informations dans les documents joints pour répondre."
+			)
+		).toBe(true);
+	});
+
+	it('repairs deterministic arithmetic and consistency contradictions', () => {
+		expect(
+			enforceAnswerInvariants(
+				'Douze mensualités font-elles la prime annuelle ?',
+				"1. Oui, 14,91 € × 12 = 178,92 € et la prime vaut 185,50 € ; l'écart est de 6,58 €."
+			)
+		).toMatch(/^1\. Non,/);
+		expect(
+			enforceAnswerInvariants(
+				'Are both totals equal?',
+				'Yes, the first is 10 and the second is 12; the difference is 2.'
+			)
+		).toMatch(/^No,/);
+		expect(
+			enforceAnswerInvariants(
+				'Le conseil et les choix sont-ils cohérents ?',
+				"Le conseil est cohérent. Cependant, l'écart vient des options non ajoutées."
+			)
+		).toContain("n'est pas cohérent");
+		expect(
+			enforceAnswerInvariants(
+				'La liste et le conseil sont-ils cohérents ?',
+				'Le conseil est cohérent, or il recommande des options non ajoutées.'
+			)
+		).toContain("n'est pas cohérent");
+		expect(
+			enforceAnswerInvariants(
+				'Douze mensualités font-elles la prime annuelle ?',
+				"<think>calcul</think>1. Oui, 14,91 € × 12 = 178,92 € ; l'écart est de 6,58 €."
+			)
+		).toMatch(/^1\. Non,/);
+	});
 });
 
 describe('stripThink / isThinking', () => {
@@ -53,6 +293,19 @@ describe('stripThink / isThinking', () => {
 });
 
 describe('resolveCitations', () => {
+	it('preserves the cited useful fact in a qualified absence answer', () => {
+		const sources = [
+			{ ...hit(1), text: "L'assurance scolaire couvre les voyages de moins de trois mois." },
+			{ ...hit(2), text: 'Assurance scolaire : non ajouté', page: 70 }
+		];
+		const result = resolveTargetedCitations(
+			"Assurance scolaire : non ajouté. Cependant, le nom demandé n'est pas précisé [2].",
+			sources,
+			"Quel est le nom de l'enfant couvert par l'assurance scolaire ?"
+		);
+		expect(result.citations.map((citation) => citation.hit.page)).toEqual([70]);
+	});
+
 	it('keeps valid markers and collects citations once', () => {
 		const { text, citations } = resolveCitations('Notice is 3 months [1]. See also [1][2].', [
 			hit(1),
@@ -120,5 +373,108 @@ describe('resolveCitations', () => {
 		const { text, citations } = resolveCitations('No idea.', [hit(1)]);
 		expect(text).toBe('No idea.');
 		expect(citations).toEqual([]);
+	});
+
+	it('canonicalizes an unsupported targeted answer into an uncited refusal', () => {
+		const result = resolveTargetedCitations(
+			'Le document ne précise pas cette information, car elle doit être fournie par le client [1].',
+			[hit(1)],
+			'Quel est son numéro personnel ?'
+		);
+		expect(result.text).toBe(
+			"Je n'ai pas trouvé assez d'informations dans les documents joints pour répondre."
+		);
+		expect(result.citations).toEqual([]);
+	});
+
+	it('preserves a useful qualified answer when only the exact detail is absent', () => {
+		const source = {
+			...hit(1),
+			text: 'Biens de valeur dont la valeur unitaire est supérieure à 5 000 euros : Oui.',
+			page: 66
+		};
+		const result = resolveTargetedCitations(
+			"L'objet exact n'est pas précisé, mais le document confirme un bien de valeur supérieure à 5 000 € [1].",
+			[source],
+			'Quel objet de valeur dépasse 5 000 € ?'
+		);
+		expect(result.text).toContain("L'objet exact n'est pas précisé");
+		expect(result.citations[0].hit.page).toBe(66);
+	});
+
+	it('repairs a missing marker only when an exact structured identifier is supported', () => {
+		const source = { ...hit(1), text: 'CRUSHED BASALT GRAVEL 1/4 MINUS 1/LP103' };
+		const result = resolveTargetedCitations(
+			'Le détail référencé est 1/LP103.',
+			[source],
+			'Quel détail est référencé pour 1/4 inch minus ?'
+		);
+		expect(result.text).toContain('[1]');
+		expect(result.citations[0].hit).toEqual(source);
+	});
+
+	it('rebinds a numeric answer to the passage containing the value', () => {
+		const generic = { ...hit(1), text: 'La prime est payable chaque mois.', page: 4 };
+		const amount = { ...hit(2), text: 'Prime mensuelle : 14,91 EUR', page: 28 };
+		const result = resolveTargetedCitations(
+			'La prime mensuelle est de 14,91 € [1].',
+			[generic, amount],
+			'Quel est le montant de la prime mensuelle ?'
+		);
+		expect(result.citations[0].hit.page).toBe(28);
+	});
+
+	it('uses short exact numbers and inflection-tolerant wording for citation grounding', () => {
+		const generic = {
+			...hit(1),
+			text: 'Les installations électriques couvertes sont situées après le compteur.',
+			page: 38
+		};
+		const exclusion = {
+			...hit(2),
+			text: 'Les trottinettes électriques dont la vitesse est supérieure à 25 km/h ne sont pas couvertes.',
+			page: 18
+		};
+		const result = resolveTargetedCitations(
+			"Non, une trottinette électrique dépassant 25 km/h n'est pas couverte [1].",
+			[generic, exclusion],
+			'Une trottinette électrique dépassant 25 km/h est-elle couverte ?'
+		);
+		expect(result.citations[0].hit.page).toBe(18);
+	});
+
+	it('prefers the passage with the complete noun phrase over a neighboring analogue', () => {
+		const electricity = {
+			...hit(1),
+			text: 'Intervention d’un électricien : Nous organisons et prenons en charge l’intervention d’un électricien. Sont couvertes les installations électriques intérieures situées après le compteur d’alimentation en électricité et les points de branchement des appareils en cas de panne ou coupure d’électricité. Sont exclus : les appareils alimentés par l’installation électrique, les pannes dues à un problème d’alimentation du fournisseur d’énergie ou une insuffisance de puissance installée, les travaux de mise en conformité de tout ou partie de l’installation électrique, les installations électriques nécessitant le déplacement de machines et de mobiliers lourds à l’aide d’équipements spéciaux.',
+			page: 38
+		};
+		const gas = {
+			...hit(2),
+			text: 'Intervention d’un spécialiste du Gaz : Nous organisons et prenons en charge l’intervention d’un spécialiste du gaz. Sont couvertes les alimentations en gaz naturel après compteur.',
+			page: 39
+		};
+		const grounding =
+			"Quelle partie de l'alimentation en gaz est couverte par l'assistance ? L'assistance couvre les alimentations en gaz naturel situées après le compteur.";
+		expect(citationGroundingCoverage(grounding, gas.text)).toBeGreaterThan(
+			citationGroundingCoverage(grounding, electricity.text)
+		);
+		const result = resolveTargetedCitations(
+			"L'assistance couvre l'alimentation en gaz naturel après compteur [1].",
+			[electricity, gas],
+			"Quelle partie de l'alimentation en gaz est couverte par l'assistance ?"
+		);
+		expect(result.citations[0].hit.page).toBe(39);
+	});
+
+	it('adds a missing citation when the answer wording is supported', () => {
+		const source = { ...hit(1), text: 'Les moisissures ne sont pas couvertes.' };
+		const result = resolveTargetedCitations(
+			'Les moisissures ne sont pas couvertes.',
+			[source],
+			'Les moisissures sont-elles couvertes ?'
+		);
+		expect(result.text).toContain('[1]');
+		expect(result.citations[0].hit).toEqual(source);
 	});
 });

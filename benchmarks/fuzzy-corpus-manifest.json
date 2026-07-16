@@ -81,6 +81,39 @@
 			"format": "html-source",
 			"bytes": 2446740,
 			"sha256": "4d37d6b61afa1c317169d8e8ad284d88697595c708558e900481fe39cbb76753"
+		},
+		{
+			"name": "nist-ai-rmf-1.0.pdf",
+			"url": "https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.100-1.pdf",
+			"canonicalUrl": "https://doi.org/10.6028/NIST.AI.100-1",
+			"licenseUrl": "https://www.nist.gov/open/license",
+			"use": "Official risk-management framework; dense prose, repeated terminology, figures, tables and cross-page synthesis",
+			"format": "pdf",
+			"expectedPages": { "min": 48, "max": 48 },
+			"bytes": 1946127,
+			"sha256": "7576edb531d9848825814ee88e28b1795d3a84b435b4b797d3670eafdc4a89f1"
+		},
+		{
+			"name": "irs-form-1040-2025.pdf",
+			"url": "https://www.irs.gov/pub/irs-pdf/f1040.pdf",
+			"canonicalUrl": "https://www.irs.gov/forms-pubs/about-form-1040",
+			"licenseUrl": "https://www.irs.gov/privacy-disclosure",
+			"use": "Official two-page form; spatial labels, near-identical line numbers, checkboxes and cross-page references",
+			"format": "pdf",
+			"expectedPages": { "min": 2, "max": 2 },
+			"bytes": 220237,
+			"sha256": "3d31c226df0d189ced80e039d01cf0f8820c1019681a0f0ca6264de277b7e982"
+		},
+		{
+			"name": "aec-addendum-drawings.pdf",
+			"url": "https://nomic-public-data.com/data/aec-bench-v1/cross-reference-resolution/rees-rtc-addendum-landscape/EB6_Addendum%201%20Drawings_08-27-24_new.pdf",
+			"canonicalUrl": "https://huggingface.co/datasets/nomic-ai/aec-bench-v1",
+			"licenseUrl": "https://huggingface.co/datasets/nomic-ai/aec-bench-v1/blob/main/LICENSE",
+			"use": "AEC-Bench public drawing set; large landscape sheets, schedules and an intentionally broken cross-reference",
+			"format": "pdf",
+			"expectedPages": { "min": 60, "max": 60 },
+			"bytes": 42467378,
+			"sha256": "3256068b75f86db49de631084c57451527bb3e4540c175973bdf1d589feb4100"
 		}
 	]
 }

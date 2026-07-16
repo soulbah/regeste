@@ -3,17 +3,19 @@ import { mkdir } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileTypeFromBuffer } from 'file-type';
 
-const MAX_FILE_BYTES = 32 * 1024 * 1024;
+const MAX_FILE_BYTES = 48 * 1024 * 1024;
 const ALLOWED_HOSTS = new Set([
 	'www.nasa.gov',
 	'ntrs.nasa.gov',
 	'www.govinfo.gov',
 	'www.rfc-editor.org',
-	'www.sec.gov'
+	'www.sec.gov',
+	'nvlpubs.nist.gov',
+	'www.irs.gov',
+	'nomic-public-data.com'
 ]);
 const root = resolve(import.meta.dir, '..');
 const output = resolve(root, manifest.outputDirectory);
-const browserOutput = resolve(root, 'static/dev/fuzzy-public');
 
 function digest(bytes: Uint8Array): string {
 	const hash = new Bun.CryptoHasher('sha256');
@@ -36,15 +38,6 @@ async function verifyType(
 	}
 }
 
-async function publishBrowserFixture(
-	entry: (typeof manifest.files)[number],
-	bytes: Uint8Array
-): Promise<void> {
-	if (entry.format !== 'pdf' && entry.format !== 'txt') return;
-	await mkdir(browserOutput, { recursive: true });
-	await Bun.write(resolve(browserOutput, entry.name), bytes);
-}
-
 await mkdir(output, { recursive: true });
 for (const entry of manifest.files) {
 	const url = new URL(entry.url);
@@ -59,7 +52,6 @@ for (const entry of manifest.files) {
 		const bytes = new Uint8Array(await existing.arrayBuffer());
 		if (bytes.byteLength === entry.bytes && digest(bytes) === entry.sha256) {
 			await verifyType(entry, bytes);
-			await publishBrowserFixture(entry, bytes);
 			console.log(`verified ${entry.name}`);
 			continue;
 		}
@@ -78,6 +70,5 @@ for (const entry of manifest.files) {
 	await verifyType(entry, bytes);
 	await mkdir(dirname(path), { recursive: true });
 	await Bun.write(path, bytes);
-	await publishBrowserFixture(entry, bytes);
 	console.log(`downloaded ${entry.name}`);
 }

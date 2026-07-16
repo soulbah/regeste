@@ -1,0 +1,12 @@
+PAYMENT NETWORK COMPARISON — CALENDAR YEAR 2007
+Source fixture: FinQA development example, Visa annual-report excerpt (FinQA dataset, Apache 2.0).
+
+Company | Payments volume (billions) | Total volume (billions) | Total transactions (billions) | Cards (millions)
+Visa Inc. | $2,457 | $3,822 | 50.3 | 1,592
+Mastercard | 1,697 | 2,276 | 27.0 | 916
+American Express | 637 | 647 | 5.0 | 86
+Discover | 102 | 119 | 1.6 | 57
+JCB | 55 | 61 | 0.6 | 58
+Diners Club | 29 | 30 | 0.2 | 7
+
+Visa figures exclude Visa Europe. American Express and Discover include business from third-party issuers. JCB total transaction figures are estimates.

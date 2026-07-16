@@ -3,9 +3,51 @@ import { playwright } from '@vitest/browser-playwright';
 import tailwindcss from '@tailwindcss/vite';
 import adapter from '@sveltejs/adapter-cloudflare';
 import { sveltekit } from '@sveltejs/kit/vite';
+import { createReadStream } from 'node:fs';
+import { stat } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import fuzzyManifest from './benchmarks/fuzzy-corpus-manifest.json';
+import type { Plugin } from 'vite';
+
+const FUZZY_FIXTURE_PREFIX = '/dev/fuzzy-public/';
+const fuzzyFixtureDirectory = resolve(import.meta.dirname, fuzzyManifest.outputDirectory);
+const fuzzyFixtureNames = new Set(fuzzyManifest.files.map((file) => file.name));
+
+/** Public research fixtures are dev inputs, not deployable application assets.
+ * Serve them from the ignored benchmark cache only while Vite is running. */
+function localBenchmarkFixtures(): Plugin {
+	return {
+		name: 'folio-local-benchmark-fixtures',
+		apply: 'serve' as const,
+		configureServer(server) {
+			server.middlewares.use(async (req, res, next) => {
+				try {
+					const pathname = new URL(req.url ?? '/', 'http://localhost').pathname;
+					if (!pathname.startsWith(FUZZY_FIXTURE_PREFIX)) return next();
+					const name = decodeURIComponent(pathname.slice(FUZZY_FIXTURE_PREFIX.length));
+					if (!fuzzyFixtureNames.has(name)) return next();
+					const path = resolve(fuzzyFixtureDirectory, name);
+					const metadata = await stat(path);
+					res.statusCode = 200;
+					res.setHeader('Content-Length', metadata.size);
+					res.setHeader(
+						'Content-Type',
+						name.endsWith('.pdf') ? 'application/pdf' : 'text/plain; charset=utf-8'
+					);
+					res.setHeader('Cache-Control', 'no-store');
+					createReadStream(path).on('error', next).pipe(res);
+				} catch (error) {
+					if ((error as NodeJS.ErrnoException).code === 'ENOENT') return next();
+					next(error);
+				}
+			});
+		}
+	};
+}
 
 export default defineConfig({
 	plugins: [
+		localBenchmarkFixtures(),
 		tailwindcss(),
 		sveltekit({
 			// Inference Service Worker is production-only. Manual registration in

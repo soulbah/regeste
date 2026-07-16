@@ -223,5 +223,11 @@ export const MIGRATIONS: string[] = [
 	// v12 — page-level OCR quality provenance (spec 029). Native text stays NULL.
 	`
 	ALTER TABLE chunks ADD COLUMN ocr_confidence REAL;
+	`,
+
+	// v13 — bounded neighbor retrieval runs once per broad hybrid batch. Equality
+	// on document_id followed by a seq range is served by this composite index.
+	`
+	CREATE INDEX idx_chunks_document_seq ON chunks(document_id, seq);
 	`
 ];

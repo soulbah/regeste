@@ -19,10 +19,17 @@ import type { ClarificationKind } from '$lib/nlu/semantic-frame';
 import { formatAggregateResult } from '$lib/analysis/format-aggregate';
 import { parseRelatedQuestions } from '$lib/related-questions';
 import { hasAnswerBearingEvidence } from '$lib/pipeline/relevance';
+import { retrieveWithLocalQueryFallback } from '$lib/pipeline/query-translation';
+import { buildDeterministicExtractiveAnswer } from '$lib/private-ai/extractive-answer';
 import {
 	SYSTEM_PROMPT,
 	buildUserPrompt,
+	buildVerificationPrompt,
+	buildVerificationUserPrompt,
+	enforceAnswerInvariants,
+	groundedRefusal,
 	isThinking,
+	needsGroundedVerification,
 	resolveCitations,
 	resolveTargetedCitations,
 	stripThink
@@ -147,6 +154,39 @@ class ChatsStore {
 			buildClarificationContext(this.messages, question, clarificationIds) ??
 			buildRetrievalContext(this.messages, question)
 		);
+	}
+
+	private async retrieveWithSearchFallback(
+		query: string,
+		documents: ChatDocument[],
+		mode: ChatMode | null,
+		refinementQuery: string,
+		route: QuestionRoute,
+		onInspect?: () => void
+	): Promise<{ hits: SearchHit[]; alternateQueries: string[] }> {
+		const retrieve = (alternateQueries: string[]) =>
+			documentsStore.retrieve(
+				query,
+				documents.map((document) => document.id),
+				refinementQuery,
+				onInspect,
+				route,
+				alternateQueries
+			);
+		if (mode !== 'private' || llmStore.status !== 'ready') {
+			return { hits: await retrieve([]), alternateQueries: [] };
+		}
+		return retrieveWithLocalQueryFallback({
+			query,
+			documentLanguages: documents.map((document) => document.language),
+			rewrite: (messages) =>
+				llmStore.generate(messages, () => {}, {
+					reasoning: 'off',
+					maxTokens: 96,
+					temperature: 0
+				}),
+			retrieve
+		});
 	}
 
 	private async insertClarification(
@@ -388,13 +428,16 @@ class ChatsStore {
 				return;
 			}
 			const hits = enabledDocs.length
-				? await documentsStore.retrieve(
-						context?.searchQuery ?? question,
-						enabledDocs.map((d) => d.id),
-						question,
-						() => this.advanceWork('inspect'),
-						route
-					)
+				? (
+						await this.retrieveWithSearchFallback(
+							context?.searchQuery ?? question,
+							enabledDocs,
+							this.chats.find((item) => item.id === chatId)?.mode ?? null,
+							question,
+							route,
+							() => this.advanceWork('inspect')
+						)
+					).hits
 				: [];
 			if (enabledDocs.length) this.setWorkCount('inspect', hits.length);
 			else this.advanceWork('inspect', 0);
@@ -549,14 +592,16 @@ class ChatsStore {
 			} else {
 				let hits: SearchHit[] = [];
 				if (enabledDocs.length) {
-					hits = await documentsStore.retrieve(
+					const retrieved = await this.retrieveWithSearchFallback(
 						context?.searchQuery ?? question,
-						enabledDocs.map((d) => d.id),
+						enabledDocs,
+						chat?.mode ?? null,
 						question,
-						() => this.advanceWork('inspect'),
-						route
+						route,
+						() => this.advanceWork('inspect')
 					);
-					if (!hasAnswerBearingEvidence(question, hits)) hits = [];
+					hits = retrieved.hits;
+					if (!hasAnswerBearingEvidence(question, hits, retrieved.alternateQueries)) hits = [];
 				}
 
 				if (enabledDocs.length) this.setWorkCount('inspect', hits.length);
@@ -594,6 +639,10 @@ class ChatsStore {
 	): Promise<void> {
 		const { db } = await getLocalDb();
 		const chat = this.chats.find((c) => c.id === chatId);
+		if (documentCount > 0 && hits.length === 0) {
+			await this.insertGroundedRefusal(chatId, question, documentCount, route, versionGroup);
+			return;
+		}
 		if (chat?.mode === 'private' && llmStore.status === 'ready') {
 			await this.generatePrivate(
 				chatId,
@@ -631,6 +680,31 @@ class ChatsStore {
 		}
 	}
 
+	private async insertGroundedRefusal(
+		chatId: string,
+		question: string,
+		documentCount: number,
+		route: QuestionRoute,
+		versionGroup: string | null = null
+	): Promise<void> {
+		const { db } = await getLocalDb();
+		const messageId = crypto.randomUUID();
+		await db.insertMessage({
+			id: messageId,
+			chatId,
+			role: 'assistant',
+			content: groundedRefusal(question),
+			mode: 'notice',
+			versionGroup
+		});
+		await db.insertMessageMethod(messageId, {
+			kind: route,
+			documentCount,
+			passageCount: 0,
+			reasoningUsed: false
+		});
+	}
+
 	private async generatePrivate(
 		chatId: string,
 		question: string,
@@ -643,12 +717,13 @@ class ChatsStore {
 		const { db } = await getLocalDb();
 		this.streamingText = '';
 		const grounded = documentCount > 0;
+		const groundedPrompt = grounded ? buildUserPrompt(question, hits, conversationContext) : '';
 		const messages = grounded
 			? [
 					{ role: 'system' as const, content: SYSTEM_PROMPT },
 					{
 						role: 'user' as const,
-						content: buildUserPrompt(question, hits, conversationContext)
+						content: groundedPrompt
 					}
 				]
 			: [
@@ -664,21 +739,64 @@ class ChatsStore {
 		// (empty streamingText) until the actual answer starts.
 		let streamRaw = '';
 		let raw: string;
+		const extractive = grounded ? buildDeterministicExtractiveAnswer(question, hits) : null;
 		this.advanceWork('write');
-		try {
-			raw = await llmStore.generate(
-				messages,
-				(delta) => {
-					streamRaw += delta;
-					this.streamingText = isThinking(streamRaw) ? '' : stripThink(streamRaw);
-				},
-				generationOptionsFor(question, route === 'synthesis' ? 'synthesis' : 'targeted')
-			);
-		} catch (err) {
-			console.error('[folio] private generation failed:', err);
-			raw = streamRaw;
+		if (extractive) {
+			raw = extractive;
+			this.streamingText = raw;
+		} else {
+			try {
+				raw = await llmStore.generate(
+					messages,
+					(delta) => {
+						streamRaw += delta;
+						this.streamingText = isThinking(streamRaw) ? '' : stripThink(streamRaw);
+					},
+					generationOptionsFor(question, route === 'synthesis' ? 'synthesis' : 'targeted')
+				);
+			} catch (err) {
+				console.error('[folio] private generation failed:', err);
+				raw = streamRaw;
+			}
 		}
-		raw = stripThink(raw! || streamRaw);
+		raw = stripThink(raw || streamRaw);
+		if (
+			!extractive &&
+			grounded &&
+			hits.length &&
+			raw.trim() &&
+			needsGroundedVerification(question, raw)
+		) {
+			try {
+				// The verification is a fresh generation; a small/CPU model can spend
+				// its whole budget inside <think> and return nothing. Only adopt the
+				// verified answer when it is non-empty, otherwise keep the good draft.
+				const verified = stripThink(
+					await llmStore.generate(
+						[
+							{ role: 'system', content: SYSTEM_PROMPT },
+							{
+								role: 'user',
+								content: buildVerificationPrompt(
+									question,
+									buildVerificationUserPrompt(question, hits, conversationContext),
+									raw
+								)
+							}
+						],
+						() => {},
+						generationOptionsFor(question, route === 'synthesis' ? 'synthesis' : 'targeted')
+					)
+				);
+				if (verified.trim()) {
+					raw = verified;
+					this.streamingText = raw;
+				}
+			} catch (err) {
+				console.error('[folio] grounded verification failed:', err);
+			}
+		}
+		raw = enforceAnswerInvariants(question, raw);
 		// Aborted or failed with nothing produced → an honest system notice.
 		const stopped = !raw.trim();
 
@@ -934,7 +1052,7 @@ class ChatsStore {
 			question,
 			plan.route
 		);
-		if (!hits.length) return 'no-excerpts';
+		if (!hits.length || !hasAnswerBearingEvidence(question, hits)) return 'no-excerpts';
 		this.pendingAssisted = {
 			chatId,
 			question,
@@ -993,6 +1111,16 @@ class ChatsStore {
 				mode: null
 			});
 			this.messages = await db.listMessages(chatId);
+			const enabledDocumentCount = this.chatDocuments.filter(
+				(document) => document.enabled && document.status === 'ready'
+			).length;
+			if (enabledDocumentCount > 0 && selected.length === 0) {
+				await this.insertGroundedRefusal(chatId, question, enabledDocumentCount, route);
+				this.messages = await db.listMessages(chatId);
+				await db.touchChat(chatId);
+				await this.refresh();
+				return;
+			}
 			this.streamingText = '';
 
 			const excerpts = selected.map((h) => ({
