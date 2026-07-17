@@ -349,7 +349,7 @@ export function needsGroundedVerification(question: string, draft = ''): boolean
 			verificationCore
 		) ||
 		(!identityCompanion &&
-			/\b(?:couvert|couverte|couverts|couverture|assure|assuree|eligible|covered|coverage|insured|eligible)\b/u.test(
+			/\b(?:couvert|couverte|couverts|couverture|couvre|couvrent|assure|assuree|eligible|covered|covers|coverage|insured|eligible)\b/u.test(
 				verificationCore
 			)) ||
 		/\b(?:nom|marque|modele|numero exact|objet precis|name|brand|model|exact number|specific item)\b/u.test(

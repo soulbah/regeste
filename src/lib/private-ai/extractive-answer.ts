@@ -1267,28 +1267,68 @@ function buildNumberedExplanation(question: string, hits: SearchHit[]): string |
 
 /** High-confidence non-generative answer path for deterministic document
  * structures. Returns null when free-form synthesis remains necessary. */
+const EXTRACTIVE_BUILDERS: ReadonlyArray<
+	[string, (question: string, hits: SearchHit[]) => string | null]
+> = [
+	['qualified-missing-attribute', buildQualifiedMissingAttribute],
+	['comparison', buildComparisonAnswer],
+	['arithmetic', buildArithmeticAnswer],
+	['duration-threshold', buildDurationThresholdAnswer],
+	['exact-date-time', buildExactDateTimeAnswer],
+	['percentage-modifier', buildPercentageModifierAnswer],
+	['action-obligations', buildActionObligationsAnswer],
+	['enumerated-evidence', buildEnumeratedEvidenceAnswer],
+	['co-located-multi-fact', buildCoLocatedMultiFactAnswer],
+	['consequence', buildConsequenceAnswer],
+	['exhaustive-quantified-form', buildExhaustiveQuantifiedFormAnswer],
+	['form', buildFormAnswer],
+	['multi-fact', buildMultiFactAnswer],
+	['list', buildListAnswer],
+	['numbered-explanation', buildNumberedExplanation],
+	['number-anchored', buildNumberAnchoredAnswer],
+	['scenario', buildScenarioAnswer]
+];
+
 export function buildDeterministicExtractiveAnswer(
 	question: string,
 	hits: SearchHit[]
 ): string | null {
+	return explainDeterministicExtractiveAnswer(question, hits)?.answer ?? null;
+}
+
+/** Extractors that SELECT one clause among lexically plausible neighbors can
+ * bind the right-looking clause to the wrong subject; their output is a draft
+ * that grounded verification must audit. Exact-copy/calculation extractors
+ * (arithmetic, exact date, thresholds, form rows) are reliable by construction
+ * and must never be paraphrased by a model pass — measured on the private
+ * benchmark: auditing selection extractors fixed 8 wrong bindings with zero
+ * losses, while auditing exact-copy extractors broke 8 correct answers. */
+const AUDITED_EXTRACTIVE_BUILDERS = new Set([
+	'multi-fact',
+	'co-located-multi-fact',
+	'percentage-modifier',
+	'enumerated-evidence'
+]);
+
+/** Deterministic extract plus whether grounded verification must audit it. */
+export function buildAuditedExtractiveAnswer(
+	question: string,
+	hits: SearchHit[]
+): { answer: string; needsAudit: boolean } | null {
+	const result = explainDeterministicExtractiveAnswer(question, hits);
+	if (!result) return null;
+	return { answer: result.answer, needsAudit: AUDITED_EXTRACTIVE_BUILDERS.has(result.builder) };
+}
+
+/** Benchmark diagnostics: which extractor produced the answer. */
+export function explainDeterministicExtractiveAnswer(
+	question: string,
+	hits: SearchHit[]
+): { builder: string; answer: string } | null {
 	if (!hits.length) return null;
-	return (
-		buildQualifiedMissingAttribute(question, hits) ??
-		buildComparisonAnswer(question, hits) ??
-		buildArithmeticAnswer(question, hits) ??
-		buildDurationThresholdAnswer(question, hits) ??
-		buildExactDateTimeAnswer(question, hits) ??
-		buildPercentageModifierAnswer(question, hits) ??
-		buildActionObligationsAnswer(question, hits) ??
-		buildEnumeratedEvidenceAnswer(question, hits) ??
-		buildCoLocatedMultiFactAnswer(question, hits) ??
-		buildConsequenceAnswer(question, hits) ??
-		buildExhaustiveQuantifiedFormAnswer(question, hits) ??
-		buildFormAnswer(question, hits) ??
-		buildMultiFactAnswer(question, hits) ??
-		buildListAnswer(question, hits) ??
-		buildNumberedExplanation(question, hits) ??
-		buildNumberAnchoredAnswer(question, hits) ??
-		buildScenarioAnswer(question, hits)
-	);
+	for (const [builder, build] of EXTRACTIVE_BUILDERS) {
+		const answer = build(question, hits);
+		if (answer !== null) return { builder, answer };
+	}
+	return null;
 }

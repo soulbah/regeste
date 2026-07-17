@@ -20,7 +20,7 @@ import { formatAggregateResult } from '$lib/analysis/format-aggregate';
 import { parseRelatedQuestions } from '$lib/related-questions';
 import { hasAnswerBearingEvidence } from '$lib/pipeline/relevance';
 import { retrieveWithLocalQueryFallback } from '$lib/pipeline/query-translation';
-import { buildDeterministicExtractiveAnswer } from '$lib/private-ai/extractive-answer';
+import { buildAuditedExtractiveAnswer } from '$lib/private-ai/extractive-answer';
 import {
 	SYSTEM_PROMPT,
 	buildUserPrompt,
@@ -739,10 +739,10 @@ class ChatsStore {
 		// (empty streamingText) until the actual answer starts.
 		let streamRaw = '';
 		let raw: string;
-		const extractive = grounded ? buildDeterministicExtractiveAnswer(question, hits) : null;
+		const extractive = grounded ? buildAuditedExtractiveAnswer(question, hits) : null;
 		this.advanceWork('write');
 		if (extractive) {
-			raw = extractive;
+			raw = extractive.answer;
 			this.streamingText = raw;
 		} else {
 			try {
@@ -760,8 +760,11 @@ class ChatsStore {
 			}
 		}
 		raw = stripThink(raw || streamRaw);
+		// Selection extracts are drafts like any other: they can bind the
+		// right-looking clause to the wrong subject, and grounded verification is
+		// what audits slot completeness. Exact-copy extracts are never paraphrased.
 		if (
-			!extractive &&
+			(!extractive || extractive.needsAudit) &&
 			grounded &&
 			hits.length &&
 			raw.trim() &&

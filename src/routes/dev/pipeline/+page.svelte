@@ -77,7 +77,10 @@
 	import { resolveQuestion, resolveQuestions } from '$lib/nlu/semantic-resolver';
 	import { buildExecutionPlan } from '$lib/nlu/execution-plan';
 	import { RETRIEVAL_PIPELINE_VERSION } from '$lib/pipeline/retrieval';
-	import { buildDeterministicExtractiveAnswer } from '$lib/private-ai/extractive-answer';
+	import {
+		buildAuditedExtractiveAnswer,
+		buildDeterministicExtractiveAnswer
+	} from '$lib/private-ai/extractive-answer';
 	import {
 		buildVerificationPrompt,
 		buildVerificationUserPrompt,
@@ -776,10 +779,12 @@
 					return pending;
 				},
 				generate: async (messages, question, route, hits) => {
-					const extractive = buildDeterministicExtractiveAnswer(question, hits);
+					const extractive = buildAuditedExtractiveAnswer(question, hits);
 					if (extractive) {
 						extractiveAnswers++;
-						return enforceAnswerInvariants(question, extractive);
+						return extractive.needsAudit
+							? verifyBenchmarkAnswer(question, route, hits, extractive.answer)
+							: enforceAnswerInvariants(question, extractive.answer);
 					}
 					const options = generationOptionsFor(question, route);
 					const cacheKey = await privateGenerationCacheKey({
