@@ -124,6 +124,13 @@ const ROLE_CONCEPTS: Record<FinancialRole, string[]> = {
 	tax: ['tva', 'vat', 'taxe', 'tax']
 };
 
+// Evidence that a question measures money (matched on normalized text, so no
+// accents). Deliberately excludes operation words ("total", "somme") and
+// generic caps ("plafond", "limite"): those describe the asked shape, not the
+// measured thing, and would drag duration/count fact questions into money math.
+const MONEY_CONTEXT =
+	/\b(?:montant|montants|prix|cout|couts|frais|commission|commissions|eur|euro|euros|usd|gbp|chf|gnf|dollar|dollars|amount|amounts|price|prices|cost|costs|fee|fees|paye|payes|payee|payees|paid|charge|charged|charges|facture|factures|invoice|invoices|transaction|transactions|transfert|transferts|transfer|transfers|franchise|franchises|prime|primes|premium|premiums|indemnite|indemnites|remboursement|remboursements|deductible|reimbursement)\b|[€$£]/u;
+
 const SYNTHESIS_CONCEPTS = [
 	'compare',
 	'comparaison',
@@ -407,11 +414,17 @@ export function analyzeQuestion(question: string): SemanticFrame {
 				: temporal
 					? 'temporal'
 					: 'unspecified';
+	// Min/max/count/average enter the money-aggregation pipeline only when the
+	// question actually measures money. "Quelle est sa durée maximale ?" or a
+	// limit "en nombre de nuits" are fact lookups: routing them to financial
+	// aggregation answers with an unrelated money total.
+	const monetary = moneyRole !== null || MONEY_CONTEXT.test(q);
 	const financiallyAggregate =
-		operation === 'average' ||
-		operation === 'minimum' ||
-		operation === 'maximum' ||
-		operation === 'count' ||
+		((operation === 'average' ||
+			operation === 'minimum' ||
+			operation === 'maximum' ||
+			operation === 'count') &&
+			monetary) ||
 		(operation === 'list' && moneyRole !== null) ||
 		(operation === 'sum' && moneyRole !== null && !singleRecord && !page);
 	// A list over the whole document is exhaustive only when it isn't already

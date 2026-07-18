@@ -218,6 +218,7 @@ class ChatsStore {
 		}
 		return retrieveWithLocalQueryFallback({
 			query,
+			refinementQuery,
 			documentLanguages: documents.map((document) => document.language),
 			rewrite: (messages) =>
 				llmStore.generate(messages, () => {}, {

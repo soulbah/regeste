@@ -178,20 +178,28 @@ Silently correct misspellings. Preserve every user-supplied name, identifier, nu
  * never extra RRF votes that can drown an already-good exact retrieval. */
 export async function retrieveWithLocalQueryFallback(input: {
 	query: string;
+	/** The current question alone. A follow-up retrieves with the composed
+	 * conversation query, but evidence gates must judge the current question:
+	 * the previous turn's words otherwise satisfy every check while the actual
+	 * question goes unserved and the rewrite never gets to win. */
+	refinementQuery?: string;
 	documentLanguages: Array<string | null>;
 	rewrite: QueryTranslator;
 	retrieve: (alternateQueries: string[]) => Promise<SearchHit[]>;
 }): Promise<{ hits: SearchHit[]; alternateQueries: string[] }> {
+	const question = input.refinementQuery ?? input.query;
 	const primaryHits = await input.retrieve([]);
 	if (
 		!isWeakMatch(primaryHits) &&
-		hasAnswerBearingEvidence(input.query, primaryHits) &&
-		hasClauseLevelLexicalEvidence(input.query, primaryHits) &&
-		hasDistinctiveLexicalEvidence(input.query, primaryHits)
+		hasAnswerBearingEvidence(question, primaryHits) &&
+		hasClauseLevelLexicalEvidence(question, primaryHits) &&
+		hasDistinctiveLexicalEvidence(question, primaryHits)
 	) {
 		return { hits: primaryHits, alternateQueries: [] };
 	}
 
+	// The rewrite still sees the composed query: a pronoun question needs the
+	// referenced entity to produce useful search views.
 	const alternateQueries = await localRetrievalQueryVariants(
 		input.query,
 		input.documentLanguages,
@@ -202,24 +210,24 @@ export async function retrieveWithLocalQueryFallback(input: {
 	const fallbackHits = await input.retrieve(alternateQueries);
 	if (
 		isWeakMatch(fallbackHits) ||
-		!hasAnswerBearingEvidence(input.query, fallbackHits, alternateQueries) ||
-		!hasClauseLevelLexicalEvidence(input.query, fallbackHits)
+		!hasAnswerBearingEvidence(question, fallbackHits, alternateQueries) ||
+		!hasClauseLevelLexicalEvidence(question, fallbackHits)
 	) {
 		return { hits: primaryHits, alternateQueries: [] };
 	}
 	// A rewrite may find useful vocabulary while losing a precise structured
 	// declaration already recalled by user wording. Compare evidence quality;
 	// never replace a stronger primary result merely because retry is valid.
-	const evidenceScore = (hits: SearchHit[]) =>
+	const evidenceScore = (hits: SearchHit[], alternates: string[]) =>
 		Number(!isWeakMatch(hits)) +
-		2 * Number(hasAnswerBearingEvidence(input.query, hits)) +
-		Number(hasClauseLevelLexicalEvidence(input.query, hits)) +
-		Number(hasDistinctiveLexicalEvidence(input.query, hits)) +
+		2 * Number(hasAnswerBearingEvidence(question, hits, alternates)) +
+		Number(hasClauseLevelLexicalEvidence(question, hits)) +
+		Number(hasDistinctiveLexicalEvidence(question, hits)) +
 		stemmedQueryCoverage(
-			input.query,
+			question,
 			hits.map((hit) => `${hit.headingPath ?? ''}\n${hit.text}`).join('\n')
 		);
-	if (evidenceScore(primaryHits) >= evidenceScore(fallbackHits)) {
+	if (evidenceScore(primaryHits, []) >= evidenceScore(fallbackHits, alternateQueries)) {
 		return { hits: primaryHits, alternateQueries: [] };
 	}
 	return { hits: fallbackHits, alternateQueries };

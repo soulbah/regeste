@@ -36,6 +36,15 @@ describe('query routing', () => {
 		).toBe('synthesis');
 	});
 
+	it('keeps non-money min/max/count fact questions out of financial aggregation', () => {
+		// Regression: "maximale"/"nombre de" routed duration and limit lookups to
+		// the money pipeline, answering with an unrelated money total.
+		expect(routeQuestion('Quelle est sa durée maximale ?')).toBe('targeted');
+		expect(routeQuestion('Et sa limite en nombre de nuits ?')).toBe('targeted');
+		expect(routeQuestion('Quel est le montant maximum envoyé ?')).toBe('aggregate');
+		expect(routeQuestion('Combien de transferts en juin ?')).toBe('aggregate');
+	});
+
 	it('does not confuse French cost questions with English count', () => {
 		for (const question of [
 			'Quel est le coût du prêt ?',

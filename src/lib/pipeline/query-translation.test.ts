@@ -150,6 +150,34 @@ describe('crossLingualQueryVariants', () => {
 		});
 	});
 
+	it('judges evidence on the current question when a follow-up composes the query', async () => {
+		// Regression: a follow-up retrieves with the composed conversation query.
+		// Primary hits covering only the previous turn's words (name, address)
+		// used to satisfy every gate, so the rewrite never ran and the actual
+		// question went unserved.
+		const composed =
+			"Comment s'appelle la demandeuse ?\nLa demandeuse s'appelle Aminata Keita\nQuel est son métier ?";
+		const primary = [
+			hit(1, 'La demandeuse Aminata Keita réside à BAMAKO, adresse électronique, téléphone.')
+		];
+		const fallback = [
+			hit(2, '21. Activité professionnelle actuelle Employé 22. Employeur (Nom, adresse)')
+		];
+		const retrieve = vi.fn().mockResolvedValueOnce(primary).mockResolvedValueOnce(fallback);
+		await expect(
+			retrieveWithLocalQueryFallback({
+				query: composed,
+				refinementQuery: 'Quel est son métier ?',
+				documentLanguages: ['fr'],
+				rewrite: vi.fn().mockResolvedValue('activité professionnelle actuelle profession métier'),
+				retrieve
+			})
+		).resolves.toEqual({
+			hits: fallback,
+			alternateQueries: ['activité professionnelle actuelle profession métier']
+		});
+	});
+
 	it('retries a weak original query and accepts a grounded rewrite', async () => {
 		const primary = [hit(1, 'Conditions générales sans information recherchée.', 0.01)];
 		const fallback = [hit(2, 'La cotisation mensuelle est de 14,91 euros.')];
