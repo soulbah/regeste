@@ -10,7 +10,7 @@
 	import CommandPalette from '$lib/components/command-palette.svelte';
 	import SettingsDialog from '$lib/components/settings-dialog.svelte';
 	import ViewerPanel from '$lib/components/viewer-panel.svelte';
-	import { goto } from '$app/navigation';
+	import { afterNavigate, goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { dev } from '$app/environment';
@@ -29,6 +29,14 @@
 	// On routes with a contextual panel (chat, documents), the viewer rides that
 	// panel. Elsewhere the right pane doesn't exist, so ⌘K document results open
 	// the viewer in this overlay sheet instead.
+
+	// The viewer is summoned by a citation, a document row or a ⌘K hit — always
+	// for the page the user is on. Leaving that page must drop it: a stale
+	// viewer otherwise hijacks the next chat's panel, and on shell-less routes
+	// its overlay sheet blocks every click behind it.
+	afterNavigate((navigation) => {
+		if (navigation.from?.url.pathname !== navigation.to?.url.pathname) viewerStore.close();
+	});
 
 	// A second tab must fail loudly, not silently orphan the database (the OPFS
 	// SAH pool is single-owner; the worker refuses with 'folio-db-busy').

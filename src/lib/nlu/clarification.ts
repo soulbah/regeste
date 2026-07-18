@@ -5,6 +5,12 @@ export interface ClarificationContext {
 	documentCount: number;
 }
 
+// "cette fiche de paie", "ce contrat": the noun names the referent (usually the
+// attached document), so there is nothing to clarify. Only bare back-references
+// ("Et lui ?", "ce dernier") leave the entity genuinely unresolved.
+const DEMONSTRATIVE_WITH_NOUN =
+	/\b(?:ce|cet|cette|ces|this|that|these|those)\s+(?!derni|latter)\p{L}{3,}/u;
+
 export function contextualClarification(
 	question: string,
 	frame: SemanticFrame,
@@ -12,7 +18,12 @@ export function contextualClarification(
 ): ClarificationKind | null {
 	if (frame.clarification) return frame.clarification;
 	const normalized = normalizeQuestion(question);
-	if (frame.referencesPrevious && !context.hasConversationContext) return 'entity';
+	if (
+		frame.referencesPrevious &&
+		!context.hasConversationContext &&
+		!DEMONSTRATIVE_WITH_NOUN.test(normalized)
+	)
+		return 'entity';
 	if (
 		!frame.temporal &&
 		/\b(?:recemment|dernier mois|derniere periode|recently|latest period|last period)\b/.test(

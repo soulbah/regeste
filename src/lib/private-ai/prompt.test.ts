@@ -113,6 +113,14 @@ describe('buildUserPrompt', () => {
 		expect(prompt).not.toContain('Requested parts');
 	});
 
+	it('never turns a leading interjection into an answerable part', () => {
+		// Regression: "Non, l'acompte est beaucoup plus" split into two "requested
+		// parts" and the model recited the user's own words back with citations.
+		const prompt = buildUserPrompt("Non, l'acompte est beaucoup plus", [hit(1)]);
+		expect(prompt).not.toContain('Requested parts');
+		expect(prompt).not.toContain('1. Non');
+	});
+
 	it('asks the verifier to correct rather than critique the draft', () => {
 		const prompt = buildVerificationPrompt('Quelle ligne ?', 'Excerpts: source', 'Ligne 34 [1].');
 		expect(prompt).toContain('Return only the corrected answer');

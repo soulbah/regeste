@@ -18,6 +18,24 @@ describe('contextual clarification dimensions', () => {
 		).toBe(expected);
 	});
 
+	it('does not ask which entity when a demonstrative names its noun', () => {
+		// Regression: "cette fiche de paie" asked "De quelle personne ou de quel
+		// sujet précédent parlez-vous ?" on the first turn with a document attached.
+		expect(
+			contextualClarification(
+				'Quel est le salaire dans cette fiche de paie ?',
+				analyzeQuestion('Quel est le salaire dans cette fiche de paie ?'),
+				{ hasConversationContext: false, documentCount: 1 }
+			)
+		).toBeNull();
+		expect(
+			contextualClarification('Que dit ce dernier ?', analyzeQuestion('Que dit ce dernier ?'), {
+				hasConversationContext: false,
+				documentCount: 2
+			})
+		).toBe('entity');
+	});
+
 	it('does not clarify resolved follow-up or one selected document', () => {
 		expect(
 			contextualClarification('Et ses frais ?', analyzeQuestion('Et ses frais ?'), {

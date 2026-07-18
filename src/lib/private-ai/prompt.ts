@@ -18,11 +18,12 @@ import { isIdentityQuestion } from '$lib/pipeline/identity-evidence';
 // "de … à …" span (normalizeQuestion folds "à"→"a", which is also the verb).
 const STRICT_DIRECTION = /\b(?:de|from)\s+(\d{4})[\s\S]*?\s+(?:a|to)\s+(\d{4})\b/u;
 
-// Leading adverbial framings ("D'après le contrat,", "Selon vous,") are not
-// answerable parts. splitQueryClauses would otherwise count them as a part and
-// route a simple question through the multi-part / verification machinery.
+// Leading adverbial framings ("D'après le contrat,", "Selon vous,") and
+// interjections ("Non, l'acompte est…", "Oui, et…") are not answerable parts.
+// splitQueryClauses would otherwise count them as a part and the multi-part
+// contract would make the model recite the user's own words back as an answer.
 const LEADING_FRAMING =
-	/^(?:d['’ ]?apres|selon|a mon avis|en general|par ailleurs|d['’ ]?ailleurs)\b/u;
+	/^(?:d['’ ]?apres|selon|a mon avis|en general|par ailleurs|d['’ ]?ailleurs|non|no|oui|yes|ok|d['’ ]?accord|merci|thanks|bonjour|hello)\b/u;
 
 export const GROUNDED_VERIFICATION_VERSION = 7;
 export const MAX_VERIFICATION_EVIDENCE_CHARS = 4800;
