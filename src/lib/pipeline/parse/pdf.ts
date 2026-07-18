@@ -10,6 +10,7 @@
 
 import type { ParsedDoc, ParsedBlock } from '$lib/types';
 import { orderPdfText } from './pdf-layout';
+import { normalizeFormMarks, type PositionedTextItem } from './pdf-form-marks';
 import { assessPdfTextLayer } from '../pdf-text-quality';
 
 export function isLikelyPdfSectionHeading(line: string, nextLine = ''): boolean {
@@ -65,23 +66,37 @@ export async function parsePdf(data: ArrayBuffer): Promise<ParsedDoc> {
 	const needsOcr: number[] = [];
 	const ocrFallbackBlocks: ParsedBlock[] = [];
 
+	// Pass 1 — collect positioned items for every page: checkbox normalization
+	// is document-wide (a glyph codepoint proven to be a checkbox on one page
+	// qualifies its lone instances everywhere).
+	const pageWidths: number[] = [];
+	const pagesPositioned: PositionedTextItem[][] = [];
 	for (let pageNum = 1; pageNum <= doc.numPages; pageNum++) {
 		const page = await doc.getPage(pageNum);
-		const pageWidth = page.getViewport({ scale: 1 }).width;
+		pageWidths.push(page.getViewport({ scale: 1 }).width);
 		const content = await page.getTextContent();
-		const positioned = content.items
-			.filter(
-				(item): item is (typeof content.items)[number] & { str: string; transform: number[] } =>
-					'str' in item && Array.isArray(item.transform)
-			)
-			.map((item) => ({
-				text: item.str.trim(),
-				x: item.transform[4],
-				y: item.transform[5],
-				width: 'width' in item && typeof item.width === 'number' ? item.width : 0
-			}))
-			.filter((item) => item.text.length > 0);
-		const lineTexts = orderPdfText(positioned, pageWidth);
+		pagesPositioned.push(
+			content.items
+				.filter(
+					(item): item is (typeof content.items)[number] & { str: string; transform: number[] } =>
+						'str' in item && Array.isArray(item.transform)
+				)
+				.map((item) => ({
+					text: item.str.trim(),
+					x: item.transform[4],
+					y: item.transform[5],
+					width: 'width' in item && typeof item.width === 'number' ? item.width : 0
+				}))
+				.filter((item) => item.text.length > 0)
+		);
+		page.cleanup();
+	}
+	await loadingTask.destroy();
+
+	// Pass 2 — order text and build blocks from the normalized items.
+	const normalizedPages = normalizeFormMarks(pagesPositioned);
+	for (let pageNum = 1; pageNum <= normalizedPages.length; pageNum++) {
+		const lineTexts = orderPdfText(normalizedPages[pageNum - 1], pageWidths[pageNum - 1]);
 		const text = lineTexts.join('\n').trim();
 		const quality = assessPdfTextLayer(text);
 		if (quality.reason) {
@@ -90,9 +105,7 @@ export async function parsePdf(data: ArrayBuffer): Promise<ParsedDoc> {
 		} else {
 			blocks.push(...pageBlocks(lineTexts, pageNum));
 		}
-		page.cleanup();
 	}
-	await loadingTask.destroy();
 
 	return {
 		blocks,
