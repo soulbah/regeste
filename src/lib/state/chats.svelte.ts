@@ -36,6 +36,7 @@ import {
 	buildVerificationPrompt,
 	buildVerificationUserPrompt,
 	enforceAnswerInvariants,
+	extractThink,
 	groundedRefusal,
 	isThinking,
 	needsGroundedVerification,
@@ -76,6 +77,8 @@ class ChatsStore {
 	sending = $state(false);
 	/** Non-null while a Private answer streams in. */
 	streamingText = $state<string | null>(null);
+	/** Live <think> trace while the answer is being written (draft notes). */
+	streamingThinking = $state<string | null>(null);
 	/** Assisted send awaiting review in the right panel (FEATURES 5ter). */
 	pendingAssisted = $state<{
 		chatId: string;
@@ -497,6 +500,7 @@ class ChatsStore {
 		} finally {
 			this.sending = false;
 			this.streamingText = null;
+			this.streamingThinking = null;
 			this.workSteps = [];
 		}
 		void this.generateRelated(chatId);
@@ -659,6 +663,7 @@ class ChatsStore {
 		} finally {
 			this.sending = false;
 			this.streamingText = null;
+			this.streamingThinking = null;
 			this.workSteps = [];
 		}
 		void this.generateRelated(chatId);
@@ -776,6 +781,9 @@ class ChatsStore {
 		// (empty streamingText) until the actual answer starts.
 		let streamRaw = '';
 		let raw: string;
+		// Draft notes: the <think> trace of whichever pass produced the answer.
+		let reasoning = '';
+		let reasoningMs: number | null = null;
 		// A contested turn re-weighs evidence; a deterministic extract would just
 		// repeat whichever clause matches and cannot concede or confirm.
 		const contested = conversationContext !== null && isContestation(question);
@@ -785,12 +793,14 @@ class ChatsStore {
 			raw = extractive.answer;
 			this.streamingText = raw;
 		} else {
+			const writeStartedAt = performance.now();
 			try {
 				raw = await llmStore.generate(
 					messages,
 					(delta) => {
 						streamRaw += delta;
 						this.streamingText = isThinking(streamRaw) ? '' : stripThink(streamRaw);
+						this.streamingThinking = extractThink(streamRaw) || null;
 					},
 					generationOptionsFor(question, route === 'synthesis' ? 'synthesis' : 'targeted')
 				);
@@ -798,6 +808,8 @@ class ChatsStore {
 				console.error('[folio] private generation failed:', err);
 				raw = streamRaw;
 			}
+			reasoning = extractThink(raw || streamRaw);
+			reasoningMs = Math.round(performance.now() - writeStartedAt);
 		}
 		raw = stripThink(raw || streamRaw);
 		// Selection extracts are drafts like any other: they can bind the
@@ -814,26 +826,33 @@ class ChatsStore {
 				// The verification is a fresh generation; a small/CPU model can spend
 				// its whole budget inside <think> and return nothing. Only adopt the
 				// verified answer when it is non-empty, otherwise keep the good draft.
-				const verified = stripThink(
-					await llmStore.generate(
-						[
-							{ role: 'system', content: SYSTEM_PROMPT },
-							{
-								role: 'user',
-								content: buildVerificationPrompt(
-									question,
-									buildVerificationUserPrompt(question, hits, conversationContext),
-									raw
-								)
-							}
-						],
-						() => {},
-						generationOptionsFor(question, route === 'synthesis' ? 'synthesis' : 'targeted')
-					)
+				const verificationStartedAt = performance.now();
+				const verifiedRaw = await llmStore.generate(
+					[
+						{ role: 'system', content: SYSTEM_PROMPT },
+						{
+							role: 'user',
+							content: buildVerificationPrompt(
+								question,
+								buildVerificationUserPrompt(question, hits, conversationContext),
+								raw
+							)
+						}
+					],
+					() => {},
+					generationOptionsFor(question, route === 'synthesis' ? 'synthesis' : 'targeted')
 				);
+				const verified = stripThink(verifiedRaw);
 				if (verified.trim()) {
 					raw = verified;
 					this.streamingText = raw;
+					// The displayed answer now comes from the verification pass; its
+					// notes are the ones that explain it.
+					const verificationThink = extractThink(verifiedRaw);
+					if (verificationThink) {
+						reasoning = verificationThink;
+						reasoningMs = Math.round(performance.now() - verificationStartedAt);
+					}
 				}
 			} catch (err) {
 				console.error('[folio] grounded verification failed:', err);
@@ -885,7 +904,10 @@ class ChatsStore {
 			kind: route,
 			documentCount,
 			passageCount: hits.length,
-			reasoningUsed: route === 'synthesis'
+			reasoningUsed: route === 'synthesis',
+			// Bounded copy: draft notes are a transparency artifact, not archival.
+			reasoning: reasoning ? reasoning.slice(0, 8000) : null,
+			reasoningMs
 		});
 		await this.loadCitations(chatId);
 	}
@@ -1247,6 +1269,7 @@ class ChatsStore {
 		} finally {
 			this.sending = false;
 			this.streamingText = null;
+			this.streamingThinking = null;
 		}
 	}
 

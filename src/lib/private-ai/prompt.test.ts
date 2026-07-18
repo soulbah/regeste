@@ -8,6 +8,7 @@ import {
 	citationGroundingCoverage,
 	compactCitationMarkers,
 	enforceAnswerInvariants,
+	extractThink,
 	needsGroundedVerification,
 	resolveCitations,
 	resolveTargetedCitations
@@ -132,6 +133,14 @@ describe('buildUserPrompt', () => {
 		const prompt = buildUserPrompt("Non, l'acompte est beaucoup plus", [hit(1)]);
 		expect(prompt).not.toContain('Requested parts');
 		expect(prompt).not.toContain('1. Non');
+	});
+
+	it('extracts think blocks as draft notes, closed or mid-stream', () => {
+		expect(extractThink('<think>weigh the clauses</think>The cap is 150 €.')).toBe(
+			'weigh the clauses'
+		);
+		expect(extractThink('<think>first</think>middle<think>still going')).toBe('first\nstill going');
+		expect(extractThink('No reasoning here.')).toBe('');
 	});
 
 	it('asks the verifier to correct rather than critique the draft', () => {

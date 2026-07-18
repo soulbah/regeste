@@ -369,6 +369,9 @@ export const fr: Record<keyof typeof en, string> = {
 		'Une précision a été demandée avant la recherche dans les documents.',
 	'work.method.reasoning':
 		'Une passe de raisonnement privée a été utilisée ; seul ce résumé opérationnel est affiché.',
+	'work.method.notes': 'Notes de travail',
+	'work.method.notesAll': 'Tout afficher',
+	'work.method.notesLess': 'Réduire',
 	'turn.sourcesMore': '+{count}',
 	'turn.sourcesLess': 'Réduire les sources',
 	'turn.copyAria': 'Copier la réponse',

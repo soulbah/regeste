@@ -11,10 +11,10 @@ describe('generationOptionsFor', () => {
 		expect(generationOptionsFor('What is their account number?', 'targeted').maxTokens).toBe(160);
 	});
 
-	it('keeps a deliberate budget for synthesis', () => {
+	it('reasons on synthesis with a budget covering the trace and the answer', () => {
 		expect(generationOptionsFor('Compare les contrats', 'synthesis')).toEqual({
-			reasoning: 'off',
-			maxTokens: 420,
+			reasoning: 'on',
+			maxTokens: 900,
 			temperature: 0
 		});
 	});

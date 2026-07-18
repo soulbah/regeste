@@ -576,6 +576,16 @@ export function isThinking(text: string): boolean {
 	return lastOpen >= 0 && text.indexOf('</think>', lastOpen) === -1;
 }
 
+/** The reasoning inside <think> blocks — closed ones and a trailing unclosed
+ * one (mid-stream). Displayed as the turn's draft notes, never as the answer. */
+export function extractThink(text: string): string {
+	const parts = [...text.matchAll(/<think>([\s\S]*?)<\/think>/g)].map((match) => match[1]);
+	const withoutClosed = text.replace(/<think>[\s\S]*?<\/think>/g, '');
+	const openIdx = withoutClosed.indexOf('<think>');
+	if (openIdx >= 0) parts.push(withoutClosed.slice(openIdx + '<think>'.length));
+	return parts.join('\n').trim();
+}
+
 export interface CitationRef {
 	/** 1-based excerpt number as emitted by the model. */
 	n: number;

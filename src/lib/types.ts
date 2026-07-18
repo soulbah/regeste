@@ -102,6 +102,11 @@ export interface MethodSummary {
 	documentCount: number;
 	passageCount: number;
 	reasoningUsed: boolean;
+	/** Raw <think> trace of the pass that produced the answer — draft notes,
+	 * shown collapsed in the method expander, never indexed for search. */
+	reasoning?: string | null;
+	/** Wall-clock of the generation that carried the reasoning. */
+	reasoningMs?: number | null;
 	calculation?: string | null;
 	clarification?:
 		| 'scope'

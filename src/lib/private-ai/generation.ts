@@ -17,7 +17,11 @@ export function generationOptionsFor(
 	question: string,
 	route: 'targeted' | 'synthesis'
 ): GenerationOptions {
-	if (route === 'synthesis') return { reasoning: 'off', maxTokens: 420, temperature: 0 };
+	// Synthesis runs with reasoning on: the trace streams live as draft notes
+	// (perceived latency) and is kept on the turn, collapsed. The budget covers
+	// thinking plus the answer. Targeted facts stay direct and fast; the Lite
+	// CPU tier is forced off in adaptGenerationOptions.
+	if (route === 'synthesis') return { reasoning: 'on', maxTokens: 900, temperature: 0 };
 	const frame = analyzeQuestion(question);
 	const shortFact =
 		frame.answerShape === 'fact' ||

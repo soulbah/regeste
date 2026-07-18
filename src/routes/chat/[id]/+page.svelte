@@ -389,12 +389,17 @@
 					{/if}
 					{#if chatsStore.streamingText !== null}
 						<div class="space-y-2">
-							<WorkLedger steps={chatsStore.workSteps} />
+							<!-- Live draft notes only until readable answer text streams:
+							     the answer then takes over as the progress signal. -->
+							<WorkLedger
+								steps={chatsStore.workSteps}
+								thinking={chatsStore.streamingText ? null : chatsStore.streamingThinking}
+							/>
 							{#if chatsStore.streamingText}
 								<p class="text-sm leading-relaxed whitespace-pre-wrap">
 									{chatsStore.streamingText}
 								</p>
-							{:else}
+							{:else if !chatsStore.streamingThinking}
 								<Skeleton class="h-4 w-2/3" />
 							{/if}
 						</div>

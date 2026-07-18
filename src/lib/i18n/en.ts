@@ -358,6 +358,9 @@ export const en = {
 	'work.method.clarification': 'Asked for the missing detail before searching the documents.',
 	'work.method.reasoning':
 		'A private reasoning pass was used; only this operational summary is shown.',
+	'work.method.notes': 'Draft notes',
+	'work.method.notesAll': 'Show all',
+	'work.method.notesLess': 'Show less',
 	'turn.sourcesMore': '+{count}',
 	'turn.sourcesLess': 'Show fewer sources',
 	'turn.copyAria': 'Copy the answer',
