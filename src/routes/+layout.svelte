@@ -35,7 +35,7 @@
 	// viewer otherwise hijacks the next chat's panel, and on shell-less routes
 	// its overlay sheet blocks every click behind it.
 	afterNavigate((navigation) => {
-		if (navigation.from?.url.pathname !== navigation.to?.url.pathname) viewerStore.close();
+		if (navigation.from?.url?.pathname !== navigation.to?.url?.pathname) viewerStore.close();
 	});
 
 	// A second tab must fail loudly, not silently orphan the database (the OPFS
