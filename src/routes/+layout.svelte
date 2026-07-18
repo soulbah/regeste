@@ -6,11 +6,12 @@
 	import { Toaster } from '$lib/components/ui/sonner';
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import * as Sheet from '$lib/components/ui/sheet';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	import AppSidebar from '$lib/components/app-sidebar.svelte';
 	import CommandPalette from '$lib/components/command-palette.svelte';
 	import SettingsDialog from '$lib/components/settings-dialog.svelte';
 	import ViewerPanel from '$lib/components/viewer-panel.svelte';
-	import { afterNavigate, goto } from '$app/navigation';
+	import { beforeNavigate, goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { dev } from '$app/environment';
@@ -31,10 +32,11 @@
 	// the viewer in this overlay sheet instead.
 
 	// The viewer is summoned by a citation, a document row or a ⌘K hit — always
-	// for the page the user is on. Leaving that page must drop it: a stale
-	// viewer otherwise hijacks the next chat's panel, and on shell-less routes
-	// its overlay sheet blocks every click behind it.
-	afterNavigate((navigation) => {
+	// for the page the user is on. Leaving that page must drop it BEFORE the
+	// next route renders: a stale viewer otherwise hijacks the next chat's
+	// panel, and on shell-less routes it flashes into the overlay sheet while
+	// the shell unmounts (afterNavigate would fire too late to prevent it).
+	beforeNavigate((navigation) => {
 		if (navigation.from?.url?.pathname !== navigation.to?.url?.pathname) viewerStore.close();
 	});
 
@@ -141,7 +143,11 @@
 	onOpenChange={(o) => !o && viewerStore.close()}
 >
 	<Sheet.Content side="right" class="w-full gap-0 p-0 sm:max-w-md">
-		<ViewerPanel />
+		<!-- This sheet portals outside Sidebar.Provider (the app's Tooltip
+		     provider); the panel header's tooltips need their own. -->
+		<Tooltip.Provider delayDuration={300}>
+			<ViewerPanel />
+		</Tooltip.Provider>
 	</Sheet.Content>
 </Sheet.Root>
 
