@@ -23,6 +23,40 @@ interface Piece {
 	charStart: number;
 	charEnd: number;
 	target: number;
+	/** Starts a numbered clause ("Article 110 :"): a chunk never straddles it. */
+	opensSection?: boolean;
+}
+
+// Numbered-clause markers open a new legal/regulatory section; a chunk that
+// straddles one cites the previous clause's tail as part of the requested one.
+// Structural like the heading heuristics: the colon/dash after the number is
+// what distinguishes a clause opener from an in-sentence cross-reference
+// ("conformément à l'article 110"). \p{L} in "ar\p{L}icle" tolerates the
+// common OCR artifact on the t ("Arțicle").
+const SECTION_MARKER = /\b(?:ar\p{L}icle|art\.)\s*\d{1,4}[a-z]?\s*(?::|[–—]|-\s)/giu;
+
+/** Split a block's text before each clause marker, keeping offsets. */
+export function splitAtSectionMarkers(
+	text: string,
+	offset: number
+): Array<{ text: string; start: number; end: number; opensSection: boolean }> {
+	const cuts: number[] = [];
+	for (const match of text.matchAll(SECTION_MARKER)) cuts.push(match.index);
+	if (!cuts.length || (cuts.length === 1 && cuts[0] === 0)) {
+		return [{ text, start: offset, end: offset + text.length, opensSection: cuts[0] === 0 }];
+	}
+	const bounds = [...new Set([0, ...cuts])].sort((left, right) => left - right);
+	return bounds
+		.map((start, index) => {
+			const end = bounds[index + 1] ?? text.length;
+			return {
+				text: text.slice(start, end),
+				start: offset + start,
+				end: offset + end,
+				opensSection: cuts.includes(start)
+			};
+		})
+		.filter((segment) => segment.text.trim().length > 0);
 }
 
 function sectionKey(b: ParsedBlock): string {
@@ -127,27 +161,32 @@ export function chunkBlocks(blocks: ParsedBlock[], documentName = ''): Chunk[] {
 					.join('\n')
 					.slice(0, 600)
 			: '';
-		// Flatten section blocks into pieces no larger than the target.
+		// Flatten section blocks into pieces no larger than the target, cutting
+		// before every numbered-clause marker.
 		const pieces: Piece[] = [];
 		for (const b of section) {
-			const target = chunkTargetForBlock(b.text);
-			if (b.text.length <= target) {
-				pieces.push({
-					text: b.text,
-					block: b,
-					charStart: b.charStart,
-					charEnd: b.charEnd,
-					target
-				});
-			} else {
-				for (const part of splitSentences(b.text, b.charStart, target)) {
+			for (const segment of splitAtSectionMarkers(b.text, b.charStart)) {
+				const target = chunkTargetForBlock(segment.text);
+				if (segment.text.length <= target) {
 					pieces.push({
-						text: part.text,
+						text: segment.text,
 						block: b,
-						charStart: part.start,
-						charEnd: part.end,
-						target
+						charStart: segment.start,
+						charEnd: segment.end,
+						target,
+						opensSection: segment.opensSection
 					});
+				} else {
+					for (const part of splitSentences(segment.text, segment.start, target)) {
+						pieces.push({
+							text: part.text,
+							block: b,
+							charStart: part.start,
+							charEnd: part.end,
+							target,
+							opensSection: segment.opensSection && part.start === segment.start
+						});
+					}
 				}
 			}
 		}
@@ -200,6 +239,13 @@ export function chunkBlocks(blocks: ParsedBlock[], documentName = ''): Chunk[] {
 			});
 		};
 		for (const piece of pieces) {
+			// A clause opener starts its own chunk, with no overlap carried across:
+			// the previous clause's tail must not be cited as part of this one.
+			if (piece.opensSection && buf.length) {
+				flush();
+				buf = [];
+				bufLen = 0;
+			}
 			const bufferTarget = Math.min(piece.target, ...buf.map((item) => item.target));
 			if (bufLen + piece.text.length > bufferTarget && buf.length) {
 				flush();

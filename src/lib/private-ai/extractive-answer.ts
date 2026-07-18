@@ -994,6 +994,18 @@ function buildNumberAnchoredAnswer(question: string, hits: SearchHit[]): string 
 	const normalizedQuestion = normalizeQuestion(question);
 	const anchor = /\b(\d{2,})\b/u.exec(normalizedQuestion)?.[1];
 	if (!anchor) return null;
+	// "Que dit l'article 110 …" anchors a SECTION REFERENCE, not a value. Those
+	// are content questions: copying the clause that contains the number dumps
+	// whichever chunk mentions it (often straddling the previous section).
+	// Leave them to model synthesis. The \p{L} in "ar\p{L}icle" tolerates the
+	// common OCR artifact on the t ("Arțicle").
+	if (
+		new RegExp(
+			String.raw`\b(?:ar\p{L}icle|art|section|chapitre|chapter|clause|paragraphe|paragraph|annexe|annex|alinea|§)\s*\.?\s*${anchor}\b`,
+			'iu'
+		).test(normalizedQuestion)
+	)
+		return null;
 	const candidates = evidenceUnits(hits)
 		.filter((unit) => new RegExp(String.raw`\b${anchor}\b`, 'u').test(normalizeQuestion(unit.text)))
 		.map((unit) => ({ unit, score: coverage(question, unit.text) }))

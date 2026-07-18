@@ -15,6 +15,34 @@ const hit = (chunkId: number, text: string, page = 1, seq = chunkId): SearchHit 
 });
 
 describe('deterministic extractive answers', () => {
+	it('leaves section-reference questions to model synthesis', () => {
+		// Regression: "Que dit l'article 110 …" anchored the number-anchored
+		// extractor, which dumped the whole chunk (starting inside article 109).
+		const answer = buildDeterministicExtractiveAnswer(
+			"Que dit l'article 110 sur la celebration d'un mariage ?",
+			[
+				hit(
+					1,
+					"Mention est portée en marge de l'acte de mariage. Arțicle 110 : Célébration du mariage A l'expiration du délai d'un mois, l'officier de l'état civil procède à la célébration du mariage."
+				)
+			]
+		);
+		expect(answer).toBeNull();
+	});
+
+	it('still anchors genuine value questions on their number', () => {
+		const answer = buildDeterministicExtractiveAnswer(
+			'Que se passe-t-il apres un sejour de plus de 90 jours ?',
+			[
+				hit(
+					1,
+					'Un séjour de plus de 90 jours impose une demande de visa de long séjour auprès du consulat.'
+				)
+			]
+		);
+		expect(answer).toContain('90 jours');
+	});
+
 	it('maps requested form slots to their exact labels and values', () => {
 		const answer = buildDeterministicExtractiveAnswer(
 			'Résume type, surface, période de construction, matériau et dépendances déclarés.',

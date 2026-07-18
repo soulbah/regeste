@@ -32,6 +32,28 @@ describe('splitSentences', () => {
 });
 
 describe('chunkBlocks', () => {
+	it('never straddles a numbered-clause marker', () => {
+		// Regression: the chunk cited for "Que dit l'article 110 ?" opened with
+		// the tail of article 109. "Arțicle" is the real OCR artifact.
+		const text =
+			`Mention du dispositif de la décision du Président du tribunal est portée en marge de l'acte de mariage. ` +
+			`Arțicle 110 : Célébration du mariage A l'expiration du délai d'un mois, l'officier de l'état civil procède à la célébration du mariage. ` +
+			`Article 111 : Publicité des débats La célébration est publique.`;
+		const chunks = chunkBlocks([{ text, page: 1, charStart: 0, charEnd: text.length }]);
+		const clause110 = chunks.find((chunk) => chunk.text.includes('110'));
+		expect(clause110?.text.startsWith('Arțicle 110')).toBe(true);
+		expect(clause110?.text).not.toContain('marge de');
+		expect(clause110?.text).not.toContain('111');
+	});
+
+	it('does not cut at an in-sentence cross-reference without a colon', () => {
+		const text =
+			`Le mariage est célébré conformément à l'article 108 du présent code. ` +
+			`La publication reste affichée pendant un mois entier au centre principal.`;
+		const chunks = chunkBlocks([{ text, page: 1, charStart: 0, charEnd: text.length }]);
+		expect(chunks.length).toBe(1);
+	});
+
 	it('never crosses page boundaries', () => {
 		const blocks: ParsedBlock[] = [
 			{ text: para(1), page: 1, charStart: 0, charEnd: para(1).length },
