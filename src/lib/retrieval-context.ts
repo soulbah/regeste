@@ -1,8 +1,9 @@
 import type { LocalMessage } from '$lib/types';
-import { analyzeQuestion } from '$lib/analysis/query-router';
+import { analyzeQuestion, normalizeQuestion } from '$lib/analysis/query-router';
 
 const MAX_PART_CHARS = 700;
 const CITATION_MARKER = /\[(?:\d{1,2})\]/g;
+const NO_EXCLUDED_IDS: ReadonlySet<string> = new Set();
 
 export interface RetrievalContext {
 	previousQuestion: string;
@@ -10,6 +11,10 @@ export interface RetrievalContext {
 	searchQuery: string;
 	/** Current question first so its date scope overrides the referenced turn. */
 	analysisQuery: string;
+	/** Text ambiguity checks may judge. A follow-up glues two complete questions
+	 * into analysisQuery, so only the current turn is safe to inspect; a
+	 * clarification continuation reads as one composed question. */
+	clarificationQuery: string;
 	promptContext: string;
 }
 
@@ -30,7 +35,8 @@ export function needsRetrievalContext(question: string): boolean {
 export function buildRetrievalContext(
 	messages: LocalMessage[],
 	currentQuestion: string,
-	force = false
+	force = false,
+	excludeAssistantIds: ReadonlySet<string> = NO_EXCLUDED_IDS
 ): RetrievalContext | null {
 	if (!force && !needsRetrievalContext(currentQuestion)) return null;
 	let skippedCurrent = false;
@@ -50,7 +56,8 @@ export function buildRetrievalContext(
 			!previousAnswer &&
 			message.role === 'assistant' &&
 			message.mode !== 'notice' &&
-			message.mode !== 'retrieval'
+			message.mode !== 'retrieval' &&
+			!excludeAssistantIds.has(message.id)
 		) {
 			previousAnswer = clean(message.content);
 			continue;
@@ -67,8 +74,20 @@ export function buildRetrievalContext(
 		previousAnswer,
 		searchQuery: `${previousQuestion}\n${previousAnswer}\n${question}`,
 		analysisQuery: `${question}\nPrevious question: ${previousQuestion}`,
+		clarificationQuery: question,
 		promptContext: `Previous question: ${previousQuestion}\nPrevious answer: ${previousAnswer}`
 	};
+}
+
+/** A clarification reply is a fragment filling a slot ("en juin", "les frais").
+ * A turn that is itself a complete question starts a new request, never a slot
+ * value — composing it with the pending question pollutes analysis and can
+ * re-trigger the same clarification forever. */
+function isStandaloneQuestion(text: string): boolean {
+	if (text.includes('?')) return true;
+	return /^(?:qui|quel(?:le|s|les)?|combien|comment|pourquoi|quand|que|qu|what|which|who|whom|whose|how|why|where|when)\b/u.test(
+		normalizeQuestion(text)
+	);
 }
 
 /** Rebuild a multi-step clarification as one compositional query. Assistant
@@ -79,6 +98,7 @@ export function buildClarificationContext(
 	currentQuestion: string,
 	clarificationMessageIds: ReadonlySet<string>
 ): RetrievalContext | null {
+	if (isStandaloneQuestion(currentQuestion)) return null;
 	const parts = [clean(currentQuestion)];
 	let skippedCurrent = false;
 	let awaitingAnswer = false;
@@ -111,6 +131,7 @@ export function buildClarificationContext(
 		previousAnswer: '',
 		searchQuery: analysisQuery,
 		analysisQuery,
+		clarificationQuery: analysisQuery,
 		promptContext: `Clarified request: ${analysisQuery}`
 	};
 }

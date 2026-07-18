@@ -39,6 +39,27 @@ describe('buildClarificationContext', () => {
 		);
 	});
 
+	it('does not treat a new full question as a clarification slot answer', () => {
+		const current = "C'est quoi le motif de la demande ?";
+		const messages = [
+			message('user', 'Quel est son métier ?', null, 'u1'),
+			message('assistant', 'À quelle partie faut-il répondre en premier ?', 'private', 'a1'),
+			message('user', current, null, 'u2')
+		];
+		expect(buildClarificationContext(messages, current, new Set(['a1']))).toBeNull();
+	});
+
+	it('does not treat an unpunctuated interrogative as a slot answer', () => {
+		const messages = [
+			message('user', 'Quel est le total ?', null, 'u1'),
+			message('assistant', 'Un relevé ou tous les documents ?', 'private', 'a1'),
+			message('user', 'quel est le motif de la demande', null, 'u2')
+		];
+		expect(
+			buildClarificationContext(messages, 'quel est le motif de la demande', new Set(['a1']))
+		).toBeNull();
+	});
+
 	it('does not carry an ordinary assistant turn as clarification state', () => {
 		const messages = [
 			message('user', 'Quel est le total ?', null, 'u1'),
@@ -137,6 +158,40 @@ describe('buildRetrievalContext', () => {
 		);
 		expect(context?.analysisQuery).toContain('Quel est le total ?');
 		expect(context?.analysisQuery.startsWith(current)).toBe(true);
+	});
+
+	it('exposes only the current turn to ambiguity checks on a follow-up', () => {
+		// Regression: analysisQuery holds two complete questions, so counting its
+		// "?" fired the multi-part clarification on every follow-up.
+		const current = 'Quel est son métier ?';
+		const context = buildRetrievalContext(
+			[
+				message('user', "Comment s'appelle la demandeuse ?"),
+				message('assistant', "La demandeuse s'appelle Aminata Keita [1]."),
+				message('user', current)
+			],
+			current
+		);
+		expect(context?.clarificationQuery).toBe(current);
+		expect(context?.analysisQuery).toContain('Previous question:');
+	});
+
+	it('never uses a clarification prompt as the previous answer', () => {
+		const current = 'Quel est son métier ?';
+		const context = buildRetrievalContext(
+			[
+				message('user', "Comment s'appelle la demandeuse ?", null, 'u1'),
+				message('assistant', "La demandeuse s'appelle Aminata Keita.", 'private', 'a1'),
+				message('user', current, null, 'u2'),
+				message('assistant', 'À quelle partie faut-il répondre en premier ?', 'private', 'a2'),
+				message('user', current, null, 'u3')
+			],
+			current,
+			false,
+			new Set(['a2'])
+		);
+		expect(context?.previousAnswer).toContain('Aminata');
+		expect(context?.previousQuestion).toContain('demandeuse');
 	});
 
 	it('ignores notices and returns no context before a completed exchange', () => {

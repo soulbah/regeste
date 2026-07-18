@@ -9,13 +9,21 @@ import { guardedFetch, OfflineError } from '$lib/net';
 import { myaiStore, endpointHost, type ChatMessage } from './myai.svelte';
 import { llmStore } from '$lib/private-ai/llm.svelte';
 import { generationOptionsFor } from '$lib/private-ai/generation';
-import { buildClarificationContext, buildRetrievalContext } from '$lib/retrieval-context';
+import {
+	buildClarificationContext,
+	buildRetrievalContext,
+	type RetrievalContext
+} from '$lib/retrieval-context';
 import { assistedPayloadBytes } from '$lib/assisted-payload';
 import { questionLocale } from '$lib/analysis/query-router';
 import { resolveQuestion, type EmbedQuestions } from '$lib/nlu/semantic-resolver';
 import { buildExecutionPlan } from '$lib/nlu/execution-plan';
 import { contextualClarification } from '$lib/nlu/clarification';
-import type { ClarificationKind } from '$lib/nlu/semantic-frame';
+import {
+	analyzeQuestion,
+	type ClarificationKind,
+	type SemanticFrame
+} from '$lib/nlu/semantic-frame';
 import { formatAggregateResult } from '$lib/analysis/format-aggregate';
 import { parseRelatedQuestions } from '$lib/related-questions';
 import { hasAnswerBearingEvidence } from '$lib/pipeline/relevance';
@@ -150,10 +158,42 @@ class ChatsStore {
 				.filter(([, summary]) => summary.kind === 'clarification')
 				.map(([messageId]) => messageId)
 		);
+		// Clarification prompts are control messages: they must never be read
+		// back as the "previous answer" of a follow-up.
 		return (
 			buildClarificationContext(this.messages, question, clarificationIds) ??
-			buildRetrievalContext(this.messages, question)
+			buildRetrievalContext(this.messages, question, false, clarificationIds)
 		);
+	}
+
+	/** Kind of the clarification the assistant just asked, if the immediately
+	 * preceding assistant turn was one. */
+	private pendingClarificationKind(): ClarificationKind | null {
+		const last = [...this.messages].reverse().find((m) => m.role === 'assistant');
+		if (!last) return null;
+		const method = this.methodByMessage[last.id];
+		return method?.kind === 'clarification' ? (method.clarification ?? null) : null;
+	}
+
+	/** Ambiguity checks judge the current turn only: a follow-up context glues
+	 * two complete questions into analysisQuery, which must not read as a
+	 * multi-part question. A repeat of the clarification the assistant just
+	 * asked is suppressed — re-asking verbatim loops forever, answering
+	 * best-effort is the way out. */
+	private clarificationFor(
+		question: string,
+		context: RetrievalContext | null,
+		frame: SemanticFrame,
+		documentCount: number
+	): ClarificationKind | null {
+		const query = context?.clarificationQuery ?? question;
+		const clarification = contextualClarification(query, context ? analyzeQuestion(query) : frame, {
+			hasConversationContext: !!context,
+			documentCount
+		});
+		return clarification && clarification !== this.pendingClarificationKind()
+			? clarification
+			: null;
 	}
 
 	private async retrieveWithSearchFallback(
@@ -403,10 +443,7 @@ class ChatsStore {
 			const enabledDocs = this.chatDocuments.filter((d) => d.enabled && d.status === 'ready');
 			const analysisQuestion = context?.analysisQuery ?? question;
 			const frame = await resolveQuestion(analysisQuestion, this.embedQuestions);
-			const clarification = contextualClarification(analysisQuestion, frame, {
-				hasConversationContext: !!context,
-				documentCount: enabledDocs.length
-			});
+			const clarification = this.clarificationFor(question, context, frame, enabledDocs.length);
 			if (clarification) {
 				await this.insertClarification(chatId, clarification, frame.locale, versionGroup);
 				this.messages = await db.listMessages(chatId);
@@ -570,10 +607,7 @@ class ChatsStore {
 			const enabledDocs = this.chatDocuments.filter((d) => d.enabled && d.status === 'ready');
 			const analysisQuestion = context?.analysisQuery ?? question;
 			const frame = await resolveQuestion(analysisQuestion, this.embedQuestions);
-			const clarification = contextualClarification(analysisQuestion, frame, {
-				hasConversationContext: !!context,
-				documentCount: enabledDocs.length
-			});
+			const clarification = this.clarificationFor(question, context, frame, enabledDocs.length);
 			if (clarification) {
 				await this.insertClarification(chatId, clarification, frame.locale);
 				await db.touchChat(chatId);
@@ -1042,10 +1076,12 @@ class ChatsStore {
 		const context = this.retrievalContext(question);
 		const frame = await resolveQuestion(context?.analysisQuery ?? question, this.embedQuestions);
 		const plan = buildExecutionPlan(context?.analysisQuery ?? question, frame);
-		const clarification = contextualClarification(context?.analysisQuery ?? question, frame, {
-			hasConversationContext: !!context,
-			documentCount: this.chatDocuments.filter((document) => document.enabled).length
-		});
+		const clarification = this.clarificationFor(
+			question,
+			context,
+			frame,
+			this.chatDocuments.filter((document) => document.enabled).length
+		);
 		if (clarification || plan.route === 'aggregate') {
 			await this.send(chatId, question);
 			return 'handled';
