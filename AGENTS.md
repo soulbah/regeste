@@ -86,5 +86,5 @@ docs/                  # constitution (public); internal/ = PRD, features, resea
 
 ## Git & deploys
 
-- Work directly on `main` in small, frequent commits during the dev phase — the owner reviews diffs, so commit after each verified task, never batch a day of work into one commit. Conventional Commits.
+- Work on `develop` in small, frequent commits (owner decision, 2026-07-18) — the owner reviews diffs, so commit after each verified task, never batch a day of work into one commit. Conventional Commits. `main` stays stable; it advances only when the owner asks for a merge from `develop`.
 - Dev phase: deploys are run locally by the agent (`bun run deploy`) when the owner asks. CI has no automatic triggers for now (manual `workflow_dispatch` only); Workers Builds + PR flow come with the open-source launch.
