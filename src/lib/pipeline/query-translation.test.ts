@@ -150,6 +150,24 @@ describe('crossLingualQueryVariants', () => {
 		});
 	});
 
+	it('labels the current question for the rewrite and binds constraints to it', async () => {
+		// The previous ANSWER's numbers must not be forced into variants, and the
+		// model must be told which line is the question to rewrite.
+		const composed =
+			"Quel est le plafond d'hôtel par nuit ?\nLe plafond est de 150 € TTC, 3 nuits par sinistre\nEt sa limite en nombre de nuits ?";
+		const rewrite = vi.fn().mockResolvedValue('hébergement nombre de nuits limite par sinistre');
+		const variants = await localRetrievalQueryVariants(
+			composed,
+			['fr'],
+			rewrite,
+			'Et sa limite en nombre de nuits ?'
+		);
+		expect(variants).toEqual(['hébergement nombre de nuits limite par sinistre']);
+		const [messages] = rewrite.mock.calls[0];
+		expect(messages[1].content).toContain('Question: Et sa limite en nombre de nuits ?');
+		expect(messages[0].content).toContain('Rewrite only the final question');
+	});
+
 	it('judges evidence on the current question when a follow-up composes the query', async () => {
 		// Regression: a follow-up retrieves with the composed conversation query.
 		// Primary hits covering only the previous turn's words (name, address)

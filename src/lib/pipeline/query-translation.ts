@@ -156,21 +156,35 @@ export function cleanRetrievalQueryVariants(raw: string, original: string): stri
 export async function localRetrievalQueryVariants(
 	query: string,
 	documentLanguages: Array<string | null>,
-	rewrite: QueryTranslator
+	rewrite: QueryTranslator,
+	question = query
 ): Promise<string[]> {
-	const locale = questionLocale(query);
+	const locale = questionLocale(question);
 	const needsEnglish = locale === 'fr' && documentLanguages.includes('en');
+	// A follow-up passes the composed conversation as `query` with the current
+	// question last. The model must know which line to rewrite (otherwise it
+	// rewrites the previous turn), and constraints must bind to the question:
+	// requiring numbers from the previous ANSWER rejected every variant.
+	const followUp = question !== query;
+	const conversation = followUp
+		? query.endsWith(`\n${question}`)
+			? query.slice(0, -question.length - 1)
+			: query
+		: '';
 	const raw = await rewrite([
 		{
 			role: 'system',
 			content: `Rewrite the user's question into up to two concise document-search queries in ${locale === 'fr' ? 'French' : 'English'}.
 Use likely form labels, formal contract vocabulary and close synonyms for every sub-question. Do not write a hypothetical answer or source sentence and do not add facts.
-Silently correct misspellings. Preserve every user-supplied name, identifier, number, negation, strict comparison and scope.${needsEnglish ? ' One query may be an English translation when useful.' : ''} Output search queries only, one per line.`
+Silently correct misspellings. Preserve every user-supplied name, identifier, number, negation, strict comparison and scope.${followUp ? ' Rewrite only the final question; use the earlier conversation lines solely to resolve pronouns and references into the named entity or subject.' : ''}${needsEnglish ? ' One query may be an English translation when useful.' : ''} Output search queries only, one per line.`
 		},
-		{ role: 'user', content: query }
+		{
+			role: 'user',
+			content: followUp ? `${conversation}\nQuestion: ${question}` : query
+		}
 	]);
-	return cleanRetrievalQueryVariants(raw, query).filter((candidate) =>
-		preservesQueryConstraints(query, candidate)
+	return cleanRetrievalQueryVariants(raw, question).filter((candidate) =>
+		preservesQueryConstraints(question, candidate)
 	);
 }
 
@@ -203,7 +217,8 @@ export async function retrieveWithLocalQueryFallback(input: {
 	const alternateQueries = await localRetrievalQueryVariants(
 		input.query,
 		input.documentLanguages,
-		input.rewrite
+		input.rewrite,
+		question
 	);
 	if (!alternateQueries.length) return { hits: primaryHits, alternateQueries: [] };
 
