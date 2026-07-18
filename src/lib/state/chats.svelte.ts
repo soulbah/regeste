@@ -12,6 +12,7 @@ import { generationOptionsFor } from '$lib/private-ai/generation';
 import {
 	buildClarificationContext,
 	buildRetrievalContext,
+	isContestation,
 	type RetrievalContext
 } from '$lib/retrieval-context';
 import { assistedPayloadBytes } from '$lib/assisted-payload';
@@ -159,10 +160,11 @@ class ChatsStore {
 				.map(([messageId]) => messageId)
 		);
 		// Clarification prompts are control messages: they must never be read
-		// back as the "previous answer" of a follow-up.
+		// back as the "previous answer" of a follow-up. A contestation forces the
+		// context even without a pronoun: the disputed answer IS its subject.
 		return (
 			buildClarificationContext(this.messages, question, clarificationIds) ??
-			buildRetrievalContext(this.messages, question, false, clarificationIds)
+			buildRetrievalContext(this.messages, question, isContestation(question), clarificationIds)
 		);
 	}
 
@@ -774,7 +776,10 @@ class ChatsStore {
 		// (empty streamingText) until the actual answer starts.
 		let streamRaw = '';
 		let raw: string;
-		const extractive = grounded ? buildAuditedExtractiveAnswer(question, hits) : null;
+		// A contested turn re-weighs evidence; a deterministic extract would just
+		// repeat whichever clause matches and cannot concede or confirm.
+		const contested = conversationContext !== null && isContestation(question);
+		const extractive = grounded && !contested ? buildAuditedExtractiveAnswer(question, hits) : null;
 		this.advanceWork('write');
 		if (extractive) {
 			raw = extractive.answer;

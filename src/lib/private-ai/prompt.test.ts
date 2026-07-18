@@ -113,6 +113,19 @@ describe('buildUserPrompt', () => {
 		expect(prompt).not.toContain('Requested parts');
 	});
 
+	it('re-weighs evidence on a contested turn instead of echoing or defending', () => {
+		const context = 'Previous question: Quel est le salaire ?\nPrevious answer: 3486,92 €';
+		const contested = buildUserPrompt("Non, l'acompte est beaucoup plus", [hit(1)], context);
+		expect(contested).toContain('The user disputes the previous answer');
+		expect(contested).toContain('say plainly that the previous answer was wrong');
+		// Without a previous answer there is nothing to dispute.
+		const firstTurn = buildUserPrompt("Non, l'acompte est beaucoup plus", [hit(1)]);
+		expect(firstTurn).not.toContain('disputes the previous answer');
+		// An ordinary follow-up with context is not treated as a dispute.
+		const followUp = buildUserPrompt('Quel est son montant net ?', [hit(1)], context);
+		expect(followUp).not.toContain('disputes the previous answer');
+	});
+
 	it('never turns a leading interjection into an answerable part', () => {
 		// Regression: "Non, l'acompte est beaucoup plus" split into two "requested
 		// parts" and the model recited the user's own words back with citations.

@@ -13,6 +13,7 @@ import {
 } from '$lib/pipeline/fuzzy';
 import { normalizeQuestion } from '$lib/nlu/semantic-frame';
 import { isIdentityQuestion } from '$lib/pipeline/identity-evidence';
+import { isContestation } from '$lib/retrieval-context';
 
 // A genuine directional change: "de 2018 à 2019", not the ubiquitous French
 // "de … à …" span (normalizeQuestion folds "à"→"a", which is also the verb).
@@ -502,6 +503,12 @@ export function buildUserPrompt(
 	const context = conversationContext
 		? `Conversation context (reference resolution only, not a source):\n${conversationContext}\n\n`
 		: '';
+	// A dispute is not a query to echo: the model must re-weigh the evidence and
+	// either stand on it with the exact wording, or concede plainly.
+	const contestedConstraint =
+		conversationContext && isContestation(question)
+			? `The user disputes the previous answer. Re-examine the excerpts from scratch. If they support the previous answer, confirm it and quote the exact supporting wording. If they support the user's correction, give the corrected answer and say plainly that the previous answer was wrong. If the excerpts settle neither, say the documents do not settle this point. Never repeat the user's words as the answer and never defend a claim the excerpts do not support.\n\n`
+			: '';
 	const role = analyzeQuestion(question).moneyRole;
 	const roleConstraint = role
 		? `Requested financial role: ${role}. Keep financial roles distinct; do not substitute sent, received, fees, tax, subtotal, or total/debited values for one another.\n\n`
@@ -540,7 +547,7 @@ export function buildUserPrompt(
 	const coverageConstraint = coverageContract ? `${coverageContract}\n\n` : '';
 	const inventory = buildEvidenceInventory(question, inventoryHits ?? hits, citationNumbers);
 	const inventoryConstraint = inventory ? `${inventory}\n\n` : '';
-	return `${context}${roleConstraint}${structuralConstraint}${directionalConstraint}${referenceHint}${multiPartConstraint}${coverageConstraint}${inventoryConstraint}Excerpts:\n\n${excerpts}\n\nQuestion: ${question}`;
+	return `${context}${contestedConstraint}${roleConstraint}${structuralConstraint}${directionalConstraint}${referenceHint}${multiPartConstraint}${coverageConstraint}${inventoryConstraint}Excerpts:\n\n${excerpts}\n\nQuestion: ${question}`;
 }
 
 export function buildVerificationUserPrompt(

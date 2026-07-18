@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	buildClarificationContext,
 	buildRetrievalContext,
+	isContestation,
 	needsRetrievalContext
 } from './retrieval-context';
 import type { LocalMessage } from '$lib/types';
@@ -192,6 +193,17 @@ describe('buildRetrievalContext', () => {
 		);
 		expect(context?.previousAnswer).toContain('Aminata');
 		expect(context?.previousQuestion).toContain('demandeuse');
+	});
+
+	it('recognizes disputes without pronouns and leaves plain turns alone', () => {
+		expect(isContestation("Non, l'acompte est beaucoup plus")).toBe(true);
+		expect(isContestation("C'est faux, le salaire est net")).toBe(true);
+		expect(isContestation('Tu te trompes')).toBe(true);
+		expect(isContestation("That's wrong, the deposit is higher")).toBe(true);
+		expect(isContestation('Quel est le montant exact ?')).toBe(false);
+		expect(isContestation('Le salaire est-il net ou brut ?')).toBe(false);
+		// "non" inside a sentence is not a dispute lead.
+		expect(isContestation('Le contrat est-il non résiliable ?')).toBe(false);
 	});
 
 	it('ignores notices and returns no context before a completed exchange', () => {

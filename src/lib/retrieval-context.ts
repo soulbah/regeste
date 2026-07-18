@@ -27,6 +27,18 @@ export function needsRetrievalContext(question: string): boolean {
 	return analyzeQuestion(clean(question)).referencesPrevious;
 }
 
+// A dispute never names its referent ("Non, l'acompte est beaucoup plus"), so
+// pronoun detection misses it — yet it needs the contested answer in context
+// more than any other turn. Leads are matched on normalized text (apostrophes
+// and accents stripped).
+const CONTESTATION_LEAD =
+	/^(?:non\b|no\b|faux\b|c est faux|incorrect\b|pas du tout\b|tu te trompes|vous vous trompez|je ne suis pas d accord|ce n est pas vrai|not true\b|that s wrong|you are wrong|wrong\b)/u;
+
+/** A turn that disputes the previous answer rather than asking something new. */
+export function isContestation(text: string): boolean {
+	return CONTESTATION_LEAD.test(normalizeQuestion(clean(text)));
+}
+
 /**
  * Latest completed exchange before the current question. Prior answers help
  * resolve references, but prompt.ts labels them as context rather than source
