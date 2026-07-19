@@ -356,8 +356,6 @@ export const en = {
 	'work.method.aggregate':
 		'Read the selected documents exhaustively and calculated from {count} retained values.',
 	'work.method.clarification': 'Asked for the missing detail before searching the documents.',
-	'work.method.reasoning':
-		'A private reasoning pass was used; only this operational summary is shown.',
 	'work.method.notes': 'Draft notes',
 	'work.method.notesAll': 'Show all',
 	'work.method.notesLess': 'Show less',

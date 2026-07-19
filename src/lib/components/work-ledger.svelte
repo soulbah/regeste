@@ -65,9 +65,6 @@
 						count: method.passageCount
 					})}
 				</p>
-				<!-- The old summary line claims notes are hidden; with stored notes it
-				     would be both false and redundant. -->
-				{#if method.reasoningUsed && !method.reasoning}<p>{t('work.method.reasoning')}</p>{/if}
 				{#if method.calculation}<p class="font-mono text-[11px]">{method.calculation}</p>{/if}
 				{#if method.reasoning}
 					<div class="pt-1">

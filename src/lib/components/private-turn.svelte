@@ -158,14 +158,25 @@
 						>
 							{segment.n}
 						</Tooltip.Trigger>
-						<Tooltip.Content class="max-w-72">
+						<!-- The base tooltip is an inline-flex row (label + kbd); this is a
+						     quote card — force a stacked block: source header, excerpt below. -->
+						<Tooltip.Content class="block w-80 max-w-80 p-0">
 							{#if citations[segment.n - 1]}
-								<p class="text-xs font-medium">
-									{citations[segment.n - 1].documentName}{citations[segment.n - 1].locator
-										? ` · ${citations[segment.n - 1].locator}`
-										: ''}
+								<div
+									class="border-border/60 flex items-baseline justify-between gap-3 border-b px-3 py-1.5"
+								>
+									<span class="min-w-0 truncate text-xs font-medium">
+										{citations[segment.n - 1].documentName}
+									</span>
+									{#if citations[segment.n - 1].locator}
+										<span class="shrink-0 font-mono text-[10px] opacity-60">
+											{citations[segment.n - 1].locator}
+										</span>
+									{/if}
+								</div>
+								<p class="line-clamp-6 px-3 py-2 text-xs leading-relaxed opacity-80">
+									{citations[segment.n - 1].snippet}
 								</p>
-								<p class="mt-1 text-xs opacity-80">{citations[segment.n - 1].snippet}</p>
 							{/if}
 						</Tooltip.Content>
 					</Tooltip.Root>

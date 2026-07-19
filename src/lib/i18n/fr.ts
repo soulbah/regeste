@@ -367,8 +367,6 @@ export const fr: Record<keyof typeof en, string> = {
 		'Documents sélectionnés lus intégralement, puis calcul effectué sur {count} valeurs retenues.',
 	'work.method.clarification':
 		'Une précision a été demandée avant la recherche dans les documents.',
-	'work.method.reasoning':
-		'Une passe de raisonnement privée a été utilisée ; seul ce résumé opérationnel est affiché.',
 	'work.method.notes': 'Notes de travail',
 	'work.method.notesAll': 'Tout afficher',
 	'work.method.notesLess': 'Réduire',

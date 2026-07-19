@@ -90,9 +90,18 @@
 								</Button>
 							{/snippet}
 						</Tooltip.Trigger>
-						<Tooltip.Content class="max-w-72">
-							<p class="text-xs opacity-80">
-								{hit.text.slice(0, 200)}{hit.text.length > 200 ? '…' : ''}
+						<!-- Same stacked quote card as the answer's citation chips. -->
+						<Tooltip.Content class="block w-80 max-w-80 p-0">
+							<div
+								class="border-border/60 flex items-baseline justify-between gap-3 border-b px-3 py-1.5"
+							>
+								<span class="min-w-0 truncate text-xs font-medium">{hit.documentName}</span>
+								{#if locator(hit)}
+									<span class="shrink-0 font-mono text-[10px] opacity-60">{locator(hit)}</span>
+								{/if}
+							</div>
+							<p class="line-clamp-6 px-3 py-2 text-xs leading-relaxed opacity-80">
+								{hit.text.slice(0, 320)}{hit.text.length > 320 ? '…' : ''}
 							</p>
 						</Tooltip.Content>
 					</Tooltip.Root>
