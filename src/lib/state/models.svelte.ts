@@ -2,6 +2,7 @@
 // and the "test my device" benchmark. Cache-API only — documents untouched.
 
 import { llmStore } from '$lib/private-ai/llm.svelte';
+import { isShellCache } from '$lib/pwa/cache-names';
 
 export interface CachedModel {
 	cacheName: string;
@@ -32,7 +33,9 @@ class ModelsStore {
 	async refresh(): Promise<void> {
 		this.loading = true;
 		try {
-			const names = await caches.keys();
+			// The app-shell cache is infrastructure, not a model: listing it here
+			// would offer a Delete button that breaks offline startup.
+			const names = (await caches.keys()).filter((name) => !isShellCache(name));
 			const out: CachedModel[] = [];
 			for (const name of names) {
 				const cache = await caches.open(name);

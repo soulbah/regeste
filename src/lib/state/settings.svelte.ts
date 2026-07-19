@@ -160,6 +160,17 @@ class SettingsStore {
 			// OPFS unavailable — nothing stored there then.
 		}
 		try {
+			// Unregister first: deleting the shell cache under a live worker would
+			// leave the reload below running against a worker whose cache is gone.
+			if ('serviceWorker' in navigator) {
+				for (const registration of await navigator.serviceWorker.getRegistrations()) {
+					await registration.unregister().catch(() => {});
+				}
+			}
+		} catch {
+			// No service worker — nothing to unregister.
+		}
+		try {
 			for (const key of await caches.keys()) await caches.delete(key);
 		} catch {
 			// Cache API unavailable

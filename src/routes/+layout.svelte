@@ -12,7 +12,10 @@
 	import SettingsDialog from '$lib/components/settings-dialog.svelte';
 	import ViewerPanel from '$lib/components/viewer-panel.svelte';
 	import { beforeNavigate, goto } from '$app/navigation';
+	import { browser } from '$app/environment';
 	import { resolve } from '$app/paths';
+	import { isShellCache } from '$lib/pwa/cache-names';
+	import { pwaStore } from '$lib/state/pwa.svelte';
 	import { page } from '$app/state';
 	import { dev } from '$app/environment';
 	import { SvelteMap } from 'svelte/reactivity';
@@ -56,24 +59,51 @@
 
 	$effect(() => {
 		i18n.init();
+		pwaStore.init();
 		guardDb(documentsStore.init());
 		guardDb(chatsStore.refresh());
 		// Offline switch loads first so a forced-offline session never phones home.
 		guardDb(settingsStore.init().then(() => sessionStore.refresh()));
 	});
 
-	// Not a PWA: production-only message worker for WebLLM, with no fetch
-	// interception or app-shell cache. Dev stays on a Dedicated Worker so HMR
-	// never competes with a persistent Service Worker.
+	// Spec 030 — the service worker hosts WebLLM AND caches the app shell, in
+	// production only. Dev stays on a Dedicated Worker so HMR never competes with
+	// a persistent Service Worker, and any worker left over from a previous
+	// build on this localhost port is torn down below.
 	$effect(() => {
-		if (dev || !('serviceWorker' in navigator)) return;
+		if (!('serviceWorker' in navigator)) return;
+		if (dev) {
+			void (async () => {
+				for (const registration of await navigator.serviceWorker.getRegistrations()) {
+					void registration.unregister();
+				}
+				// Only the shell caches: deleting the model caches would re-download
+				// gigabytes on every dev boot.
+				for (const name of await caches.keys()) {
+					if (isShellCache(name)) void caches.delete(name);
+				}
+			})();
+			return;
+		}
 		const register = () => {
-			void navigator.serviceWorker.register('/service-worker.js').catch((err) => {
-				console.warn('[folio] inference service worker unavailable:', err);
-			});
+			void navigator.serviceWorker
+				.register('/service-worker.js')
+				.then((registration) => pwaStore.watch(registration))
+				.catch((err) => {
+					console.warn('[folio] service worker unavailable:', err);
+				});
 		};
 		if (document.readyState === 'complete') register();
 		else window.addEventListener('load', register, { once: true });
+	});
+
+	// Storage persistence (spec 030): retry on every start. Chrome caches grants
+	// but not denials, so this is cheap, and calling too early races the
+	// installed-app registry and silently skips the installed-PWA grant path.
+	$effect(() => {
+		if (!browser) return;
+		const timer = setTimeout(() => void pwaStore.ensurePersisted(), 3000);
+		return () => clearTimeout(timer);
 	});
 
 	// Feedback rules (FEATURES 5bis): ingestion state lives in the documents

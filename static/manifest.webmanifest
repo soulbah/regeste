@@ -1,0 +1,32 @@
+{
+	"id": "/chat/",
+	"name": "Folio",
+	"short_name": "Folio",
+	"description": "Ask questions about your documents. Everything stays on your device.",
+	"start_url": "/chat/",
+	"scope": "/chat/",
+	"display": "standalone",
+	"theme_color": "#f6f5f1",
+	"background_color": "#f6f5f1",
+	"color_scheme_dark": {
+		"theme_color": "#1c1916",
+		"background_color": "#1c1916"
+	},
+	"launch_handler": {
+		"client_mode": "navigate-existing"
+	},
+	"icons": [
+		{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+		{ "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+		{
+			"src": "/icons/maskable-512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "maskable"
+		}
+	],
+	"shortcuts": [
+		{ "name": "New chat", "url": "/chat/" },
+		{ "name": "Documents", "url": "/chat/documents" }
+	]
+}
