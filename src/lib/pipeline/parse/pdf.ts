@@ -23,7 +23,14 @@ export function isLikelyPdfSectionHeading(line: string, nextLine = ''): boolean 
 		words.length > 12 ||
 		nextLine.trim().length < 20 ||
 		/[.;,]$/u.test(text) ||
-		/(?:https?:\/\/|www\.|@)/iu.test(text)
+		/(?:https?:\/\/|www\.|@)/iu.test(text) ||
+		// A form field ("Nom * KEITA", "Prénom * AMINATA KEITA") is a
+		// label-and-value pair, not a section title — the asterisk field marker
+		// with a value after it disqualifies it. Without this, an ALL-CAPS value
+		// pushes the uppercase ratio over the bar and the value becomes the
+		// heading, severing the person from the real section label above it
+		// (e.g. "Bénéficiaire"), which then never reaches the answer.
+		/(?:^|\s)\*\s+\p{L}/u.test(text)
 	)
 		return false;
 	if (/[?:]$/u.test(text)) return true;
