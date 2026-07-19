@@ -654,6 +654,7 @@ class ChatsStore {
 				);
 			} else {
 				let hits: SearchHit[] = [];
+				let rejected: SearchHit[] = [];
 				if (enabledDocs.length) {
 					const retrieved = await this.retrieveWithSearchFallback(
 						context?.searchQuery ?? question,
@@ -664,7 +665,12 @@ class ChatsStore {
 						() => this.advanceWork('inspect')
 					);
 					hits = retrieved.hits;
-					if (!hasAnswerBearingEvidence(question, hits, retrieved.alternateQueries)) hits = [];
+					if (!hasAnswerBearingEvidence(question, hits, retrieved.alternateQueries)) {
+						// Kept out of generation on purpose, kept here so a refusal can
+						// still show what was looked at.
+						rejected = hits;
+						hits = [];
+					}
 				}
 
 				if (enabledDocs.length) this.setWorkCount('inspect', hits.length);
@@ -676,7 +682,8 @@ class ChatsStore {
 					enabledDocs.length,
 					null,
 					route,
-					context?.promptContext ?? null
+					context?.promptContext ?? null,
+					rejected
 				);
 			}
 			await db.touchChat(chatId);
@@ -699,12 +706,21 @@ class ChatsStore {
 		documentCount: number,
 		versionGroup: string | null = null,
 		route: QuestionRoute = 'targeted',
-		conversationContext: string | null = null
+		conversationContext: string | null = null,
+		/** Retrieved but judged too weak to answer from — shown with the refusal. */
+		rejected: SearchHit[] = []
 	): Promise<void> {
 		const { db } = await getLocalDb();
 		const chat = this.chats.find((c) => c.id === chatId);
 		if (documentCount > 0 && hits.length === 0) {
-			await this.insertGroundedRefusal(chatId, question, documentCount, route, versionGroup);
+			await this.insertGroundedRefusal(
+				chatId,
+				question,
+				documentCount,
+				route,
+				versionGroup,
+				rejected
+			);
 			return;
 		}
 		if (chat?.mode === 'private' && llmStore.status === 'ready') {
@@ -749,24 +765,42 @@ class ChatsStore {
 		question: string,
 		documentCount: number,
 		route: QuestionRoute,
-		versionGroup: string | null = null
+		versionGroup: string | null = null,
+		rejected: SearchHit[] = []
 	): Promise<void> {
 		const { db } = await getLocalDb();
 		const messageId = crypto.randomUUID();
+		// A grounded refusal is an ANSWER, not a system notice: it is one version
+		// of the turn, and the passages that were looked at and judged too weak
+		// are exactly what makes the refusal auditable. Recording them here gives
+		// it the same closest-sources list, "what the AI received" panel and
+		// version navigation as any other answer.
 		await db.insertMessage({
 			id: messageId,
 			chatId,
 			role: 'assistant',
 			content: groundedRefusal(question),
-			mode: 'notice',
+			mode: 'private',
 			versionGroup
+		});
+		if (rejected.length) {
+			await db.insertMessageExcerpts(messageId, ChatsStore.excerptRows(rejected, false, new Set()));
+		}
+		await db.insertPrivacyEvent({
+			chatId,
+			messageId,
+			mode: 'private',
+			destination: 'device',
+			excerptCount: rejected.length,
+			bytesSent: 0
 		});
 		await db.insertMessageMethod(messageId, {
 			kind: route,
 			documentCount,
-			passageCount: 0,
+			passageCount: rejected.length,
 			reasoningUsed: false
 		});
+		await this.loadCitations(chatId);
 	}
 
 	private async generatePrivate(
