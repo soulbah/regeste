@@ -793,23 +793,48 @@ class ChatsStore {
 			raw = extractive.answer;
 			this.streamingText = raw;
 		} else {
+			this.stopRequested = false;
+			const options = generationOptionsFor(
+				question,
+				route === 'synthesis' ? 'synthesis' : 'targeted'
+			);
+			const onDelta = (delta: string) => {
+				streamRaw += delta;
+				this.streamingText = isThinking(streamRaw) ? '' : stripThink(streamRaw);
+				this.streamingThinking = extractThink(streamRaw) || null;
+			};
 			const writeStartedAt = performance.now();
 			try {
-				raw = await llmStore.generate(
-					messages,
-					(delta) => {
-						streamRaw += delta;
-						this.streamingText = isThinking(streamRaw) ? '' : stripThink(streamRaw);
-						this.streamingThinking = extractThink(streamRaw) || null;
-					},
-					generationOptionsFor(question, route === 'synthesis' ? 'synthesis' : 'targeted')
-				);
+				raw = await llmStore.generate(messages, onDelta, options);
 			} catch (err) {
 				console.error('[folio] private generation failed:', err);
 				raw = streamRaw;
 			}
 			reasoning = extractThink(raw || streamRaw);
 			reasoningMs = Math.round(performance.now() - writeStartedAt);
+			// A reasoning pass can die inside <think> (early EOS at temperature 0)
+			// and deliver no answer. Retry once directly — dead-pass notes explain
+			// nothing that is shown, so they are dropped.
+			if (
+				options.reasoning === 'on' &&
+				!stripThink(raw || streamRaw).trim() &&
+				!this.stopRequested
+			) {
+				this.streamingThinking = null;
+				streamRaw = '';
+				try {
+					raw = await llmStore.generate(messages, onDelta, {
+						...options,
+						reasoning: 'off',
+						maxTokens: 420
+					});
+				} catch (err) {
+					console.error('[folio] direct retry after reasoning failed:', err);
+					raw = streamRaw;
+				}
+				reasoning = '';
+				reasoningMs = null;
+			}
 		}
 		raw = stripThink(raw || streamRaw);
 		// Selection extracts are drafts like any other: they can bind the
@@ -1074,7 +1099,10 @@ class ChatsStore {
 		await this.loadCitations(chat.id);
 	}
 
+	private stopRequested = false;
+
 	async stopGeneration(): Promise<void> {
+		this.stopRequested = true;
 		myaiStore.stop();
 		await llmStore.stop();
 	}
