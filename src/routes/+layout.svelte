@@ -14,6 +14,7 @@
 	import { beforeNavigate, goto } from '$app/navigation';
 	import { browser } from '$app/environment';
 	import { resolve } from '$app/paths';
+	import UpdateBanner from '$lib/components/update-banner.svelte';
 	import { isShellCache } from '$lib/pwa/cache-names';
 	import { pwaStore } from '$lib/state/pwa.svelte';
 	import { page } from '$app/state';
@@ -167,6 +168,7 @@
 <Toaster position="bottom-right" />
 <CommandPalette />
 <SettingsDialog />
+<UpdateBanner />
 
 <Sheet.Root
 	open={viewerStore.isOpen && !panelStore.usingShell}

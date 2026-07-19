@@ -333,6 +333,15 @@ export const fr: Record<keyof typeof en, string> = {
 	// Settings
 	'settings.title': 'Réglages',
 	'settings.subtitle': 'Stockage · confidentialité · hors ligne',
+	'install.title': "Installez d'abord",
+	'install.body':
+		"L'installation garde ce téléchargement et vos documents sur votre appareil. Sans elle, le navigateur peut les effacer pour récupérer de la place.",
+	'install.bodyIos':
+		'Installez depuis le menu de partage, puis ajoutez vos documents là-bas. Une app installée garde son propre stockage : ce qui est ajouté ici ne suivrait pas.',
+	'install.cta': 'Installer',
+	'install.dismiss': 'Plus tard',
+	'update.ready': 'Une nouvelle version est prête.',
+	'update.cta': 'Recharger',
 	'settings.storage.title': 'Stockage',
 	'settings.storage.used': '{used} utilisés',
 	'settings.storage.available': '{quota} disponibles',

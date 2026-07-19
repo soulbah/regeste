@@ -323,6 +323,15 @@ export const en = {
 	// Settings
 	'settings.title': 'Settings',
 	'settings.subtitle': 'Storage · privacy · offline',
+	'install.title': 'Install it first',
+	'install.body':
+		'Installing keeps this download and your documents on your device. Without it, the browser may clear them to reclaim space.',
+	'install.bodyIos':
+		'Install from the share menu, then add your documents there. An installed app keeps its own storage, so anything added here would not follow.',
+	'install.cta': 'Install',
+	'install.dismiss': 'Not now',
+	'update.ready': 'A new version is ready.',
+	'update.cta': 'Reload',
 	'settings.storage.title': 'Storage',
 	'settings.storage.used': '{used} used',
 	'settings.storage.available': '{quota} available',

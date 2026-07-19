@@ -2,6 +2,7 @@
 	// Settings modal (spec 021, owner design pass): a tinted rail with iconed
 	// tabs and the green accent bar (the ⌘K signature), and Claude-style rows —
 	// label + description left, control right. Essentials only.
+	import InstallInvite from '$lib/components/install-invite.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import * as Select from '$lib/components/ui/select';
@@ -286,14 +287,13 @@
 										<Badge class="text-[10px]">{t('settings.storage.persistent')}</Badge>
 									{/if}
 								{/snippet}
+								<!-- Usage only. Chrome reports quota as usage + 10 GiB whenever the
+								     disk is large enough, so showing "available" invites a preflight
+								     that passes with 200 MB of real free space and then fails. -->
 								{@render row(
 									t('settings.storage.title'),
 									settingsStore.storage
-										? `${t('settings.storage.used', { used: fmtBytes(settingsStore.storage.usage) })}${
-												settingsStore.storage.quota
-													? ` · ${t('settings.storage.available', { quota: fmtBytes(settingsStore.storage.quota) })}`
-													: ''
-											}`
+										? t('settings.storage.used', { used: fmtBytes(settingsStore.storage.usage) })
 										: t('settings.storage.unavailable'),
 									storageControl
 								)}
@@ -378,6 +378,11 @@
 									</div>
 								{/snippet}
 								<div class="space-y-4 py-3.5">
+									<!-- Before the AI download, not after: an installed app on iOS has
+									     its own storage, so installing later means downloading twice. -->
+									{#if llmStore.status !== 'ready'}
+										<InstallInvite />
+									{/if}
 									<section class="bg-background/40 rounded-lg border p-4" data-mode-card="private">
 										<header class="flex items-center justify-between gap-3 pb-1.5">
 											<p class="text-sm font-semibold">Private</p>
