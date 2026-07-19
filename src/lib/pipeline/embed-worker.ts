@@ -6,12 +6,20 @@ import { expose } from 'comlink';
 import {
 	AutoModel,
 	AutoTokenizer,
+	env,
 	pipeline,
 	type FeatureExtractionPipeline,
 	type PreTrainedModel,
 	type PreTrainedTokenizer,
 	type Tensor
 } from '@huggingface/transformers';
+
+// Cross-origin isolation (COEP) blocks the browser's direct fetch to
+// huggingface.co. Route model files through our same-origin /cdn proxy so the
+// download works on the deployed, isolated origin. Path template unchanged:
+// remoteHost + "{model}/resolve/{revision}/{file}".
+env.allowLocalModels = false;
+env.remoteHost = `${self.location.origin}/cdn/huggingface.co`;
 import {
 	E5_EMBEDDING_MODEL,
 	GEMMA_EMBEDDING_MODEL,

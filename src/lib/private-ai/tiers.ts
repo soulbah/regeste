@@ -43,7 +43,9 @@ export const TIERS: Tier[] = [
 	{
 		id: 'lite',
 		engine: 'wllama',
-		model: 'https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_K_M.gguf',
+		// Same-origin proxy (see routes/cdn): a direct huggingface.co fetch fails
+		// under the cross-origin isolation Private mode requires.
+		model: '/cdn/huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_K_M.gguf',
 		downloadLabel: '~0.4 GB',
 		requiresF16: false
 	}

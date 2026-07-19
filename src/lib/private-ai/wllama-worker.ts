@@ -31,10 +31,12 @@ async function load(modelUrl: string, onProgress?: (progress: number, text: stri
 		wllama = null;
 	}
 	// wllama resolves relative asset paths against `document`, which does not
-	// exist in a worker — hand it a fully absolute URL.
+	// exist in a worker — hand it a fully absolute URL. The model URL (a
+	// same-origin /cdn proxy path) needs the same absolutization.
 	const absoluteWasmUrl = new URL(wllamaWasmUrl, self.location.href).href;
+	const absoluteModelUrl = new URL(modelUrl, self.location.href).href;
 	wllama = new Wllama({ default: absoluteWasmUrl }, { suppressNativeLog: true });
-	await wllama.loadModelFromUrl(modelUrl, {
+	await wllama.loadModelFromUrl(absoluteModelUrl, {
 		n_ctx: 4096,
 		useCache: true,
 		progressCallback: ({ loaded, total }) => {

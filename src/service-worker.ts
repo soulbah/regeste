@@ -4,6 +4,7 @@
 /// <reference types="@sveltejs/kit" />
 
 import { CreateMLCEngine, type MLCEngineInterface } from '@mlc-ai/web-llm';
+import { proxiedAppConfig } from '$lib/private-ai/webllm-config';
 import type { GenerationOptions, GenerationResult } from '$lib/private-ai/generation';
 
 const sw = self as unknown as ServiceWorkerGlobalScope;
@@ -36,7 +37,11 @@ async function load(
 		onProgress({ progress: 1, text: 'Model already loaded' });
 		return;
 	}
-	if (!engine) engine = await CreateMLCEngine(model, { initProgressCallback: onProgress });
+	if (!engine)
+		engine = await CreateMLCEngine(model, {
+			appConfig: proxiedAppConfig(sw.location.origin),
+			initProgressCallback: onProgress
+		});
 	else {
 		engine.setInitProgressCallback(onProgress);
 		await engine.reload(model);

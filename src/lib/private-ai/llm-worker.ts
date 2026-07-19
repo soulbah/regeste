@@ -5,6 +5,7 @@
 
 import { expose } from 'comlink';
 import { CreateMLCEngine, type MLCEngineInterface, type InitProgressReport } from '@mlc-ai/web-llm';
+import { proxiedAppConfig } from './webllm-config';
 import type { GenerationOptions, GenerationResult } from './generation';
 
 let engine: MLCEngineInterface | null = null;
@@ -17,6 +18,7 @@ async function load(model: string, onProgress?: (progress: number, text: string)
 		engine = null;
 	}
 	engine = await CreateMLCEngine(model, {
+		appConfig: proxiedAppConfig(self.location.origin),
 		initProgressCallback: (report: InitProgressReport) => {
 			onProgress?.(report.progress, report.text);
 		}
