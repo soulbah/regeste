@@ -11,9 +11,13 @@
 	import { pwaStore } from '$lib/state/pwa.svelte';
 
 	let dismissed = $state(false);
-	const show = $derived(!dismissed && pwaStore.shouldInviteInstall);
-	/** No beforeinstallprompt outside Chromium: iOS/Safari get instructions. */
+	/** No beforeinstallprompt outside Chromium: iOS gets instructions instead. */
 	const canPrompt = $derived(pwaStore.installAvailable);
+	// Only invite where installing is actually possible. Firefox desktop has no
+	// install at all, so telling those users to install would be noise.
+	const show = $derived(
+		!dismissed && pwaStore.shouldInviteInstall && (canPrompt || pwaStore.isIosSafari)
+	);
 
 	async function install() {
 		const outcome = await pwaStore.promptInstall();

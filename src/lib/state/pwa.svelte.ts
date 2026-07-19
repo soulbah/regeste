@@ -123,10 +123,22 @@ class PwaStore {
 	}
 
 	/** True when it is worth inviting the user to install before a large
-	 * download: not installed, not already dismissed, and either a prompt is
-	 * available or we can give iOS instructions. */
+	 * download: not installed and not already dismissed. */
 	get shouldInviteInstall(): boolean {
 		return !this.installed && !this.inviteDismissed;
+	}
+
+	/** iOS can install, but only through the share sheet — there is no
+	 * beforeinstallprompt on any iOS browser. Detected so the invitation can
+	 * explain the manual route there and stay silent where installing is
+	 * impossible (Firefox desktop). */
+	get isIosSafari(): boolean {
+		if (typeof navigator === 'undefined') return false;
+		return (
+			/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+			// iPadOS reports as a Mac; the touch points give it away.
+			(navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+		);
 	}
 
 	/** Shell caches are app infrastructure, not user data. */
