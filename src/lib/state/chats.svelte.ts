@@ -817,8 +817,11 @@ class ChatsStore {
 			// by build; the failure is always the same — no usable answer after
 			// thinking. Judge the result: retry once directly, and drop the
 			// dead-pass notes since they explain nothing that is shown.
+			// Threshold calibrated on observed failures ("", "1. **Garantie…" ≈ 13
+			// chars); a legitimate single-fact answer already runs ~60-110 chars
+			// and must not trigger the retry (it would discard its notes).
 			const visibleAnswer = stripThink(raw || streamRaw).trim();
-			if (options.reasoning === 'on' && visibleAnswer.length < 120 && !this.stopRequested) {
+			if (options.reasoning === 'on' && visibleAnswer.length < 40 && !this.stopRequested) {
 				this.streamingThinking = null;
 				streamRaw = '';
 				try {
