@@ -14,7 +14,7 @@ describe('generationOptionsFor', () => {
 	it('reasons on synthesis with a budget covering the trace and the answer', () => {
 		expect(generationOptionsFor('Compare les contrats', 'synthesis')).toEqual({
 			reasoning: 'on',
-			maxTokens: 900,
+			maxTokens: 1100,
 			temperature: 0
 		});
 	});

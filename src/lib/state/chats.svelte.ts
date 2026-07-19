@@ -813,11 +813,15 @@ class ChatsStore {
 			reasoning = extractThink(raw || streamRaw);
 			reasoningMs = Math.round(performance.now() - writeStartedAt);
 			// A reasoning pass can die inside <think> (early EOS at temperature 0)
-			// and deliver no answer. Retry once directly — dead-pass notes explain
-			// nothing that is shown, so they are dropped.
+			// or burn its whole budget thinking and get truncated a few words into
+			// the answer. Either way the pass failed: retry once directly —
+			// dead-pass notes explain nothing that is shown, so they are dropped.
+			const visibleAnswer = stripThink(raw || streamRaw).trim();
+			const spentTokens = llmStore.lastMetrics?.completionTokens ?? null;
+			const truncatedByBudget = spentTokens !== null && spentTokens >= options.maxTokens - 8;
 			if (
 				options.reasoning === 'on' &&
-				!stripThink(raw || streamRaw).trim() &&
+				(!visibleAnswer || (truncatedByBudget && visibleAnswer.length < 120)) &&
 				!this.stopRequested
 			) {
 				this.streamingThinking = null;

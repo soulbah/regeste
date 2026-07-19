@@ -21,7 +21,7 @@ export function generationOptionsFor(
 	// (perceived latency) and is kept on the turn, collapsed. The budget covers
 	// thinking plus the answer. Targeted facts stay direct and fast; the Lite
 	// CPU tier is forced off in adaptGenerationOptions.
-	if (route === 'synthesis') return { reasoning: 'on', maxTokens: 900, temperature: 0 };
+	if (route === 'synthesis') return { reasoning: 'on', maxTokens: 1100, temperature: 0 };
 	const frame = analyzeQuestion(question);
 	const shortFact =
 		frame.answerShape === 'fact' ||
