@@ -66,18 +66,26 @@
 
 	let thread = $state<HTMLElement | null>(null);
 	// Stick to the bottom while the turn unfolds (ledger, draft notes, streamed
-	// answer), but let go the moment the user scrolls up to read; re-stick when
-	// they come back near the bottom.
+	// answer, related questions), but let go the moment the user scrolls UP to
+	// read; re-stick when they come back near the bottom. Only an upward move
+	// unsticks: our own scrollTo fires scroll events too, and content growing
+	// under it must not be mistaken for the user leaving the bottom.
 	let stickToBottom = $state(true);
+	let lastScrollTop = 0;
 	function handleThreadScroll() {
 		if (!thread) return;
-		stickToBottom = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 120;
+		const goingUp = thread.scrollTop < lastScrollTop - 1;
+		lastScrollTop = thread.scrollTop;
+		const nearBottom = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 120;
+		if (nearBottom) stickToBottom = true;
+		else if (goingUp) stickToBottom = false;
 	}
 	$effect(() => {
-		void chatsStore.messages.length;
+		void chatsStore.messages;
 		void chatsStore.workSteps;
 		void chatsStore.streamingText;
 		void chatsStore.streamingThinking;
+		void chatsStore.related;
 		if (stickToBottom) thread?.scrollTo({ top: thread.scrollHeight });
 	});
 
