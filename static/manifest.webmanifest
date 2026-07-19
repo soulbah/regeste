@@ -1,10 +1,10 @@
 {
-	"id": "/chat/",
+	"id": "/chat",
 	"name": "Folio",
 	"short_name": "Folio",
 	"description": "Ask questions about your documents. Everything stays on your device.",
-	"start_url": "/chat/",
-	"scope": "/chat/",
+	"start_url": "/chat",
+	"scope": "/chat",
 	"display": "standalone",
 	"theme_color": "#f6f5f1",
 	"background_color": "#f6f5f1",
@@ -26,7 +26,7 @@
 		}
 	],
 	"shortcuts": [
-		{ "name": "New chat", "url": "/chat/" },
+		{ "name": "New chat", "url": "/chat" },
 		{ "name": "Documents", "url": "/chat/documents" }
 	]
 }

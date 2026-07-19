@@ -21,7 +21,7 @@ let loadedModel: string | null = null;
 // ---------------------------------------------------------------------------
 
 const SHELL_CACHE = shellCacheName(version);
-const SHELL_KEY = '/chat/';
+const SHELL_KEY = '/chat';
 
 /** The SQLite engine is needed by 100% of sessions: without it the app opens
  * and then the database throws. Everything else large stays out of the eager
