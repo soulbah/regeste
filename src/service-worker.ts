@@ -58,6 +58,10 @@ async function precache(): Promise<void> {
 	// offline while every dev test still passed. Fail install loudly instead.
 	const shell = await fetch(SHELL_KEY, { cache: 'reload' });
 	if (!shell.ok) throw new Error(`shell fetch failed: ${shell.status}`);
+	// A redirected response replayed for a navigation throws
+	// "Response served by service worker has redirected". SHELL_KEY has no
+	// trailing slash precisely because SvelteKit would 308 it away.
+	if (shell.redirected) throw new Error(`shell redirected to ${shell.url}`);
 	if (
 		!shell.headers.get('Cross-Origin-Opener-Policy') ||
 		!shell.headers.get('Cross-Origin-Embedder-Policy')
