@@ -9,6 +9,7 @@
 	import { Textarea } from '$lib/components/ui/textarea';
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import InfoIcon from '@lucide/svelte/icons/info';
+	import VersionNav from '$lib/components/version-nav.svelte';
 	import PanelRightIcon from '@lucide/svelte/icons/panel-right';
 	import MessageSquareQuoteIcon from '@lucide/svelte/icons/message-square-quote';
 	import Composer from '$lib/components/composer.svelte';
@@ -347,21 +348,35 @@
 								privateOnly={chatsStore.activeChat?.privateOnly ?? false}
 							/>
 						{:else if message.mode === 'notice'}
-							<!-- System notice, visually distinct from real answers. -->
+							<!-- System notice, visually distinct from real answers. A grounded
+							     refusal lands here too, and it can be one version of a turn, so
+							     the version nav belongs here as well: without it, switching onto
+							     a refusal stranded the user with no way back to the answers. -->
 							<div class="border-muted-foreground/30 flex items-start gap-2 border-l-2 py-1 pl-3">
 								<InfoIcon class="text-muted-foreground mt-0.5 size-3.5 shrink-0" />
 								<div>
 									<p class="text-muted-foreground text-sm">{message.content}</p>
-									{#if message.id === lastMessage?.id && !chatsStore.sending}
-										<Button
-											variant="ghost"
-											size="sm"
-											class="text-muted-foreground -ml-2 h-6 px-2 font-mono text-[10px] uppercase"
-											onclick={() => chatsStore.regenerate(chatId)}
-										>
-											{t('notice.retry')}
-										</Button>
-									{/if}
+									<div class="flex items-center gap-1">
+										{#if message.id === lastMessage?.id && !chatsStore.sending}
+											<Button
+												variant="ghost"
+												size="sm"
+												class="text-muted-foreground -ml-2 h-6 px-2 font-mono text-[10px] uppercase"
+												onclick={() => chatsStore.regenerate(chatId)}
+											>
+												{t('notice.retry')}
+											</Button>
+										{/if}
+										<VersionNav
+											versions={message.versionGroup
+												? (chatsStore.versionsByGroup[message.versionGroup] ?? null)
+												: null}
+											messageId={message.id}
+											onswitch={message.versionGroup
+												? (id) => chatsStore.switchVersion(chatId, message.versionGroup!, id)
+												: null}
+										/>
+									</div>
 								</div>
 							</div>
 						{:else if message.mode === 'private' || message.mode === 'assisted' || message.mode === 'myai'}

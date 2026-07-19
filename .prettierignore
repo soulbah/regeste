@@ -13,3 +13,8 @@ bun.lockb
 migrations/meta/
 worker-configuration.d.ts
 bun.lock
+
+# Agent scratch space: session worktrees are checkouts of this same repo nested
+# inside it, so linting them double-reports every file and fails on generated
+# ones.
+.claude/

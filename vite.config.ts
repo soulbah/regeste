@@ -61,6 +61,12 @@ export default defineConfig({
 			// Inference Service Worker is production-only. Manual registration in
 			// +layout keeps Vite HMR free from persistent worker lifecycle state.
 			serviceWorker: { register: false },
+			// Absolute asset URLs (spec 030). SvelteKit defaults to relative ones,
+			// which resolve against the CURRENT path — so the single cached app
+			// shell, served for every navigation, asked for /chat/<id>/_app/… and
+			// 404'd on any sub-route refresh. Absolute paths make one shell valid
+			// everywhere; the app is always served from the origin root.
+			paths: { relative: false },
 			compilerOptions: {
 				// Force runes mode for the project, except for libraries. Can be removed in svelte 6.
 				runes: ({ filename }) =>
