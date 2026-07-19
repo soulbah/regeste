@@ -30,6 +30,11 @@ class SessionStore {
 			this.user = data?.user
 				? { id: data.user.id, email: data.user.email, name: data.user.name }
 				: null;
+		} catch {
+			// Offline (spec 030): the app is fully usable without a session, so a
+			// failed lookup must not surface as an unhandled rejection. Treat it as
+			// signed out until the network is back.
+			this.user = null;
 		} finally {
 			this.loading = false;
 		}
