@@ -186,6 +186,9 @@
 			{/each}
 		</div>
 	{/if}
+	<!-- Always editable: you can draft the next question while a document
+	     indexes or an answer streams. Sending is what's gated (the button and
+	     the Enter handler), not typing. -->
 	<Textarea
 		bind:value={text}
 		bind:ref={textareaRef}
@@ -196,10 +199,11 @@
 					? 'composer.followUp'
 					: 'composer.placeholder'
 		)}
-		disabled={sendBlocked}
 		class="max-h-40 min-h-8 resize-none border-0 bg-transparent px-1 py-1 shadow-none focus-visible:ring-0"
 		onkeydown={(e) => {
-			if (e.key === 'Enter' && !e.shiftKey) {
+			// When sending is gated, Enter falls through to a normal newline so a
+			// draft can still be composed; it only submits when a send is allowed.
+			if (e.key === 'Enter' && !e.shiftKey && !sendBlocked) {
 				e.preventDefault();
 				submit();
 			}

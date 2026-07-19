@@ -65,7 +65,7 @@ export const en = {
 	'composer.preparingStep': '{phase}, step {step} of 4',
 	'composer.preparingAvailable': '{count} ready, you can ask a question now',
 	'composer.documentsReady': 'Your documents are ready to search',
-	'composer.waitPlaceholder': 'Wait until your document is ready…',
+	'composer.waitPlaceholder': 'Write your question, it sends once your document is ready…',
 
 	// Preset actions (R3) — read-only templates, sent as normal questions
 	'actions.menu': 'Actions',

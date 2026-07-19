@@ -68,7 +68,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'composer.preparingStep': '{phase}, étape {step} sur 4',
 	'composer.preparingAvailable': '{count} prêt, vous pouvez déjà poser une question',
 	'composer.documentsReady': 'Vos documents sont prêts pour la recherche',
-	'composer.waitPlaceholder': 'Attendez que votre document soit prêt…',
+	'composer.waitPlaceholder': 'Écrivez votre question, elle partira dès que le document est prêt…',
 
 	// Preset actions (R3)
 	'actions.menu': 'Actions',
