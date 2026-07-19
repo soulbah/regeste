@@ -65,9 +65,20 @@
 	}
 
 	let thread = $state<HTMLElement | null>(null);
+	// Stick to the bottom while the turn unfolds (ledger, draft notes, streamed
+	// answer), but let go the moment the user scrolls up to read; re-stick when
+	// they come back near the bottom.
+	let stickToBottom = $state(true);
+	function handleThreadScroll() {
+		if (!thread) return;
+		stickToBottom = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 120;
+	}
 	$effect(() => {
 		void chatsStore.messages.length;
-		thread?.scrollTo({ top: thread.scrollHeight });
+		void chatsStore.workSteps;
+		void chatsStore.streamingText;
+		void chatsStore.streamingThinking;
+		if (stickToBottom) thread?.scrollTo({ top: thread.scrollHeight });
 	});
 
 	// C2 — edit the last question, in place in the bubble (spec 019, no dialog).
@@ -245,6 +256,7 @@
 				class="relative flex-1 overflow-y-auto {dragging ? 'bg-muted/50' : ''}"
 				role="region"
 				aria-label={t('chat.threadAria')}
+				onscroll={handleThreadScroll}
 				ondragover={(e) => {
 					e.preventDefault();
 					dragging = true;

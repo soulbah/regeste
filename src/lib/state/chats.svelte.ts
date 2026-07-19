@@ -156,6 +156,18 @@ class ChatsStore {
 		];
 	}
 
+	/** The ledger starts with the send itself — before question analysis, so
+	 * feedback is immediate. Aggregates gain their extra step here, once the
+	 * route is known, without resetting statuses or the step timer. */
+	private ensureCalculateStep(): void {
+		if (this.workSteps.some((step) => step.id === 'calculate')) return;
+		this.workSteps = this.workSteps.flatMap((step) =>
+			step.id === 'write'
+				? [{ id: 'calculate' as const, status: 'pending' as const }, step]
+				: [step]
+		);
+	}
+
 	private retrievalContext(question: string) {
 		const clarificationIds = new Set(
 			Object.entries(this.methodByMessage)
@@ -439,6 +451,10 @@ class ChatsStore {
 		if (!last || last.role !== 'assistant' || !question) return;
 		this.sending = true;
 		this.related = null;
+		this.startWork(
+			'targeted',
+			this.chatDocuments.filter((d) => d.enabled && d.status === 'ready').length
+		);
 		try {
 			const { db } = await getLocalDb();
 			// Spec 020 — Try again keeps the previous answer as an inactive version.
@@ -456,8 +472,8 @@ class ChatsStore {
 				return;
 			}
 			const route = buildExecutionPlan(analysisQuestion, frame).route;
-			this.startWork(route, enabledDocs.length);
 			if (route === 'aggregate') {
+				this.ensureCalculateStep();
 				await this.generateAggregate(
 					chatId,
 					analysisQuestion,
@@ -595,6 +611,12 @@ class ChatsStore {
 		if (!question || this.sending) return;
 		this.sending = true;
 		this.related = null;
+		// Immediate feedback: the ledger appears with the send, not after the
+		// question analysis (embedding) that precedes retrieval.
+		this.startWork(
+			'targeted',
+			this.chatDocuments.filter((d) => d.enabled && d.status === 'ready').length
+		);
 		try {
 			const { db } = await getLocalDb();
 			const chat = this.chats.find((c) => c.id === chatId);
@@ -623,8 +645,8 @@ class ChatsStore {
 				return;
 			}
 			const route = buildExecutionPlan(analysisQuestion, frame).route;
-			this.startWork(route, enabledDocs.length);
 			if (route === 'aggregate') {
+				this.ensureCalculateStep();
 				await this.generateAggregate(
 					chatId,
 					analysisQuestion,
