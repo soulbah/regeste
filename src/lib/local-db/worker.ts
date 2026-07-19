@@ -71,8 +71,32 @@ async function acquireSingleOwnerLock(): Promise<void> {
 	if (!acquired) throw new Error('folio-db-busy');
 }
 
+// sqlite-wasm auto-installs its async OPFS VFS at bootstrap, which spawns a
+// proxy worker (`sqlite3-opfs-async-proxy.js`) that our pinned package does not
+// ship. It skips that install when the worker's own URL carries `opfs-disable`.
+// In dev, Vite keeps the `?opfs-disable=1` query on the worker URL; the
+// production bundler strips it, so the flag is set here deterministically —
+// before the sqlite import — by shadowing the read-only worker location with a
+// URL that carries it. We use only opfs-sahpool, so the async VFS is dead
+// weight; without this it 404s and stalls first init by ~4s (caught, non-fatal).
+function forceOpfsDisable(): void {
+	try {
+		if (new URL(globalThis.location.href).searchParams.has('opfs-disable')) return;
+		const href = globalThis.location.href.replace(/#.*$/, '');
+		const withFlag = href + (href.includes('?') ? '&' : '?') + 'opfs-disable';
+		Object.defineProperty(globalThis, 'location', {
+			configurable: true,
+			value: new URL(withFlag)
+		});
+	} catch {
+		// Environment forbids the shadow: the async VFS still fails gracefully
+		// (onerror + 4s timeout, both caught) — degraded first init, not broken.
+	}
+}
+
 async function init(): Promise<DbInfo> {
 	await acquireSingleOwnerLock();
+	forceOpfsDisable();
 	const { default: sqlite3InitModule } = await import(/* @vite-ignore */ SQLITE_DIST_URL);
 	const sqlite3 = await sqlite3InitModule({
 		print: () => {},

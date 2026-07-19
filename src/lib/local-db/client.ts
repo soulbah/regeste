@@ -40,12 +40,14 @@ async function acquire(): Promise<{ db: LocalDb; info: DbInfo }> {
 	});
 	if (!granted) throw new DbLockedError();
 
-	// This build bundles both OPFS implementations. Folio explicitly uses
-	// opfs-sahpool below, so disable the unused async "opfs" VFS before SQLite
-	// bootstrap; otherwise it tries to fetch an unshipped proxy Worker.
-	const workerUrl = new URL('./worker.ts', import.meta.url);
-	workerUrl.searchParams.set('opfs-disable', '1');
-	const worker = new Worker(workerUrl, { type: 'module' });
+	// Vite's worker bundling is SYNTACTIC and fragile: it only compiles
+	// `new Worker(new URL('./x.ts', import.meta.url), …)` when the URL is a bare
+	// relative specifier. A URL query (the old `?opfs-disable=1`) or a hoisted
+	// `new URL(...)` variable both defeat detection — Vite then ships the raw
+	// `.ts` as an asset and the deployed app hangs forever on database init
+	// (the worker script 404s / can't execute). Keep this call bare. The async
+	// OPFS VFS is disabled inside the worker instead (see forceOpfsDisable).
+	const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
 	const db = wrap<DbApi>(worker);
 	const info = await db.init();
 	return { db, info };
