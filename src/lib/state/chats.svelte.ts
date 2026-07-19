@@ -834,8 +834,8 @@ class ChatsStore {
 					console.error('[folio] direct retry after reasoning failed:', err);
 					raw = streamRaw;
 				}
-				reasoning = '';
-				reasoningMs = null;
+				// The thinking-pass notes stay: they are what actually happened
+				// during this turn, and the direct retry answered the same prompt.
 			}
 		}
 		raw = stripThink(raw || streamRaw);
