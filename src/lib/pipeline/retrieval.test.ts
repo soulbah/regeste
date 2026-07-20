@@ -1216,8 +1216,30 @@ describe('expected answer type for contact atoms', () => {
 		).toBe(1);
 		expect(contactAnswerEvidenceCoverage('Quel est le téléphone ?', 'Appelez le service')).toBe(0);
 		expect(
-			contactAnswerEvidenceCoverage('Quel est le site ?', 'Voir https://www.orangemoney.fr')
+			contactAnswerEvidenceCoverage('Quel est le site web ?', 'Voir https://www.orangemoney.fr')
 		).toBe(1);
+	});
+
+	// Regression: these all scored 1 and hijacked the answer. A phone number or a
+	// URL sits in the letterhead of nearly every real document, so the value half
+	// of the guard filters nothing — the question wording is the whole gate, and
+	// it matched French words that merely share a spelling with an identifier.
+	// Shipped once: a question about an amount was answered with a phone number.
+	it('does not fire on ordinary French that merely resembles an identifier', () => {
+		const letterhead = 'Cabinet Durand, 01 42 55 66 77. Montant annuel : 1 200 EUR';
+		const withUrl = 'Surface : 4 200 m2. Voir https://exemple.fr/a';
+		expect(contactAnswerEvidenceCoverage("Quel est le montant tel qu'indiqué ?", letterhead)).toBe(
+			0
+		);
+		expect(
+			contactAnswerEvidenceCoverage("Quel est le lien entre l'article 5 et l'annexe B ?", withUrl)
+		).toBe(0);
+		expect(
+			contactAnswerEvidenceCoverage('Quelle est la surface du site industriel ?', withUrl)
+		).toBe(0);
+		expect(contactAnswerEvidenceCoverage('Le mobilier mobile est-il couvert ?', letterhead)).toBe(
+			0
+		);
 	});
 
 	// The correction prompt names the literal value, so extraction has to return

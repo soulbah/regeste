@@ -4,7 +4,7 @@
 // Every phase updates a named state the UI can render — no lying spinners.
 
 import { wrap, proxy, type Remote } from 'comlink';
-import { getLocalDb } from '$lib/local-db/client';
+import { getLocalDb, type LocalDb } from '$lib/local-db/client';
 import type { DbInfo } from '$lib/local-db/worker';
 import { sha256Hex } from '$lib/pipeline/hash';
 import { chunkBlocks } from '$lib/pipeline/chunk';
@@ -871,23 +871,26 @@ class DocumentsStore {
 	async reindex(id: string): Promise<void> {
 		if (this.processingIds.has(id) || this.ocrAborts[id]) return;
 		this.startProcessing(id);
-		const { db } = await getLocalDb();
-		const doc = await db.getDocument(id);
-		if (!doc) {
-			this.endProcessing(id);
-			return;
-		}
-		const existingChunkCount = await db.countChunks(id);
-		const data = await readOriginal(doc.hash);
-		if (!data) {
-			this.setIngest(id, { status: 'error', phaseProgress: 0, error: 'parse_failed' });
-			if (existingChunkCount === 0) {
-				await db.setDocumentStatus(id, 'error', { error: 'parse_failed' });
-			}
-			this.endProcessing(id);
-			return;
-		}
+		// Everything after startProcessing runs under try/finally. These first
+		// lookups are comlink calls that can reject; leaving them outside meant a
+		// rejection stranded the id in processingIds, and since `ingesting` gates
+		// the update banner, one failed boot repair disabled updates for the whole
+		// session. reindex is auto-invoked at boot, so this was not a rare path.
+		let db: LocalDb | null = null;
+		let existingChunkCount = 0;
 		try {
+			db = (await getLocalDb()).db;
+			const doc = await db.getDocument(id);
+			if (!doc) return;
+			existingChunkCount = await db.countChunks(id);
+			const data = await readOriginal(doc.hash);
+			if (!data) {
+				this.setIngest(id, { status: 'error', phaseProgress: 0, error: 'parse_failed' });
+				if (existingChunkCount === 0) {
+					await db.setDocumentStatus(id, 'error', { error: 'parse_failed' });
+				}
+				return;
+			}
 			this.setIngest(id, { status: 'parsing', phaseProgress: 0 });
 			const parsed = await parseByName(doc.name, doc.mime, data);
 			let blocks = parsed.blocks;
@@ -934,7 +937,7 @@ class DocumentsStore {
 				error: code,
 				diagnostic: err instanceof Error ? `${err.name}: ${err.message}` : String(err)
 			});
-			if (existingChunkCount === 0) await db.setDocumentStatus(id, 'error', { error: code });
+			if (existingChunkCount === 0) await db?.setDocumentStatus(id, 'error', { error: code });
 			console.error('[folio] re-index failed:', code, err);
 		} finally {
 			this.endProcessing(id);

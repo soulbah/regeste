@@ -68,9 +68,19 @@ class PwaStore {
 		// with no previous controller — reloading there restarts a session nobody
 		// asked to restart, and it wipes any state the boot had already recorded
 		// (a failed worker, for one). Measured: five navigations on a first load.
-		const hadController = !!navigator.serviceWorker.controller;
+		let controlled = !!navigator.serviceWorker.controller;
 		navigator.serviceWorker.addEventListener('controllerchange', () => {
-			if (this.reloading || !hadController) return;
+			if (!controlled) {
+				// A first install claiming this page: there is no older build to leave,
+				// so reloading would only restart a session nobody asked to restart.
+				// From here on the page IS controlled, so the next swap is a real
+				// update and must reload — latching this as a constant meant a tab
+				// opened before its first install never reloaded again, and kept
+				// running a build whose cache activate had just deleted.
+				controlled = true;
+				return;
+			}
+			if (this.reloading) return;
 			this.reloading = true;
 			window.location.reload();
 		});

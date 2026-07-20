@@ -495,17 +495,25 @@ export function numericLabelValueProximityCoverage(query: string, text: string):
 // a passage that merely REPEATS the question's words without carrying one is a
 // non-answer ("the email address used for this request"). Structural like the
 // numeric shapes above: a token kind, not document vocabulary.
+// The `asked` patterns must name the identifier, never merely brush past a word
+// that happens to share its spelling. `tel` is French for "such" (*tel
+// qu'indiqué*), `lien` is any connection, `site` is any physical site, `mobile`
+// is an adjective — each of those matched ordinary questions, and since a phone
+// number or a URL sits in the letterhead of nearly every real document, the
+// `value` half filtered nothing. A question about an amount was answered with a
+// phone number. Require the identifier to be named, not alluded to.
 const CONTACT_SHAPES = [
 	{
 		asked: /\b(?:mail|e-?mail|courriel|email)\b/u,
 		value: /[\p{L}\p{N}._%+-]+@[\p{L}\p{N}.-]+\.[\p{L}]{2,}/u
 	},
 	{
-		asked: /\b(?:telephone|tel|numero de tel\w*|phone|mobile)\b/u,
+		asked:
+			/\b(?:telephone|numero (?:de |du )?(?:telephone|portable|mobile|fixe)|phone number|mobile number)\b/u,
 		value: /(?:\+\d[\d\s.-]{6,}\d)|(?:\b0\d(?:[\s.-]?\d{2}){4}\b)/u
 	},
 	{
-		asked: /\b(?:site|lien|url|website|web)\b/u,
+		asked: /\b(?:url|site (?:web|internet)|adresse (?:du site|web)|lien vers|website)\b/u,
 		value: /https?:\/\/[^\s)]+|\bwww\.[^\s)]+/u
 	}
 ] as const;
@@ -815,9 +823,13 @@ export function refineCandidates(
 	// is monotone in that overlap, so no reweighting can invert the pair.
 	// Fails safe: when nothing carries the type this list is empty and the
 	// ordinary ranking stands, so a mis-typed question is never made worse.
+	// Capped like the numeric leaders above: the point is to put a carrier where
+	// the ranking would have buried it, not to hand the whole head of the list to
+	// every chunk whose footer happens to hold a phone number.
 	const contactLeaders = rescored
 		.filter((hit) => contactAnswerEvidenceCoverage(query, hit.text) > 0)
-		.sort((left, right) => right.score - left.score);
+		.sort((left, right) => right.score - left.score)
+		.slice(0, 3);
 	return [...contactLeaders, ...channelNumericLeaders, ...rescored]
 		.filter(
 			(hit, index, all) => all.findIndex((candidate) => candidate.chunkId === hit.chunkId) === index
@@ -959,9 +971,12 @@ export function selectWithNeighbors(
 	// that CARRIES one, and a passage echoing the question's wording outscores the
 	// carrier on every overlap feature. Empty unless the question names a contact
 	// atom AND a candidate carries it, so ordinary ranking is untouched otherwise.
-	const contactEvidenceCandidates = sorted.filter(
-		(hit) => analysisByChunk.get(hit.chunkId)!.contact > 0
-	);
+	// Capped for the same reason as its counterpart in refineCandidates: it sits
+	// at the head of both order branches, so an uncapped list could claim the
+	// whole evidence budget on any document with a phone number in its footer.
+	const contactEvidenceCandidates = sorted
+		.filter((hit) => analysisByChunk.get(hit.chunkId)!.contact > 0)
+		.slice(0, 3);
 	const coherentCandidates = sorted.filter((hit) => analysisByChunk.get(hit.chunkId)!.coherent);
 	const answerShape = analyzeQuestion(query).answerShape;
 	const contextUtility = (hit: SearchHit) => {
