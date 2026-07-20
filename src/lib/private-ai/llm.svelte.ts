@@ -39,7 +39,7 @@ async function getWorker(engine: 'webllm' | 'wllama'): Promise<Remote<LlmApi> | 
 			const worker = new Worker(new URL('./wllama-worker.ts', import.meta.url), {
 				type: 'module'
 			});
-			guardWorker(worker, 'private AI');
+			guardWorker(worker, 'privateAi');
 			wllamaApi = wrap<WllamaApi>(worker);
 		}
 		return wllamaApi as unknown as Remote<LlmApi>;

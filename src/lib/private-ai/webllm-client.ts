@@ -35,7 +35,7 @@ const pending = new Map<string, PendingRequest<unknown>>();
 function dedicatedClient(): Remote<LlmApi> {
 	if (!dedicated) {
 		const worker = new Worker(new URL('./llm-worker.ts', import.meta.url), { type: 'module' });
-		guardWorker(worker, 'private AI');
+		guardWorker(worker, 'privateAi');
 		dedicated = wrap<LlmApi>(worker);
 	}
 	return dedicated;

@@ -11,6 +11,7 @@
 	import { pwaStore } from '$lib/state/pwa.svelte';
 	import { llmStore } from '$lib/private-ai/llm.svelte';
 	import { documentsStore } from '$lib/state/documents.svelte';
+	import { workerHealth } from '$lib/state/worker-health.svelte';
 
 	const busy = $derived(
 		llmStore.status === 'generating' ||
@@ -18,7 +19,10 @@
 			llmStore.status === 'loading' ||
 			documentsStore.ingesting > 0
 	);
-	const show = $derived(pwaStore.updateReady && !busy);
+	// A dead worker owns the bottom slot: both cards sit at bottom-4 left-1/2 and
+	// both say Reload, so side by side they read as one confused message, and
+	// "a new version is ready" is a poor answer to "search just stopped working".
+	const show = $derived(pwaStore.updateReady && !busy && !workerHealth.failed);
 
 	$effect(() => {
 		if (!pwaStore.updateReady || busy) return;

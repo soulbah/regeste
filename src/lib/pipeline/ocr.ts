@@ -21,7 +21,7 @@ let ocrApi: Remote<OcrWorkerApi> | null = null;
 function getOcrWorker(): Remote<OcrWorkerApi> {
 	if (!ocrApi) {
 		const worker = new Worker(new URL('./ocr-worker.ts', import.meta.url), { type: 'module' });
-		guardWorker(worker, 'text recognition');
+		guardWorker(worker, 'ocr');
 		ocrApi = wrap<OcrWorkerApi>(worker);
 	}
 	return ocrApi;

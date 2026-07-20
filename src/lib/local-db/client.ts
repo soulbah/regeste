@@ -49,7 +49,7 @@ async function acquire(): Promise<{ db: LocalDb; info: DbInfo }> {
 	// (the worker script 404s / can't execute). Keep this call bare. The async
 	// OPFS VFS is disabled inside the worker instead (see forceOpfsDisable).
 	const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
-	guardWorker(worker, 'database');
+	guardWorker(worker, 'db');
 	const db = wrap<DbApi>(worker);
 	const info = await db.init();
 	return { db, info };

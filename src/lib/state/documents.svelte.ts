@@ -70,7 +70,7 @@ function getEmbedWorker(): Remote<EmbedApi> {
 		const worker = new Worker(new URL('../pipeline/embed-worker.ts', import.meta.url), {
 			type: 'module'
 		});
-		guardWorker(worker, 'document search');
+		guardWorker(worker, 'search');
 		embedApi = wrap<EmbedApi>(worker);
 	}
 	return embedApi;
@@ -86,7 +86,7 @@ function getRankingWorkers(count: number) {
 		const worker = new Worker(new URL('../pipeline/retrieval-ranking-worker.ts', import.meta.url), {
 			type: 'module'
 		});
-		guardWorker(worker, 'document search');
+		guardWorker(worker, 'search');
 		rankingWorkers.push({ worker, api: wrap<RetrievalRankingApi>(worker) });
 	}
 	return rankingWorkers.slice(0, desired);

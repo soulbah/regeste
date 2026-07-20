@@ -392,9 +392,13 @@ export const fr: Record<keyof typeof en, string> = {
 	'clarification.multiPart': 'À quelle partie faut-il répondre en premier ?',
 	'app.dbBusy':
 		'Vous avez déjà ceci ouvert dans un autre onglet. Fermez-le, puis rechargez cette page.',
-	'app.workerFailed':
-		"Un fichier nécessaire à cette page ne s'est pas chargé. Rechargez pour continuer.",
-	'app.workerFailedAction': 'Recharger',
+	'app.workerFailed.title': "Cette page n'a pas fini de se charger",
+	'app.workerFailed.body': 'Rechargez pour continuer.',
+	'app.workerFailed.cta': 'Recharger',
+	'app.workerFailed.dismiss': 'Masquer',
+	'app.workerFailed.search': 'La recherche dans vos documents ne fonctionne plus.',
+	'app.workerFailed.ocr': 'La reconnaissance de texte ne fonctionne plus.',
+	'app.workerFailed.privateAi': "L'IA privée ne fonctionne plus.",
 	'panel.backAria': 'Revenir aux documents',
 	'panel.hideAria': 'Fermer le panneau',
 	'chat.panelToggleAria': 'Ouvrir le panneau latéral',
