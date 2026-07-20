@@ -491,6 +491,34 @@ export function numericLabelValueProximityCoverage(query: string, text: string):
 	return best;
 }
 
+// A question asking for a way to reach someone wants a literal identifier, and
+// a passage that merely REPEATS the question's words without carrying one is a
+// non-answer ("the email address used for this request"). Structural like the
+// numeric shapes above: a token kind, not document vocabulary.
+const CONTACT_SHAPES = [
+	{
+		asked: /\b(?:mail|e-?mail|courriel|email)\b/u,
+		value: /[\p{L}\p{N}._%+-]+@[\p{L}\p{N}.-]+\.[\p{L}]{2,}/u
+	},
+	{
+		asked: /\b(?:telephone|tel|numero de tel\w*|phone|mobile)\b/u,
+		value: /(?:\+\d[\d\s.-]{6,}\d)|(?:\b0\d(?:[\s.-]?\d{2}){4}\b)/u
+	},
+	{
+		asked: /\b(?:site|lien|url|website|web)\b/u,
+		value: /https?:\/\/[^\s)]+|\bwww\.[^\s)]+/u
+	}
+] as const;
+
+/** 1 when the question asks for a contact identifier and the passage actually
+ * carries one, 0 otherwise. Reranking feature only. */
+export function contactAnswerEvidenceCoverage(query: string, text: string): number {
+	const normalizedQuery = normalizeForFuzzy(query);
+	const asked = CONTACT_SHAPES.filter((shape) => shape.asked.test(normalizedQuery));
+	if (!asked.length) return 0;
+	return asked.some((shape) => shape.value.test(text)) ? 1 : 0;
+}
+
 /** Deterministic answer-shape signal, deliberately limited to explicit numeric
  * structure. It is a reranking feature, not a domain or intent classifier. */
 export function numericAnswerEvidenceCoverage(query: string, text: string): number {
@@ -767,7 +795,18 @@ export function refineCandidates(
 						right.score - left.score
 				)
 		: [];
-	return [...channelNumericLeaders, ...rescored]
+	// Expected-answer-type restriction for contact atoms, the same partition the
+	// numeric leaders above apply. A question naming an email, phone or URL is
+	// answered by a passage that CARRIES one; a passage that merely echoes the
+	// question's wording ("the email address used for this request") maximises
+	// every overlap feature while containing no answer, and term-overlap scoring
+	// is monotone in that overlap, so no reweighting can invert the pair.
+	// Fails safe: when nothing carries the type this list is empty and the
+	// ordinary ranking stands, so a mis-typed question is never made worse.
+	const contactLeaders = rescored
+		.filter((hit) => contactAnswerEvidenceCoverage(query, hit.text) > 0)
+		.sort((left, right) => right.score - left.score);
+	return [...contactLeaders, ...channelNumericLeaders, ...rescored]
 		.filter(
 			(hit, index, all) => all.findIndex((candidate) => candidate.chunkId === hit.chunkId) === index
 		)
@@ -862,6 +901,7 @@ export function selectWithNeighbors(
 					constraint: numericConstraintEvidenceCoverage(query, hit.text),
 					numeric: numericAnswerEvidenceCoverage(query, hit.text),
 					numericScope: numericScopeCoverage(query, candidate),
+					contact: contactAnswerEvidenceCoverage(query, hit.text),
 					labelProximity: numericLabelValueProximityCoverage(query, hit.text),
 					coherent: multiClauseEvidenceCoverage(query, candidate, route) === 1
 				}
@@ -901,6 +941,15 @@ export function selectWithNeighbors(
 					analysisByChunk.get(left.chunkId)!.numericScope ||
 				right.score - left.score
 		);
+	// Second half of the expected-answer-type partition applied in refineCandidates.
+	// That ordering is rebuilt from raw score here, so the restriction has to be
+	// restated: a question naming an email, phone or URL is answered by a passage
+	// that CARRIES one, and a passage echoing the question's wording outscores the
+	// carrier on every overlap feature. Empty unless the question names a contact
+	// atom AND a candidate carries it, so ordinary ranking is untouched otherwise.
+	const contactEvidenceCandidates = sorted.filter(
+		(hit) => analysisByChunk.get(hit.chunkId)!.contact > 0
+	);
 	const coherentCandidates = sorted.filter((hit) => analysisByChunk.get(hit.chunkId)!.coherent);
 	const answerShape = analyzeQuestion(query).answerShape;
 	const contextUtility = (hit: SearchHit) => {
@@ -1110,6 +1159,7 @@ export function selectWithNeighbors(
 		? [...ranked, ...sorted]
 		: route === 'synthesis'
 			? [
+					...contactEvidenceCandidates,
 					...contextualWindowCandidates,
 					// A composed question is only answerable when every substantial
 					// sub-question survives packing. Broadly relevant legal or narrative
@@ -1131,6 +1181,7 @@ export function selectWithNeighbors(
 					)
 				]
 			: [
+					...contactEvidenceCandidates,
 					...coherentCandidates,
 					// For coverage/permission scenarios, exact scoped leaders must claim
 					// the small per-page budget before a broader same-page window.

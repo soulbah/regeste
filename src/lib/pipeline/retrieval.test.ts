@@ -18,6 +18,7 @@ import {
 	selectWithNeighbors,
 	numericAnswerEvidenceCoverage,
 	numericConstraintEvidenceCoverage,
+	contactAnswerEvidenceCoverage,
 	multiClauseEvidenceCoverage
 } from './retrieval';
 import { chunkBlocks } from './chunk';
@@ -1191,5 +1192,49 @@ describe('retrieval refinement', () => {
 		expect(result.map((item) => item.page)).toContain(23);
 		expect(result[0].text).toContain('JOHN DOE');
 		expect(result[0].text).not.toContain('Expéditeur');
+	});
+});
+
+describe('expected answer type for contact atoms', () => {
+	// Regression: a passage that echoes the question's wording without carrying
+	// an address outranked the terse chunk that held it, because every
+	// overlap feature is monotone in question-chunk similarity.
+	const GOLD = 'Destinataire :\nservice-visas@consulat-exemple.org';
+	const ECHO =
+		'Je souhaite recevoir les documents sous format électronique PDF à l’adresse e-mail utilisée pour la présente demande';
+
+	it('separates a passage carrying the requested identifier from one that only echoes it', () => {
+		const question = 'Quelle adresse mail dois-je joindre pour la demande de documents ?';
+		expect(contactAnswerEvidenceCoverage(question, GOLD)).toBe(1);
+		expect(contactAnswerEvidenceCoverage(question, ECHO)).toBe(0);
+	});
+
+	it('covers phone and url atoms', () => {
+		expect(
+			contactAnswerEvidenceCoverage('Quel est le téléphone ?', 'Tel : +33 1 41 86 09 69')
+		).toBe(1);
+		expect(contactAnswerEvidenceCoverage('Quel est le téléphone ?', 'Appelez le service')).toBe(0);
+		expect(
+			contactAnswerEvidenceCoverage('Quel est le site ?', 'Voir https://www.orangemoney.fr')
+		).toBe(1);
+	});
+
+	it('stays inert when the question names no contact atom', () => {
+		expect(contactAnswerEvidenceCoverage('Qui est le destinataire ?', GOLD)).toBe(0);
+		expect(contactAnswerEvidenceCoverage('Quel est le montant ?', GOLD)).toBe(0);
+	});
+
+	// Selection rebuilds its own order from raw score, so the partition has to
+	// hold here too: ranking the carrier first upstream is not enough.
+	it('selects the carrier over a higher-scored echo within a one-passage budget', () => {
+		const gold = { ...hit(1, 'demande', 0.1), seq: 1, text: GOLD };
+		const echo = { ...hit(2, 'demande', 0.9), seq: 8, text: ECHO };
+		const selected = selectWithNeighbors(
+			[echo, gold],
+			[],
+			'Quelle adresse mail dois-je joindre pour la demande de documents ?',
+			1
+		);
+		expect(selected.map((item) => item.chunkId)).toEqual([1]);
 	});
 });
