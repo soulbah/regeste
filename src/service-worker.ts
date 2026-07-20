@@ -77,7 +77,15 @@ async function precache(): Promise<void> {
 		...EAGER_EXTRA
 	];
 	await Promise.allSettled(
-		assets.map(async (url) => cache.put(url, await fetch(url, { cache: 'reload' })))
+		assets.map(async (url) => {
+			const response = await fetch(url, { cache: 'reload' });
+			// Cache.put stores a 404 as readily as a 200, and a stored failure is
+			// permanent for the life of this cache version — nothing ever refetches
+			// an entry that is already there. Drop it instead and let the runtime
+			// path retry against the network.
+			if (!response.ok) throw new Error(`${url}: ${response.status}`);
+			await cache.put(url, response);
+		})
 	);
 }
 
@@ -181,9 +189,11 @@ async function generate(
 // stops serving after a redeploy) and tear a loaded model out of an in-flight
 // generation. The page asks for it explicitly instead (see the message branch).
 sw.addEventListener('install', (event) => event.waitUntil(precache()));
-sw.addEventListener('activate', (event) =>
-	event.waitUntil(dropOldCaches().then(() => sw.clients.claim()))
-);
+// Claim BEFORE dropping: deleting the previous cache while its pages are still
+// controlled by the previous worker leaves them fetching chunk names this deploy
+// no longer serves. Claiming fires controllerchange, which reloads them onto this
+// build, and only then does the old cache become unreachable.
+sw.addEventListener('activate', (event) => event.waitUntil(sw.clients.claim().then(dropOldCaches)));
 
 sw.addEventListener('fetch', (event: FetchEvent) => {
 	const { request } = event;
