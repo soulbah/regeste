@@ -2,6 +2,7 @@
 	// Settings modal (spec 021, owner design pass): a tinted rail with iconed
 	// tabs and the green accent bar (the ⌘K signature), and Claude-style rows —
 	// label + description left, control right. Essentials only.
+	import { untrack } from 'svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import * as Select from '$lib/components/ui/select';
@@ -63,8 +64,14 @@
 	// My AI endpoint drafts, seeded when the dialog opens.
 	let urlDraft = $state('');
 	let keyDraft = $state('');
+	// Seed on OPEN, and only on open. These calls read state of their own —
+	// llmStore.init() reads status, myaiStore.init() its config — so tracking them
+	// re-ran the whole block on every unrelated change: during a generation the
+	// status flips repeatedly, and each flip refetched the quota and re-read
+	// storage. Untracked, the dependency is the one that actually belongs here.
 	$effect(() => {
-		if (uiStore.settingsOpen) {
+		if (!uiStore.settingsOpen) return;
+		untrack(() => {
 			urlDraft = myaiStore.baseUrl ?? '';
 			keyDraft = myaiStore.apiKey ?? '';
 			settingsStore.refreshStorage();
@@ -72,7 +79,7 @@
 			llmStore.init();
 			myaiStore.init();
 			modelsStore.refresh();
-		}
+		});
 	});
 
 	const presetHint = $derived(
