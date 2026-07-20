@@ -241,3 +241,147 @@
 		@apply font-display tracking-tight;
 	}
 }
+
+/* ---------------------------------------------------------------------
+   Markdown prose — two scoped variants, no @tailwindcss/typography.
+   Elements come from src/lib/components/markdown/tokens.svelte.
+   .prose-answer = AI answer (text-sm rhythm); .prose-notes = the muted
+   draft trace (flat 11px, headings demoted, bold softened — must not
+   shout). Only theme tokens, so both light and dark follow automatically.
+   --------------------------------------------------------------------- */
+@layer components {
+	.prose-answer > :first-child {
+		margin-top: 0;
+	}
+	.prose-answer > * + * {
+		margin-top: 0.6rem;
+	}
+	.prose-answer p {
+		line-height: 1.65;
+	}
+	.prose-answer ul,
+	.prose-answer ol {
+		padding-left: 1.25rem;
+		margin-top: 0.4rem;
+	}
+	.prose-answer ul {
+		list-style: disc;
+	}
+	.prose-answer ol {
+		list-style: decimal;
+	}
+	.prose-answer li {
+		margin-top: 0.2rem;
+	}
+	.prose-answer li::marker {
+		color: var(--muted-foreground);
+	}
+	.prose-answer ol li::marker {
+		font-family: var(--font-mono);
+		font-size: 0.85em;
+	}
+	.prose-answer strong {
+		font-weight: 600;
+	}
+	.prose-answer code {
+		font-family: var(--font-mono);
+		font-size: 0.85em;
+		background: color-mix(in oklch, var(--foreground) 6%, transparent);
+		padding: 0.05em 0.3em;
+		border-radius: var(--radius-sm);
+	}
+	.prose-answer pre {
+		font-family: var(--font-mono);
+		font-size: 0.8rem;
+		line-height: 1.5;
+		background: var(--muted);
+		padding: 0.6rem 0.75rem;
+		border-radius: var(--radius-md);
+		overflow-x: auto;
+	}
+	.prose-answer pre code {
+		background: none;
+		padding: 0;
+		font-size: inherit;
+	}
+	.prose-answer .md-h {
+		font-weight: 600;
+	}
+	.prose-answer blockquote {
+		border-left: 2px solid var(--border);
+		padding-left: 0.75rem;
+		color: var(--muted-foreground);
+	}
+	.prose-answer hr {
+		border: 0;
+		border-top: 1px solid var(--border);
+	}
+
+	/* Draft notes — flat 11px, emphasis demoted, muted by color not opacity so
+	   a restored bold can still reach full contrast. */
+	.prose-notes {
+		font-size: 11px;
+		line-height: 1.45;
+		color: var(--muted-foreground);
+	}
+	.prose-notes > :first-child {
+		margin-top: 0;
+	}
+	.prose-notes > * + * {
+		margin-top: 0.35rem;
+	}
+	.prose-notes ul,
+	.prose-notes ol {
+		padding-left: 1.1em;
+		margin-top: 0.2rem;
+	}
+	.prose-notes ul {
+		list-style: disc;
+	}
+	.prose-notes ol {
+		list-style: decimal;
+	}
+	.prose-notes li {
+		margin-top: 0.1rem;
+	}
+	.prose-notes li::marker {
+		color: var(--muted-foreground);
+	}
+	.prose-notes ol li::marker {
+		font-family: var(--font-mono);
+	}
+	.prose-notes strong {
+		font-weight: 500;
+		color: var(--foreground);
+	}
+	.prose-notes code {
+		font-family: var(--font-mono);
+		background: color-mix(in oklch, var(--foreground) 5%, transparent);
+		padding: 0 0.25em;
+		border-radius: 3px;
+	}
+	.prose-notes pre {
+		font-family: var(--font-mono);
+		font-size: 10px;
+		background: color-mix(in oklch, var(--foreground) 5%, transparent);
+		padding: 0.4rem 0.5rem;
+		border-radius: 4px;
+		overflow-x: auto;
+	}
+	.prose-notes pre code {
+		background: none;
+		padding: 0;
+	}
+	.prose-notes .md-h {
+		font-weight: 500;
+		color: var(--foreground);
+	}
+	.prose-notes blockquote {
+		border-left: 1px solid var(--border);
+		padding-left: 0.5rem;
+	}
+	.prose-notes hr {
+		border: 0;
+		border-top: 1px solid var(--border);
+	}
+}

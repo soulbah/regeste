@@ -16,6 +16,7 @@
 	import RetrievalTurn from '$lib/components/retrieval-turn.svelte';
 	import PrivateTurn from '$lib/components/private-turn.svelte';
 	import WorkLedger from '$lib/components/work-ledger.svelte';
+	import Markdown from '$lib/components/markdown/markdown.svelte';
 	import PresendPanel from '$lib/components/presend-panel.svelte';
 	import DocumentsPanel from '$lib/components/documents-panel.svelte';
 	import ViewerPanel from '$lib/components/viewer-panel.svelte';
@@ -431,9 +432,12 @@
 								thinking={chatsStore.streamingText ? null : chatsStore.streamingThinking}
 							/>
 							{#if chatsStore.streamingText}
-								<p class="text-sm leading-relaxed whitespace-pre-wrap">
-									{chatsStore.streamingText}
-								</p>
+								<!-- Same renderer as the finalized turn: streaming raw then snapping
+								     to formatted markdown on completion would flip every list answer.
+								     No citations mid-stream, so [n] stays literal exactly as before. -->
+								<div class="text-sm">
+									<Markdown source={chatsStore.streamingText} variant="answer" />
+								</div>
 							{:else if !chatsStore.streamingThinking}
 								<Skeleton class="h-4 w-2/3" />
 							{/if}

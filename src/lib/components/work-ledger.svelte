@@ -6,6 +6,7 @@
 	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import { t } from '$lib/i18n/index.svelte';
+	import Markdown from '$lib/components/markdown/markdown.svelte';
 	import type { MethodSummary, WorkStep } from '$lib/types';
 
 	let {
@@ -73,13 +74,9 @@
 								? ` · ${Math.max(1, Math.round(method.reasoningMs / 1000))} s`
 								: ''}
 						</p>
-						<p
-							class="mt-1 text-[11px] leading-snug whitespace-pre-wrap opacity-80 {notesOpen
-								? ''
-								: 'line-clamp-6'}"
-						>
-							{method.reasoning}
-						</p>
+						<div class="mt-1 {notesOpen ? '' : 'line-clamp-6'}">
+							<Markdown source={method.reasoning} variant="notes" />
+						</div>
 						<Button
 							variant="ghost"
 							class="text-muted-foreground hover:text-foreground h-auto p-0 text-[11px]"

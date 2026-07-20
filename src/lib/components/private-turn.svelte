@@ -15,6 +15,7 @@
 	import { compactCitationMarkers } from '$lib/private-ai/prompt';
 	import { viewerStore } from '$lib/state/viewer.svelte';
 	import WorkLedger from '$lib/components/work-ledger.svelte';
+	import Markdown from '$lib/components/markdown/markdown.svelte';
 	import type { MethodSummary } from '$lib/types';
 
 	let {
@@ -74,19 +75,6 @@
 		setTimeout(() => (copied = false), 1500);
 	}
 
-	// Split "text [1] more [2]" into segments; markers become citation chips.
-	const segments = $derived.by(() => {
-		const out: Array<{ type: 'text'; value: string } | { type: 'cite'; n: number }> = [];
-		let last = 0;
-		for (const m of displayContent.matchAll(/\[(\d{1,2})\]/g)) {
-			if (m.index! > last) out.push({ type: 'text', value: displayContent.slice(last, m.index) });
-			out.push({ type: 'cite', n: Number(m[1]) });
-			last = m.index! + m[0].length;
-		}
-		if (last < displayContent.length) out.push({ type: 'text', value: displayContent.slice(last) });
-		return out;
-	});
-
 	// Sources strip: 1:1 with chip numbers, capped at 3 + "+N" (Perplexity model).
 	const STRIP_CAP = 3;
 	let stripExpanded = $state(false);
@@ -138,47 +126,9 @@
 		</div>
 	{/if}
 
-	<p class="text-sm leading-relaxed whitespace-pre-wrap">
-		{#each segments as segment, i (i)}
-			{#if segment.type === 'text'}{segment.value}{:else}
-				<Tooltip.Provider delayDuration={600}>
-					<Tooltip.Root>
-						<Tooltip.Trigger
-							class="bg-accent text-accent-foreground focus-visible:ring-ring mx-0.5 inline-flex h-4 min-w-4 cursor-pointer items-center justify-center rounded-[5px] px-1 align-super font-mono text-[10px] font-semibold focus-visible:ring-2 focus-visible:outline-none"
-							onclick={() => {
-								const citation = citations[segment.n - 1];
-								if (citation) viewerStore.openCitation(citation);
-							}}
-							aria-label={t('turn.openSourceAria', { n: segment.n })}
-						>
-							{segment.n}
-						</Tooltip.Trigger>
-						<!-- The base tooltip is an inline-flex row (label + kbd); this is a
-						     quote card — force a stacked block: source header, excerpt below. -->
-						<Tooltip.Content class="block w-80 max-w-80 p-0">
-							{#if citations[segment.n - 1]}
-								<div
-									class="border-border/60 flex items-baseline justify-between gap-3 border-b px-3 py-1.5"
-								>
-									<span class="min-w-0 truncate text-xs font-medium">
-										{citations[segment.n - 1].documentName}
-									</span>
-									{#if citations[segment.n - 1].locator}
-										<span class="shrink-0 font-mono text-[10px] opacity-60">
-											{citations[segment.n - 1].locator}
-										</span>
-									{/if}
-								</div>
-								<p class="line-clamp-6 px-3 py-2 text-xs leading-relaxed opacity-80">
-									{citations[segment.n - 1].snippet}
-								</p>
-							{/if}
-						</Tooltip.Content>
-					</Tooltip.Root>
-				</Tooltip.Provider>
-			{/if}
-		{/each}
-	</p>
+	<div class="text-sm">
+		<Markdown source={displayContent} variant="answer" {citations} />
+	</div>
 
 	{#if closestSources.length}
 		<div class="space-y-0.5 border-t pt-2">
