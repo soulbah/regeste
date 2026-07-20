@@ -63,8 +63,14 @@ class PwaStore {
 		};
 		consider(registration.waiting);
 		registration.addEventListener('updatefound', () => consider(registration.installing));
+		// Reload only when an update swapped the worker out from under a page that
+		// already had one. On a first-ever visit `clients.claim()` also fires this,
+		// with no previous controller — reloading there restarts a session nobody
+		// asked to restart, and it wipes any state the boot had already recorded
+		// (a failed worker, for one). Measured: five navigations on a first load.
+		const hadController = !!navigator.serviceWorker.controller;
 		navigator.serviceWorker.addEventListener('controllerchange', () => {
-			if (this.reloading) return;
+			if (this.reloading || !hadController) return;
 			this.reloading = true;
 			window.location.reload();
 		});
