@@ -1,4 +1,5 @@
 import { wrap, type Remote } from 'comlink';
+import { guardWorker } from '$lib/state/worker-health.svelte';
 import type { GenerationOptions, GenerationResult } from './generation';
 import type { LlmApi } from './llm-worker';
 
@@ -33,9 +34,9 @@ const pending = new Map<string, PendingRequest<unknown>>();
 
 function dedicatedClient(): Remote<LlmApi> {
 	if (!dedicated) {
-		dedicated = wrap<LlmApi>(
-			new Worker(new URL('./llm-worker.ts', import.meta.url), { type: 'module' })
-		);
+		const worker = new Worker(new URL('./llm-worker.ts', import.meta.url), { type: 'module' });
+		guardWorker(worker, 'private AI');
+		dedicated = wrap<LlmApi>(worker);
 	}
 	return dedicated;
 }

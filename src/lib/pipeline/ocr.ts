@@ -5,6 +5,7 @@ import { transfer, wrap, type Remote } from 'comlink';
 import type { ParsedBlock } from '$lib/types';
 import type { OcrWorkerApi } from './ocr-worker';
 import { yieldToMain } from './embed-batches';
+import { guardWorker } from '$lib/state/worker-health.svelte';
 
 export interface OcrProgress {
 	page: number;
@@ -19,9 +20,9 @@ let ocrApi: Remote<OcrWorkerApi> | null = null;
 
 function getOcrWorker(): Remote<OcrWorkerApi> {
 	if (!ocrApi) {
-		ocrApi = wrap<OcrWorkerApi>(
-			new Worker(new URL('./ocr-worker.ts', import.meta.url), { type: 'module' })
-		);
+		const worker = new Worker(new URL('./ocr-worker.ts', import.meta.url), { type: 'module' });
+		guardWorker(worker, 'text recognition');
+		ocrApi = wrap<OcrWorkerApi>(worker);
 	}
 	return ocrApi;
 }

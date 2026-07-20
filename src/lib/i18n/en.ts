@@ -378,6 +378,8 @@ export const en = {
 	'clarification.unitCurrency': 'Which target currency or unit should I use?',
 	'clarification.multiPart': 'Which part should I answer first?',
 	'app.dbBusy': 'You already have this open in another tab. Close it there, then reload.',
+	'app.workerFailed': "A file this page needs didn't load. Reload to continue.",
+	'app.workerFailedAction': 'Reload',
 	'panel.backAria': 'Back to documents',
 	'panel.hideAria': 'Close the panel',
 	'chat.panelToggleAria': 'Open the side panel',

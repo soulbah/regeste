@@ -12,6 +12,7 @@ import { detectTier } from './capability';
 import { downgrade, type Tier } from './tiers';
 import type { LlmApi } from './llm-worker';
 import type { WllamaApi } from './wllama-worker';
+import { guardWorker } from '$lib/state/worker-health.svelte';
 import { adaptGenerationOptions, type GenerationOptions } from './generation';
 import type { GenerationResult } from './generation';
 import type { WebLlmClient } from './webllm-client';
@@ -38,6 +39,7 @@ async function getWorker(engine: 'webllm' | 'wllama'): Promise<Remote<LlmApi> | 
 			const worker = new Worker(new URL('./wllama-worker.ts', import.meta.url), {
 				type: 'module'
 			});
+			guardWorker(worker, 'private AI');
 			wllamaApi = wrap<WllamaApi>(worker);
 		}
 		return wllamaApi as unknown as Remote<LlmApi>;

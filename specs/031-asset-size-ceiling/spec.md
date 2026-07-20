@@ -89,10 +89,32 @@ noticeably slower embeddings. Not recommended.
 
 ## Decision
 
-Guard now (done), option A when the guard escalates from warning to error, or when
-the open-source launch makes the skew gap worth closing anyway — whichever comes
-first. Before either, pin `@huggingface/transformers` to an exact version so the
-bump is a deliberate act with a known cost.
+Sequenced 2026-07-20, cheapest and most user-visible first.
+
+1. **Pin the dependency. (done)** `@huggingface/transformers` moved from `^4.2.0`
+   to `4.2.0`, so the only way this file can grow is a bump we choose to make.
+2. **Make a failed worker visible. (done)** Independent of this ceiling and of
+   skew — see below. It is what turns the worst outcome into a recoverable one.
+3. **Option A, the R2 mirror. (not started)** At the open-source launch, or when
+   the build guard escalates from warning to error, whichever comes first. It is
+   the only item that removes both problems structurally rather than making them
+   survivable, and its cost is now known to be modest: one ~62 MB sync, then only
+   genuinely changed files.
+
+### Why 2 came before 3
+
+Before it, a worker script that failed to load was unobservable. Nothing listened
+for `error` at any of the six construction sites (verified), the worker still
+constructs, and comlink then waits on a reply that never arrives — no rejection,
+no timeout. The page sat on its skeletons forever with nothing to explain it.
+Skew is only one way to reach that state; a network hiccup during a lazy load
+reaches it too, with no deploy involved. `guardWorker` in
+`src/lib/state/worker-health.svelte.ts` now observes it and the layout surfaces
+one honest message with a reload action. Verified live both ways: forcing a 404
+on the database worker produces the message, and a normal boot stays silent.
+
+That bounds the damage without touching infrastructure. It does not make the 404
+stop happening — only step 3 does that.
 
 ## Done when
 

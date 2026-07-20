@@ -17,6 +17,7 @@
 	import UpdateBanner from '$lib/components/update-banner.svelte';
 	import { isShellCache } from '$lib/pwa/cache-names';
 	import { pwaStore } from '$lib/state/pwa.svelte';
+	import { workerHealth } from '$lib/state/worker-health.svelte';
 	import { page } from '$app/state';
 	import { dev } from '$app/environment';
 	import { SvelteMap } from 'svelte/reactivity';
@@ -57,6 +58,17 @@
 			throw err;
 		});
 	}
+
+	// A worker script that fails to load leaves comlink waiting on a reply that
+	// never comes, so the affected view would otherwise sit on its skeletons with
+	// nothing to explain it. Say so once, and offer the only thing that helps.
+	$effect(() => {
+		if (!workerHealth.failed) return;
+		toast.error(t('app.workerFailed'), {
+			duration: Number.POSITIVE_INFINITY,
+			action: { label: t('app.workerFailedAction'), onClick: () => window.location.reload() }
+		});
+	});
 
 	$effect(() => {
 		i18n.init();
