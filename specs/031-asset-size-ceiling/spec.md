@@ -87,6 +87,41 @@ glue and a wasm URL we construct by hand. Rejected unless A proves impractical.
 **C — Give up WebGPU for embeddings** and ship the 12.3 MB build. Large headroom,
 noticeably slower embeddings. Not recommended.
 
+## Deferred: the one worker death that stays silent
+
+`guardWorker` listens for `error` on the Worker object. Measured in Chromium
+against the deployed origin, that covers four of the five ways a worker dies:
+
+| mode                             | `error` event |
+| -------------------------------- | ------------- |
+| throws at top level              | fires         |
+| imports a missing module         | fires         |
+| syntax error                     | fires         |
+| throws asynchronously after load | fires         |
+| **loads, then stops answering**  | **silent**    |
+
+Every mode a redeploy or a broken build produces is in the covered set. What is
+left is a worker killed under memory pressure, a deadlock, or a swallowed
+rejection.
+
+A handshake ping does **not** close it. At handshake time the worker has just
+loaded and answers; the ping only detects "the script ran but comlink never
+worked", which `error` already reports, sooner and unambiguously. Catching a
+_later_ death needs a per-call deadline, and this codebase has no safe deadline
+to pick: OCR runs at 300 DPI per page, a generation takes ~60 s, an ingest longer
+still. Any deadline sized for those is useless, and any useful one fires on a
+slow first boot.
+
+The only sound design is a watchdog on **absence of progress**, not on elapsed
+time: alarm when the signal stops, not when the work is long. Three workers
+already emit exactly that signal — `EmbedProgress`, `OcrProgress`, and the
+generation deltas — so a watchdog would wrap those and leave the database worker
+alone, whose calls are short anyway.
+
+Not built. It touches every hot path in the app to catch three rare causes, and
+nobody has hit one. Revisit if a tester reports an unexplained freeze that
+`guardWorker` did not catch.
+
 ## Decision
 
 Sequenced 2026-07-20, cheapest and most user-visible first.
