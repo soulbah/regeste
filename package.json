@@ -10,7 +10,7 @@
 	"packageManager": "bun@1.2.22",
 	"scripts": {
 		"dev": "vite dev",
-		"build": "vite build",
+		"build": "vite build && node scripts/check-asset-limits.mjs",
 		"preview": "bun run build && wrangler dev",
 		"prepare": "svelte-kit sync && bun run vendor || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",

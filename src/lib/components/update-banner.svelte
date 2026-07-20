@@ -16,7 +16,7 @@
 		llmStore.status === 'generating' ||
 			llmStore.status === 'downloading' ||
 			llmStore.status === 'loading' ||
-			Object.keys(documentsStore.ingests).length > 0
+			documentsStore.ingesting > 0
 	);
 	const show = $derived(pwaStore.updateReady && !busy);
 

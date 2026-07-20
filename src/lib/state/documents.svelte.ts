@@ -181,6 +181,10 @@ class DocumentsStore {
 	private interruptedRepairStarted = false;
 	private retrievalRepairStarted = false;
 	private processingIds = new Set<string>();
+	/** Reactive mirror of processingIds. `ingests` is a progress map that keeps
+	 * its terminal entries, so its size answers "has ever ingested", not "is
+	 * working right now" — anything gating on an idle app needs this instead. */
+	ingesting = $state(0);
 	dbInfo = $state<DbInfo | null>(null);
 	dbError = $state<string | null>(null);
 	/** False until the first library load lands, so the UI can tell "loading"
@@ -340,6 +344,16 @@ class DocumentsStore {
 		this.ingests = { ...this.ingests, [id]: state };
 	}
 
+	private startProcessing(id: string): void {
+		this.startProcessing(id);
+		this.ingesting = this.processingIds.size;
+	}
+
+	private endProcessing(id: string): void {
+		this.endProcessing(id);
+		this.ingesting = this.processingIds.size;
+	}
+
 	/** Ingest a file; returns the document id (existing one on dedup). */
 	async ingest(file: File): Promise<string> {
 		const staged = await this.stageDocument(file);
@@ -410,7 +424,7 @@ class DocumentsStore {
 	/** Parse → chunk → embed → index one staged document (bytes re-read here). */
 	private async processDocument(id: string, file: File, hash: string): Promise<void> {
 		if (this.processingIds.has(id)) return;
-		this.processingIds.add(id);
+		this.startProcessing(id);
 		const { db } = await getLocalDb();
 		try {
 			const data = await file.arrayBuffer();
@@ -481,7 +495,7 @@ class DocumentsStore {
 			this.setIngest(id, { status: 'error', phaseProgress: 0, error: code });
 			if (code === 'unknown') console.error('[folio] ingest failed:', err);
 		} finally {
-			this.processingIds.delete(id);
+			this.endProcessing(id);
 			await this.refreshLibrary();
 		}
 	}
@@ -853,11 +867,11 @@ class DocumentsStore {
 	/** D4 — rebuild chunks + embeddings from the OPFS original. */
 	async reindex(id: string): Promise<void> {
 		if (this.processingIds.has(id) || this.ocrAborts[id]) return;
-		this.processingIds.add(id);
+		this.startProcessing(id);
 		const { db } = await getLocalDb();
 		const doc = await db.getDocument(id);
 		if (!doc) {
-			this.processingIds.delete(id);
+			this.endProcessing(id);
 			return;
 		}
 		const existingChunkCount = await db.countChunks(id);
@@ -867,7 +881,7 @@ class DocumentsStore {
 			if (existingChunkCount === 0) {
 				await db.setDocumentStatus(id, 'error', { error: 'parse_failed' });
 			}
-			this.processingIds.delete(id);
+			this.endProcessing(id);
 			return;
 		}
 		try {
@@ -920,7 +934,7 @@ class DocumentsStore {
 			if (existingChunkCount === 0) await db.setDocumentStatus(id, 'error', { error: code });
 			console.error('[folio] re-index failed:', code, err);
 		} finally {
-			this.processingIds.delete(id);
+			this.endProcessing(id);
 			await this.refreshLibrary();
 		}
 	}
