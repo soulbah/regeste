@@ -348,12 +348,12 @@ class DocumentsStore {
 	}
 
 	private startProcessing(id: string): void {
-		this.startProcessing(id);
+		this.processingIds.add(id);
 		this.ingesting = this.processingIds.size;
 	}
 
 	private endProcessing(id: string): void {
-		this.endProcessing(id);
+		this.processingIds.delete(id);
 		this.ingesting = this.processingIds.size;
 	}
 
