@@ -15,6 +15,7 @@ import {
 	isContestation,
 	type RetrievalContext
 } from '$lib/retrieval-context';
+import { contactAnswerEvidenceCoverage, contactAnswerValues } from '$lib/pipeline/retrieval';
 import { assistedPayloadBytes } from '$lib/assisted-payload';
 import { questionLocale } from '$lib/analysis/query-router';
 import { resolveQuestion, type EmbedQuestions } from '$lib/nlu/semantic-resolver';
@@ -32,6 +33,7 @@ import { retrieveWithLocalQueryFallback } from '$lib/pipeline/query-translation'
 import { buildAuditedExtractiveAnswer } from '$lib/private-ai/extractive-answer';
 import {
 	SYSTEM_PROMPT,
+	buildContactValuePrompt,
 	buildUserPrompt,
 	buildVerificationPrompt,
 	buildVerificationUserPrompt,
@@ -939,6 +941,44 @@ class ChatsStore {
 				}
 			} catch (err) {
 				console.error('[folio] grounded verification failed:', err);
+			}
+		}
+		// An answer to "which email address" that names no address is not an
+		// answer, even when it faithfully renders a passage. The passage that
+		// echoes the question's wording maximises every overlap feature, so the
+		// draft can land on it while the excerpt carrying the value sits right
+		// there. Judge the result the way the reasoning pass above is judged and
+		// retry once. Three conditions, all required: the question names a typed
+		// atom (otherwise coverage is 0 everywhere and this is inert), an excerpt
+		// carries one, and the draft states none. The retry is adopted only when
+		// it does state the value, so the answer can improve or stay, never regress.
+		// buildUserPrompt numbers excerpts 1..n in hits order, so the carrier's
+		// position is its citation number and the correction can point at it.
+		const carrierIndex =
+			grounded && raw.trim() && contactAnswerEvidenceCoverage(question, raw) === 0
+				? hits.findIndex((hit) => contactAnswerEvidenceCoverage(question, hit.text) > 0)
+				: -1;
+		if (carrierIndex >= 0 && !this.stopRequested && (!extractive || extractive.needsAudit)) {
+			try {
+				const value = contactAnswerValues(question, hits[carrierIndex].text)[0];
+				const retriedRaw = await llmStore.generate(
+					[
+						{ role: 'system' as const, content: SYSTEM_PROMPT },
+						{
+							role: 'user' as const,
+							content: `${groundedPrompt}\n\n${buildContactValuePrompt(question, value, carrierIndex + 1)}`
+						}
+					],
+					() => {},
+					generationOptionsFor(question, 'targeted')
+				);
+				const retried = stripThink(retriedRaw);
+				if (retried.trim() && contactAnswerEvidenceCoverage(question, retried) > 0) {
+					raw = retried;
+					this.streamingText = raw;
+				}
+			} catch (err) {
+				console.error('[folio] contact-value retry failed:', err);
 			}
 		}
 		raw = enforceAnswerInvariants(question, raw);

@@ -310,6 +310,25 @@ Rules:
 - Conversation context may resolve pronouns, but it is not evidence. Never cite it or repeat a fact that current excerpts do not support.
 - Be concise. No reasoning preamble.`;
 
+/** A question naming an email, phone or link is answered by the value itself.
+ * A passage that echoes the question's wording without carrying one wins on
+ * every overlap feature, so a draft can cite it and name no value at all ("the
+ * address used for this request"). Used only when the excerpts demonstrably
+ * carry a value and the draft states none. */
+export function buildContactValuePrompt(
+	question: string,
+	value: string,
+	excerptNumber: number
+): string {
+	// The rejected draft is deliberately NOT shown: quoting it back anchors the
+	// model, which then welds the value onto the wrong claim ("the address used
+	// for this request, namely <recipient address>") — confidently wrong where it
+	// was merely vague. Answer from the carrying excerpt instead.
+	return `Question: ${question}
+
+Excerpt [${excerptNumber}] contains ${value}, which is what this question asks for. Answer the question from excerpt [${excerptNumber}], stating ${value} and citing [${excerptNumber}]. Do not describe which address, number or link to use without naming it. Answer in the language of the question and return only the answer.`;
+}
+
 export function groundedRefusal(question: string): string {
 	return analyzeQuestion(question).locale === 'fr'
 		? "Je n'ai pas trouvé assez d'informations dans les documents joints pour répondre."

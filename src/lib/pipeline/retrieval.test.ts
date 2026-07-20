@@ -19,6 +19,7 @@ import {
 	numericAnswerEvidenceCoverage,
 	numericConstraintEvidenceCoverage,
 	contactAnswerEvidenceCoverage,
+	contactAnswerValues,
 	multiClauseEvidenceCoverage
 } from './retrieval';
 import { chunkBlocks } from './chunk';
@@ -1217,6 +1218,16 @@ describe('expected answer type for contact atoms', () => {
 		expect(
 			contactAnswerEvidenceCoverage('Quel est le site ?', 'Voir https://www.orangemoney.fr')
 		).toBe(1);
+	});
+
+	// The correction prompt names the literal value, so extraction has to return
+	// the identifier itself and nothing when the question asked for another type.
+	it('returns the carried identifier for the asked type only', () => {
+		expect(contactAnswerValues('Quelle adresse mail joindre ?', GOLD)).toEqual([
+			'service-visas@consulat-exemple.org'
+		]);
+		expect(contactAnswerValues('Quelle adresse mail joindre ?', ECHO)).toEqual([]);
+		expect(contactAnswerValues('Quel est le téléphone ?', GOLD)).toEqual([]);
 	});
 
 	it('stays inert when the question names no contact atom', () => {

@@ -519,6 +519,18 @@ export function contactAnswerEvidenceCoverage(query: string, text: string): numb
 	return asked.some((shape) => shape.value.test(text)) ? 1 : 0;
 }
 
+/** The identifiers a passage carries for the type the question asked about.
+ * Same table as the coverage signal above, returning what it matched: a draft
+ * that omits the value can then be corrected against the literal string rather
+ * than a description of it. */
+export function contactAnswerValues(query: string, text: string): string[] {
+	const normalizedQuery = normalizeForFuzzy(query);
+	return CONTACT_SHAPES.filter((shape) => shape.asked.test(normalizedQuery)).flatMap((shape) => {
+		const found = text.match(shape.value);
+		return found ? [found[0]] : [];
+	});
+}
+
 /** Deterministic answer-shape signal, deliberately limited to explicit numeric
  * structure. It is a reranking feature, not a domain or intent classifier. */
 export function numericAnswerEvidenceCoverage(query: string, text: string): number {
