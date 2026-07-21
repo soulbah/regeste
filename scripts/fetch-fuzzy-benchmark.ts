@@ -57,7 +57,7 @@ for (const entry of manifest.files) {
 		}
 	}
 	const response = await fetch(url, {
-		headers: { 'user-agent': 'Folio retrieval benchmark research contact@example.invalid' },
+		headers: { 'user-agent': 'Regeste retrieval benchmark research contact@example.invalid' },
 		redirect: 'follow'
 	});
 	if (!response.ok) throw new Error(`Download failed ${response.status}: ${entry.url}`);

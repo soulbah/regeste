@@ -21,10 +21,10 @@ interface PendingRequest<T> {
 }
 
 type WorkerResponse =
-	| { source: 'folio-llm'; id: string; kind: 'progress'; progress: number; text: string }
-	| { source: 'folio-llm'; id: string; kind: 'delta'; delta: string }
-	| { source: 'folio-llm'; id: string; kind: 'result'; result: unknown }
-	| { source: 'folio-llm'; id: string; kind: 'error'; error: string };
+	| { source: 'regeste-llm'; id: string; kind: 'progress'; progress: number; text: string }
+	| { source: 'regeste-llm'; id: string; kind: 'delta'; delta: string }
+	| { source: 'regeste-llm'; id: string; kind: 'result'; result: unknown }
+	| { source: 'regeste-llm'; id: string; kind: 'error'; error: string };
 
 let dedicated: Remote<LlmApi> | null = null;
 let serviceModel: string | null = null;
@@ -46,7 +46,7 @@ function installListener(): void {
 	listenerInstalled = true;
 	navigator.serviceWorker.addEventListener('message', (event: MessageEvent<WorkerResponse>) => {
 		const message = event.data;
-		if (!message || message.source !== 'folio-llm') return;
+		if (!message || message.source !== 'regeste-llm') return;
 		const request = pending.get(message.id);
 		if (!request) return;
 		if (message.kind === 'progress') request.onProgress?.(message.progress, message.text);
@@ -72,7 +72,7 @@ function serviceRequest<T>(
 	const id = crypto.randomUUID();
 	return new Promise<T>((resolve, reject) => {
 		pending.set(id, { resolve: resolve as (value: unknown) => void, reject, ...callbacks });
-		controller.postMessage({ source: 'folio-llm', id, kind, ...payload });
+		controller.postMessage({ source: 'regeste-llm', id, kind, ...payload });
 	});
 }
 
@@ -103,7 +103,7 @@ async function loadService(
 	if (!heartbeatTimer) {
 		heartbeatTimer = setInterval(() => {
 			navigator.serviceWorker.controller?.postMessage({
-				source: 'folio-llm',
+				source: 'regeste-llm',
 				id: crypto.randomUUID(),
 				kind: 'ping'
 			});

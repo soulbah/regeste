@@ -1,8 +1,8 @@
 import type { PrivateDocumentStressResult } from './private-document-stress';
 
 export const PRIVATE_RUN_CACHE_VERSION = 1;
-export const PRIVATE_GENERATION_CACHE_STORAGE_KEY = 'folio:dev-private-generation-cache-v1';
-export const PRIVATE_RUN_CHECKPOINT_STORAGE_KEY = 'folio:dev-private-run-checkpoint-v1';
+export const PRIVATE_GENERATION_CACHE_STORAGE_KEY = 'regeste:dev-private-generation-cache-v1';
+export const PRIVATE_RUN_CHECKPOINT_STORAGE_KEY = 'regeste:dev-private-run-checkpoint-v1';
 
 export type PrivateHumanVerdict = 'pass' | 'fail' | 'oracle-invalid';
 

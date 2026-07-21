@@ -2,7 +2,7 @@
 
 ## Why
 
-Folio can retrieve noisy passages well, but query routing still depends on overlapping phrase regexes.
+Regeste can retrieve noisy passages well, but query routing still depends on overlapping phrase regexes.
 Equivalent requests may therefore select different execution paths and financial roles. This undermines
 the PRD's cited-answer and honest-failure requirements, P8 relevance honesty, and R4 bilingual behavior.
 

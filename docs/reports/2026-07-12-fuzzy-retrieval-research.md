@@ -41,7 +41,7 @@ Measured implementation results and defects found are recorded in
   <https://aclanthology.org/2025.findings-acl.20/>,
   <https://aclanthology.org/2026.semeval-1.155/>,
   <https://aclanthology.org/2025.emnlp-main.1062/>.
-- sqlite-vec documents optimized `vec0` KNN through `embedding MATCH ? AND k = ?`; Folio uses this
+- sqlite-vec documents optimized `vec0` KNN through `embedding MATCH ? AND k = ?`; Regeste uses this
   established primitive only where exact scoped-top-k preservation can be proven:
   <https://alexgarcia.xyz/sqlite-vec/features/knn.html>.
 

@@ -2,7 +2,7 @@
   "lockfileVersion": 1,
   "workspaces": {
     "": {
-      "name": "folio",
+      "name": "regeste",
       "dependencies": {
         "@huggingface/transformers": "4.2.0",
         "@mlc-ai/web-llm": "^0.2.84",

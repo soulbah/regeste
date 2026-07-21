@@ -177,7 +177,7 @@
 </script>
 
 <svelte:head
-	><title>{chatsStore.activeChat?.title ?? t('chat.fallback')} · Folio</title></svelte:head
+	><title>{chatsStore.activeChat?.title ?? t('chat.fallback')} · Regeste</title></svelte:head
 >
 
 <svelte:document onselectionchange={handleSelection} />

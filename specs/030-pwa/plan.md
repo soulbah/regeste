@@ -52,15 +52,15 @@ Runtime, opportunistic, same versioned cache: `_app/immutable/workers/**` and
 `_app/immutable/assets/*.mjs`. The user stores only the ORT variant their device loads.
 
 `skipWaiting()` is removed from `install`; `clients.claim()` stays (the WebLLM client
-needs a controller). A `folio-pwa` message branch triggers it on demand, declared before
-the `folio-llm` guard so the inference protocol is untouched.
+needs a controller). A `regeste-pwa` message branch triggers it on demand, declared before
+the `regeste-llm` guard so the inference protocol is untouched.
 
 ## Dev exemption
 
 Three existing gates stay verbatim: `vite.config.ts` `serviceWorker.register: false`,
 the `if (dev) return` in `+layout.svelte`, and `waitForController` returning false in
 dev. A fourth is added: in dev, unregister any leftover worker and delete **only**
-`folio-shell-*` caches — deleting the model caches would re-download gigabytes on every
+`regeste-shell-*` caches — deleting the model caches would re-download gigabytes on every
 dev boot.
 
 ## New/changed files

@@ -12,7 +12,7 @@
 - Enrich metric report with Wilson intervals, coverage, abstention, per-category failures, cold/warm model
   cost and checked baseline comparisons.
 - Add reproducible browser-profile commands/metadata for Chromium WebGPU/WASM and external OS runners.
-- Keep established libraries responsible for parsing/OCR/embedding/indexing; Folio owns orchestration,
+- Keep established libraries responsible for parsing/OCR/embedding/indexing; Regeste owns orchestration,
   calibration, provenance, abstention and quality gates.
 
 Never contains: product behavior (→ spec.md), progress tracking (→ tasks.md).

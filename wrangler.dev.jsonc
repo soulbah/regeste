@@ -5,7 +5,7 @@
 // locally /api/assisted answers 503. Keep both files in sync otherwise.
 {
 	"$schema": "./node_modules/wrangler/config-schema.json",
-	"name": "folio",
+	"name": "regeste",
 	"main": ".svelte-kit/cloudflare/_worker.js",
 	"compatibility_date": "2026-07-01",
 	"compatibility_flags": ["nodejs_compat"],
@@ -16,8 +16,8 @@
 	"d1_databases": [
 		{
 			"binding": "DB",
-			"database_name": "folio-db",
-			"database_id": "4cbf13c2-2570-44ff-a145-1a1b8a2634c0",
+			"database_name": "regeste-db",
+			"database_id": "762f3c84-08d2-444c-9e47-7ba0c654d159",
 			"migrations_dir": "migrations"
 		}
 	],

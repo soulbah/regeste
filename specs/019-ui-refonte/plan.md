@@ -18,7 +18,7 @@ Reference: owner-validated design report (artifact, 2026-07-10). Values below ar
 ## Phase 2 — shell & zones
 
 - `+layout.svelte`: `Sidebar.Provider` + `AppSidebar collapsible="icon"` + inset main (`Sidebar.Inset`-like card on canvas). Canvas = `--sidebar` token background.
-- `chat/[id]/+page.svelte`: keep `Resizable.PaneGroup` (paneforge), add `autoSaveId="folio-main"`, panel Pane `collapsible collapsedSize={0} minSize≈22 maxSize=50 defaultSize=30` (percent equivalents at 1440px; conversation minSize≈35). Handle: widen hit area to 8px, hover/active highlight, dblclick → `resize(30)`. Header toggle button (PanelRight icon) + ⌘. global shortcut; `viewerStore`/presend/wais opens call `expand()` first.
+- `chat/[id]/+page.svelte`: keep `Resizable.PaneGroup` (paneforge), add `autoSaveId="regeste-main"`, panel Pane `collapsible collapsedSize={0} minSize≈22 maxSize=50 defaultSize=30` (percent equivalents at 1440px; conversation minSize≈35). Handle: widen hit area to 8px, hover/active highlight, dblclick → `resize(30)`. Header toggle button (PanelRight icon) + ⌘. global shortcut; `viewerStore`/presend/wais opens call `expand()` first.
 - New `panel-header.svelte` (name + » close) wrapped around the four panel contents.
 - `app-sidebar.svelte`: Header (logo, new chat, search, documents) / Content (history) / Footer (avatar + email only); drop mono-uppercase group styling; remove `sidebar.signedIn` line.
 - Trust de-repetition: remove header chips on `/`, `/documents`, `/settings`; landing keeps one line; account keeps one; toast description dropped. Egress pill: neutral variant when 0 bytes, amber otherwise.

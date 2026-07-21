@@ -1,7 +1,7 @@
 // Launches (or reuses) the persistent benchmark Chromium and opens the spike page.
 import { chromium } from 'playwright-core';
 
-const PROFILE = '/Users/dev/Projects/saas/folio/.benchmark-corpus/chrome-profile';
+const PROFILE = '/Users/dev/Projects/saas/regeste/.benchmark-corpus/chrome-profile';
 const URL = 'http://localhost:5199/';
 
 const ctx = await chromium.launchPersistentContext(PROFILE, {

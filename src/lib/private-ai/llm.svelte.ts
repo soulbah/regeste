@@ -17,8 +17,8 @@ import { adaptGenerationOptions, type GenerationOptions } from './generation';
 import type { GenerationResult } from './generation';
 import type { WebLlmClient } from './webllm-client';
 
-const PREPARED_KEY = 'folio:private-prepared-model';
-const METRICS_KEY = 'folio:private-last-metrics';
+const PREPARED_KEY = 'regeste:private-prepared-model';
+const METRICS_KEY = 'regeste:private-last-metrics';
 
 export type PrivateStatus =
 	| 'detecting'
@@ -106,7 +106,7 @@ class LlmStore {
 			this.prepared = true;
 			this.status = 'ready';
 		} catch (err) {
-			console.error('[folio] private engine load failed:', err);
+			console.error('[regeste] private engine load failed:', err);
 			const lower = this.tier ? downgrade(this.tier) : null;
 			if (lower) {
 				this.tier = lower;

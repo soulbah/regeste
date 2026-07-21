@@ -18,7 +18,7 @@
 		main,
 		panel,
 		mainMinSize = 35,
-		autoSaveId = 'folio-panes'
+		autoSaveId = 'regeste-panes'
 	}: {
 		open?: boolean;
 		/** Fired when the user closes it (drag-collapse or Sheet dismiss). */

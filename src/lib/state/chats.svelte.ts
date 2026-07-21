@@ -550,7 +550,7 @@ class ChatsStore {
 		const lines: string[] = [`# ${chat?.title ?? 'Chat'}`, ''];
 		for (const m of messages) {
 			if (m.mode === 'retrieval') continue;
-			lines.push(m.role === 'user' ? `## You` : `## Folio`);
+			lines.push(m.role === 'user' ? `## You` : `## Regeste`);
 			lines.push('');
 			lines.push(m.content);
 			const cites = citationsByMessage[m.id];
@@ -865,7 +865,7 @@ class ChatsStore {
 			try {
 				raw = await llmStore.generate(messages, onDelta, options);
 			} catch (err) {
-				console.error('[folio] private generation failed:', err);
+				console.error('[regeste] private generation failed:', err);
 				raw = streamRaw;
 			}
 			reasoning = extractThink(raw || streamRaw);
@@ -889,7 +889,7 @@ class ChatsStore {
 						maxTokens: 420
 					});
 				} catch (err) {
-					console.error('[folio] direct retry after reasoning failed:', err);
+					console.error('[regeste] direct retry after reasoning failed:', err);
 					raw = streamRaw;
 				}
 				// The thinking-pass notes stay: they are what actually happened
@@ -940,7 +940,7 @@ class ChatsStore {
 					}
 				}
 			} catch (err) {
-				console.error('[folio] grounded verification failed:', err);
+				console.error('[regeste] grounded verification failed:', err);
 			}
 		}
 		// An answer to "which email address" that names no address is not an
@@ -978,7 +978,7 @@ class ChatsStore {
 					this.streamingText = raw;
 				}
 			} catch (err) {
-				console.error('[folio] contact-value retry failed:', err);
+				console.error('[regeste] contact-value retry failed:', err);
 			}
 		}
 		raw = enforceAnswerInvariants(question, raw);
@@ -1140,7 +1140,7 @@ class ChatsStore {
 				this.streamingText = isThinking(streamRaw) ? '' : stripThink(streamRaw);
 			});
 		} catch (err) {
-			if (!(err instanceof OfflineError)) console.error('[folio] my-ai generation failed:', err);
+			if (!(err instanceof OfflineError)) console.error('[regeste] my-ai generation failed:', err);
 			if (!streamRaw.trim()) {
 				failed = err instanceof OfflineError ? err.message : t('notice.myaiUnreachable');
 			}

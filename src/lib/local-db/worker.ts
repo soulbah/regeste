@@ -52,12 +52,12 @@ export interface DbInfo {
  * The OPFS SAH pool is NOT multi-context safe: a second tab installing the
  * pool can re-associate its files and silently orphan the database. One
  * exclusive Web Lock, held for the worker's lifetime, guarantees a single
- * owner; later tabs fail fast with 'folio-db-busy' instead of destroying data.
+ * owner; later tabs fail fast with 'regeste-db-busy' instead of destroying data.
  */
 async function acquireSingleOwnerLock(): Promise<void> {
 	const acquired = await new Promise<boolean>((resolve) => {
 		navigator.locks
-			.request('folio-db-pool', { ifAvailable: true }, (lock) => {
+			.request('regeste-db-pool', { ifAvailable: true }, (lock) => {
 				if (!lock) {
 					resolve(false);
 					return;
@@ -68,7 +68,7 @@ async function acquireSingleOwnerLock(): Promise<void> {
 			})
 			.catch(() => resolve(false));
 	});
-	if (!acquired) throw new Error('folio-db-busy');
+	if (!acquired) throw new Error('regeste-db-busy');
 }
 
 // sqlite-wasm auto-installs its async OPFS VFS at bootstrap, which spawns a
@@ -102,8 +102,8 @@ async function init(): Promise<DbInfo> {
 		print: () => {},
 		printErr: (msg: string) => console.error('[sqlite]', msg)
 	});
-	poolUtil = await sqlite3.installOpfsSAHPoolVfs({ name: 'folio' });
-	db = new poolUtil.OpfsSAHPoolDb('/folio.db');
+	poolUtil = await sqlite3.installOpfsSAHPoolVfs({ name: 'regeste' });
+	db = new poolUtil.OpfsSAHPoolDb('/regeste.db');
 
 	// Feature asserts: this build must ship vec0 + FTS5, and we must be on OPFS.
 	const vecVersion = db.selectValue('SELECT vec_version()') as string;

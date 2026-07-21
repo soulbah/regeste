@@ -21,7 +21,7 @@ const fuzzyFixtureNames = new Set(fuzzyManifest.files.map((file) => file.name));
  * same way so the dev benchmark page can ingest them without manual upload. */
 function localBenchmarkFixtures(): Plugin {
 	return {
-		name: 'folio-local-benchmark-fixtures',
+		name: 'regeste-local-benchmark-fixtures',
 		apply: 'serve' as const,
 		configureServer(server) {
 			server.middlewares.use(async (req, res, next) => {

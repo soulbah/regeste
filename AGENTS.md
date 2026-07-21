@@ -1,6 +1,6 @@
-# Folio — agent guide
+# Regeste — agent guide
 
-Folio is an open-source, privacy-first "chat with your documents" web app. Everything document-related (parsing, chunking, embeddings, vector index, chats, citations) runs **in the browser** and stays on the user's device. The only backend is a single Cloudflare Worker (this SvelteKit app) handling auth, quotas and the Assisted endpoint (Workers AI). Product docs are in French, code and repo docs are in English.
+Regeste is an open-source, privacy-first "chat with your documents" web app. Everything document-related (parsing, chunking, embeddings, vector index, chats, citations) runs **in the browser** and stays on the user's device. The only backend is a single Cloudflare Worker (this SvelteKit app) handling auth, quotas and the Assisted endpoint (Workers AI). Product docs are in French, code and repo docs are in English.
 
 ## Current phase
 
@@ -28,7 +28,7 @@ bun run test             # vitest run (client browser project + server node proj
 bun run build            # vite build (Cloudflare adapter)
 bun run verify           # check + lint + test + build — THE done gate
 bun run db:generate      # drizzle-kit generate (after editing src/lib/server/db/schema.ts)
-bun run db:migrate:local # wrangler d1 migrations apply folio-db --local
+bun run db:migrate:local # wrangler d1 migrations apply regeste-db --local
 bun run cf:types         # regenerate worker-configuration.d.ts after wrangler.jsonc changes
 ```
 

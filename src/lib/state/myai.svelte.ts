@@ -1,5 +1,5 @@
 // My AI mode (spec 007): the user's own OpenAI-compatible endpoint (Ollama,
-// LM Studio, vLLM…). The browser talks to it DIRECTLY — no Folio server in
+// LM Studio, vLLM…). The browser talks to it DIRECTLY — no Regeste server in
 // the path. Config persists in the local DB settings; the model per chat.
 
 import { t, type MessageKey } from '$lib/i18n/index.svelte';

@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for considering a contribution. Folio is maintained by a small team working primarily with AI coding agents — the repo is configured for that, and the same rules apply to everyone, human or agent.
+Thanks for considering a contribution. Regeste is maintained by a small team working primarily with AI coding agents — the repo is configured for that, and the same rules apply to everyone, human or agent.
 
 ## Ground rules
 

@@ -100,7 +100,7 @@ class SettingsStore {
 			const url = URL.createObjectURL(blob);
 			const a = document.createElement('a');
 			a.href = url;
-			a.download = `folio-workspace-${new Date().toISOString().slice(0, 10)}.zip`;
+			a.download = `regeste-workspace-${new Date().toISOString().slice(0, 10)}.zip`;
 			a.click();
 			URL.revokeObjectURL(url);
 		} finally {

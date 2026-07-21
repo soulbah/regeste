@@ -10,7 +10,7 @@ app never promotes it.
 
 ## Why
 
-Everything a user owns in Folio lives in the browser: the SQLite index in OPFS, the
+Everything a user owns in Regeste lives in the browser: the SQLite index in OPFS, the
 documents in OPFS, and up to 2.4 GB of model weights in the Cache API. Yet the app
 could not open without the network, and that data was best-effort storage a browser
 may evict to reclaim space — an app whose whole promise is "your documents stay here"

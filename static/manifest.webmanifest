@@ -1,7 +1,7 @@
 {
 	"id": "/chat",
-	"name": "Folio",
-	"short_name": "Folio",
+	"name": "Regeste",
+	"short_name": "Regeste",
 	"description": "Ask questions about your documents. Everything stays on your device.",
 	"start_url": "/chat",
 	"scope": "/chat",

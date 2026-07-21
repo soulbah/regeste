@@ -2,7 +2,7 @@
 
 ## Why
 
-The current UI reads austere: mono-uppercase labels as the default register, square corners, a near-black dark mode without elevation, and the privacy promise repeated in text on every screen. Users are experienced chatbot users; the interface must follow the conventions ChatGPT/Claude/Perplexity/NotebookLM fixed, while keeping Folio's paper-editorial identity. Full design rationale and research live in the owner-validated report (artifact "Refonte UI/UX", 2026-07-10); this spec freezes its decisions.
+The current UI reads austere: mono-uppercase labels as the default register, square corners, a near-black dark mode without elevation, and the privacy promise repeated in text on every screen. Users are experienced chatbot users; the interface must follow the conventions ChatGPT/Claude/Perplexity/NotebookLM fixed, while keeping Regeste's paper-editorial identity. Full design rationale and research live in the owner-validated report (artifact "Refonte UI/UX", 2026-07-10); this spec freezes its decisions.
 
 Owner-validated decisions: green is the single brand accent; mode colors are reduced (Private = no color, amber = the only egress signal for Assisted and My AI, blue removed — amends `.claude/rules/ui.md`).
 

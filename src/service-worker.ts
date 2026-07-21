@@ -108,18 +108,18 @@ async function serveFromCache(request: Request, key: string): Promise<Response> 
 }
 
 type RequestMessage =
-	| { source: 'folio-llm'; id: string; kind: 'load'; model: string }
+	| { source: 'regeste-llm'; id: string; kind: 'load'; model: string }
 	| {
-			source: 'folio-llm';
+			source: 'regeste-llm';
 			id: string;
 			kind: 'generate';
 			messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>;
 			options: GenerationOptions;
 	  }
-	| { source: 'folio-llm'; id: string; kind: 'abort' | 'ping' };
+	| { source: 'regeste-llm'; id: string; kind: 'abort' | 'ping' };
 
 function reply(client: Client | ServiceWorker | MessagePort | null, message: object): void {
-	client?.postMessage({ source: 'folio-llm', ...message });
+	client?.postMessage({ source: 'regeste-llm', ...message });
 }
 
 async function load(
@@ -229,13 +229,13 @@ sw.addEventListener('fetch', (event: FetchEvent) => {
 });
 
 sw.addEventListener('message', (event: ExtendableMessageEvent) => {
-	// Declared before the folio-llm guard so the inference protocol is untouched.
-	if ((event.data as { source?: string } | null)?.source === 'folio-pwa') {
+	// Declared before the regeste-llm guard so the inference protocol is untouched.
+	if ((event.data as { source?: string } | null)?.source === 'regeste-pwa') {
 		if ((event.data as { kind?: string }).kind === 'skip-waiting') void sw.skipWaiting();
 		return;
 	}
 	const message = event.data as RequestMessage;
-	if (!message || message.source !== 'folio-llm') return;
+	if (!message || message.source !== 'regeste-llm') return;
 	const client = event.source;
 	event.waitUntil(
 		(async () => {

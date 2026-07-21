@@ -46,11 +46,11 @@
 	});
 
 	// A second tab must fail loudly, not silently orphan the database (the OPFS
-	// SAH pool is single-owner; the worker refuses with 'folio-db-busy').
+	// SAH pool is single-owner; the worker refuses with 'regeste-db-busy').
 	let dbBusyShown = false;
 	function guardDb<T>(p: Promise<T>): Promise<T | void> {
 		return p.catch((err) => {
-			if (String(err).includes('folio-db-busy') && !dbBusyShown) {
+			if (String(err).includes('regeste-db-busy') && !dbBusyShown) {
 				dbBusyShown = true;
 				toast.error(t('app.dbBusy'), { duration: Number.POSITIVE_INFINITY });
 				return;
@@ -92,7 +92,7 @@
 				.register('/service-worker.js')
 				.then((registration) => pwaStore.watch(registration))
 				.catch((err) => {
-					console.warn('[folio] service worker unavailable:', err);
+					console.warn('[regeste] service worker unavailable:', err);
 				});
 		};
 		if (document.readyState === 'complete') register();

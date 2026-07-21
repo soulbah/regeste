@@ -2,7 +2,7 @@
 
 ## Why
 
-Folio can retrieve isolated facts quickly, but follow-up questions lose their conversational referent,
+Regeste can retrieve isolated facts quickly, but follow-up questions lose their conversational referent,
 long scanned documents can surface unrelated early-page passages, and simple Private answers remain
 slower and less natural than expected. This weakens core grounded chat, citations, What AI saw, OCR,
 and model-management behavior from PRD §§3, 6, 10 and FEATURES MVP, P8/P9, D3, M1-M3.

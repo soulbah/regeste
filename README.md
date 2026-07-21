@@ -1,8 +1,8 @@
-# Folio
+# Regeste
 
 **Chat with sensitive documents. Your files stay local. You choose what the AI can see.**
 
-Folio is an open-source, privacy-first document chat. Parsing, chunking, embeddings, vector search and chat history all run **in your browser** — documents never leave your device. For each answer you pick a trust boundary:
+Regeste is an open-source, privacy-first document chat. Parsing, chunking, embeddings, vector search and chat history all run **in your browser** — documents never leave your device. For each answer you pick a trust boundary:
 
 - **Private** — an LLM runs on your device (WebGPU/WASM). Nothing is sent anywhere.
 - **Assisted** — only the retrieved excerpts are sent to our Cloudflare Worker (Workers AI), transiently, never stored. You see exactly what was sent ("What AI saw").

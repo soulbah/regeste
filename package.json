@@ -1,5 +1,5 @@
 {
-	"name": "folio",
+	"name": "regeste",
 	"private": true,
 	"version": "0.1.0",
 	"type": "module",
@@ -22,8 +22,8 @@
 		"verify": "bun run check && bun run lint && bun run test && bun run build",
 		"benchmark:fetch": "bun scripts/fetch-fuzzy-benchmark.ts",
 		"db:generate": "drizzle-kit generate",
-		"db:migrate:local": "wrangler d1 migrations apply folio-db --local",
-		"db:migrate:remote": "wrangler d1 migrations apply folio-db --remote",
+		"db:migrate:local": "wrangler d1 migrations apply regeste-db --local",
+		"db:migrate:remote": "wrangler d1 migrations apply regeste-db --remote",
 		"cf:types": "wrangler types && sed -i '' 's#typeof import(\"./.svelte-kit/cloudflare/_worker\")#unknown#' worker-configuration.d.ts",
 		"deploy": "bun run build && bunx wrangler@4.106.0 deploy",
 		"knip": "knip",

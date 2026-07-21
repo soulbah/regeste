@@ -23,12 +23,12 @@ Check a task off ONLY after its Done-when commands pass. `[P]` = safe to run in 
 
 - [ ] 4. `src/lib/pwa/cache-names.ts` + fetch handler in `src/service-worker.ts`: the
       bail-out ladder, the fetched-shell navigation cache, tiered precache, and the
-      `folio-pwa` skip-waiting branch. Remove `skipWaiting()` from install, keep
+      `regeste-pwa` skip-waiting branch. Remove `skipWaiting()` from install, keep
       `clients.claim()`.
       Done when: offline reload of the deployed app boots, `crossOriginIsolated === true`,
       `SharedArrayBuffer` is defined, and the cache holds no `/cdn/*` or `workers/*` entry.
 
-- [ ] 5. Dev exemption gate: unregister leftover workers and delete only `folio-shell-*`
+- [ ] 5. Dev exemption gate: unregister leftover workers and delete only `regeste-shell-*`
       caches when `dev`.
       Done when: `bun run dev` then DevTools shows zero service workers and the model
       caches are untouched.

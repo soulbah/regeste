@@ -42,7 +42,7 @@ export function guardWorker(worker: Worker, feature: WorkerFeature): Worker {
 		// A script that 404s fires a bare event: no message, no filename (verified
 		// in Chromium). The one certainty is that no call against it will answer.
 		event.preventDefault();
-		console.warn(`[folio] worker failed to load: ${feature}`);
+		console.warn(`[regeste] worker failed to load: ${feature}`);
 		workerHealth.report(feature);
 	});
 	return worker;

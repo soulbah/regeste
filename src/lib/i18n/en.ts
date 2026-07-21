@@ -532,7 +532,7 @@ export const en = {
 		'The code is open source. Inspect it, self-host it, or stay in Private mode with the network off.',
 
 	// Account
-	'account.kicker': 'Folio · account',
+	'account.kicker': 'Regeste · account',
 	'account.headline': 'One address. One code.',
 	'account.body':
 		'An account unlocks Assisted mode. No password: we send a six-digit code to your email. Your documents and chats stay on this device.',

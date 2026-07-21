@@ -143,7 +143,7 @@
 			}
 		} catch (err: unknown) {
 			if ((err as { name?: string })?.name !== 'RenderingCancelledException') {
-				console.error('[folio] pdf render failed:', err);
+				console.error('[regeste] pdf render failed:', err);
 			}
 		} finally {
 			if (seq === renderSeq) rendering = false;

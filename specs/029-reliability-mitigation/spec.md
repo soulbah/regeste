@@ -10,9 +10,9 @@ uncertainty and cross-device drift. Leaving those limits as prose would make lat
 
 - WHEN semantic behavior is evaluated THEN base utterances SHALL be split into calibration and held-out
   groups before perturbations, so variants of one utterance cannot leak across both sets.
-- WHEN a semantic model/profile is unknown THEN Folio SHALL abstain from semantic route mutation until a
+- WHEN a semantic model/profile is unknown THEN Regeste SHALL abstain from semantic route mutation until a
   matching versioned calibration profile exists.
-- WHEN uncertainty supports several execution routes THEN Folio SHALL expose a bounded prediction set and
+- WHEN uncertainty supports several execution routes THEN Regeste SHALL expose a bounded prediction set and
   clarify instead of forcing the nearest route.
 - WHEN scope remains ambiguous THEN clarification SHALL cover collection/record, financial role, time,
   entity, document/revision, unit/currency and multi-part requests using local state only.

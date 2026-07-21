@@ -9,7 +9,7 @@ interface InstallPromptEvent extends Event {
 	userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
-const INVITE_DISMISSED_KEY = 'folio:install-invite-dismissed';
+const INVITE_DISMISSED_KEY = 'regeste:install-invite-dismissed';
 
 class PwaStore {
 	/** A browser-provided install prompt is available (Chromium only). */
@@ -89,7 +89,7 @@ class PwaStore {
 	/** Apply a waiting update. The caller decides when it is safe (never during
 	 * a generation or a model download). */
 	applyUpdate(): void {
-		this.waiting?.postMessage({ source: 'folio-pwa', kind: 'skip-waiting' });
+		this.waiting?.postMessage({ source: 'regeste-pwa', kind: 'skip-waiting' });
 		this.updateReady = false;
 	}
 

@@ -1,6 +1,6 @@
 # Security policy
 
-Folio's core promise is that user documents never leave the device. Anything that undermines that promise is a critical vulnerability.
+Regeste's core promise is that user documents never leave the device. Anything that undermines that promise is a critical vulnerability.
 
 ## Reporting
 

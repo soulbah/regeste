@@ -44,7 +44,7 @@
 	const askSteps = $derived([t('hiw.step.question'), t('hiw.step.search'), t('hiw.step.passages')]);
 </script>
 
-<svelte:head><title>{t('hiw.title')} · Folio</title></svelte:head>
+<svelte:head><title>{t('hiw.title')} · Regeste</title></svelte:head>
 
 <div class="flex h-full flex-col">
 	<header class="flex h-14 shrink-0 items-center gap-1 border-b px-4">

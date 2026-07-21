@@ -79,13 +79,13 @@
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement('a');
 		a.href = url;
-		a.download = 'folio-privacy-report.json';
+		a.download = 'regeste-privacy-report.json';
 		a.click();
 		URL.revokeObjectURL(url);
 	}
 </script>
 
-<svelte:head><title>{t('privacy.title')} · Folio</title></svelte:head>
+<svelte:head><title>{t('privacy.title')} · Regeste</title></svelte:head>
 
 <div class="flex h-full flex-col">
 	<header class="flex h-14 shrink-0 items-center justify-between gap-3 border-b pr-6 pl-4">

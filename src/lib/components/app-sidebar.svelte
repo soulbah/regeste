@@ -97,7 +97,7 @@
 				class="flex min-w-0 items-center gap-2 px-2 py-1.5 group-data-[collapsible=icon]:hidden"
 			>
 				<FileIcon class="size-4 shrink-0" />
-				<span class="font-display text-lg tracking-tight">Folio</span>
+				<span class="font-display text-lg tracking-tight">Regeste</span>
 			</a>
 			<Tooltip.Root>
 				<Tooltip.Trigger>

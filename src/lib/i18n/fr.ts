@@ -548,7 +548,7 @@ export const fr: Record<keyof typeof en, string> = {
 		'Le code est open source. Inspectez-le, hébergez-le vous-même, ou restez en mode Private sans réseau.',
 
 	// Account
-	'account.kicker': 'Folio · compte',
+	'account.kicker': 'Regeste · compte',
 	'account.headline': 'Une adresse. Un code.',
 	'account.body':
 		'Un compte déverrouille le mode Assisted. Pas de mot de passe : nous envoyons un code à six chiffres à votre adresse e-mail. Vos documents et discussions restent sur cet appareil.',

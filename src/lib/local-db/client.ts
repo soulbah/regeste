@@ -29,7 +29,7 @@ export function getLocalDb(): Promise<{ db: LocalDb; info: DbInfo }> {
 
 async function acquire(): Promise<{ db: LocalDb; info: DbInfo }> {
 	const granted = await new Promise<boolean>((resolve) => {
-		navigator.locks.request('folio-db-owner', { ifAvailable: true }, async (lock) => {
+		navigator.locks.request('regeste-db-owner', { ifAvailable: true }, async (lock) => {
 			if (!lock) {
 				resolve(false);
 				return;

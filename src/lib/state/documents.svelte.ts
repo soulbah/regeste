@@ -64,7 +64,7 @@ const rankingWorkers: Array<{
 	api: Remote<RetrievalRankingApi>;
 }> = [];
 const OCR_INDEX_VERSION = 2;
-const OCR_INDEX_VERSION_KEY = 'folio:ocr-index-version';
+const OCR_INDEX_VERSION_KEY = 'regeste:ocr-index-version';
 function getEmbedWorker(): Remote<EmbedApi> {
 	if (!embedApi) {
 		const worker = new Worker(new URL('../pipeline/embed-worker.ts', import.meta.url), {
@@ -112,7 +112,7 @@ async function storeOriginal(hash: string, data: ArrayBuffer): Promise<void> {
 		await w.write(data);
 		await w.close();
 	} catch (err) {
-		console.warn('[folio] could not persist original file to OPFS:', err);
+		console.warn('[regeste] could not persist original file to OPFS:', err);
 	}
 }
 
@@ -496,7 +496,7 @@ class DocumentsStore {
 			const code: IngestErrorCode = (err as { code?: IngestErrorCode }).code ?? 'unknown';
 			await db.setDocumentStatus(id, 'error', { error: code });
 			this.setIngest(id, { status: 'error', phaseProgress: 0, error: code });
-			if (code === 'unknown') console.error('[folio] ingest failed:', err);
+			if (code === 'unknown') console.error('[regeste] ingest failed:', err);
 		} finally {
 			this.endProcessing(id);
 			await this.refreshLibrary();
@@ -938,7 +938,7 @@ class DocumentsStore {
 				diagnostic: err instanceof Error ? `${err.name}: ${err.message}` : String(err)
 			});
 			if (existingChunkCount === 0) await db?.setDocumentStatus(id, 'error', { error: code });
-			console.error('[folio] re-index failed:', code, err);
+			console.error('[regeste] re-index failed:', code, err);
 		} finally {
 			this.endProcessing(id);
 			await this.refreshLibrary();
@@ -1035,7 +1035,7 @@ class DocumentsStore {
 				const code: IngestErrorCode = (err as { code?: IngestErrorCode }).code ?? 'unknown';
 				await db.setDocumentStatus(id, 'error', { error: code });
 				this.setIngest(id, { status: 'error', phaseProgress: 0, error: code });
-				if (code === 'unknown') console.error('[folio] OCR failed:', err);
+				if (code === 'unknown') console.error('[regeste] OCR failed:', err);
 			}
 		} finally {
 			const rest = { ...this.ocrAborts };

@@ -92,7 +92,7 @@ function getEmbedder(onProgress?: (p: EmbedProgress) => void): Promise<Embedder>
 				try {
 					return await buildGemma(onProgress);
 				} catch (err) {
-					console.warn('[folio] webgpu embeddings failed, falling back to wasm:', err);
+					console.warn('[regeste] webgpu embeddings failed, falling back to wasm:', err);
 				}
 			}
 			return {

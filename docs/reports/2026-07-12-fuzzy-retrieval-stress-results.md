@@ -94,7 +94,7 @@ or real-browser regression tests. None is left as a report-only recommendation.
 
 ## Library boundary
 
-Folio uses established local primitives: SQLite FTS5 for word/full-text indexes, sqlite-vec `vec0` for
+Regeste uses established local primitives: SQLite FTS5 for word/full-text indexes, sqlite-vec `vec0` for
 vectors/KNN, pdf.js for PDF extraction/rendering, Mammoth for DOCX and PP-OCRv5 through
 `ppu-paddle-ocr` for OCR. Product-specific code is limited to normalized derived views, rank fusion,
 structure/provenance and refusal guards.
@@ -102,8 +102,8 @@ structure/provenance and refusal guards.
 This boundary is deliberate:
 
 - **Library-owned:** parsing/rendering, OCR inference, word tokenization/ranking, vector storage and KNN.
-  Folio does not reimplement those engines.
-- **Folio-owned:** privacy-preserving derived text views, exact source offsets, cross-channel fusion,
+  Regeste does not reimplement those engines.
+- **Regeste-owned:** privacy-preserving derived text views, exact source offsets, cross-channel fusion,
   selected-document constraints, evidence diversity and unsupported-answer policy. Generic libraries do
   not know these product invariants.
 - **No unjustified dependency:** a generic in-memory fuzzy package would require loading/ranking the

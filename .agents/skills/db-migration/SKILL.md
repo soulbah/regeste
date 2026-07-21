@@ -17,5 +17,5 @@ Remember: the remote DB stores identity/plan/quota data only — never document 
 Hard rules:
 
 - **Never edit a committed migration** (hook-enforced) — write a new corrective migration instead.
-- Never `drizzle-kit push` against remote. Remote applies happen in CI/deploy via `wrangler d1 migrations apply folio-db --remote`.
+- Never `drizzle-kit push` against remote. Remote applies happen in CI/deploy via `wrangler d1 migrations apply regeste-db --remote`.
 - better-auth tables (`user`, `session`, `account`, `verification`) must keep the shape better-auth expects — check better-auth docs before touching them.

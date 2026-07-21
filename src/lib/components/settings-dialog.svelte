@@ -217,7 +217,7 @@
 							</Button>
 						{/each}
 					</div>
-					<p class="text-muted-foreground mt-auto px-3 pb-1 font-mono text-[10px]">Folio</p>
+					<p class="text-muted-foreground mt-auto px-3 pb-1 font-mono text-[10px]">Regeste</p>
 				</nav>
 				<div class="flex min-h-0 flex-col">
 					<!-- Fixed header: the close button lives here so it never rides over

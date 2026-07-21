@@ -185,7 +185,7 @@
 	}
 </script>
 
-<svelte:head><title>{t('docs.title')} · Folio</title></svelte:head>
+<svelte:head><title>{t('docs.title')} · Regeste</title></svelte:head>
 
 <input
 	bind:this={fileInput}
@@ -220,7 +220,7 @@
 			viewerStore.close();
 		}
 	}}
-	autoSaveId="folio-docs-panes"
+	autoSaveId="regeste-docs-panes"
 >
 	{#snippet main()}
 		<section class="flex h-full min-w-0 flex-1 flex-col">

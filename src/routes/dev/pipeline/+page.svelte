@@ -1758,7 +1758,7 @@
 	}
 </script>
 
-<svelte:head><title>Folio · dev pipeline</title></svelte:head>
+<svelte:head><title>Regeste · dev pipeline</title></svelte:head>
 
 <div class="mx-auto max-w-3xl space-y-6 p-8">
 	<div>

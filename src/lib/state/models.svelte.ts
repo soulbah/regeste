@@ -58,7 +58,7 @@ class ModelsStore {
 		await caches.delete(cacheName);
 		// Deleting Private weights invalidates the "prepared" fast path.
 		if (cacheName.toLowerCase().includes('webllm')) {
-			localStorage.removeItem('folio:private-prepared-model');
+			localStorage.removeItem('regeste:private-prepared-model');
 			llmStore.prepared = false;
 			if (llmStore.status === 'ready') location.reload();
 		}

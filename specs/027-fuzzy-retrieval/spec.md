@@ -2,7 +2,7 @@
 
 ## Why
 
-Folio's current hybrid search combines exact word-level FTS5 and one dense embedding per structural
+Regeste's current hybrid search combines exact word-level FTS5 and one dense embedding per structural
 chunk. It remains brittle to user typos, OCR confusions, broken words, abbreviations, inflections,
 near-identical identifiers and facts whose useful context lives in a parent section or another file.
 The owner accepts slower ingestion when it produces materially better grounded answers. This extends
@@ -25,7 +25,7 @@ Research basis:
 
 ## What
 
-- WHEN a query contains one or more realistic spelling mistakes THEN Folio SHALL retrieve the same
+- WHEN a query contains one or more realistic spelling mistakes THEN Regeste SHALL retrieve the same
   supporting evidence as the clean query when enough discriminating characters remain.
 - WHEN a query or extracted passage differs only through accents, case, Unicode normalization,
   ligatures, apostrophes, hyphens, soft hyphens, line-break hyphenation or joined/split words THEN
@@ -33,7 +33,7 @@ Research basis:
 - WHEN OCR confuses `0/O`, `1/l/I`, `5/S`, `rn/m`, `cl/d` or inserts/deletes spaces THEN fuzzy retrieval
   SHALL recover candidates while exact identifiers and stronger context prevent cross-record matches.
 - WHEN a typo affects a short exact identifier, date, amount, legal citation, model number or acronym
-  THEN Folio SHALL NOT silently replace it with a nearby identifier; it SHALL either recover evidence
+  THEN Regeste SHALL NOT silently replace it with a nearby identifier; it SHALL either recover evidence
   with explicit corroborating context or report weak/absent evidence.
 - WHEN a document defines an acronym, alias or parenthetical long form THEN either form SHALL retrieve
   the same evidence. Domain vocabulary SHALL be derived from selected documents, not hard-coded into
@@ -52,7 +52,7 @@ Research basis:
   or attribute into evidence. Unsupported-answer precision SHALL be measured independently from recall.
 - WHEN clean exact search already finds the correct evidence THEN fuzzy channels SHALL NOT lower its
   rank, change its citation or introduce a false positive.
-- WHEN a file is ingested THEN Folio MAY spend additional local CPU time and storage building multiple
+- WHEN a file is ingested THEN Regeste MAY spend additional local CPU time and storage building multiple
   searchable views, derived vocabulary and hierarchical context. UI SHALL continue showing truthful
   named ingest phases and remain responsive/cancellable.
 - WHEN an index schema or extraction version changes THEN existing documents SHALL upgrade from OPFS

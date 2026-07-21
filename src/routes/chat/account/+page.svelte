@@ -31,7 +31,7 @@
 	});
 </script>
 
-<svelte:head><title>Account · Folio</title></svelte:head>
+<svelte:head><title>Account · Regeste</title></svelte:head>
 
 <div class="flex h-full flex-col items-center justify-center gap-8 px-6">
 	<div class="max-w-sm text-center">

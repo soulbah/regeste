@@ -27,7 +27,7 @@ export function createAuth(env: Env, origin: string) {
 						// (vite console locally, `wrangler tail` on a deploy).
 						// Production wiring: Cloudflare Email Service — and this
 						// branch must die before launch (docs/internal/OSS-LAUNCH.md).
-						console.log(`[folio dev] OTP for ${email}: ${otp}`);
+						console.log(`[regeste dev] OTP for ${email}: ${otp}`);
 						return;
 					}
 					throw new Error('Email delivery not configured yet');

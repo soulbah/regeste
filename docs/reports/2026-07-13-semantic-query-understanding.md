@@ -2,7 +2,7 @@
 
 ## Outcome
 
-Folio now resolves a typed query frame before retrieval: route, operation, financial role, scope,
+Regeste now resolves a typed query frame before retrieval: route, operation, financial role, scope,
 time range, identifiers, follow-up state, answer shape, confidence and clarification. Deterministic
 parsing handles exact structure; the existing local multilingual embedding model is used only for
 low-confidence route fallback. Ambiguous monetary questions ask a local clarification instead of
@@ -17,7 +17,7 @@ deterministic concepts such as dates, record identifiers, arithmetic operations 
 There is no useful universal “RAG word matrix”. The reusable open-source building blocks fall into
 four complementary groups:
 
-| Need                          | Public reference                                                                                                                                                                                                                                                                                                                                                          | What Folio adopts                                                                       |
+| Need                          | Public reference                                                                                                                                                                                                                                                                                                                                                          | What Regeste adopts                                                                     |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
 | Heterogeneous retrieval qrels | [BEIR](https://github.com/beir-cellar/beir), [MIRACL](https://aclanthology.org/2023.tacl-1.63/)                                                                                                                                                                                                                                                                           | Query/document relevance labels, Recall@k, MRR and nDCG, heterogeneous document formats |
 | Behavioral NLP testing        | [CheckList](https://github.com/marcotcr/checklist)                                                                                                                                                                                                                                                                                                                        | Minimum-functionality, invariance and directional perturbation matrices                 |
@@ -28,7 +28,7 @@ Rasa and spaCy both position regex/lookup rules as precise signals, not a comple
 classifier ([Rasa](https://rasa.com/docs/reference/primitives/intents-and-entities/),
 [spaCy](https://spacy.io/usage/rule-based-matching/)). BEIR also reports that no single dense method
 dominates heterogeneous zero-shot retrieval and that reranking improves quality at added compute cost.
-That supports Folio's hybrid lexical/fuzzy/dense retrieval and its measured ablations rather than a
+That supports Regeste's hybrid lexical/fuzzy/dense retrieval and its measured ablations rather than a
 dense-only rewrite.
 
 ## Behavior corpus
@@ -112,7 +112,7 @@ Retrieval regression packs after the refactor:
    which was ingested as a one-page PDF and collapsed fuzzy scores. The harness now reuses the largest
    valid ready fixture and rejects HTML/missing assets explicitly.
 
-## Library versus Folio boundary
+## Library versus Regeste boundary
 
 Library-owned behavior stays library-owned:
 
@@ -122,9 +122,9 @@ Library-owned behavior stays library-owned:
 - embeddings: Transformers.js and the installed multilingual E5 model;
 - lexical and vector storage/search: SQLite FTS5 and sqlite-vec.
 
-Folio code owns the product-specific contract those libraries cannot supply: privacy, typed query frame,
+Regeste code owns the product-specific contract those libraries cannot supply: privacy, typed query frame,
 financial ontology, scope semantics, clarification state, hybrid candidate fusion, evidence/citation
-provenance, behavioral corpora, thresholds and regression gates. Folio does not implement a tokenizer,
+provenance, behavioral corpora, thresholds and regression gates. Regeste does not implement a tokenizer,
 embedding model, OCR engine, vector index or generic NLU framework.
 
 ## Honest limits and next gates

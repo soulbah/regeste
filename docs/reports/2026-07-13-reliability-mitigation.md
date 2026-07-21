@@ -2,7 +2,7 @@
 
 ## Decision
 
-Folio now treats routing, benchmark data and OCR-derived numbers as calibrated evidence rather than
+Regeste now treats routing, benchmark data and OCR-derived numbers as calibrated evidence rather than
 universal truth. The safe default is abstention: an unknown embedding profile cannot change the route;
 an ambiguous question asks for a slot; weak OCR can remain searchable and citable but cannot silently
 enter exact arithmetic; an invalid benchmark asset fails before scoring.
@@ -16,12 +16,12 @@ This avoids both an exhaustive word-list classifier and a semantic-only rewrite.
 
 - [CheckList](https://aclanthology.org/2020.acl-main.442/) shows why one held-out accuracy number is
   insufficient and organizes tests as minimum-functionality, invariance and directional expectations.
-  Folio's matrix uses those categories plus hard negatives and misspellings.
+  Regeste's matrix uses those categories plus hard negatives and misspellings.
 - [CLINC out-of-scope evaluation](https://aclanthology.org/D19-1131/) establishes that production intent
-  systems cannot assume every query belongs to one supported intent. Folio therefore leaves unknown
+  systems cannot assume every query belongs to one supported intent. Regeste therefore leaves unknown
   profiles and uncertain route sets unchanged instead of forcing the nearest label.
 - [Conformal Intent Classification and Clarification](https://aclanthology.org/2024.findings-naacl.156/)
-  motivates small candidate sets and clarification. Folio implements the conservative behavior, but does
+  motivates small candidate sets and clarification. Regeste implements the conservative behavior, but does
   **not** claim the paper's distribution-free coverage guarantee: the independent labeled calibration
   volume is not yet sufficient for that claim.
 - [OWASP's file-upload guidance](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html)
@@ -50,7 +50,7 @@ This avoids both an exhaustive word-list classifier and a semantic-only rewrite.
 6. **State-contaminated benchmark selection.** A same-named or large user file could satisfy a fixture.
    Reuse now requires the registered content hash; invalid or absent assets stop the run.
 7. **Weak asset identity.** URL and extension could hide HTML or changed content. `file-type` owns binary
-   signature detection; Folio adds host/size/hash/UTF-8 checks and expected parser output bounds.
+   signature detection; Regeste adds host/size/hash/UTF-8 checks and expected parser output bounds.
 8. **OCR certainty laundering.** Noisy recognized digits looked identical to native text. Page confidence
    now propagates to chunks/hits, one contrast retry is permitted, and low-confidence hits are excluded
    from exact financial facts while remaining available as cited evidence.
@@ -101,15 +101,15 @@ independent human evaluation and the report does not label it as one.
 - Benchmark reuse run: 1,362 registered chunks, 248 PDF pages, 1,126,940 indexed text bytes and 1,394,688
   embedding bytes; no new storage because verified fixtures were already indexed.
 
-## Library versus Folio boundary
+## Library versus Regeste boundary
 
 Libraries continue to own generic engines: pdf.js (PDF), Mammoth (DOCX), PP-OCRv5 through
 `ppu-paddle-ocr` (recognition), Transformers.js/model artifacts (embeddings), SQLite FTS5 and sqlite-vec
-(indexes), and `file-type` (binary signature detection). Folio owns the product contract around them:
+(indexes), and `file-type` (binary signature detection). Regeste owns the product contract around them:
 privacy, model-profile registry, typed query frame, execution plan, clarification lifecycle, hybrid fusion,
 OCR quality policy, provenance, fixture isolation, behavioral qrels and regression gates.
 
-Folio does not implement a tokenizer, embedding model, OCR engine, MIME database, vector index or generic
+Regeste does not implement a tokenizer, embedding model, OCR engine, MIME database, vector index or generic
 intent framework.
 
 ## Reproduction
@@ -139,7 +139,7 @@ signature/hash/bound mismatches before scoring.
 - OCR confidence is an engine score, not calibrated digit-level probability. The mitigation blocks weak
   OCR from exact sums and cites it for review; it cannot recover unreadable source pixels.
 - File signatures and hashes protect benchmark identity, not arbitrary user-document malware analysis.
-  Folio still parses locally in the browser and never uploads files; full CDR/antivirus is outside this
+  Regeste still parses locally in the browser and never uploads files; full CDR/antivirus is outside this
   local-only product boundary.
 
 ## Strict ablation follow-up

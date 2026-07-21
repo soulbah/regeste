@@ -73,7 +73,7 @@ an exported consolidated report.
 
 Private local fixtures are intentionally ignored by Git and stored at:
 
-`/Users/dev/Projects/saas/folio/.benchmark-corpus/private/`
+`/Users/dev/Projects/saas/regeste/.benchmark-corpus/private/`
 
 Contents: Assurance PDF, `transfer-statement.pdf`, `Compromis Martin.pdf`, Martin call-for-funds PDF,
 117-case matrix and oracle review. The Compromis original was recovered from the obsolete Claude
@@ -86,9 +86,9 @@ allowlist, maximum size, exact byte count, SHA-256, file signature and UTF-8 che
 ## Prompt for the next independent agent
 
 ```text
-Work only on /Users/dev/Projects/saas/folio, branch main. Never use or merge c556da.
+Work only on /Users/dev/Projects/saas/regeste, branch main. Never use or merge c556da.
 
-Goal: independently validate and improve Folio's private document QA. Do not assume the current
+Goal: independently validate and improve Regeste's private document QA. Do not assume the current
 automatic oracle is correct. Source corpus is local in .benchmark-corpus/private/; public corpus
 is reproducible from benchmarks/fuzzy-corpus-manifest.json. Read PROGRESS.md, AGENTS.md and this
 handoff first.
