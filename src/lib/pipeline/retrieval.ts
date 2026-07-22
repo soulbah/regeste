@@ -42,13 +42,21 @@ export function neighborsForAnchors(
 /** Merge query-variant rankings without comparing cosine values from different queries. */
 export function mergeRankedCandidateLists(lists: SearchHit[][], limit = 60): SearchHit[] {
 	const byChunk = new Map<number, { hit: SearchHit; rankScore: number }>();
-	for (const hits of lists) {
+	for (let listIndex = 0; listIndex < lists.length; listIndex++) {
+		const hits = lists[listIndex];
+		// The FIRST list is the user's actual question; the rest are rewrites and
+		// typo/translation variants. Rank-only fusion lets several variants each
+		// pulling near-duplicates of one theme outvote the original query's unique
+		// hit (measured: an enumeration question lost two named perils that the
+		// plain query retrieves). Weighted RRF, the Elasticsearch/Azure pattern:
+		// the original counts double, variants still contribute recall.
+		const weight = listIndex === 0 ? 2 : 1;
 		for (let index = 0; index < hits.length; index++) {
 			const hit = hits[index];
 			const previous = byChunk.get(hit.chunkId);
 			byChunk.set(hit.chunkId, {
 				hit: !previous || hit.score > previous.hit.score ? hit : previous.hit,
-				rankScore: (previous?.rankScore ?? 0) + 1 / (RRF_K + index + 1)
+				rankScore: (previous?.rankScore ?? 0) + weight / (RRF_K + index + 1)
 			});
 		}
 	}
@@ -420,10 +428,22 @@ function requestedNumericKinds(query: string): NumericAnswerKind[] {
 		malformedHowLong
 	)
 		kinds.push('duration');
+	// A polar (yes/no) question mentioning a money noun asks for a decision, not
+	// an amount: "Un recours est-il exercé si le dommage est inférieur à la
+	// franchise ?" must keep its conditional passage first, not the price line.
+	const polar =
+		/\b(?:est|sont|peut|peuvent|doit|dois|a-t|suis|ai)[ -](?:il|elle|ils|elles|on|je|tu|nous|vous)\b|^(?:est ce que|is|are|does|do|can|did)\b/u.test(
+			normalized
+		);
 	if (
 		/\b(?:prime|cotisation|premium|prix|price|cost|cout|montant|amount|honoraire|fee)\b/u.test(
 			normalized
 		) ||
+		// plafond/franchise ask "how much" on their own: a clause like "les trois
+		// grands plafonds biens" carries no other money word, and its carrier
+		// chunk ("…jusqu'à 40 000 €…") shares no vocabulary with it — the typed
+		// signal is the only bridge (measured on the 117: three multi-part cases).
+		(!polar && /\b(?:plafonds?|franchises?|deductible)\b/u.test(normalized)) ||
 		/\b(?:combien|montant|valeur|quelle? est|what is)\b.{0,32}\b(?:franchise|deductible)\b/u.test(
 			normalized
 		) ||
@@ -1159,10 +1179,26 @@ export function selectWithNeighbors(
 				);
 				return { hit, coverage, typedEvidence, utility: coverage + typedEvidence * 0.75 };
 			})
-			.sort((left, right) => right.utility - left.utility || right.hit.score - left.hit.score)
+			.sort((left, right) => right.utility - left.utility || right.hit.score - left.hit.score);
+		const chosen = leaders
 			.filter((leader) => leader.coverage >= 0.2 || leader.typedEvidence >= 0.25)
 			.slice(0, route === 'synthesis' ? 2 : 1);
-		return leaders.map((leader) => leader.hit);
+		// Guaranteed typed slot (the per-sub-question floor every decomposition
+		// system applies): when the clause asks for a numeric value and none of
+		// the lexical winners carries one, the amounts never reach the excerpts —
+		// the carrier for "les trois grands plafonds biens" says "affaires …
+		// 40 000 €" and shares not one word with the clause. The lexical filter
+		// may shape ordering; it must never veto the only value-bearing candidate.
+		if (
+			isNumericAnswerQuestion(clause) &&
+			!chosen.some((leader) => numericAnswerEvidenceCoverage(clause, leader.hit.text) > 0)
+		) {
+			const carrier = leaders.find(
+				(leader) => numericAnswerEvidenceCoverage(clause, leader.hit.text) > 0
+			);
+			if (carrier) chosen.push(carrier);
+		}
+		return chosen.map((leader) => leader.hit);
 	});
 	const scenarioScopedEvidenceCandidates =
 		/\b(?:couvert\w*|assure\w*|eligible|autorise\w*|permis|covered|insured|allowed)\b/u.test(

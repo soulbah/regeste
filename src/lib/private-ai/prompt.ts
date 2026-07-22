@@ -372,7 +372,10 @@ export function groundedRefusal(question: string): string {
 
 export function isRefusalLike(text: string): boolean {
 	const normalized = normalizeQuestion(text);
-	return /\b(?:je n ai pas trouve|pas mentionne|ne mentionne pas|ne precise(?:nt)? pas|n est pas (?:fourni|specifie|precise)|aucune information|aucun detail|ne contiennent aucune information|objet exact|non fourni|not mentioned|not specified|not provided|no information|couldn t find enough information)\b/u.test(
+	// "n'est pas indiqué" is the model's most common absence phrasing and was
+	// missing here — the answer then kept a citation on an absence claim, which
+	// the honest-refusal rule forbids (a citation cannot prove an absence).
+	return /\b(?:je n ai pas trouve|pas mentionne|ne mentionne pas|ne precise(?:nt)? pas|n est pas (?:fourni|specifie|precise|indique|mentionne|disponible)|aucune information|aucun detail|ne contiennent aucune information|objet exact|non fourni|not mentioned|not specified|not provided|not indicated|not available|no information|couldn t find enough information)\b/u.test(
 		normalized
 	);
 }

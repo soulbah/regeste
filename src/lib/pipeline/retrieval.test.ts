@@ -64,7 +64,11 @@ describe('fuseCandidates', () => {
 		expect(numericLabelEvidenceCoverage(query, 'cotisation moins importante')).toBe(0.5);
 	});
 
-	it('merges query variants by rank instead of incomparable cosine magnitude', () => {
+	it('merges query variants by rank, the original query counting double', () => {
+		// Rank-only fusion let variants outvote the original query's unique hit
+		// (measured: an enumeration question lost two named perils the plain
+		// query retrieves). Agreement across lists still wins; between two
+		// rank-1 hits, the user's actual question now beats a rewrite.
 		const originalBest = hit(1, 'original', 0.51);
 		const expandedBest = hit(2, 'expanded', 0.91);
 		const agreed = hit(3, 'agreed', 0.5);
@@ -72,7 +76,7 @@ describe('fuseCandidates', () => {
 			[originalBest, agreed],
 			[expandedBest, { ...agreed, score: 0.8 }]
 		]);
-		expect(result.map((item) => item.chunkId)).toEqual([3, 2, 1]);
+		expect(result.map((item) => item.chunkId)).toEqual([3, 1, 2]);
 	});
 
 	it('rewards agreement and keeps raw scores', () => {
