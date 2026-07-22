@@ -43,3 +43,12 @@ export function adaptGenerationOptions(
 		? { ...options, reasoning: 'off', maxTokens: Math.min(options.maxTokens, 420) }
 		: options;
 }
+
+/** Verification is an audit: re-derive the answer from a checklist and copy
+ * exact values. On this 4B a reasoning pass at that job re-opens the door the
+ * audit exists to close — it re-thinks, drifts, and echoes source boilerplate
+ * instead of correcting (measured on the 117: two verbatim-echo failures that
+ * a direct pass answers cleanly). Always run corrections directly. */
+export function verificationOptionsFor(): GenerationOptions {
+	return { reasoning: 'off', maxTokens: 420, temperature: 0 };
+}

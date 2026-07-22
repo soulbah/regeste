@@ -69,7 +69,7 @@
 		type PrivateRunCheckpoint
 	} from '$lib/benchmark/private-run-cache';
 	import type { SearchHit } from '$lib/types';
-	import { generationOptionsFor } from '$lib/private-ai/generation';
+	import { generationOptionsFor, verificationOptionsFor } from '$lib/private-ai/generation';
 	import {
 		crossLingualQueryVariants,
 		retrieveWithLocalQueryFallback
@@ -631,7 +631,7 @@
 		hits: SearchHit[],
 		draft: string
 	): Promise<string> {
-		const options = generationOptionsFor(question, route);
+		const options = verificationOptionsFor();
 		let answer = draft;
 		if (needsGroundedVerification(question, answer)) {
 			const verified = stripThink(

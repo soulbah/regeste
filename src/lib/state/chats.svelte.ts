@@ -8,7 +8,7 @@ import { documentsStore } from './documents.svelte';
 import { guardedFetch, OfflineError } from '$lib/net';
 import { myaiStore, endpointHost, type ChatMessage } from './myai.svelte';
 import { llmStore } from '$lib/private-ai/llm.svelte';
-import { generationOptionsFor } from '$lib/private-ai/generation';
+import { generationOptionsFor, verificationOptionsFor } from '$lib/private-ai/generation';
 import {
 	buildClarificationContext,
 	buildRetrievalContext,
@@ -970,7 +970,7 @@ class ChatsStore {
 						}
 					],
 					() => {},
-					generationOptionsFor(question, route === 'synthesis' ? 'synthesis' : 'targeted')
+					verificationOptionsFor()
 				);
 				const verified = stripThink(verifiedRaw);
 				// Non-empty is not enough: the verification pass runs the same engine
