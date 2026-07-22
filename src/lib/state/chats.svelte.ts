@@ -39,6 +39,7 @@ import {
 	buildVerificationUserPrompt,
 	enforceAnswerInvariants,
 	extractThink,
+	fitEvidenceToContext,
 	groundedRefusal,
 	isDegenerateAnswer,
 	isThinking,
@@ -837,6 +838,9 @@ class ChatsStore {
 		const { db } = await getLocalDb();
 		this.streamingText = '';
 		const grounded = documentCount > 0;
+		// Trim BEFORE anything numbers the excerpts: prompt, citations and the
+		// what-AI-saw record must all see the same list (see fitEvidenceToContext).
+		if (grounded) hits = fitEvidenceToContext(question, hits, conversationContext);
 		const groundedPrompt = grounded ? buildUserPrompt(question, hits, conversationContext) : '';
 		const messages = grounded
 			? [

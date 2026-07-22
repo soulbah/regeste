@@ -87,6 +87,7 @@
 		enforceAnswerInvariants,
 		GROUNDED_VERIFICATION_VERSION,
 		needsGroundedVerification,
+		isDegenerateAnswer,
 		stripThink,
 		SYSTEM_PROMPT
 	} from '$lib/private-ai/prompt';
@@ -808,7 +809,24 @@
 						return cached;
 					}
 					newGenerations++;
-					const draft = stripThink(await llmStore.generate(messages, () => {}, options));
+					let draft = stripThink(await llmStore.generate(messages, () => {}, options));
+					// Parity with the app path (chats.svelte.ts): a reasoning pass that
+					// dies inside <think> leaves an empty/dead draft, and the app
+					// retries it once directly. Without the same retry here the
+					// benchmark measures a raw death rate users never see — eight
+					// empty answers in the 2026-07-22 run, each after 99-150 s.
+					if (isDegenerateAnswer(draft)) {
+						const retried = stripThink(
+							await llmStore.generate(messages, () => {}, {
+								...options,
+								reasoning: 'off',
+								maxTokens: 420
+							})
+						).trim();
+						if (retried && (!isDegenerateAnswer(retried) || retried.length > draft.length)) {
+							draft = retried;
+						}
+					}
 					const corrected = await verifyBenchmarkAnswer(question, route, hits, draft);
 					privateGenerationCache.set(cacheKey, corrected);
 					saveGenerationCache(localStorage, privateGenerationCache);

@@ -2,6 +2,7 @@ import { damerauLevenshtein, normalizeForFuzzy, stemmedQueryCoverage } from '$li
 import { hasAnswerBearingEvidence } from '$lib/pipeline/relevance';
 import {
 	buildUserPrompt,
+	fitEvidenceToContext,
 	groundedRefusal,
 	resolveCitations,
 	resolveTargetedCitations,
@@ -498,7 +499,7 @@ export async function runPrivateDocumentStress(input: {
 		const {
 			test,
 			route,
-			hits,
+			hits: retrievedHits,
 			answerBearing,
 			rawHits,
 			alternateQueries,
@@ -508,6 +509,9 @@ export async function runPrivateDocumentStress(input: {
 			answerGroupTriagePassed,
 			retrievalMs
 		} = retrievedCase;
+		// Same clamp as the app path: prompt, generation and citation resolution
+		// must all see one list, trimmed to the model's context window.
+		const hits = fitEvidenceToContext(test.question, retrievedHits);
 		const expectedOutcome = expectedOutcomeFor(test);
 		const retrievalPassed = retrievedCase.retrievalPassed;
 		const generationSkipped =

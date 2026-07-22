@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	SYSTEM_PROMPT,
 	buildUserPrompt,
 	buildAnswerCoverageContract,
 	buildEvidenceInventory,
@@ -9,6 +10,7 @@ import {
 	compactCitationMarkers,
 	enforceAnswerInvariants,
 	extractThink,
+	fitEvidenceToContext,
 	isDegenerateAnswer,
 	needsGroundedVerification,
 	resolveCitations,
@@ -567,5 +569,29 @@ describe('isDegenerateAnswer', () => {
 		expect(
 			isDegenerateAnswer("Je n'ai pas trouvé assez d'informations dans les documents joints.")
 		).toBe(false);
+	});
+});
+
+describe('fitEvidenceToContext', () => {
+	// Regression: a 16-excerpt coverage question assembled 4114 prompt tokens
+	// against the model's 4096 window and MLC rejected it outright — the turn
+	// died in an exception the retry then repeated.
+	it('trims the lowest-ranked excerpts until the prompt fits', () => {
+		const big = Array.from({ length: 16 }, (_, i) => ({
+			...hit(i + 1),
+			text: 'grande clause du contrat répétée pour peser lourd. '.repeat(24)
+		}));
+		const kept = fitEvidenceToContext('Quelle est la franchise ?', big);
+		expect(kept.length).toBeLessThan(big.length);
+		expect(kept.length).toBeGreaterThan(0);
+		// Order preserved, prefix intact: citation numbers keep their meaning.
+		expect(kept.map((h) => h.chunkId)).toEqual(big.slice(0, kept.length).map((h) => h.chunkId));
+		const prompt = buildUserPrompt('Quelle est la franchise ?', kept);
+		expect((SYSTEM_PROMPT.length + prompt.length) / 3).toBeLessThanOrEqual(3900);
+	});
+
+	it('leaves a fitting list untouched', () => {
+		const small = [hit(1), hit(2)];
+		expect(fitEvidenceToContext('Question ?', small)).toEqual(small);
 	});
 });

@@ -330,6 +330,29 @@ export function buildContactValuePrompt(
 Excerpt [${excerptNumber}] contains ${value}, which is what this question asks for. Answer the question from excerpt [${excerptNumber}], stating ${value} and citing [${excerptNumber}]. Do not describe which address, number or link to use without naming it. Answer in the language of the question and return only the answer.`;
 }
 
+/** The 4B's context window is 4096 tokens and MLC rejects any prompt that
+ * exceeds it outright — the whole turn dies in an exception the retry then
+ * repeats (measured: 4114 tokens on a 16-excerpt coverage question). Trim the
+ * lowest-ranked excerpts until the assembled prompt fits. French runs ~3.2
+ * chars per token on this tokenizer; dividing by 3 overestimates tokens, so
+ * the clamp errs toward dropping one excerpt too many rather than throwing.
+ * Callers MUST use the returned list everywhere (prompt, citations, excerpt
+ * records): citation numbers are positional, and trimming after numbering
+ * would remap every [n] to the wrong source. */
+export function fitEvidenceToContext(
+	question: string,
+	hits: SearchHit[],
+	conversationContext: string | null = null,
+	maxPromptTokens = 3900
+): SearchHit[] {
+	const fits = (list: SearchHit[]) =>
+		(SYSTEM_PROMPT.length + buildUserPrompt(question, list, conversationContext).length) / 3 <=
+		maxPromptTokens;
+	let kept = hits;
+	while (kept.length > 1 && !fits(kept)) kept = kept.slice(0, -1);
+	return kept;
+}
+
 /** A generation that died after a token or two: too short to answer anything
  * AND carrying no citation marker. Both conditions matter — a terse cited fact
  * ("1 200,50 € [1].") is a legitimate answer and must never be judged
