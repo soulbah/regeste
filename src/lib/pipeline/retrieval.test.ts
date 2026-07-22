@@ -1257,6 +1257,28 @@ describe('expected answer type for contact atoms', () => {
 		expect(contactAnswerEvidenceCoverage('Quel est le montant ?', GOLD)).toBe(0);
 	});
 
+	// Regression: "Quels sont les numeros de demandes ?" answered "1, 2, …, 10".
+	// The carriers (réf. FILE-REF…) never reached the excerpts — passages dense in
+	// the WORD "demande" (a numbered list of requests to make) crowded them out,
+	// and the model enumerated the list ordinals. The reference shape puts the
+	// carrier back; the list itself must never count as a carrier.
+	it('recognises reference identifiers and rejects list ordinals', () => {
+		const carrier = 'Une première demande (réf. FILE-REF-A-0000001), déposée le 1er juillet';
+		const list =
+			'Demande exactement : 1. une copie intégrale certifiée de l’acte ; 2. la procuration';
+		const q = 'Quels sont les numeros de demandes ?';
+		expect(contactAnswerEvidenceCoverage(q, carrier)).toBe(1);
+		expect(contactAnswerValues(q, carrier)).toEqual(['FILE-REF-A-0000001']);
+		expect(contactAnswerEvidenceCoverage(q, list)).toBe(0);
+		expect(
+			contactAnswerEvidenceCoverage('Quel est le numéro de dossier ?', 'Dossier n° 536431')
+		).toBe(1);
+		// Adjacent types stay independent: a phone question is not fed references,
+		// and a date/amount question never enters this shape at all.
+		expect(contactAnswerEvidenceCoverage('Quel est le numéro de téléphone ?', carrier)).toBe(0);
+		expect(contactAnswerEvidenceCoverage('Quelle est la date de la demande ?', carrier)).toBe(0);
+	});
+
 	// Selection rebuilds its own order from raw score, so the partition has to
 	// hold here too: ranking the carrier first upstream is not enough.
 	it('selects the carrier over a higher-scored echo within a one-passage budget', () => {

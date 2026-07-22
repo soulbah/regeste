@@ -515,6 +515,19 @@ const CONTACT_SHAPES = [
 	{
 		asked: /\b(?:url|site (?:web|internet)|adresse (?:du site|web)|lien vers|website)\b/u,
 		value: /https?:\/\/[^\s)]+|\bwww\.[^\s)]+/u
+	},
+	// Reference identifiers: "numéro de demande / de dossier / de référence".
+	// Measured failure: both documents carried the requested numbers
+	// (réf. FILE-REF-A-0000001), but passages dense in the WORD "demande" — a
+	// numbered list of requests to make — crowded every carrier out of the 16
+	// excerpts, and the model dutifully enumerated the list ordinals. Same
+	// structure as the email case: the carrier shares almost no vocabulary with
+	// the question beyond the one noun. The value is an alphanumeric reference
+	// (letters AND digits, 8+) or a long plain number (6+ digits).
+	{
+		asked:
+			/\b(?:num[ée]ros? d(?:e la |e |u )?(?:demandes?|dossiers?|r[ée]f[ée]rences?)|r[ée]f[ée]rences? d(?:e la |e |u )?(?:demandes?|dossiers?)|(?:request|application|file|reference) numbers?)\b/u,
+		value: /\b(?=[A-Za-z]*\d)(?=\d*[A-Za-z])[A-Za-z0-9]{8,}\b|\b\d{6,}\b/u
 	}
 ] as const;
 
