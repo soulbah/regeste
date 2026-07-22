@@ -88,6 +88,12 @@ export default defineConfig({
 		format: 'es'
 	},
 	server: {
+		// Nested agent worktrees live under .claude/worktrees INSIDE this tree.
+		// Their svelte-kit sync rewrites a tsconfig on every agent turn, which
+		// this server's watcher read as a config change and answered with a
+		// full-reload of every client — killing any long browser run (the 117
+		// benchmark died twice at exactly those timestamps).
+		watch: { ignored: ['**/.claude/**'] },
 		// Cross-origin isolation (spec 018): worker scripts are served by vite,
 		// not hooks.server.ts, and COEP blocks a worker whose own response lacks
 		// the headers. Prod equivalent lives in static/_headers.
