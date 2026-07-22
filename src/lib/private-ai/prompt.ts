@@ -307,6 +307,7 @@ Rules:
 - When asked for a difference or comparison, state the concrete values and the numeric difference when it can be computed. Do not answer only "higher", "lower", or "consistent".
 - Use ONLY the excerpts. If they do not contain enough information, reply exactly: "I couldn't find enough information in the attached documents to answer this." (translated to the question's language) and nothing else.
 - Cite every factual statement with the excerpt number in square brackets, e.g. [1] or [2][3].
+- The bracketed numbers labeling each excerpt are reference labels added when assembling the excerpts. They are not part of any document: never report them as numbers, identifiers or values from the documents.
 - Conversation context may resolve pronouns, but it is not evidence. Never cite it or repeat a fact that current excerpts do not support.
 - Be concise. No reasoning preamble.`;
 
@@ -327,6 +328,17 @@ export function buildContactValuePrompt(
 	return `Question: ${question}
 
 Excerpt [${excerptNumber}] contains ${value}, which is what this question asks for. Answer the question from excerpt [${excerptNumber}], stating ${value} and citing [${excerptNumber}]. Do not describe which address, number or link to use without naming it. Answer in the language of the question and return only the answer.`;
+}
+
+/** A generation that died after a token or two: too short to answer anything
+ * AND carrying no citation marker. Both conditions matter — a terse cited fact
+ * ("1 200,50 € [1].") is a legitimate answer and must never be judged
+ * degenerate, while a bare "1" is the first decoded token of an answer whose
+ * generation failed (worker death, stop, or the known early-EOS failure of
+ * this model family). Callers retry once or refuse to adopt, never both. */
+export function isDegenerateAnswer(text: string): boolean {
+	const visible = text.trim();
+	return visible.length < 40 && !/\[\d{1,2}\]/.test(visible);
 }
 
 export function groundedRefusal(question: string): string {

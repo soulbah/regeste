@@ -40,6 +40,7 @@ import {
 	enforceAnswerInvariants,
 	extractThink,
 	groundedRefusal,
+	isDegenerateAnswer,
 	isThinking,
 	needsGroundedVerification,
 	resolveCitations,
@@ -725,6 +726,25 @@ class ChatsStore {
 			);
 			return;
 		}
+		// The engine is briefly 'generating' after every answer (related questions
+		// run on-device once sending is already false) and 'loading' for ~2s on a
+		// warm start. A strict readiness check here turned both windows into a
+		// permanent retrieval-only turn — the stored turn is a fossil of a race,
+		// and regenerate() even retires the real answer to make room for it. Wait
+		// out the short states; fall through honestly only if the engine never
+		// becomes ready (cold 2.4 GB download, error, unavailable).
+		if (
+			chat?.mode === 'private' &&
+			(llmStore.status === 'generating' || llmStore.status === 'loading')
+		) {
+			const deadline = performance.now() + 20_000;
+			while (
+				performance.now() < deadline &&
+				(llmStore.status === 'generating' || llmStore.status === 'loading')
+			) {
+				await new Promise((resolve) => setTimeout(resolve, 250));
+			}
+		}
 		if (chat?.mode === 'private' && llmStore.status === 'ready') {
 			await this.generatePrivate(
 				chatId,
@@ -894,6 +914,27 @@ class ChatsStore {
 				}
 				// The thinking-pass notes stay: they are what actually happened
 				// during this turn, and the direct retry answered the same prompt.
+			} else if (
+				options.reasoning !== 'on' &&
+				isDegenerateAnswer(visibleAnswer) &&
+				!this.stopRequested
+			) {
+				// The same early-death failure exists on the direct path, where the
+				// gate above could structurally never fire: a worker that dies after
+				// one decoded token leaves "1" as the whole answer, and nothing
+				// downstream judged it. Retry once; adopt the retry only when it is
+				// an actual improvement, so this can never make an answer worse.
+				streamRaw = '';
+				try {
+					const retried = stripThink(
+						await llmStore.generate(messages, onDelta, { ...options, maxTokens: 420 })
+					).trim();
+					if (retried && (!isDegenerateAnswer(retried) || retried.length > visibleAnswer.length)) {
+						raw = retried;
+					}
+				} catch (err) {
+					console.error('[regeste] direct retry after degenerate answer failed:', err);
+				}
 			}
 		}
 		raw = stripThink(raw || streamRaw);
@@ -928,7 +969,11 @@ class ChatsStore {
 					generationOptionsFor(question, route === 'synthesis' ? 'synthesis' : 'targeted')
 				);
 				const verified = stripThink(verifiedRaw);
-				if (verified.trim()) {
+				// Non-empty is not enough: the verification pass runs the same engine
+				// with the same failure modes, and adopting a "1" that died after one
+				// token REPLACES a coherent draft with garbage. A degenerate output
+				// means the audit failed, not that the draft was wrong — keep the draft.
+				if (verified.trim() && !isDegenerateAnswer(verified)) {
 					raw = verified;
 					this.streamingText = raw;
 					// The displayed answer now comes from the verification pass; its

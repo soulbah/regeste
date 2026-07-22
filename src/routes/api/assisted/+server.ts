@@ -40,6 +40,7 @@ Rules:
 - Preserve full names as written. Do not invent aliases or split a full name.
 - Use ONLY the excerpts. If they do not contain enough information, say you couldn't find enough information in the documents (in the question's language) and nothing else.
 - Cite every factual statement with the excerpt number in square brackets, e.g. [1] or [2][3].
+- The bracketed numbers labeling each excerpt are reference labels added when assembling the excerpts. They are not part of any document: never report them as numbers, identifiers or values from the documents.
 - Conversation context resolves references only. It is not evidence and must not be cited.
 - Be concise. Answer directly without reasoning preamble.`;
 

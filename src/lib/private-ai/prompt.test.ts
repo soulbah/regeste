@@ -9,6 +9,7 @@ import {
 	compactCitationMarkers,
 	enforceAnswerInvariants,
 	extractThink,
+	isDegenerateAnswer,
 	needsGroundedVerification,
 	resolveCitations,
 	resolveTargetedCitations
@@ -545,5 +546,26 @@ describe('resolveCitations', () => {
 		);
 		expect(result.text).toContain('[1]');
 		expect(result.citations[0].hit).toEqual(source);
+	});
+});
+
+describe('isDegenerateAnswer', () => {
+	// Regression: a generation that died after one decoded token stored "1" as
+	// the whole answer to "quel est le prix du devis ?" — no judge existed on
+	// the reasoning-off path, and the verification pass adopted any non-empty
+	// output. The boundary that matters: a terse CITED fact is legitimate.
+	it('flags dead fragments', () => {
+		expect(isDegenerateAnswer('1')).toBe(true);
+		expect(isDegenerateAnswer('1.')).toBe(true);
+		expect(isDegenerateAnswer('')).toBe(true);
+		expect(isDegenerateAnswer('1. **Garantie')).toBe(true);
+	});
+
+	it('accepts terse cited facts and normal answers', () => {
+		expect(isDegenerateAnswer('1 200,50 € [1].')).toBe(false);
+		expect(isDegenerateAnswer('Le prix du devis est de 1 200,50 € TTC [1].')).toBe(false);
+		expect(
+			isDegenerateAnswer("Je n'ai pas trouvé assez d'informations dans les documents joints.")
+		).toBe(false);
 	});
 });
