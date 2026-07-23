@@ -296,7 +296,12 @@ function detectLocale(question: string): 'fr' | 'en' {
 }
 
 function referencesPrevious(question: string): boolean {
-	const normalized = normalizeQuestion(question);
+	// French subject-verb inversion writes its clitic with a hyphen
+	// ("AWP accuse-t-il…", "répond-il") — the pronoun is grammar, not an
+	// anaphor, whatever the verb. The verb-list rewrite below only covers
+	// auxiliaries/modals whose inversion survives normalization unhyphenated.
+	const withoutHyphenInversions = question.replace(/-(?:t-)?(?:il|elle|ils|elles|on)\b/giu, ' ');
+	const normalized = normalizeQuestion(withoutHyphenInversions);
 	const withoutInversion = normalized.replace(
 		/\b(?:est|sont|a|ont|avait|etaient|peut|peuvent|doit|doivent|sera|seront|fait|font)\s+(?:t\s+)?(?:il|elle|ils|elles)\b/gu,
 		''

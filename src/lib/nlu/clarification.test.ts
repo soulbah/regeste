@@ -36,6 +36,23 @@ describe('contextual clarification dimensions', () => {
 		).toBe('entity');
 	});
 
+	it('never reads a hyphenated inversion clitic as a back-reference', () => {
+		// Regression: "AWP accuse-t-il réception … et répond-il ?" asked
+		// "De quelle personne parlez-vous ?" on the first turn — the named
+		// subject (AWP) IS the referent; "-t-il"/"-il" is inversion grammar.
+		const question =
+			'Sous quels délais AWP accuse-t-il réception d’une réclamation écrite et répond-il ?';
+		expect(analyzeQuestion(question).referencesPrevious).toBe(false);
+		expect(
+			contextualClarification(question, analyzeQuestion(question), {
+				hasConversationContext: false,
+				documentCount: 1
+			})
+		).toBeNull();
+		// A bare subject pronoun with no named subject stays a back-reference.
+		expect(analyzeQuestion('Et lui ?').referencesPrevious).toBe(true);
+	});
+
 	it('does not clarify resolved follow-up or one selected document', () => {
 		expect(
 			contextualClarification('Et ses frais ?', analyzeQuestion('Et ses frais ?'), {
