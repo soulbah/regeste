@@ -44,7 +44,16 @@ export function formatAggregateResult(
 		};
 	}
 	const labels = result.groups.map((group) => money(group.valueMinor, group.currency, language));
-	const citations = result.facts.map((_, index) => `[${index + 1}]`).join(' ');
+	// Inline markers were designed for a handful of statement records; a
+	// 240-row schedule turns the answer into a wall of citations (and markers
+	// past [99] don't even resolve). Past a small cap the text says how many
+	// values were counted instead — the sources strip and the what-AI-saw
+	// panel still carry every row.
+	const INLINE_CITATION_CAP = 8;
+	const compact = result.facts.length > INLINE_CITATION_CAP;
+	const citations = compact
+		? copy(locale, 'aggregate.overValues', { count: result.facts.length })
+		: result.facts.map((_, index) => `[${index + 1}]`).join(' ');
 	if (result.operation === 'count') {
 		return {
 			text: copy(locale, 'aggregate.count', { count: result.count, citations }),
@@ -55,13 +64,18 @@ export function formatAggregateResult(
 		const values = result.facts.map(
 			(fact, index) => `${money(fact.valueMinor, fact.currency, language)} [${index + 1}]`
 		);
+		const shown = compact
+			? `${values.slice(0, INLINE_CITATION_CAP).join(', ')}, … (${copy(locale, 'aggregate.overValues', { count: values.length })})`
+			: values.join(', ');
 		return {
-			text: copy(locale, 'aggregate.list', { values: values.join(', ') }),
-			calculation: values.join(' · ')
+			text: copy(locale, 'aggregate.list', { values: shown }),
+			calculation: shown
 		};
 	}
 	const operation = copy(locale, `aggregate.${result.operation}`);
-	let text = `${operation} ${labels.join(locale === 'fr' ? ' et ' : ' and ')}. ${citations}`;
+	let text = compact
+		? `${operation} ${labels.join(locale === 'fr' ? ' et ' : ' and ')} (${citations}).`
+		: `${operation} ${labels.join(locale === 'fr' ? ' et ' : ' and ')}. ${citations}`;
 	if (result.ambiguousDocuments.length) {
 		text += ` ${copy(locale, 'aggregate.excluded', {
 			count: result.ambiguousDocuments.length
@@ -72,9 +86,16 @@ export function formatAggregateResult(
 			const values = result.facts
 				.filter((fact) => fact.currency === group.currency)
 				.map((fact) => money(fact.valueMinor, fact.currency, language));
+			const shown =
+				values.length <= 12
+					? values
+					: [
+							...values.slice(0, 3),
+							`… (${copy(locale, 'aggregate.overValues', { count: values.length })})`
+						];
 			return result.operation === 'sum'
-				? `${values.join(' + ')} = ${money(group.valueMinor, group.currency, language)}`
-				: `${result.operation}(${values.join(', ')}) = ${labels[result.groups.indexOf(group)]}`;
+				? `${shown.join(' + ')} = ${money(group.valueMinor, group.currency, language)}`
+				: `${result.operation}(${shown.join(', ')}) = ${labels[result.groups.indexOf(group)]}`;
 		})
 		.join(' · ');
 	return { text, calculation };

@@ -597,6 +597,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'aggregate.countCalculation': '{count} opération(s) correspondante(s)',
 	'aggregate.list': 'Les montants sont {values}.',
 	'aggregate.sum': 'La somme est',
+	'aggregate.overValues': 'sur {count} valeurs',
 	'aggregate.average': 'La moyenne est',
 	'aggregate.minimum': 'Le minimum est',
 	'aggregate.maximum': 'Le maximum est',

@@ -212,3 +212,36 @@ describe('schedule aggregation', () => {
 		expect(prose.facts.every((fact) => !fact.recordKey.includes(':schedule:'))).toBe(true);
 	});
 });
+
+// A 240-row schedule sum rendered 240 inline markers (those past [99] not
+// even resolving). Past a small cap the text states the count; the sources
+// strip and what-AI-saw still carry every row.
+describe('aggregate formatting at scale', () => {
+	it('replaces marker walls with a count past the inline cap', async () => {
+		const { formatAggregateResult } = await import('./format-aggregate');
+		const rows = [
+			'1 05.11.2025 14 949,07 69,39 50,93 18,46',
+			...Array.from({ length: 12 }, (_, index) => {
+				const month = String(((index + 11) % 12) + 1).padStart(2, '0');
+				const year = index < 1 ? 2025 : 2026;
+				return `${index + 2} 05.${month}.${year} 14 ${898 - index * 51},05 75,81 51,02 24,79`;
+			})
+		];
+		const result = aggregateMoney('Combien dois-je payer au total ?', [
+			chunk(1, 'loan', ['Echéancier (en euros)', ...rows].join('\n'))
+		]);
+		const formatted = formatAggregateResult(result, 'fr');
+		expect(formatted.text).toContain('sur 13 valeurs');
+		expect(formatted.text).not.toContain('[9]');
+		expect(formatted.calculation).toContain('… (sur 13 valeurs)');
+		// A handful of records keeps the inline markers.
+		const small = formatAggregateResult(
+			aggregateMoney('Somme TTC de toutes les factures', [
+				chunk(1, 'a', 'Total TTC 100,00 €'),
+				chunk(2, 'b', 'Total TTC 25,50 €')
+			]),
+			'fr'
+		);
+		expect(small.text).toContain('[1] [2]');
+	});
+});

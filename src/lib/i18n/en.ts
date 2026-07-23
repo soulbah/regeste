@@ -581,6 +581,7 @@ export const en = {
 	'aggregate.countCalculation': '{count} matching record(s)',
 	'aggregate.list': 'The amounts are {values}.',
 	'aggregate.sum': 'The sum is',
+	'aggregate.overValues': 'across {count} values',
 	'aggregate.average': 'The average is',
 	'aggregate.minimum': 'The minimum is',
 	'aggregate.maximum': 'The maximum is',
