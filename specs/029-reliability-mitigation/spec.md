@@ -55,7 +55,7 @@ None. Owner approved implementing every mitigation listed on 2026-07-13.
 5. OCR confidence gates exact numeric analytics and bounded retry without changing high-confidence pages.
 6. Browser reports include profile, denominators, Wilson intervals, coverage/abstention, cold/warm latency,
    threshold errors and baseline diff.
-7. Existing invoice, record, cross-document, fuzzy, semantic and Martin checks pass.
+7. Existing invoice, record, cross-document, fuzzy, semantic and private-document checks pass.
 8. `bun run verify` exits 0 and changed flows are exercised in browser.
 
 Never contains: implementation details (→ plan.md), task breakdown (→ tasks.md).

@@ -66,7 +66,7 @@ requested full implementation on 2026-07-12.
    match, 100% expected citation coverage and zero cross-currency attribution errors.
 3. In `/dev/pipeline`, ingest the anonymized fixture and observe all record-bearing pages remain in the
    candidate/result set even though their template similarity exceeds 0.90.
-4. In a real Private chat, ingest the owner's local ignored `transfer-statement.pdf`. Run the agreed question pack,
+4. In a real Private chat, ingest the owner's local ignored a local, gitignored real-world PDF. Run the agreed question pack,
    including June sent amount, June debited total, June fees, June received GNF, transaction count,
    per-month lists, extrema, equal 150 EUR records, identifiers and absent facts. Compare every answer
    and citation against visual page truth; no answer may rely on a single page for an exhaustive query.

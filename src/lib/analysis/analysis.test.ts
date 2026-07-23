@@ -182,11 +182,11 @@ describe('schedule aggregation', () => {
 	const scheduleChunk = (id: number, rows: string[]) =>
 		chunk(id, 'loan', ['Echéancier de remboursement (en euros)', ...rows].join('\n'));
 	const rows = [
-		'1 05.11.2025 14 949,07 69,39 50,93 18,46',
+		'1 05.02.2027 11 962,45 57,20 49,16 8,04',
 		...Array.from({ length: 12 }, (_, index) => {
 			const month = String(((index + 11) % 12) + 1).padStart(2, '0');
 			const year = index < 1 ? 2025 : 2026;
-			return `${index + 2} 05.${month}.${year} 14 ${898 - index * 51},05 75,81 51,02 24,79`;
+			return `${index + 2} 05.${month}.${year} 11 ${913 - index * 49},29 64,73 49,22 15,51`;
 		})
 	];
 
@@ -196,7 +196,7 @@ describe('schedule aggregation', () => {
 			scheduleChunk(2, rows.slice(7))
 		]);
 		expect(result.count).toBe(13);
-		expect(result.groups).toEqual([{ currency: 'EUR', valueMinor: 6939 + 12 * 7581, count: 13 }]);
+		expect(result.groups).toEqual([{ currency: 'EUR', valueMinor: 5720 + 12 * 6473, count: 13 }]);
 	});
 
 	it('builds no schedule records without a repeating column or enough rows', () => {
@@ -220,11 +220,11 @@ describe('aggregate formatting at scale', () => {
 	it('replaces marker walls with a count past the inline cap', async () => {
 		const { formatAggregateResult } = await import('./format-aggregate');
 		const rows = [
-			'1 05.11.2025 14 949,07 69,39 50,93 18,46',
+			'1 05.02.2027 11 962,45 57,20 49,16 8,04',
 			...Array.from({ length: 12 }, (_, index) => {
 				const month = String(((index + 11) % 12) + 1).padStart(2, '0');
 				const year = index < 1 ? 2025 : 2026;
-				return `${index + 2} 05.${month}.${year} 14 ${898 - index * 51},05 75,81 51,02 24,79`;
+				return `${index + 2} 05.${month}.${year} 11 ${913 - index * 49},29 64,73 49,22 15,51`;
 			})
 		];
 		const result = aggregateMoney('Combien dois-je payer au total ?', [

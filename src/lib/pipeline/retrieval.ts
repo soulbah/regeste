@@ -538,7 +538,7 @@ const CONTACT_SHAPES = [
 	},
 	// Reference identifiers: "numéro de demande / de dossier / de référence".
 	// Measured failure: both documents carried the requested numbers
-	// (réf. FILE-REF-A-0000001), but passages dense in the WORD "demande" — a
+	// (réf. REF4XK20260031425), but passages dense in the WORD "demande" — a
 	// numbered list of requests to make — crowded every carrier out of the 16
 	// excerpts, and the model dutifully enumerated the list ordinals. Same
 	// structure as the email case: the carrier shares almost no vocabulary with
@@ -767,7 +767,7 @@ export function parseScheduleRows(text: string): ScheduleRow[] {
 			date: Number(dateMatch[3]) * 10000 + Number(dateMatch[2]) * 100 + Number(dateMatch[1]),
 			dateIso: `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}`,
 			// Amount-shaped tokenization: French thousands are space-separated
-			// ("14 949,07"), so splitting on spaces would shear every large value.
+			// ("12 345,67"), so splitting on spaces would shear every large value.
 			amounts: [...amountBlob.matchAll(/\d[\d  ]*,\d{2}/gu)].map((value) => value[0])
 		});
 	}

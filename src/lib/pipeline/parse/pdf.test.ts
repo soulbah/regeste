@@ -4,9 +4,9 @@ import { isLikelyPdfSectionHeading, pageBlocks } from './pdf';
 
 describe('PDF structural blocks', () => {
 	it('detects question, title-case and uppercase headings without treating prose as a title', () => {
-		expect(isLikelyPdfSectionHeading('Qui est couvert(e) ?', 'La police couvre Idrissa Konaté.')).toBe(
-			true
-		);
+		expect(
+			isLikelyPdfSectionHeading('Qui est couvert(e) ?', 'La police couvre Idrissa Konaté.')
+		).toBe(true);
 		expect(isLikelyPdfSectionHeading('La Version Pressée', 'Voici une copie de votre devis.')).toBe(
 			true
 		);

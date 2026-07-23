@@ -60,15 +60,15 @@ describe('orderPdfText', () => {
 			...Array.from({ length: 6 }, (_, row) => [
 				item(String(row + 1), 40, 680 - row * 16, 20),
 				item(`05.${String(row + 11).padStart(2, '0')}.2025`, 100, 680 - row * 16, 70),
-				item(`${14949 - row * 51},07`, 220, 680 - row * 16, 80),
-				item(row === 0 ? '69,39' : '75,81', 400, 680 - row * 16, 50)
+				item(`${11962 - row * 49},45`, 220, 680 - row * 16, 80),
+				item(row === 0 ? '57,20' : '64,73', 400, 680 - row * 16, 50)
 			]).flat()
 		];
 		const lines = orderPdfText(items, 596);
 		const text = lines.join('\n');
 		// The first record survives as one line: rank, date, balance, installment.
-		expect(text).toMatch(/1 05\.11\.2025 14949,07 69,39/);
-		expect(text).toMatch(/2 05\.12\.2025 14898,07 75,81/);
+		expect(text).toMatch(/1 05\.11\.2025 11962,45 57,20/);
+		expect(text).toMatch(/2 05\.12\.2025 11913,45 64,73/);
 		// The header stays a single line above the records, not a column title
 		// welded onto one column's values.
 		expect(text).toContain('N° Date Capital restant dû Montant échéance');

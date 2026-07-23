@@ -24,14 +24,14 @@ Check a task off ONLY after its Done-when commands pass. `[P]` = safe to run in 
       Done when: benchmark reports 100% record recall, execution exact match, expected citation coverage
       and currency-role accuracy for PDF/DOCX/TXT corpus; old 25-invoice benchmark remains 100%.
 - [x] 8. Real PDF and regression verification
-      Done when: local ignored `transfer-statement.pdf` answers agreed stress pack against visual truth; Martin and
+      Done when: local ignored a local, gitignored real-world PDF answers agreed stress pack against visual truth; the private compromis benchmark and
       long scanned-document regressions remain green; browser console has no errors.
 - [x] 9. Cross-document and unsupported-evidence stress
       Done when: at least eight cases require multiple files; complementary, identity, multi-hop,
       negation, superseded, conflict and absent categories pass at 100% evidence recall/completeness and
       unsupported-attribute precision; one real chat cites three distinct files.
 - [x] 10. OCR conversational traps
-      Done when: live Martin OCR answers price/loan comparison and cadastral area from correct late/early
+      Done when: the live private OCR compromis document answers price/loan comparison and cadastral area from correct late/early
       evidence; French inversion does not inherit previous topic; an absent sensitive attribute uses
       zero passages; Private synthesis produces an answer without exhausting hidden reasoning.
 

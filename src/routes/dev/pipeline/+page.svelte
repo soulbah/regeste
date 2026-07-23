@@ -41,7 +41,6 @@
 		benchmarkAsset,
 		validateBenchmarkBytes
 	} from '$lib/benchmark/assets';
-	import { runMartinAnswerStress, runMartinStress } from '$lib/benchmark/compromis-stress';
 	import {
 		PUBLIC_ANSWER_STRESS_CASES,
 		runPublicAnswerStress
@@ -172,11 +171,7 @@
 		};
 	} | null>(null);
 	let fuzzyBenchmarkError = $state<string | null>(null);
-	let compromisDiagnostic = $state<unknown>(null);
-	let compromisReindexReport = $state<unknown>(null);
-	let compromisAnswerBenchmarking = $state(false);
-	let compromisAnswerProgress = $state({ completed: 0, total: 44 });
-	let compromisAnswerReport = $state<unknown>(null);
+	let reindexReport = $state<unknown>(null);
 	let publicAnswerBenchmarking = $state(false);
 	let publicAnswerProgress = $state({ completed: 0, total: PUBLIC_ANSWER_STRESS_CASES.length });
 	let publicAnswerReport = $state<unknown>(null);
@@ -1512,70 +1507,18 @@
 		}
 	}
 
-	async function runMartinDiagnostic() {
-		const document = documentsStore.documents.find((item) => /compromis compromis/i.test(item.name));
-		if (!document) {
-			compromisDiagnostic = { error: 'Martin document not found' };
-			return;
-		}
-		compromisDiagnostic = await runMartinStress({
-			documentId: document.id,
-			retrieve: (question, documentIds) => documentsStore.retrieve(question, documentIds)
-		});
-	}
-
-	async function runMartinReindexDiagnostic() {
-		const document = documentsStore.documents.find((item) => /compromis compromis/i.test(item.name));
-		if (!document) {
-			compromisReindexReport = { error: 'Martin document not found' };
-			return;
-		}
-		await documentsStore.reindex(document.id);
-		compromisReindexReport = documentsStore.ingests[document.id] ?? { error: 'No ingest state' };
-		await refreshIndexDiagnostics();
-	}
-
 	async function runAssuranceReindexDiagnostic() {
 		const document = documentsStore.documents.find((item) =>
 			/assurance habitation devis/i.test(item.name)
 		);
 		if (!document) {
-			compromisReindexReport = { error: 'Assurance document not found' };
+			reindexReport = { error: 'Assurance document not found' };
 			return;
 		}
 		await documentsStore.reindex(document.id);
 		privateRetrievalCache.clear();
-		compromisReindexReport = documentsStore.ingests[document.id] ?? { error: 'No ingest state' };
+		reindexReport = documentsStore.ingests[document.id] ?? { error: 'No ingest state' };
 		await refreshIndexDiagnostics();
-	}
-
-	async function runMartinAnswerBenchmark() {
-		const document = documentsStore.documents.find((item) => /compromis compromis/i.test(item.name));
-		if (!document || llmStore.status !== 'ready') {
-			compromisAnswerReport = {
-				error: !document ? 'Martin document not found' : `Private model is ${llmStore.status}`
-			};
-			return;
-		}
-		compromisAnswerBenchmarking = true;
-		compromisAnswerProgress = { completed: 0, total: 44 };
-		compromisAnswerReport = null;
-		try {
-			compromisAnswerReport = await runMartinAnswerStress({
-				documentId: document.id,
-				retrieve: (question, documentIds) => documentsStore.retrieve(question, documentIds),
-				generate: async (messages, question, hits) => {
-					const extractive = buildDeterministicExtractiveAnswer(question, hits);
-					if (extractive) return enforceAnswerInvariants(question, extractive);
-					const options = generationOptionsFor(question, 'targeted');
-					const draft = stripThink(await llmStore.generate(messages, () => {}, options));
-					return verifyBenchmarkAnswer(question, 'targeted', hits, draft);
-				},
-				onProgress: (completed, total) => (compromisAnswerProgress = { completed, total })
-			});
-		} finally {
-			compromisAnswerBenchmarking = false;
-		}
 	}
 
 	async function runPublicAnswerBenchmark(caseIds: string[] | null = null) {
@@ -1927,19 +1870,8 @@
 				<Button variant="outline" onclick={runFuzzyBenchmark} disabled={fuzzyBenchmarking}>
 					{fuzzyBenchmarking ? 'Running fuzzy benchmark…' : 'Run fuzzy benchmark'}
 				</Button>
-				<Button variant="outline" onclick={runMartinDiagnostic}>Run Martin diagnostic</Button>
-				<Button variant="outline" onclick={runMartinReindexDiagnostic}>Re-index Martin</Button>
 				<Button variant="outline" onclick={runAssuranceReindexDiagnostic}>Re-index Assurance</Button
 				>
-				<Button
-					variant="outline"
-					onclick={runMartinAnswerBenchmark}
-					disabled={compromisAnswerBenchmarking}
-				>
-					{compromisAnswerBenchmarking
-						? `Answering ${compromisAnswerProgress.completed}/${compromisAnswerProgress.total}…`
-						: 'Run Martin answer benchmark'}
-				</Button>
 				<Button
 					variant="outline"
 					onclick={runSemanticRoutingBenchmark}
@@ -2050,29 +1982,11 @@
 			{#if fuzzyBenchmarkError}
 				<p class="text-destructive text-sm">{fuzzyBenchmarkError}</p>
 			{/if}
-			{#if compromisDiagnostic}
+			{#if reindexReport}
 				<pre
-					data-testid="compromis-stress-report"
+					data-testid="reindex-report"
 					class="bg-muted overflow-auto rounded-md p-3 text-xs">{JSON.stringify(
-						compromisDiagnostic,
-						null,
-						2
-					)}</pre>
-			{/if}
-			{#if compromisReindexReport}
-				<pre
-					data-testid="compromis-reindex-report"
-					class="bg-muted overflow-auto rounded-md p-3 text-xs">{JSON.stringify(
-						compromisReindexReport,
-						null,
-						2
-					)}</pre>
-			{/if}
-			{#if compromisAnswerReport}
-				<pre
-					data-testid="compromis-answer-report"
-					class="bg-muted overflow-auto rounded-md p-3 text-xs">{JSON.stringify(
-						compromisAnswerReport,
+						reindexReport,
 						null,
 						2
 					)}</pre>
@@ -2227,7 +2141,6 @@
 					stale: indexDiagnostics
 						.filter((row) => row.status === 'ready' && row.retrievalVersion < RETRIEVAL_VERSION)
 						.map((row) => row.name),
-					compromis: indexDiagnostics.filter((row) => /compromis/i.test(row.name)),
 					ingests: documentsStore.ingests
 				},
 				null,

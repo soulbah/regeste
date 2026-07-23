@@ -46,7 +46,7 @@ const facts = [
 		'Référence BX-77 | Capacité: 42 kg | Classe: renforcée.',
 		'table-1'
 	],
-	['ocr', 'Quel est le numéro Martin ?', 'Le numéro de dossier Martin est CP-58019.', 'scan-1'],
+	['ocr', 'Quel est le numéro Morel ?', 'Le numéro de dossier Morel est CP-58019.', 'scan-1'],
 	[
 		'multidoc',
 		'Quel est le statut complet de Malik Ouedraogo ?',

@@ -339,7 +339,7 @@ describe('retrieval relevance', () => {
 	it('accepts typoed and bilingual attribute evidence', () => {
 		expect(
 			hasAnswerBearingEvidence('Quel est le prxi de vnete exct du bien Cpelle ?', [
-				evidenceHit('Le prix de vente exact du bien Martin est 146.000,00 €.')
+				evidenceHit('Le prix de vente exact du bien Morel est 146.000,00 €.')
 			])
 		).toBe(true);
 		expect(

@@ -81,8 +81,8 @@ function emitColumnRegions(lines: PdfLine[], gutters: number[]): string[] {
 	// schedule is made of them; a fact-sheet table (checkbox grids, IPID-style
 	// prose cells that wrap over several lines) has none. Data rows must be
 	// emitted row-major — column-major shears the record apart and re-titles a
-	// lone column with the full table header, which is how "capital restant dû
-	// 1 765,44" got answered as the first installment.
+	// lone column with the full table header, which is how an
+	// outstanding-balance cell got answered as the first installment.
 	const isValueCell = (cell: string) => /^[\d\s.,/€%'-]+$/.test(cell) && /\d/.test(cell);
 	const isDataRow = (line: PdfLine) => {
 		const columns = [...new Set(line.items.map((item) => columnOf(item, gutters)))];

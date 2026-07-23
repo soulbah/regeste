@@ -68,16 +68,16 @@ describe('fuzzy retrieval views', () => {
 		);
 	});
 	it('recognizes several realistic transpositions without rewarding unrelated text', () => {
-		const query = 'Quel est le prxi de vnete exct du bien Martin ?';
+		const query = 'Quel est le prxi de vnete exct du bien Morel ?';
 		expect(
-			fuzzyQueryCoverage(query, 'Compromis Martin prix de vente exact 146 000 euros')
+			fuzzyQueryCoverage(query, 'Compromis Morel prix de vente exact 152 000 euros')
 		).toBeGreaterThan(0.55);
 		expect(fuzzyQueryCoverage(query, 'Le locataire résilie son bail')).toBeLessThan(0.2);
 	});
 	it('keeps grams from a discriminating name at the end of a long question', () => {
-		const grams = fuzzyQueryGrams('Quel est le prxi de vnete exct du bien Martin ?');
-		expect(grams).toContain('cap');
-		expect(grams).toContain('pel');
+		const grams = fuzzyQueryGrams('Quel est le prxi de vnete exct du bien Morel ?');
+		expect(grams).toContain('mor');
+		expect(grams).toContain('ore');
 	});
 	it('matches joined and split forms through a compact gram view', () => {
 		expect(fuzzyIndexText('micro service')).toContain('cro');

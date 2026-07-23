@@ -408,10 +408,10 @@ describe('resolveCitations', () => {
 	});
 
 	it('preserves separate citations for coordinated multi-fact questions', () => {
-		const price = { ...hit(1), text: 'Prix de vente 146 000 euros', page: 3 };
-		const loan = { ...hit(2), text: 'Montant du prêt 146 000 euros', page: 19 };
+		const price = { ...hit(1), text: 'Prix de vente 152 000 euros', page: 3 };
+		const loan = { ...hit(2), text: 'Montant du prêt 152 000 euros', page: 19 };
 		const result = resolveTargetedCitations(
-			'Le prix est 146 000 € [1] et le prêt est 146 000 € [2].',
+			'Le prix est 152 000 € [1] et le prêt est 152 000 € [2].',
 			[price, loan],
 			'Quel est le prix et quel est le prêt ?'
 		);

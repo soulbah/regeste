@@ -128,18 +128,18 @@ describe('fuzzy and multi-document safety', () => {
 	});
 
 	it('lets a discriminating fuzzy candidate beat unrelated two-channel agreement', () => {
-		const compromis = {
-			...hit(1, 'compromis', -1),
-			documentName: 'Compromis Martin.pdf',
-			text: 'PRIX DE LA VENTE exact 146 000 euros'
+		const morel = {
+			...hit(1, 'morel', -1),
+			documentName: 'Compromis Morel.pdf',
+			text: 'PRIX DE LA VENTE exact 152 000 euros'
 		};
 		const unrelated = { ...hit(2, 'lease', 0.8), text: 'Le locataire résilie son bail.' };
 		const result = refineCandidates(
 			[unrelated],
 			[unrelated],
-			'Quel est le prxi de vnete exct du bien Martin ?',
+			'Quel est le prxi de vnete exct du bien Morel ?',
 			2,
-			[compromis]
+			[morel]
 		);
 		expect(result[0].chunkId).toBe(1);
 	});
@@ -660,12 +660,12 @@ describe('retrieval refinement', () => {
 
 	it('promotes the named parties block over repeated boilerplate mentions', () => {
 		const parties = {
-			...hit(1, 'compromis', 0.027),
+			...hit(1, 'morel', 0.027),
 			page: 1,
 			text: '1) Vendeurs Monsieur Cédric MARTIN et Madame Hélène DUPUIS. 2) Acquéreur Monsieur Idrissa KONATÉ.'
 		};
 		const boilerplate = {
-			...hit(2, 'compromis', 0.03),
+			...hit(2, 'morel', 0.03),
 			page: 17,
 			text: "L'acquéreur informe le vendeur des conditions de la vente."
 		};
@@ -809,21 +809,21 @@ describe('retrieval refinement', () => {
 		);
 	});
 
-	it('promotes the Martin price, loan and cadastral-area passages', () => {
+	it('promotes the compromis price, loan and cadastral-area passages', () => {
 		const candidates = [
-			{ ...hit(1, 'compromis', 0.03), page: 4, text: 'Description générale de immeuble' },
+			{ ...hit(1, 'morel', 0.03), page: 4, text: 'Description générale de immeuble' },
 			{
-				...hit(2, 'compromis', 0.029),
+				...hit(2, 'morel', 0.029),
 				page: 3,
 				text: 'PRIX DE LA VENTE montant CENT CINQUANTE MILLE EUROS 146.000,00 €'
 			},
 			{
-				...hit(3, 'compromis', 0.029),
+				...hit(3, 'morel', 0.029),
 				page: 19,
 				text: 'FINANCEMENT Montant du prêt 146.000,00 €'
 			},
 			{
-				...hit(4, 'compromis', 0.029),
+				...hit(4, 'morel', 0.029),
 				page: 2,
 				text: 'Une maison à usage habitation, contenance totale 76 ca'
 			}
@@ -1268,17 +1268,17 @@ describe('expected answer type for contact atoms', () => {
 	});
 
 	// Regression: "Quels sont les numeros de demandes ?" answered "1, 2, …, 10".
-	// The carriers (réf. FILE-REF…) never reached the excerpts — passages dense in
+	// The carriers (réf. REF4XK…) never reached the excerpts — passages dense in
 	// the WORD "demande" (a numbered list of requests to make) crowded them out,
 	// and the model enumerated the list ordinals. The reference shape puts the
 	// carrier back; the list itself must never count as a carrier.
 	it('recognises reference identifiers and rejects list ordinals', () => {
-		const carrier = 'Une première demande (réf. FILE-REF-A-0000001), déposée le 1er juillet';
+		const carrier = 'Une première demande (réf. REF4XK20260031425), déposée le 1er juillet';
 		const list =
 			'Demande exactement : 1. une copie intégrale certifiée de l’acte ; 2. la procuration';
 		const q = 'Quels sont les numeros de demandes ?';
 		expect(contactAnswerEvidenceCoverage(q, carrier)).toBe(1);
-		expect(contactAnswerValues(q, carrier)).toEqual(['FILE-REF-A-0000001']);
+		expect(contactAnswerValues(q, carrier)).toEqual(['REF4XK20260031425']);
 		expect(contactAnswerEvidenceCoverage(q, list)).toBe(0);
 		expect(
 			contactAnswerEvidenceCoverage('Quel est le numéro de dossier ?', 'Dossier n° 536431')
@@ -1419,11 +1419,11 @@ describe('ordinal payment-series partition', () => {
 	});
 
 	it('reads the extreme date only from amount-bearing series, never a lone stamp', () => {
-		const rows = '1 05.11.2025 14 949,07 69,39 50,93 18,46\n2 05.12.2025 14 750,15 75,81 51,02';
-		expect(extremeSeriesDate(rows, 'first')).toBe(20251105);
+		const rows = '1 05.02.2027 11 962,45 57,20 49,16 8,04\n2 05.03.2027 11 913,29 64,73 49,22';
+		expect(extremeSeriesDate(rows, 'first')).toBe(20270205);
 		expect(
-			extremeSeriesDate('216 05.10.2043 1 765,44 75,81\n217 05.03.2044 1 650,42 75,81', 'last')
-		).toBe(20431105);
+			extremeSeriesDate('192 05.09.2046 1 471,52 64,73\n193 05.10.2046 1 406,99 64,73', 'last')
+		).toBe(20461005);
 		// A date with no amount is prose, not a schedule row.
 		expect(extremeSeriesDate('Le contrat prend effet le 13.10.2025.', 'first')).toBeNull();
 		// The issue date stamped in a page header (no adjacent amount) does not
@@ -1435,7 +1435,7 @@ describe('ordinal payment-series partition', () => {
 			)
 		).toBeNull();
 		// One dated amount is a mention, not a series.
-		expect(extremeSeriesDate('Échéance du 05.11.2025 : 69,39 €', 'first')).toBeNull();
+		expect(extremeSeriesDate('Échéance du 05.02.2027 : 57,20 €', 'first')).toBeNull();
 	});
 
 	it('puts the first schedule row ahead of higher-scored later rows', () => {
@@ -1443,13 +1443,13 @@ describe('ordinal payment-series partition', () => {
 			...hit(1, 'loan', 0.05),
 			seq: 3,
 			page: 2,
-			text: '1 05.11.2025 14 949,07 69,39 50,93 18,46\n2 05.12.2025 14 750,15 75,81 51,02 24,79'
+			text: '1 05.02.2027 11 962,45 57,20 49,16 8,04\n2 05.03.2027 11 913,29 64,73 49,22 15,51'
 		};
 		const lateRow = {
 			...hit(2, 'loan', 0.9),
 			seq: 40,
 			page: 7,
-			text: '216 05.10.2043 1 765,44 75,81 72,73 3,08\n217 05.03.2044 1 650,42 75,81 72,85 2,96'
+			text: '192 05.09.2046 1 471,52 64,73 61,90 2,83\n193 05.10.2046 1 406,99 64,73 61,97 2,71'
 		};
 		const selected = selectWithNeighbors(
 			[lateRow, firstRow],
@@ -1468,18 +1468,18 @@ describe('ordinal payment-series partition', () => {
 describe('ordinalScheduleValue', () => {
 	const schedule = [
 		'N° Date Capital Restant dû Montant échéance Capital amorti Intérêts',
-		'1 05.11.2025 14 949,07 69,39 50,93 18,46',
-		'2 05.12.2025 14 750,15 75,81 51,02 24,79',
-		'3 05.01.2026 14 846,95 75,81 51,10 24,71',
-		'4 05.02.2026 14 780,12 75,81 51,19 24,62'
+		'1 05.02.2027 11 962,45 57,20 49,16 8,04',
+		'2 05.03.2027 11 913,29 64,73 49,22 15,51',
+		'3 05.04.2027 11 864,07 64,73 49,28 15,45',
+		'4 05.05.2027 11 814,60 64,73 49,35 15,38'
 	].join('\n');
 
 	it('resolves the first installment to the repeating column, extreme row', () => {
 		expect(ordinalScheduleValue('Quel est montant de la premiere mensualité ?', schedule)).toEqual({
-			literal: '69,39'
+			literal: '57,20'
 		});
 		expect(ordinalScheduleValue('Quelle est la dernière échéance ?', schedule)).toEqual({
-			literal: '75,81'
+			literal: '64,73'
 		});
 	});
 
@@ -1494,9 +1494,9 @@ describe('ordinalScheduleValue', () => {
 		).toBeNull();
 		// No repeating column → no confident cell.
 		const drifting = [
-			'1 05.11.2025 14 949,07 69,39',
-			'2 05.12.2025 14 750,15 70,12',
-			'3 05.01.2026 14 846,95 71,44'
+			'1 05.02.2027 11 962,45 57,20',
+			'2 05.03.2027 11 913,29 70,12',
+			'3 05.04.2027 11 864,07 71,44'
 		].join('\n');
 		expect(
 			ordinalScheduleValue('Quel est montant de la premiere mensualité ?', drifting)
