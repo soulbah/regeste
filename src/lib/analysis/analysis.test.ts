@@ -172,3 +172,43 @@ describe('deterministic aggregation', () => {
 		expect(result.groups).toEqual([{ currency: 'EUR', valueMinor: 10000, count: 1 }]);
 	});
 });
+
+// "Combien dois-je payer au total ?" over an amortization notice: the bare
+// row amounts carry no currency symbol, so the generic extractor never made
+// records of them and the model approximated a 240-row sum. Schedule rows now
+// become one record per installment (repeating-column analysis), and the
+// exact aggregate answers.
+describe('schedule aggregation', () => {
+	const scheduleChunk = (id: number, rows: string[]) =>
+		chunk(id, 'loan', ['Echéancier de remboursement (en euros)', ...rows].join('\n'));
+	const rows = [
+		'1 05.11.2025 14 949,07 69,39 50,93 18,46',
+		...Array.from({ length: 12 }, (_, index) => {
+			const month = String(((index + 11) % 12) + 1).padStart(2, '0');
+			const year = index < 1 ? 2025 : 2026;
+			return `${index + 2} 05.${month}.${year} 14 ${898 - index * 51},05 75,81 51,02 24,79`;
+		})
+	];
+
+	it('sums the installment column exactly, one record per dated row', () => {
+		const result = aggregateMoney('Combien dois-je payer au total ?', [
+			scheduleChunk(1, rows.slice(0, 7)),
+			scheduleChunk(2, rows.slice(7))
+		]);
+		expect(result.count).toBe(13);
+		expect(result.groups).toEqual([{ currency: 'EUR', valueMinor: 6939 + 12 * 7581, count: 13 }]);
+	});
+
+	it('builds no schedule records without a repeating column or enough rows', () => {
+		// Too few rows.
+		const short = aggregateMoney('Combien dois-je payer au total ?', [
+			scheduleChunk(1, rows.slice(0, 4))
+		]);
+		expect(short.count).toBe(0);
+		// Prose document: untouched behavior.
+		const prose = aggregateMoney('Combien dois-je payer au total ?', [
+			chunk(1, 'contract', 'Le loyer mensuel est de 850,00 € payable le 5 de chaque mois.')
+		]);
+		expect(prose.facts.every((fact) => !fact.recordKey.includes(':schedule:'))).toBe(true);
+	});
+});

@@ -749,10 +749,15 @@ const SCHEDULE_ROW_PATTERN =
  * is exactly the cell a fixed-rate schedule's first, catch-up or final row
  * changes, so the mode itself is never blindly returned. Null whenever the
  * passage is not a parseable schedule or no column clearly repeats. */
-export function ordinalScheduleValue(query: string, text: string): { literal: string } | null {
-	const direction = ordinalPaymentDirection(query);
-	if (!direction) return null;
-	const rows: Array<{ date: number; amounts: string[] }> = [];
+export interface ScheduleRow {
+	date: number;
+	dateIso: string;
+	amounts: string[];
+}
+
+/** Parse `rank date amount…` schedule rows out of a passage. */
+export function parseScheduleRows(text: string): ScheduleRow[] {
+	const rows: ScheduleRow[] = [];
 	for (const line of text.split('\n')) {
 		const match = SCHEDULE_ROW_PATTERN.exec(line);
 		if (!match) continue;
@@ -760,11 +765,19 @@ export function ordinalScheduleValue(query: string, text: string): { literal: st
 		const dateMatch = /(\d{2})[./](\d{2})[./](\d{4})/u.exec(date)!;
 		rows.push({
 			date: Number(dateMatch[3]) * 10000 + Number(dateMatch[2]) * 100 + Number(dateMatch[1]),
+			dateIso: `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}`,
 			// Amount-shaped tokenization: French thousands are space-separated
 			// ("14 949,07"), so splitting on spaces would shear every large value.
 			amounts: [...amountBlob.matchAll(/\d[\d  ]*,\d{2}/gu)].map((value) => value[0])
 		});
 	}
+	return rows;
+}
+
+/** The installment column of a schedule: the one whose value repeats across
+ * rows (a constant payment plan), while balances and interest drift row by
+ * row. Null when rows disagree on width or no column clearly repeats. */
+export function scheduleInstallmentColumn(rows: ScheduleRow[]): number | null {
 	if (rows.length < 3) return null;
 	const width = rows[0].amounts.length;
 	if (width < 2 || !rows.every((row) => row.amounts.length === width)) return null;
@@ -783,6 +796,15 @@ export function ordinalScheduleValue(query: string, text: string): { literal: st
 	}
 	// The installment column must actually repeat; balances never do.
 	if (bestRepetition < Math.ceil(rows.length * 0.6)) return null;
+	return installmentColumn;
+}
+
+export function ordinalScheduleValue(query: string, text: string): { literal: string } | null {
+	const direction = ordinalPaymentDirection(query);
+	if (!direction) return null;
+	const rows = parseScheduleRows(text);
+	const installmentColumn = scheduleInstallmentColumn(rows);
+	if (installmentColumn === null) return null;
 	const extremeRow = rows.reduce((best, row) =>
 		direction === 'first' ? (row.date < best.date ? row : best) : row.date > best.date ? row : best
 	);

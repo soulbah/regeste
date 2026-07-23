@@ -485,7 +485,10 @@ class ChatsStore {
 				return;
 			}
 			const route = buildExecutionPlan(analysisQuestion, frame).route;
-			if (route === 'aggregate') {
+			if (
+				route === 'aggregate' ||
+				(await this.scheduleAggregateApplies(analysisQuestion, frame, enabledDocs))
+			) {
 				this.ensureCalculateStep();
 				await this.generateAggregate(
 					chatId,
@@ -658,7 +661,10 @@ class ChatsStore {
 				return;
 			}
 			const route = buildExecutionPlan(analysisQuestion, frame).route;
-			if (route === 'aggregate') {
+			if (
+				route === 'aggregate' ||
+				(await this.scheduleAggregateApplies(analysisQuestion, frame, enabledDocs))
+			) {
 				this.ensureCalculateStep();
 				await this.generateAggregate(
 					chatId,
@@ -1184,6 +1190,35 @@ class ChatsStore {
 			reasoningMs
 		});
 		await this.loadCitations(chatId);
+	}
+
+	/** "How much do I pay in total?" over a single amortization notice: the
+	 * frame sees a sum with no specific money role — the shape that asks the
+	 * scope clarification with several documents, and with one document used
+	 * to fall through to generation, where the model approximated a 240-row
+	 * sum. When the document's facts are dominated by schedule records (a
+	 * dozen-plus dated installments with a repeating column), the exact
+	 * aggregate path answers instead. The probe's extraction work is cached
+	 * per document, so generateAggregate right after re-reads it for free. */
+	private async scheduleAggregateApplies(
+		question: string,
+		frame: SemanticFrame,
+		enabledDocs: ChatDocument[]
+	): Promise<boolean> {
+		if (frame.operation !== 'sum' || frame.clarification !== 'scope') return false;
+		if (!enabledDocs.length) return false;
+		try {
+			const probe = await documentsStore.aggregate(
+				question,
+				enabledDocs.map((document) => document.id)
+			);
+			const scheduleFacts = probe.facts.filter((fact) =>
+				fact.recordKey?.includes(':schedule:')
+			).length;
+			return probe.groups.length === 1 && probe.count >= 12 && scheduleFacts >= probe.count * 0.8;
+		} catch {
+			return false;
+		}
 	}
 
 	private async generateAggregate(

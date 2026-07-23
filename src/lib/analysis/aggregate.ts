@@ -3,7 +3,7 @@ import type { MoneyKind } from './money';
 import { analyzeQuestion, type AggregateOperation, type TemporalScope } from './query-router';
 import type { QuestionRoute, SearchHit } from '$lib/types';
 
-export const FACT_EXTRACTOR_VERSION = 'money-v3-ocr-quality';
+export const FACT_EXTRACTOR_VERSION = 'money-v4-schedule';
 
 export type DocumentMoneyFact = FinancialRecordFact;
 

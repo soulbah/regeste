@@ -2,6 +2,11 @@ import { extractMoneyCandidates, type MoneyCandidate, type MoneyKind } from './m
 import { normalizeQuestion } from './query-router';
 import type { SearchHit } from '$lib/types';
 import { reliableForExactAnalytics } from '$lib/pipeline/ocr-quality';
+import {
+	parseScheduleRows,
+	scheduleInstallmentColumn,
+	type ScheduleRow
+} from '$lib/pipeline/retrieval';
 
 export interface FinancialRecordFact extends MoneyCandidate {
 	documentId: string;
@@ -105,6 +110,68 @@ function contextualKind(kind: MoneyKind, context: string): MoneyKind {
 	return kind;
 }
 
+/** Amortization-schedule rows as one record per installment. The bare row
+ * amounts carry no currency symbol, so the generic money extractor never sees
+ * them; the installment column is the one whose value repeats across rows
+ * (the same analysis the ordinal answer gate uses). Guarded hard: at least a
+ * dozen rows document-wide, a clear repeating column, and a euro mention
+ * somewhere in the document — otherwise no records, and the aggregate path
+ * behaves exactly as before. */
+export function extractScheduleRecords(chunks: SearchHit[]): FinancialRecord[] {
+	const byDocument = new Map<string, SearchHit[]>();
+	for (const chunk of chunks) {
+		if (!reliableForExactAnalytics(chunk)) continue;
+		const list = byDocument.get(chunk.documentId) ?? [];
+		list.push(chunk);
+		byDocument.set(chunk.documentId, list);
+	}
+	const records: FinancialRecord[] = [];
+	for (const documentChunks of byDocument.values()) {
+		if (!documentChunks.some((chunk) => /€|\beuros?\b/iu.test(chunk.text))) continue;
+		const rows: Array<{ row: ScheduleRow; chunk: SearchHit }> = [];
+		for (const chunk of documentChunks) {
+			for (const row of parseScheduleRows(chunk.text)) rows.push({ row, chunk });
+		}
+		if (rows.length < 12) continue;
+		const column = scheduleInstallmentColumn(rows.map((entry) => entry.row));
+		if (column === null) continue;
+		for (const { row, chunk } of rows) {
+			const literal = row.amounts[column];
+			const valueMinor = Number(literal.replace(/[^\d,]/gu, '').replace(',', ''));
+			if (!Number.isFinite(valueMinor)) continue;
+			const recordKey = `${chunk.documentId}:schedule:${row.dateIso}`;
+			records.push({
+				key: recordKey,
+				documentId: chunk.documentId,
+				documentName: chunk.documentName,
+				date: row.dateIso,
+				id: null,
+				page: chunk.page,
+				headingPath: chunk.headingPath,
+				facts: [
+					{
+						kind: 'amount',
+						label: 'échéance',
+						valueMinor,
+						currency: 'EUR',
+						confidence: 0.95,
+						documentId: chunk.documentId,
+						documentName: chunk.documentName,
+						chunkId: chunk.chunkId,
+						page: chunk.page,
+						headingPath: chunk.headingPath,
+						text: chunk.text,
+						recordKey,
+						recordDate: row.dateIso,
+						recordId: null
+					}
+				]
+			});
+		}
+	}
+	return records;
+}
+
 /** Build stable records without relying on provider-specific page templates. */
 export function extractFinancialRecords(chunks: SearchHit[]): FinancialRecord[] {
 	const locations = new Map<string, SearchHit[]>();
@@ -180,5 +247,5 @@ export function extractFinancialRecords(chunks: SearchHit[]): FinancialRecord[] 
 			}
 		}
 	}
-	return [...records.values()];
+	return [...records.values(), ...extractScheduleRecords(chunks)];
 }
