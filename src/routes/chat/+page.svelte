@@ -76,11 +76,40 @@
 		// after navigation could otherwise create a second, source-less chat.
 		await goto(resolve(`/chat/${id}`));
 	}
+
+	// Same drop affordance as the chat thread (C7): files dropped on the empty
+	// home start a chat with them through the normal upload path.
+	let dragging = $state(false);
+	function handleDrop(e: DragEvent) {
+		e.preventDefault();
+		dragging = false;
+		const files = Array.from(e.dataTransfer?.files ?? []);
+		if (files.length) handleUpload(files);
+	}
 </script>
 
 <svelte:head><title>Regeste</title></svelte:head>
 
-<div class="flex h-full flex-col">
+<div
+	class="relative flex h-full flex-col {dragging ? 'bg-muted/50' : ''}"
+	role="region"
+	aria-label={t('sidebar.newChat')}
+	ondragover={(e) => {
+		e.preventDefault();
+		dragging = true;
+	}}
+	ondragleave={() => (dragging = false)}
+	ondrop={handleDrop}
+>
+	{#if dragging}
+		<div
+			class="border-primary/40 bg-background/80 pointer-events-none absolute inset-4 z-10 flex items-center justify-center rounded-xl border-2 border-dashed"
+		>
+			<p class="text-muted-foreground font-mono text-xs tracking-widest uppercase">
+				{t('home.drop')}
+			</p>
+		</div>
+	{/if}
 	<header class="flex h-14 shrink-0 items-center gap-1 border-b px-4">
 		<Sidebar.Trigger class="shrink-0 md:hidden" />
 		<h1 class="font-display px-1 text-lg tracking-tight">{t('sidebar.newChat')}</h1>

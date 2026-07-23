@@ -237,6 +237,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'home.demoPreparing': 'Préparation de la démo…',
 	'home.demoCta': 'Essayer avec un contrat fictif',
 	'home.demoTitle': 'Démo · contrat fictif',
+	'home.drop': 'Déposez pour démarrer une discussion',
 
 	// Chat page
 	'chat.fallback': 'Conversation',
@@ -261,6 +262,7 @@ export const fr: Record<keyof typeof en, string> = {
 		"Chaque document est lu dans votre navigateur, rien n'en sort. Votre bibliothèque reste consultable même hors ligne.",
 	'docsPage.introAction': 'Ajoutez un document à une discussion pour poser vos questions.',
 	'docsPage.add': 'Ajouter des documents',
+	'docsPage.drop': 'Déposez pour ajouter à votre bibliothèque',
 	'docsPage.sortRecent': 'Plus récents',
 	'docsPage.sortName': 'Nom',
 	'docsPage.sortSize': 'Taille',

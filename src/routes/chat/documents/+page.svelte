@@ -156,6 +156,16 @@
 		await documentsStore.ingestMany(files);
 	}
 
+	// Same drop affordance as the chat thread (C7): files dropped anywhere on
+	// the page land in the library through the normal upload path.
+	let dragging = $state(false);
+	function handleDrop(e: DragEvent) {
+		e.preventDefault();
+		dragging = false;
+		const files = Array.from(e.dataTransfer?.files ?? []);
+		if (files.length) handleFiles(files);
+	}
+
 	async function confirmDelete() {
 		if (!deleteTarget) return;
 		const id = deleteTarget.id;
@@ -223,7 +233,26 @@
 	autoSaveId="regeste-docs-panes"
 >
 	{#snippet main()}
-		<section class="flex h-full min-w-0 flex-1 flex-col">
+		<section
+			class="relative flex h-full min-w-0 flex-1 flex-col {dragging ? 'bg-muted/50' : ''}"
+			role="region"
+			aria-label={t('docs.title')}
+			ondragover={(e) => {
+				e.preventDefault();
+				dragging = true;
+			}}
+			ondragleave={() => (dragging = false)}
+			ondrop={handleDrop}
+		>
+			{#if dragging}
+				<div
+					class="border-primary/40 bg-background/80 pointer-events-none absolute inset-4 z-10 flex items-center justify-center rounded-xl border-2 border-dashed"
+				>
+					<p class="text-muted-foreground font-mono text-xs tracking-widest uppercase">
+						{t('docsPage.drop')}
+					</p>
+				</div>
+			{/if}
 			<header class="flex h-14 shrink-0 items-center gap-1 border-b px-4">
 				<Sidebar.Trigger class="shrink-0 md:hidden" />
 				<div class="min-w-0 px-1">

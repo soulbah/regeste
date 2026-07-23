@@ -228,6 +228,7 @@ export const en = {
 	'home.demoPreparing': 'Preparing the demo…',
 	'home.demoCta': 'Try with a sample contract',
 	'home.demoTitle': 'Demo · sample contract',
+	'home.drop': 'Drop to start a chat',
 
 	// Chat page
 	'chat.fallback': 'Chat',
@@ -252,6 +253,7 @@ export const en = {
 		'Everything you add is read right in your browser and never leaves it. Your library stays searchable at any time, even offline.',
 	'docsPage.introAction': 'Add a document to a chat to start asking questions.',
 	'docsPage.add': 'Add documents',
+	'docsPage.drop': 'Drop to add to your library',
 	'docsPage.sortRecent': 'Most recent',
 	'docsPage.sortName': 'Name',
 	'docsPage.sortSize': 'Size',
