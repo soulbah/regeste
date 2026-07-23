@@ -235,7 +235,6 @@
 	{#snippet main()}
 		<section
 			class="relative flex h-full min-w-0 flex-1 flex-col {dragging ? 'bg-muted/50' : ''}"
-			role="region"
 			aria-label={t('docs.title')}
 			ondragover={(e) => {
 				e.preventDefault();

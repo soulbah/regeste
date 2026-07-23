@@ -21,7 +21,10 @@ import {
 	contactAnswerEvidenceCoverage,
 	contactAnswerValues,
 	durationValueMentions,
+	extremeSeriesDate,
 	missingDurationCarrier,
+	ordinalPaymentDirection,
+	ordinalScheduleValue,
 	multiClauseEvidenceCoverage,
 	requestedDurationCount
 } from './retrieval';
@@ -1398,5 +1401,105 @@ describe('synthesis mid-sentence continuation', () => {
 		expect(selected.map((item) => item.chunkId)).toContain(2);
 		// The anchor itself stays; the continuation displaces a tail filler only.
 		expect(selected.map((item) => item.chunkId)).toContain(1);
+	});
+});
+
+// Regression: "Quel est montant de la premiere mensualité ?" on an
+// amortization schedule answered with a mid-table outstanding balance from
+// page 7 — every schedule chunk looks alike to lexical and dense features,
+// and only the row carrying the series' minimum date can answer.
+describe('ordinal payment-series partition', () => {
+	it('detects the direction only for payment-series ordinals', () => {
+		expect(ordinalPaymentDirection('Quel est montant de la premiere mensualité ?')).toBe('first');
+		expect(ordinalPaymentDirection('Quelle est la dernière échéance ?')).toBe('last');
+		expect(ordinalPaymentDirection('What is the last payment?')).toBe('last');
+		// Ordinal without a payment noun, and payment noun without an ordinal.
+		expect(ordinalPaymentDirection('Que dit la dernière version ?')).toBeNull();
+		expect(ordinalPaymentDirection('Quel est le montant de la mensualité ?')).toBeNull();
+	});
+
+	it('reads the extreme date only from amount-bearing series, never a lone stamp', () => {
+		const rows = '1 05.11.2025 14 949,07 69,39 50,93 18,46\n2 05.12.2025 14 750,15 75,81 51,02';
+		expect(extremeSeriesDate(rows, 'first')).toBe(20251105);
+		expect(
+			extremeSeriesDate('216 05.10.2043 1 765,44 75,81\n217 05.03.2044 1 650,42 75,81', 'last')
+		).toBe(20431105);
+		// A date with no amount is prose, not a schedule row.
+		expect(extremeSeriesDate('Le contrat prend effet le 13.10.2025.', 'first')).toBeNull();
+		// The issue date stamped in a page header (no adjacent amount) does not
+		// qualify, even when the page mentions "euros" elsewhere.
+		expect(
+			extremeSeriesDate(
+				'BANQUE POPULAIRE 13.10.2025\nA ARCHIVER\nEchéancier de remboursement (en euros)\nIBAN FR76 1234 5678 9012',
+				'first'
+			)
+		).toBeNull();
+		// One dated amount is a mention, not a series.
+		expect(extremeSeriesDate('Échéance du 05.11.2025 : 69,39 €', 'first')).toBeNull();
+	});
+
+	it('puts the first schedule row ahead of higher-scored later rows', () => {
+		const firstRow = {
+			...hit(1, 'loan', 0.05),
+			seq: 3,
+			page: 2,
+			text: '1 05.11.2025 14 949,07 69,39 50,93 18,46\n2 05.12.2025 14 750,15 75,81 51,02 24,79'
+		};
+		const lateRow = {
+			...hit(2, 'loan', 0.9),
+			seq: 40,
+			page: 7,
+			text: '216 05.10.2043 1 765,44 75,81 72,73 3,08\n217 05.03.2044 1 650,42 75,81 72,85 2,96'
+		};
+		const selected = selectWithNeighbors(
+			[lateRow, firstRow],
+			[],
+			'Quel est montant de la premiere mensualité ?',
+			1
+		);
+		expect(selected.map((item) => item.chunkId)).toEqual([1]);
+	});
+});
+
+// The generation-side completion of the ordinal partition: even with the
+// right row on top, the 4B answers the first large amount after the date —
+// the balance. The installment column is the one whose value repeats across
+// rows; the extreme row's cell there is the deterministic answer.
+describe('ordinalScheduleValue', () => {
+	const schedule = [
+		'N° Date Capital Restant dû Montant échéance Capital amorti Intérêts',
+		'1 05.11.2025 14 949,07 69,39 50,93 18,46',
+		'2 05.12.2025 14 750,15 75,81 51,02 24,79',
+		'3 05.01.2026 14 846,95 75,81 51,10 24,71',
+		'4 05.02.2026 14 780,12 75,81 51,19 24,62'
+	].join('\n');
+
+	it('resolves the first installment to the repeating column, extreme row', () => {
+		expect(ordinalScheduleValue('Quel est montant de la premiere mensualité ?', schedule)).toEqual({
+			literal: '69,39'
+		});
+		expect(ordinalScheduleValue('Quelle est la dernière échéance ?', schedule)).toEqual({
+			literal: '75,81'
+		});
+	});
+
+	it('stays inert off-shape', () => {
+		// Non-ordinal question, and an ordinal question over prose.
+		expect(ordinalScheduleValue('Quel est le taux ?', schedule)).toBeNull();
+		expect(
+			ordinalScheduleValue(
+				'Quel est montant de la premiere mensualité ?',
+				'Le prêt de 15 000,00 € est remboursable en 240 mensualités au taux de 1,99 %.'
+			)
+		).toBeNull();
+		// No repeating column → no confident cell.
+		const drifting = [
+			'1 05.11.2025 14 949,07 69,39',
+			'2 05.12.2025 14 750,15 70,12',
+			'3 05.01.2026 14 846,95 71,44'
+		].join('\n');
+		expect(
+			ordinalScheduleValue('Quel est montant de la premiere mensualité ?', drifting)
+		).toBeNull();
 	});
 });

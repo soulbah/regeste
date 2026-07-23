@@ -16,6 +16,9 @@ export function contextualClarification(
 	frame: SemanticFrame,
 	context: ClarificationContext
 ): ClarificationKind | null {
+	// "One record or all selected documents?" has exactly one answer when a
+	// single document is attached — asking it reads as a bug, not caution.
+	if (frame.clarification === 'scope' && context.documentCount <= 1) return null;
 	if (frame.clarification) return frame.clarification;
 	const normalized = normalizeQuestion(question);
 	if (

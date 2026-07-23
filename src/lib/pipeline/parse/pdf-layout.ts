@@ -76,6 +76,21 @@ function emitColumnRegions(lines: PdfLine[], gutters: number[]): string[] {
 		);
 	const out: string[] = [];
 	let region: PdfLine[] = [];
+	// A data-table row is a self-contained record: two or more columns whose
+	// every cell is a bare value (number, amount, date). An amortization
+	// schedule is made of them; a fact-sheet table (checkbox grids, IPID-style
+	// prose cells that wrap over several lines) has none. Data rows must be
+	// emitted row-major — column-major shears the record apart and re-titles a
+	// lone column with the full table header, which is how "capital restant dû
+	// 1 765,44" got answered as the first installment.
+	const isValueCell = (cell: string) => /^[\d\s.,/€%'-]+$/.test(cell) && /\d/.test(cell);
+	const isDataRow = (line: PdfLine) => {
+		const columns = [...new Set(line.items.map((item) => columnOf(item, gutters)))];
+		if (columns.length < 2) return false;
+		return columns.every((column) =>
+			isValueCell(joinItems(line.items.filter((item) => columnOf(item, gutters) === column)))
+		);
+	};
 	const flush = () => {
 		if (!region.length) return;
 		const multiColumnLines = region.filter(
@@ -87,7 +102,14 @@ function emitColumnRegions(lines: PdfLine[], gutters: number[]): string[] {
 		const everyColumnPopulated = Array.from({ length: gutters.length + 1 }, (_, column) =>
 			region.filter((line) => line.items.some((item) => columnOf(item, gutters) === column))
 		).every((linesInColumn) => linesInColumn.length >= populationFloor);
-		if (
+		const dataRows = region.filter(isDataRow).length;
+		if (region.length >= 3 && dataRows >= Math.max(3, Math.ceil(region.length * 0.5))) {
+			// Row-major: each record stays one line, headers keep their own line.
+			for (const line of region) {
+				const text = joinItems([...line.items]);
+				if (text) out.push(text);
+			}
+		} else if (
 			region.length >= 3 &&
 			multiColumnLines >= Math.ceil(region.length * 0.3) &&
 			everyColumnPopulated
@@ -185,6 +207,17 @@ export function orderPdfText(items: PositionedPdfText[], pageWidth: number): str
 /** Original single-gutter path: split left/right only when a central gutter
  * recurs at nearly the same position on many lines; otherwise line order. */
 function orderLinesWithSingleGutter(lines: PdfLine[], pageWidth: number): string[] {
+	// Data-table guard, same reasoning as in emitColumnRegions: a page whose
+	// lines are rows of three-plus bare values (numbers, amounts, dates) is a
+	// schedule, and the two-column article split would shear every record in
+	// half — dates left, installments right (measured: an amortization page
+	// answered "the first installment" with an outstanding balance).
+	const isValueItem = (text: string) => /^[\d\s.,/€%'-]+$/.test(text) && /\d/.test(text);
+	const dataRowCount = lines.filter(
+		(line) => line.items.length >= 3 && line.items.every((item) => isValueItem(item.text))
+	).length;
+	if (dataRowCount >= Math.max(3, Math.ceil(lines.length * 0.3)))
+		return lines.map((line) => joinItems([...line.items])).filter(Boolean);
 	const minimumGap = Math.max(10, pageWidth * 0.02);
 	const splitCandidates: number[] = [];
 	for (const line of lines) {

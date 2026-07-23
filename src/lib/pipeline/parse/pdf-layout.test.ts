@@ -46,6 +46,34 @@ describe('orderPdfText', () => {
 		expect(lines.at(-1)).toContain('Toute demande doit être déclarée');
 	});
 
+	it('emits amortization-style data rows row-major, one record per line', () => {
+		// Regression: column-major emission sheared the schedule apart — every
+		// date in one block, every amount in another — and the lone "capital
+		// restant dû" column inherited the full table header, so "the first
+		// installment" was answered with a mid-table outstanding balance.
+		const items = [
+			item('Echéancier de remboursement (en euros)', 36, 720, 400),
+			item('N°', 40, 700, 20),
+			item('Date', 100, 700, 40),
+			item('Capital restant dû', 220, 700, 100),
+			item('Montant échéance', 400, 700, 100),
+			...Array.from({ length: 6 }, (_, row) => [
+				item(String(row + 1), 40, 680 - row * 16, 20),
+				item(`05.${String(row + 11).padStart(2, '0')}.2025`, 100, 680 - row * 16, 70),
+				item(`${14949 - row * 51},07`, 220, 680 - row * 16, 80),
+				item(row === 0 ? '69,39' : '75,81', 400, 680 - row * 16, 50)
+			]).flat()
+		];
+		const lines = orderPdfText(items, 596);
+		const text = lines.join('\n');
+		// The first record survives as one line: rank, date, balance, installment.
+		expect(text).toMatch(/1 05\.11\.2025 14949,07 69,39/);
+		expect(text).toMatch(/2 05\.12\.2025 14898,07 75,81/);
+		// The header stays a single line above the records, not a column title
+		// welded onto one column's values.
+		expect(text).toContain('N° Date Capital restant dû Montant échéance');
+	});
+
 	it('keeps the two-column article path for single-gutter layouts', () => {
 		const items = [];
 		for (let row = 0; row < 12; row++) {

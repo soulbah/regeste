@@ -17,7 +17,7 @@ const RERANK_CANDIDATE_LIMIT = 96;
 export const MAX_EVIDENCE_CHARS = 10000;
 /** Query/ranking behavior fingerprint. Unlike RETRIEVAL_VERSION this does not
  * require re-indexing documents; it invalidates benchmark/result caches only. */
-export const RETRIEVAL_PIPELINE_VERSION = 46;
+export const RETRIEVAL_PIPELINE_VERSION = 47;
 
 /** A batched DB read may return the union of several requests' neighbors.
  * Restore per-request isolation before ranking so batching cannot change a
@@ -698,6 +698,97 @@ export function missingDurationCarrier(
 	return best ? { index: best.index, literal: best.literal } : null;
 }
 
+/** "Première mensualité / last installment": an ordinal over a dated payment
+ * series. Every chunk of an amortization schedule looks alike to lexical and
+ * dense features — the row that answers is the one carrying the series'
+ * extreme date, which only a list-level comparison can find. */
+export function ordinalPaymentDirection(query: string): 'first' | 'last' | null {
+	const normalized = normalizeForFuzzy(query);
+	if (
+		!/\b(?:mensualites?|echeances?|versements?|paiements?|remboursements?|prelevements?|annuites?|trimestrialites?|installments?|payments?|instalments?)\b/u.test(
+			normalized
+		)
+	)
+		return null;
+	if (/\b(?:premiere?s?|first)\b/u.test(normalized)) return 'first';
+	if (/\b(?:derniere?s?|last|finale?)\b/u.test(normalized)) return 'last';
+	return null;
+}
+
+const TEXT_DATE_PATTERN = /\b(\d{2})[./](\d{2})[./](\d{4})\b/gu;
+
+/** The extreme (min or max) date a passage's payment SERIES carries, as a
+ * sortable number. A date only counts with a decimal amount within a few
+ * dozen characters, and a passage needs at least two such dates: a schedule
+ * chunk has many, while the document's issue date stamped in every page
+ * header ("13.10.2025 · A ARCHIVER") has no adjacent amount and must never
+ * outrank the true first installment row. */
+export function extremeSeriesDate(text: string, direction: 'first' | 'last'): number | null {
+	let extreme: number | null = null;
+	let qualified = 0;
+	for (const match of text.matchAll(TEXT_DATE_PATTERN)) {
+		const index = match.index ?? 0;
+		const window = text.slice(Math.max(0, index - 40), index + match[0].length + 60);
+		if (!/\d[\d\u202f\u00a0 ]*,\d{2}\b/u.test(window.replace(match[0], ' '))) continue;
+		qualified++;
+		const value = Number(match[3]) * 10000 + Number(match[2]) * 100 + Number(match[1]);
+		if (extreme === null || (direction === 'first' ? value < extreme : value > extreme))
+			extreme = value;
+	}
+	return qualified >= 2 ? extreme : null;
+}
+
+const SCHEDULE_ROW_PATTERN =
+	/^\s*(\d{1,3})\s+(\d{2}[./]\d{2}[./]\d{4})\s+((?:\d[\d  ]*,\d{2}\s*)+)$/u;
+
+/** The installment amount an ordinal question asks for, read from a schedule
+ * passage the deterministic way: rows are `rank date amount…`, and among the
+ * amount positions the installment column is the one whose value repeats
+ * across rows (a constant payment plan) while balances and interest drift
+ * row by row. The answer is the extreme row's value at that position — which
+ * is exactly the cell a fixed-rate schedule's first, catch-up or final row
+ * changes, so the mode itself is never blindly returned. Null whenever the
+ * passage is not a parseable schedule or no column clearly repeats. */
+export function ordinalScheduleValue(query: string, text: string): { literal: string } | null {
+	const direction = ordinalPaymentDirection(query);
+	if (!direction) return null;
+	const rows: Array<{ date: number; amounts: string[] }> = [];
+	for (const line of text.split('\n')) {
+		const match = SCHEDULE_ROW_PATTERN.exec(line);
+		if (!match) continue;
+		const [, , date, amountBlob] = match;
+		const dateMatch = /(\d{2})[./](\d{2})[./](\d{4})/u.exec(date)!;
+		rows.push({
+			date: Number(dateMatch[3]) * 10000 + Number(dateMatch[2]) * 100 + Number(dateMatch[1]),
+			// Amount-shaped tokenization: French thousands are space-separated
+			// ("14 949,07"), so splitting on spaces would shear every large value.
+			amounts: [...amountBlob.matchAll(/\d[\d  ]*,\d{2}/gu)].map((value) => value[0])
+		});
+	}
+	if (rows.length < 3) return null;
+	const width = rows[0].amounts.length;
+	if (width < 2 || !rows.every((row) => row.amounts.length === width)) return null;
+	let installmentColumn = -1;
+	let bestRepetition = 0;
+	for (let column = 0; column < width; column++) {
+		const counts = new Map<string, number>();
+		for (const row of rows) {
+			counts.set(row.amounts[column], (counts.get(row.amounts[column]) ?? 0) + 1);
+		}
+		const mode = Math.max(...counts.values());
+		if (mode > bestRepetition) {
+			bestRepetition = mode;
+			installmentColumn = column;
+		}
+	}
+	// The installment column must actually repeat; balances never do.
+	if (bestRepetition < Math.ceil(rows.length * 0.6)) return null;
+	const extremeRow = rows.reduce((best, row) =>
+		direction === 'first' ? (row.date < best.date ? row : best) : row.date > best.date ? row : best
+	);
+	return { literal: extremeRow.amounts[installmentColumn] };
+}
+
 /** Deterministic answer-shape signal, deliberately limited to explicit numeric
  * structure. It is a reranking feature, not a domain or intent classifier. */
 export function numericAnswerEvidenceCoverage(query: string, text: string): number {
@@ -1284,6 +1375,21 @@ export function selectWithNeighbors(
 							.slice(0, 1)
 					)
 			: [];
+	// Ordinal over a dated payment series: rank the rows by their extreme date
+	// and let the true first/last row claim a slot. List-level on purpose — no
+	// per-chunk feature can know which date is the series' minimum.
+	const ordinalDirection = ordinalPaymentDirection(query);
+	const ordinalSeriesCandidates = ordinalDirection
+		? sorted
+				.filter((hit) => hit.paraIndex !== -1)
+				.map((hit) => ({ hit, extreme: extremeSeriesDate(hit.text, ordinalDirection) }))
+				.filter((entry): entry is { hit: SearchHit; extreme: number } => entry.extreme !== null)
+				.sort((left, right) =>
+					ordinalDirection === 'first' ? left.extreme - right.extreme : right.extreme - left.extreme
+				)
+				.slice(0, 2)
+				.map((entry) => entry.hit)
+		: [];
 	const clauses = splitQueryClauses(query.split('\n', 1)[0]);
 	const clauseLeaders = clauses.flatMap((clause) => {
 		const leaders = [...sorted]
@@ -1394,6 +1500,7 @@ export function selectWithNeighbors(
 		: route === 'synthesis'
 			? [
 					...contactEvidenceCandidates,
+					...ordinalSeriesCandidates,
 					...contextualWindowCandidates,
 					...synthesisContinuationCandidates,
 					// A composed question is only answerable when every substantial
@@ -1417,6 +1524,7 @@ export function selectWithNeighbors(
 				]
 			: [
 					...contactEvidenceCandidates,
+					...ordinalSeriesCandidates,
 					...coherentCandidates,
 					// For coverage/permission scenarios, exact scoped leaders must claim
 					// the small per-page budget before a broader same-page window.
@@ -1446,6 +1554,7 @@ export function selectWithNeighbors(
 				numericEvidenceCandidates,
 				documentLeaders,
 				synthesisContinuationCandidates,
+				ordinalSeriesCandidates,
 				scopedEvidenceCandidates,
 				scenarioScopedEvidenceCandidates,
 				gapContinuationCandidates,

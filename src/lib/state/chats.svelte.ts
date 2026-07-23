@@ -19,7 +19,8 @@ import {
 	contactAnswerEvidenceCoverage,
 	contactAnswerValues,
 	durationValueMentions,
-	missingDurationCarrier
+	missingDurationCarrier,
+	ordinalScheduleValue
 } from '$lib/pipeline/retrieval';
 import { assistedPayloadBytes } from '$lib/assisted-payload';
 import { questionLocale } from '$lib/analysis/query-router';
@@ -41,6 +42,7 @@ import {
 	SYSTEM_PROMPT,
 	buildContactValuePrompt,
 	buildDurationValuePrompt,
+	buildScheduleValuePrompt,
 	buildUserPrompt,
 	buildVerificationPrompt,
 	buildVerificationUserPrompt,
@@ -1095,6 +1097,39 @@ class ChatsStore {
 				}
 			} catch (err) {
 				console.error('[regeste] duration-value retry failed:', err);
+			}
+		}
+		// Same judgment for schedule tables: "the first installment" answered
+		// with the outstanding balance is a wrong-column read the repeating-value
+		// analysis resolves deterministically. Retry naming the cell; adopted
+		// only when the retry states it.
+		const scheduleCell =
+			grounded && raw.trim() && !this.stopRequested && (!extractive || extractive.needsAudit)
+				? hits
+						.slice(0, 3)
+						.map((hit, index) => ({ index, value: ordinalScheduleValue(question, hit.text) }))
+						.find((entry) => entry.value !== null)
+				: undefined;
+		if (scheduleCell && !raw.includes(scheduleCell.value!.literal)) {
+			try {
+				const retriedRaw = await llmStore.generate(
+					[
+						{ role: 'system' as const, content: SYSTEM_PROMPT },
+						{
+							role: 'user' as const,
+							content: `${groundedPrompt}\n\n${buildScheduleValuePrompt(question, scheduleCell.value!.literal, scheduleCell.index + 1)}`
+						}
+					],
+					() => {},
+					generationOptionsFor(question, 'targeted')
+				);
+				const retried = stripThink(retriedRaw);
+				if (retried.trim() && retried.includes(scheduleCell.value!.literal)) {
+					raw = retried;
+					this.streamingText = raw;
+				}
+			} catch (err) {
+				console.error('[regeste] schedule-value retry failed:', err);
 			}
 		}
 		raw = enforceAnswerInvariants(question, raw);

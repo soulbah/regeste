@@ -79,6 +79,7 @@
 	import {
 		durationValueMentions,
 		missingDurationCarrier,
+		ordinalScheduleValue,
 		RETRIEVAL_PIPELINE_VERSION
 	} from '$lib/pipeline/retrieval';
 	import {
@@ -88,6 +89,7 @@
 	import { generateWithContextFit, isContextOverflowError } from '$lib/private-ai/context-fit';
 	import {
 		buildDurationValuePrompt,
+		buildScheduleValuePrompt,
 		buildUserPrompt,
 		buildVerificationPrompt,
 		buildVerificationUserPrompt,
@@ -692,6 +694,34 @@
 					!isDegenerateAnswer(retried) &&
 					durationValueMentions(retried).length > statedBefore
 				) {
+					answer = retried;
+				}
+			} catch (err) {
+				if (!isContextOverflowError(err)) throw err;
+			}
+		}
+		// Parity with the app path: a wrong-column schedule read is corrected
+		// against the deterministically resolved cell.
+		const scheduleCell = hits
+			.slice(0, 3)
+			.map((hit, index) => ({ index, value: ordinalScheduleValue(question, hit.text) }))
+			.find((entry) => entry.value !== null);
+		if (scheduleCell && !answer.includes(scheduleCell.value!.literal)) {
+			try {
+				const retried = stripThink(
+					await llmStore.generate(
+						[
+							{ role: 'system', content: SYSTEM_PROMPT },
+							{
+								role: 'user',
+								content: `${buildUserPrompt(question, hits, null)}\n\n${buildScheduleValuePrompt(question, scheduleCell.value!.literal, scheduleCell.index + 1)}`
+							}
+						],
+						() => {},
+						generationOptionsFor(question, 'targeted')
+					)
+				);
+				if (retried.trim() && retried.includes(scheduleCell.value!.literal)) {
 					answer = retried;
 				}
 			} catch (err) {

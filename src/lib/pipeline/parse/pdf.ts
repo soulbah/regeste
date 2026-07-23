@@ -88,6 +88,13 @@ export async function parsePdf(data: ArrayBuffer): Promise<ParsedDoc> {
 					(item): item is (typeof content.items)[number] & { str: string; transform: number[] } =>
 						'str' in item && Array.isArray(item.transform)
 				)
+				// Rotated (vertical) text is print-margin plumbing — page ids, batch
+				// numbers stamped along the sheet edge. Its y lands mid-table, where
+				// the line clustering absorbs it into a data row and pushes the row's
+				// own first cell out (measured: an amortization row lost its rank to
+				// the stamp "184320"). transform[0] is cos(rotation)·scale: ~0 means
+				// the glyphs run vertically.
+				.filter((item) => Math.abs(item.transform[0]) > 0.01)
 				.map((item) => ({
 					text: item.str.trim(),
 					x: item.transform[4],

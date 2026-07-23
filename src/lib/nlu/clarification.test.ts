@@ -53,6 +53,26 @@ describe('contextual clarification dimensions', () => {
 		expect(analyzeQuestion('Et lui ?').referencesPrevious).toBe(true);
 	});
 
+	it('never asks single-or-all-documents with one document attached', () => {
+		// Regression: "Combien dois-je payer au total ?" on a single amortization
+		// notice asked "one record or across all selected documents?" — with one
+		// document there is exactly one possible answer.
+		const question = 'Combien dois-je payer au total ?';
+		expect(
+			contextualClarification(question, analyzeQuestion(question), {
+				hasConversationContext: false,
+				documentCount: 1
+			})
+		).toBeNull();
+		// Two documents keep the genuine ambiguity.
+		expect(
+			contextualClarification(question, analyzeQuestion(question), {
+				hasConversationContext: false,
+				documentCount: 2
+			})
+		).toBe('scope');
+	});
+
 	it('does not clarify resolved follow-up or one selected document', () => {
 		expect(
 			contextualClarification('Et ses frais ?', analyzeQuestion('Et ses frais ?'), {

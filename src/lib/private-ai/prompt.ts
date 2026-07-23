@@ -346,6 +346,21 @@ export function buildDurationValuePrompt(
 Each part of this question asks for its own time limit. Excerpt [${excerptNumber}] states the time limit "${value}", which answers one part the draft missed. Answer every part of the question, stating each part's time limit from the excerpts, including "${value}" cited [${excerptNumber}]. Answer in the language of the question and return only the answer.`;
 }
 
+/** A schedule row reads `rank date balance installment amortized interest`,
+ * and the model reliably answers the first large amount after the date — the
+ * outstanding balance — when asked for an installment. Used only when the
+ * ordinal schedule cell was resolved deterministically (repeating-column
+ * analysis) and the draft states a different value. */
+export function buildScheduleValuePrompt(
+	question: string,
+	value: string,
+	excerptNumber: number
+): string {
+	return `Question: ${question}
+
+Excerpt [${excerptNumber}] is a payment schedule table: each row lists the row number, the date, the remaining balance, and then the payment amounts, following the column order of the table's header line. The installment amount this question asks for is "${value}" — the value under the installment column of the relevant row, not the remaining balance next to the date. Answer the question stating "${value}" and citing [${excerptNumber}]. Answer in the language of the question and return only the answer.`;
+}
+
 /** The 4B's context window is 4096 tokens and MLC rejects any prompt that
  * exceeds it outright — the whole turn dies in an exception the retry then
  * repeats (measured: 4114 tokens on a 16-excerpt coverage question). Trim the
