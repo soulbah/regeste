@@ -20,7 +20,10 @@ import {
 	numericConstraintEvidenceCoverage,
 	contactAnswerEvidenceCoverage,
 	contactAnswerValues,
-	multiClauseEvidenceCoverage
+	durationValueMentions,
+	missingDurationCarrier,
+	multiClauseEvidenceCoverage,
+	requestedDurationCount
 } from './retrieval';
 import { chunkBlocks } from './chunk';
 import type { SearchHit } from '$lib/types';
@@ -1295,5 +1298,105 @@ describe('expected answer type for contact atoms', () => {
 			1
 		);
 		expect(selected.map((item) => item.chunkId)).toEqual([1]);
+	});
+});
+
+// Benchmark case complaint-response: "Sous quels délais AWP accuse-t-il
+// réception d'une réclamation écrite et répond-il ?" — the carrier ("dix (10)
+// jours ouvrables … deux (2) mois") was IN the sent evidence and the model
+// still answered only the response delay, dropping the acknowledgment. The
+// duration gate mirrors the contact gate: count what the question asks,
+// judge the draft, hand the retry the literal missing value.
+describe('duration answer gate', () => {
+	const complaintQuestion =
+		'Sous quels délais AWP accuse-t-il réception d’une réclamation écrite et répond-il ?';
+	const carrierText =
+		'AWP accuse réception de la réclamation écrite dans les dix (10) jours ouvrables suivant sa ' +
+		'réception et y répond dans les deux (2) mois suivant la date de réception de la réclamation.';
+
+	it('counts one deadline per part, the elliptical verb echo included', () => {
+		expect(requestedDurationCount(complaintQuestion)).toBe(2);
+		// Single-deadline questions gate nothing, whatever their clause count.
+		expect(
+			requestedDurationCount(
+				'Mes biens restent-ils couverts pendant un voyage à l’étranger, et pendant combien de temps ?'
+			)
+		).toBe(1);
+		expect(
+			requestedDurationCount('Quand peut-on saisir le médiateur et quel est le dernier délai ?')
+		).toBe(1);
+		expect(requestedDurationCount('Combien de temps dure la garantie ?')).toBe(1);
+		expect(requestedDurationCount('Quel est le montant de la franchise ?')).toBe(0);
+	});
+
+	it('extracts distinct duration values across spellings and languages', () => {
+		expect(durationValueMentions(carrierText).map((m) => m.key)).toEqual(['10 jour', '2 mois']);
+		// "dix (10) jours" and "10 jours" are the same value, not two.
+		expect(
+			durationValueMentions('dix (10) jours ouvrables, puis 10 jours au plus').map((m) => m.key)
+		).toEqual(['10 jour']);
+		// Speeds and bare numbers are not durations.
+		expect(durationValueMentions('des tempêtes de plus de 100 km/h et 40 000 €')).toEqual([]);
+	});
+
+	it('finds the question-covering excerpt carrying the missing value', () => {
+		const draft = 'AWP répond à la réclamation dans les deux (2) mois. [2]';
+		const unrelated = {
+			text: 'La garantie constructeur est de deux (2) ans et la prescription de cinq (5) ans.',
+			headingPath: null
+		};
+		const carrier = { text: carrierText, headingPath: 'Réclamation' };
+		const found = missingDurationCarrier(complaintQuestion, draft, [unrelated, carrier]);
+		expect(found).toEqual({ index: 1, literal: 'dix (10) jours ouvrables' });
+		// A draft already stating both deadlines needs no retry.
+		expect(
+			missingDurationCarrier(
+				complaintQuestion,
+				'Accusé de réception sous dix (10) jours ouvrables, réponse sous deux (2) mois. [1]',
+				[carrier]
+			)
+		).toBeNull();
+		// A single-deadline question never fires, even with a partial draft.
+		expect(missingDurationCarrier('Quel est le délai de réponse ?', draft, [carrier])).toBeNull();
+	});
+});
+
+// Benchmark case covered-events: the enumeration opens in one chunk ("…contre
+// les incendies, la fumée,") and every remaining peril lives in its direct
+// continuation, which shares no word with the question and ranks far below
+// the packing cutoff. A selected anchor that visibly ends mid-sentence pulls
+// its successor in right behind it.
+describe('synthesis mid-sentence continuation', () => {
+	it('keeps the continuation of an early anchor that ends mid-enumeration', () => {
+		const query =
+			'Quels principaux événements endommageant le logement ou les biens sont couverts ?';
+		const filler =
+			'Nous couvrons les biens endommagés suite à ces événements, dans la limite des plafonds ' +
+			'indiqués, lorsque le logement ou les biens sont endommagés par un événement couvert par la police.';
+		const anchor = {
+			...hit(1, 'policy', 0.9),
+			seq: 10,
+			text: 'Le logement et les biens sont couverts contre les événements suivants : les incendies, la fumée,'
+		};
+		const continuation = {
+			...hit(2, 'policy', 0.01),
+			seq: 11,
+			text: 'les explosions, les surtensions électriques, le cambriolage et le vandalisme.'
+		};
+		const windows = [3, 4, 5, 6].map((chunkId, index) => ({
+			...hit(chunkId, 'policy', 0.5 - index * 0.1),
+			seq: 12 + index,
+			text: `${filler} (${chunkId})`
+		}));
+		const selected = selectWithNeighbors(
+			[anchor, ...windows, continuation],
+			[],
+			query,
+			5,
+			'synthesis'
+		);
+		expect(selected.map((item) => item.chunkId)).toContain(2);
+		// The anchor itself stays; the continuation displaces a tail filler only.
+		expect(selected.map((item) => item.chunkId)).toContain(1);
 	});
 });

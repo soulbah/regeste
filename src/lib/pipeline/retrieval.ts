@@ -17,7 +17,7 @@ const RERANK_CANDIDATE_LIMIT = 96;
 export const MAX_EVIDENCE_CHARS = 10000;
 /** Query/ranking behavior fingerprint. Unlike RETRIEVAL_VERSION this does not
  * require re-indexing documents; it invalidates benchmark/result caches only. */
-export const RETRIEVAL_PIPELINE_VERSION = 45;
+export const RETRIEVAL_PIPELINE_VERSION = 46;
 
 /** A batched DB read may return the union of several requests' neighbors.
  * Restore per-request isolation before ranking so batching cannot change a
@@ -572,6 +572,132 @@ export function contactAnswerValues(query: string, text: string): string[] {
 	});
 }
 
+// Word numerals a duration clause can spell out ("dix (10) jours ouvrables").
+const NUMBER_WORDS: Record<string, number> = {
+	un: 1,
+	une: 1,
+	deux: 2,
+	trois: 3,
+	quatre: 4,
+	cinq: 5,
+	six: 6,
+	sept: 7,
+	huit: 8,
+	neuf: 9,
+	dix: 10,
+	onze: 11,
+	douze: 12,
+	one: 1,
+	two: 2,
+	three: 3,
+	four: 4,
+	five: 5,
+	seven: 7,
+	eight: 8,
+	nine: 9,
+	ten: 10,
+	eleven: 11,
+	twelve: 12
+};
+
+const DURATION_MENTION_PATTERN =
+	/\b(\d{1,4}|un|une|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|onze|douze|one|two|three|four|five|seven|eight|nine|ten|eleven|twelve)\s*(?:\(\s*\d{1,4}\s*\))?\s+(ans?\b|ann[eé]es?\b|jours?\b|mois\b|semaines?\b|heures?\b|years?\b|months?\b|weeks?\b|days?\b|hours?\b)(\s+ouvrables?|\s+ouvr[eé]s?|\s+calendaires?|\s+francs?)?/giu;
+
+const DURATION_UNIT_KEYS: Array<[RegExp, string]> = [
+	[/^an|^ann|^year/iu, 'an'],
+	[/^jour|^day/iu, 'jour'],
+	[/^mois|^month/iu, 'mois'],
+	[/^semaine|^week/iu, 'semaine'],
+	[/^heure|^hour/iu, 'heure']
+];
+
+/** Every distinct duration value a text states, as `{ key, literal }`:
+ * the key normalizes numeral spelling and unit language ("dix (10) jours
+ * ouvrables" and "10 days" are both `10 jour`), the literal is the exact
+ * wording so a correction can hand the model the string to state. */
+export function durationValueMentions(text: string): Array<{ key: string; literal: string }> {
+	const seen = new Map<string, string>();
+	for (const match of text.matchAll(DURATION_MENTION_PATTERN)) {
+		const rawNumber = match[1].toLowerCase();
+		const value = /^\d+$/.test(rawNumber) ? Number(rawNumber) : NUMBER_WORDS[rawNumber];
+		if (value === undefined) continue;
+		const unit = DURATION_UNIT_KEYS.find(([pattern]) => pattern.test(match[2]))?.[1];
+		if (!unit) continue;
+		const key = `${value} ${unit}`;
+		if (!seen.has(key)) seen.set(key, match[0].trim());
+	}
+	return [...seen.entries()].map(([key, literal]) => ({ key, literal }));
+}
+
+/** How many distinct deadlines a question asks for. One per clause that
+ * requests a duration; a bare verb-echo clause ("… et répond-il ?") has no
+ * vocabulary of its own and inherits the question's duration request — the
+ * plural interrogative distributes over the coordinated verbs. Questions
+ * that ask a single deadline (or none) return 0 or 1 and gate nothing. */
+export function requestedDurationCount(query: string): number {
+	// The global kind classifier matches "délai" but not the plural "délais";
+	// widening it there would change ranking for every délais question, so the
+	// plural is recognized here only — this gate is generation-side and inert
+	// for retrieval.
+	const asksDelay = (clause: string) =>
+		requestedNumericKinds(clause).includes('duration') ||
+		/\bdelais\b/u.test(normalizeForFuzzy(clause));
+	if (!asksDelay(query)) return 0;
+	const clauses = splitQueryClauses(query.split('\n', 1)[0]);
+	if (clauses.length < 2) return 1;
+	const asksDuration = clauses.map(asksDelay);
+	let count = 0;
+	for (let index = 0; index < clauses.length; index++) {
+		if (asksDuration[index]) {
+			count++;
+			continue;
+		}
+		// Elliptical continuation: at most two significant tokens, no numeric
+		// request of its own ("répond-il", "y répond-il"). A full clause with its
+		// own subject ("Mes biens restent-ils couverts pendant un voyage…") never
+		// inherits: it asks its own, non-numeric question.
+		if (
+			terms(clauses[index]).length <= 2 &&
+			!requestedNumericKinds(clauses[index]).length &&
+			count > 0
+		)
+			count++;
+	}
+	return count;
+}
+
+/** The excerpt able to repair a draft that answered fewer deadlines than the
+ * question asked: the best question-covering excerpt carrying a duration value
+ * the draft does not state. Null when the draft is complete or nothing
+ * carries a missing value — the gate then stays inert. */
+export function missingDurationCarrier(
+	query: string,
+	draft: string,
+	hits: Array<{ text: string; headingPath?: string | null }>
+): { index: number; literal: string } | null {
+	const expected = requestedDurationCount(query);
+	if (expected < 2) return null;
+	const stated = new Set(durationValueMentions(draft).map((mention) => mention.key));
+	if (stated.size >= expected) return null;
+	let best: { index: number; literal: string; coverage: number } | null = null;
+	for (let index = 0; index < hits.length; index++) {
+		const missing = durationValueMentions(hits[index].text).filter(
+			(mention) => !stated.has(mention.key)
+		);
+		if (!missing.length) continue;
+		const candidate = `${hits[index].headingPath ?? ''}\n${hits[index].text}`;
+		const coverage = Math.max(
+			queryCoverage(query, candidate),
+			fuzzyQueryCoverage(query, candidate),
+			stemmedQueryCoverage(query, candidate)
+		);
+		if (!best || coverage > best.coverage) {
+			best = { index, literal: missing[0].literal, coverage };
+		}
+	}
+	return best ? { index: best.index, literal: best.literal } : null;
+}
+
 /** Deterministic answer-shape signal, deliberately limited to explicit numeric
  * structure. It is a reranking feature, not a domain or intent classifier. */
 export function numericAnswerEvidenceCoverage(query: string, text: string): number {
@@ -908,7 +1034,8 @@ export function selectWithNeighbors(
 	neighbors: SearchHit[],
 	query: string,
 	topK = 8,
-	route = analyzeQuestion(query).route
+	route = analyzeQuestion(query).route,
+	debug?: Record<string, unknown>
 ): SearchHit[] {
 	const preserveRecordPages = route === 'aggregate';
 	const maxNeighborDistance =
@@ -1231,12 +1358,44 @@ export function selectWithNeighbors(
 			);
 			return continuation ? [continuation] : [];
 		});
+	// A chunk boundary can cut an enumeration mid-sentence: the anchor keeps the
+	// lexical overlap ("covered", "damaged", the lead-in) while its continuation
+	// holds the tail of the list and shares no word with the question, so it
+	// ranks far below the packing cutoff. When an early-slot anchor visibly ends
+	// mid-sentence, its direct successor is part of the same sentence — bring it
+	// in right behind the anchor. Anchored on chunks already winning a slot,
+	// capped at two, and drawn from the existing candidate pool, so ranking
+	// leaders stay untouched and only tail residuals can be displaced.
+	const synthesisContinuationCandidates =
+		route === 'synthesis'
+			? [...contextualWindowCandidates, ...sorted.slice(0, 8)]
+					.filter(
+						(hit, index, all) =>
+							all.findIndex((candidate) => candidate.chunkId === hit.chunkId) === index
+					)
+					.filter(
+						(hit) =>
+							hit.paraIndex !== -1 && hit.seq !== undefined && !/[.!?;:…]$/u.test(hit.text.trim())
+					)
+					.slice(0, 2)
+					.flatMap((anchor) => {
+						const continuation = sorted.find(
+							(hit) =>
+								hit.paraIndex !== -1 &&
+								hit.documentId === anchor.documentId &&
+								hit.seq !== undefined &&
+								hit.seq === anchor.seq! + 1
+						);
+						return continuation ? [continuation] : [];
+					})
+			: [];
 	const order = preserveRecordPages
 		? [...ranked, ...sorted]
 		: route === 'synthesis'
 			? [
 					...contactEvidenceCandidates,
 					...contextualWindowCandidates,
+					...synthesisContinuationCandidates,
 					// A composed question is only answerable when every substantial
 					// sub-question survives packing. Broadly relevant legal or narrative
 					// passages must not exhaust the budget before a clause-specific answer.
@@ -1272,6 +1431,29 @@ export function selectWithNeighbors(
 					...scopedEvidenceCandidates,
 					...sorted
 				];
+	if (debug) {
+		Object.assign(debug, {
+			sorted,
+			lists: {
+				contactEvidenceCandidates,
+				contextualWindowCandidates,
+				clauseLeaders,
+				namedEntityCandidates,
+				identityCandidates,
+				constraintCandidates,
+				temporalEvidenceCandidates,
+				coherentCandidates,
+				numericEvidenceCandidates,
+				documentLeaders,
+				synthesisContinuationCandidates,
+				scopedEvidenceCandidates,
+				scenarioScopedEvidenceCandidates,
+				gapContinuationCandidates,
+				incompleteContinuationCandidates
+			},
+			order
+		});
+	}
 	for (const hit of order) {
 		// Structural parents are routing aids, never generation/citation excerpts.
 		if (hit.paraIndex === -1) continue;

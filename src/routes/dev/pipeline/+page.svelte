@@ -76,12 +76,18 @@
 	} from '$lib/pipeline/query-translation';
 	import { resolveQuestion, resolveQuestions } from '$lib/nlu/semantic-resolver';
 	import { buildExecutionPlan } from '$lib/nlu/execution-plan';
-	import { RETRIEVAL_PIPELINE_VERSION } from '$lib/pipeline/retrieval';
+	import {
+		durationValueMentions,
+		missingDurationCarrier,
+		RETRIEVAL_PIPELINE_VERSION
+	} from '$lib/pipeline/retrieval';
 	import {
 		buildAuditedExtractiveAnswer,
 		buildDeterministicExtractiveAnswer
 	} from '$lib/private-ai/extractive-answer';
 	import {
+		buildDurationValuePrompt,
+		buildUserPrompt,
 		buildVerificationPrompt,
 		buildVerificationUserPrompt,
 		enforceAnswerInvariants,
@@ -652,6 +658,33 @@
 				)
 			);
 			if (verified.trim()) answer = verified;
+		}
+		// Parity with the app path: a multi-part deadline question answered with
+		// fewer distinct durations than it has parts gets one corrective retry
+		// naming the missing literal value, adopted only on strict improvement.
+		const durationCarrier = missingDurationCarrier(question, answer, hits);
+		if (durationCarrier) {
+			const statedBefore = durationValueMentions(answer).length;
+			const retried = stripThink(
+				await llmStore.generate(
+					[
+						{ role: 'system', content: SYSTEM_PROMPT },
+						{
+							role: 'user',
+							content: `${buildUserPrompt(question, hits, null)}\n\n${buildDurationValuePrompt(question, durationCarrier.literal, durationCarrier.index + 1)}`
+						}
+					],
+					() => {},
+					generationOptionsFor(question, 'targeted')
+				)
+			);
+			if (
+				retried.trim() &&
+				!isDegenerateAnswer(retried) &&
+				durationValueMentions(retried).length > statedBefore
+			) {
+				answer = retried;
+			}
 		}
 		return enforceAnswerInvariants(question, answer);
 	}

@@ -15,7 +15,12 @@ import {
 	isContestation,
 	type RetrievalContext
 } from '$lib/retrieval-context';
-import { contactAnswerEvidenceCoverage, contactAnswerValues } from '$lib/pipeline/retrieval';
+import {
+	contactAnswerEvidenceCoverage,
+	contactAnswerValues,
+	durationValueMentions,
+	missingDurationCarrier
+} from '$lib/pipeline/retrieval';
 import { assistedPayloadBytes } from '$lib/assisted-payload';
 import { questionLocale } from '$lib/analysis/query-router';
 import { resolveQuestion, type EmbedQuestions } from '$lib/nlu/semantic-resolver';
@@ -34,6 +39,7 @@ import { buildAuditedExtractiveAnswer } from '$lib/private-ai/extractive-answer'
 import {
 	SYSTEM_PROMPT,
 	buildContactValuePrompt,
+	buildDurationValuePrompt,
 	buildUserPrompt,
 	buildVerificationPrompt,
 	buildVerificationUserPrompt,
@@ -1028,6 +1034,44 @@ class ChatsStore {
 				}
 			} catch (err) {
 				console.error('[regeste] contact-value retry failed:', err);
+			}
+		}
+		// Same judgment for deadlines: a question asking one delay per part
+		// ("within what time does X acknowledge a written complaint and answer
+		// it?") is not answered by a draft stating fewer distinct durations than
+		// the question has parts, when an excerpt carries the missing value. The
+		// retry names the literal value and its excerpt number, and is adopted
+		// only when it states strictly more distinct durations — improve or stay,
+		// never regress.
+		const durationCarrier =
+			grounded && raw.trim() && !this.stopRequested && (!extractive || extractive.needsAudit)
+				? missingDurationCarrier(question, raw, hits)
+				: null;
+		if (durationCarrier) {
+			try {
+				const statedBefore = durationValueMentions(raw).length;
+				const retriedRaw = await llmStore.generate(
+					[
+						{ role: 'system' as const, content: SYSTEM_PROMPT },
+						{
+							role: 'user' as const,
+							content: `${groundedPrompt}\n\n${buildDurationValuePrompt(question, durationCarrier.literal, durationCarrier.index + 1)}`
+						}
+					],
+					() => {},
+					generationOptionsFor(question, 'targeted')
+				);
+				const retried = stripThink(retriedRaw);
+				if (
+					retried.trim() &&
+					!isDegenerateAnswer(retried) &&
+					durationValueMentions(retried).length > statedBefore
+				) {
+					raw = retried;
+					this.streamingText = raw;
+				}
+			} catch (err) {
+				console.error('[regeste] duration-value retry failed:', err);
 			}
 		}
 		raw = enforceAnswerInvariants(question, raw);

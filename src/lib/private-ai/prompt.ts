@@ -330,6 +330,22 @@ export function buildContactValuePrompt(
 Excerpt [${excerptNumber}] contains ${value}, which is what this question asks for. Answer the question from excerpt [${excerptNumber}], stating ${value} and citing [${excerptNumber}]. Do not describe which address, number or link to use without naming it. Answer in the language of the question and return only the answer.`;
 }
 
+/** A multi-part question asking one deadline per part is only answered when
+ * every part gets its own value; the 4B reliably states the deadline it read
+ * last and drops the other ("acknowledged within ten working days, answered
+ * within two months" → only the two months survive). Same contract as the
+ * contact-value correction: used only when an excerpt demonstrably carries a
+ * deadline the draft does not state, and the draft is never quoted back. */
+export function buildDurationValuePrompt(
+	question: string,
+	value: string,
+	excerptNumber: number
+): string {
+	return `Question: ${question}
+
+Each part of this question asks for its own time limit. Excerpt [${excerptNumber}] states the time limit "${value}", which answers one part the draft missed. Answer every part of the question, stating each part's time limit from the excerpts, including "${value}" cited [${excerptNumber}]. Answer in the language of the question and return only the answer.`;
+}
+
 /** The 4B's context window is 4096 tokens and MLC rejects any prompt that
  * exceeds it outright — the whole turn dies in an exception the retry then
  * repeats (measured: 4114 tokens on a 16-excerpt coverage question). Trim the
