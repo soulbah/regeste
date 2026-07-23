@@ -85,6 +85,7 @@
 		buildAuditedExtractiveAnswer,
 		buildDeterministicExtractiveAnswer
 	} from '$lib/private-ai/extractive-answer';
+	import { generateWithContextFit, isContextOverflowError } from '$lib/private-ai/context-fit';
 	import {
 		buildDurationValuePrompt,
 		buildUserPrompt,
@@ -640,24 +641,31 @@
 		const options = verificationOptionsFor();
 		let answer = draft;
 		if (needsGroundedVerification(question, answer)) {
-			const verified = stripThink(
-				await llmStore.generate(
-					[
-						{ role: 'system', content: SYSTEM_PROMPT },
-						{
-							role: 'user',
-							content: buildVerificationPrompt(
-								question,
-								buildVerificationUserPrompt(question, hits),
-								answer
-							)
-						}
-					],
-					() => {},
-					options
-				)
-			);
-			if (verified.trim()) answer = verified;
+			// The verification prompt embeds the draft on top of the evidence, so
+			// it can overflow a window the draft prompt fit. Auxiliary pass: on
+			// overflow keep the draft rather than fail the turn.
+			try {
+				const verified = stripThink(
+					await llmStore.generate(
+						[
+							{ role: 'system', content: SYSTEM_PROMPT },
+							{
+								role: 'user',
+								content: buildVerificationPrompt(
+									question,
+									buildVerificationUserPrompt(question, hits),
+									answer
+								)
+							}
+						],
+						() => {},
+						options
+					)
+				);
+				if (verified.trim()) answer = verified;
+			} catch (err) {
+				if (!isContextOverflowError(err)) throw err;
+			}
 		}
 		// Parity with the app path: a multi-part deadline question answered with
 		// fewer distinct durations than it has parts gets one corrective retry
@@ -665,25 +673,29 @@
 		const durationCarrier = missingDurationCarrier(question, answer, hits);
 		if (durationCarrier) {
 			const statedBefore = durationValueMentions(answer).length;
-			const retried = stripThink(
-				await llmStore.generate(
-					[
-						{ role: 'system', content: SYSTEM_PROMPT },
-						{
-							role: 'user',
-							content: `${buildUserPrompt(question, hits, null)}\n\n${buildDurationValuePrompt(question, durationCarrier.literal, durationCarrier.index + 1)}`
-						}
-					],
-					() => {},
-					generationOptionsFor(question, 'targeted')
-				)
-			);
-			if (
-				retried.trim() &&
-				!isDegenerateAnswer(retried) &&
-				durationValueMentions(retried).length > statedBefore
-			) {
-				answer = retried;
+			try {
+				const retried = stripThink(
+					await llmStore.generate(
+						[
+							{ role: 'system', content: SYSTEM_PROMPT },
+							{
+								role: 'user',
+								content: `${buildUserPrompt(question, hits, null)}\n\n${buildDurationValuePrompt(question, durationCarrier.literal, durationCarrier.index + 1)}`
+							}
+						],
+						() => {},
+						generationOptionsFor(question, 'targeted')
+					)
+				);
+				if (
+					retried.trim() &&
+					!isDegenerateAnswer(retried) &&
+					durationValueMentions(retried).length > statedBefore
+				) {
+					answer = retried;
+				}
+			} catch (err) {
+				if (!isContextOverflowError(err)) throw err;
 			}
 		}
 		return enforceAnswerInvariants(question, answer);
@@ -842,7 +854,25 @@
 						return cached;
 					}
 					newGenerations++;
-					let draft = stripThink(await llmStore.generate(messages, () => {}, options));
+					// Parity with the app path: the engine's context-overflow error
+					// shrinks tail excerpts and replays — the survivors keep their
+					// numbers, so citation resolution against the full list still holds.
+					let fitMessages = messages;
+					const fitted = await generateWithContextFit(
+						{ hits, conversationContext: null },
+						(state) => {
+							fitMessages =
+								state.hits === hits
+									? messages
+									: [
+											{ role: 'system', content: SYSTEM_PROMPT },
+											{ role: 'user', content: buildUserPrompt(question, state.hits) }
+										];
+							return llmStore.generate(fitMessages, () => {}, options);
+						}
+					);
+					let draft = stripThink(fitted.text);
+					const fitHits = fitted.state.hits;
 					// Parity with the app path (chats.svelte.ts): a reasoning pass that
 					// dies inside <think> leaves an empty/dead draft, and the app
 					// retries it once directly. Without the same retry here the
@@ -850,7 +880,7 @@
 					// empty answers in the 2026-07-22 run, each after 99-150 s.
 					if (isDegenerateAnswer(draft)) {
 						const retried = stripThink(
-							await llmStore.generate(messages, () => {}, {
+							await llmStore.generate(fitMessages, () => {}, {
 								...options,
 								reasoning: 'off',
 								maxTokens: 420
@@ -860,7 +890,7 @@
 							draft = retried;
 						}
 					}
-					const corrected = await verifyBenchmarkAnswer(question, route, hits, draft);
+					const corrected = await verifyBenchmarkAnswer(question, route, fitHits, draft);
 					privateGenerationCache.set(cacheKey, corrected);
 					saveGenerationCache(localStorage, privateGenerationCache);
 					return corrected;

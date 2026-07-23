@@ -36,6 +36,7 @@ import { parseRelatedQuestions } from '$lib/related-questions';
 import { hasAnswerBearingEvidence } from '$lib/pipeline/relevance';
 import { retrieveWithLocalQueryFallback } from '$lib/pipeline/query-translation';
 import { buildAuditedExtractiveAnswer } from '$lib/private-ai/extractive-answer';
+import { generateWithContextFit } from '$lib/private-ai/context-fit';
 import {
 	SYSTEM_PROMPT,
 	buildContactValuePrompt,
@@ -847,16 +848,10 @@ class ChatsStore {
 		// Trim BEFORE anything numbers the excerpts: prompt, citations and the
 		// what-AI-saw record must all see the same list (see fitEvidenceToContext).
 		if (grounded) hits = fitEvidenceToContext(question, hits, conversationContext);
-		const groundedPrompt = grounded ? buildUserPrompt(question, hits, conversationContext) : '';
-		const messages = grounded
-			? [
-					{ role: 'system' as const, content: SYSTEM_PROMPT },
-					{
-						role: 'user' as const,
-						content: groundedPrompt
-					}
-				]
-			: [
+		let groundedPrompt = grounded ? buildUserPrompt(question, hits, conversationContext) : '';
+		const buildMessages = (state: { hits: SearchHit[]; conversationContext: string | null }) => {
+			if (!grounded)
+				return [
 					{
 						role: 'system' as const,
 						content:
@@ -864,6 +859,13 @@ class ChatsStore {
 					},
 					{ role: 'user' as const, content: question }
 				];
+			groundedPrompt = buildUserPrompt(question, state.hits, state.conversationContext);
+			return [
+				{ role: 'system' as const, content: SYSTEM_PROMPT },
+				{ role: 'user' as const, content: groundedPrompt }
+			];
+		};
+		let messages = buildMessages({ hits, conversationContext });
 
 		// Stream display filters reasoning blocks: the user sees "Thinking…"
 		// (empty streamingText) until the actual answer starts.
@@ -893,7 +895,28 @@ class ChatsStore {
 			};
 			const writeStartedAt = performance.now();
 			try {
-				raw = await llmStore.generate(messages, onDelta, options);
+				// The chars/3 clamp above is an estimate; the engine's overflow
+				// error is exact. Shrink tail excerpts (then the conversation
+				// context) and replay until the prompt fits — the surviving
+				// excerpts keep their numbers, so citations stay positional.
+				const fitted = await generateWithContextFit(
+					{ hits, conversationContext },
+					(state) => {
+						streamRaw = '';
+						messages = buildMessages(state);
+						return llmStore.generate(messages, onDelta, options);
+					},
+					(state) =>
+						console.warn(
+							`[regeste] prompt over context window, retrying with ${state.hits.length} excerpts` +
+								(state.conversationContext === null ? ' and no conversation context' : '')
+						)
+				);
+				raw = fitted.text;
+				// Citations, retry prompts, verification and the what-AI-saw record
+				// must all describe the list the model actually saw.
+				hits = fitted.state.hits;
+				conversationContext = fitted.state.conversationContext;
 			} catch (err) {
 				console.error('[regeste] private generation failed:', err);
 				raw = streamRaw;
