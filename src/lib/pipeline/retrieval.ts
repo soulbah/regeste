@@ -17,7 +17,7 @@ const RERANK_CANDIDATE_LIMIT = 96;
 export const MAX_EVIDENCE_CHARS = 10000;
 /** Query/ranking behavior fingerprint. Unlike RETRIEVAL_VERSION this does not
  * require re-indexing documents; it invalidates benchmark/result caches only. */
-export const RETRIEVAL_PIPELINE_VERSION = 47;
+export const RETRIEVAL_PIPELINE_VERSION = 48;
 
 /** A batched DB read may return the union of several requests' neighbors.
  * Restore per-request isolation before ranking so batching cannot change a

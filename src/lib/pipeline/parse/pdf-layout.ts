@@ -19,6 +19,22 @@ function joinItems(items: PositionedPdfText[]): string {
 		.trim();
 }
 
+/** A cell that is a monetary/numeric amount: a bare number (French thousands
+ * spaced) optionally trailed by a currency mark. A row whose rightmost cell is
+ * one of these is a line-item / subtotal / statement row (invoice, devis,
+ * schedule), and column-major emission would shear the amount away from its
+ * label — the "Extension … 17 056,11 €" bug. Prose cells (an IPID coverage
+ * grid, a wrapped description) never match, so those tables stay column-major. */
+function isAmountCell(cell: string): boolean {
+	const text = cell.trim();
+	if (!/\d/.test(text)) return false;
+	return (
+		/(?:€|eur\b|euros?\b|%)\s*$/iu.test(text) ||
+		/^[\d][\d\s.,]*$/u.test(text) ||
+		/^[\d][\d\s.,]*\s*(?:€|eur|euros?)$/iu.test(text)
+	);
+}
+
 /** Recurring vertical gutters shared by many lines (recursive XY-cut's
  * projection step): x-bands that almost no line's ink covers, with occupied
  * zones on both sides. Three-plus-column tables produce two or more. */
@@ -91,6 +107,20 @@ function emitColumnRegions(lines: PdfLine[], gutters: number[]): string[] {
 			isValueCell(joinItems(line.items.filter((item) => columnOf(item, gutters) === column)))
 		);
 	};
+	// A line-item / subtotal row: a label on the left and a monetary amount in
+	// its rightmost populated column ("2 Extension … 17 056,11 €"). These MUST
+	// stay row-major; column-major would file the amount under a bare column,
+	// unbindable from its label.
+	const endsWithAmount = (line: PdfLine) => {
+		const columns = [...new Set(line.items.map((item) => columnOf(item, gutters)))].sort(
+			(left, right) => left - right
+		);
+		if (columns.length < 2) return false;
+		const lastColumn = columns[columns.length - 1];
+		return isAmountCell(
+			joinItems(line.items.filter((item) => columnOf(item, gutters) === lastColumn))
+		);
+	};
 	const flush = () => {
 		if (!region.length) return;
 		const multiColumnLines = region.filter(
@@ -102,7 +132,7 @@ function emitColumnRegions(lines: PdfLine[], gutters: number[]): string[] {
 		const everyColumnPopulated = Array.from({ length: gutters.length + 1 }, (_, column) =>
 			region.filter((line) => line.items.some((item) => columnOf(item, gutters) === column))
 		).every((linesInColumn) => linesInColumn.length >= populationFloor);
-		const dataRows = region.filter(isDataRow).length;
+		const dataRows = region.filter((line) => isDataRow(line) || endsWithAmount(line)).length;
 		if (region.length >= 3 && dataRows >= Math.max(3, Math.ceil(region.length * 0.5))) {
 			// Row-major: each record stays one line, headers keep their own line.
 			for (const line of region) {
@@ -216,7 +246,18 @@ function orderLinesWithSingleGutter(lines: PdfLine[], pageWidth: number): string
 	const dataRowCount = lines.filter(
 		(line) => line.items.length >= 3 && line.items.every((item) => isValueItem(item.text))
 	).length;
-	if (dataRowCount >= Math.max(3, Math.ceil(lines.length * 0.3)))
+	// Line-item / statement rows ending in a monetary amount (invoice, devis):
+	// the left/right article split would file every amount after every label,
+	// severing "Extension" from "17 056,11 €". Keep them line-ordered.
+	const amountEndingCount = lines.filter((line) => {
+		if (line.items.length < 2) return false;
+		const last = [...line.items].sort((left, right) => left.x - right.x).at(-1);
+		return last !== undefined && isAmountCell(last.text);
+	}).length;
+	if (
+		dataRowCount >= Math.max(3, Math.ceil(lines.length * 0.3)) ||
+		amountEndingCount >= Math.max(3, Math.ceil(lines.length * 0.4))
+	)
 		return lines.map((line) => joinItems([...line.items])).filter(Boolean);
 	const minimumGap = Math.max(10, pageWidth * 0.02);
 	const splitCandidates: number[] = [];

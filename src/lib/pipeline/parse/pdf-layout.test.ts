@@ -85,3 +85,34 @@ describe('orderPdfText', () => {
 		expect(lines.slice(12).every((line) => line.startsWith('droite'))).toBe(true);
 	});
 });
+
+it('keeps a devis/invoice section-subtotal row intact (label + amount, not sheared)', () => {
+	// Regression: a construction quote's section header "2 Extension 17 056,11 €"
+	// was emitted column-major — the amount filed under a bare column, severed
+	// from "Extension" — so "total de l'Extension" could not be answered. A row
+	// whose rightmost cell is a monetary amount must stay row-major.
+	const items = [
+		item('Devis N° D202500075', 36, 760, 200),
+		item('N° DÉSIGNATION QTÉ U. PRIX U. TOTAL HT', 36, 740, 460),
+		// Section header: short label left, subtotal far right (skips middle cols)
+		item('2', 40, 700, 10),
+		item('Extension', 58, 700, 60),
+		item('17 056,11 €', 470, 700, 70),
+		// Line items: designation spans wide, amounts on the right
+		...Array.from({ length: 5 }, (_, row) => [
+			item(`2.${row + 1}`, 40, 680 - row * 18, 20),
+			item(`Poste de travaux numéro ${row + 1} sur la toiture`, 80, 680 - row * 18, 260),
+			item('1,00', 400, 680 - row * 18, 30),
+			item('u', 440, 680 - row * 18, 10),
+			item(`${300 + row * 50},00 €`, 470, 680 - row * 18, 70)
+		]).flat()
+	];
+	const lines = orderPdfText(items, 595);
+	const text = lines.join('\n');
+	// The section subtotal stays on one line with its label.
+	expect(text).toMatch(/2 Extension 17 056,11 €/);
+	// Each line item keeps its designation next to its amount.
+	expect(text).toMatch(/2\.1 Poste de travaux numéro 1 sur la toiture 1,00 u 300,00 €/);
+	// No bare amount column detached from labels.
+	expect(text).not.toMatch(/^17 056,11 €$/m);
+});
