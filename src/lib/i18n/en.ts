@@ -101,6 +101,8 @@ export const en = {
 	'modes.locked': 'Locked · this chat is private-only',
 	'modes.offlineOn': 'Offline mode is on',
 	'modes.choose': 'Answer mode',
+	'onboard.modeTitle': 'Pick how your answers run',
+	'onboard.recommended': 'Recommended',
 	'modes.state.ready': 'Ready',
 	'modes.state.setup': 'Set up',
 	'modes.state.signIn': 'Sign in',

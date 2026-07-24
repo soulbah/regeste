@@ -13,6 +13,7 @@
 	import PanelRightIcon from '@lucide/svelte/icons/panel-right';
 	import MessageSquareQuoteIcon from '@lucide/svelte/icons/message-square-quote';
 	import Composer from '$lib/components/composer.svelte';
+	import ModeOnboarding from '$lib/components/mode-onboarding.svelte';
 	import RetrievalTurn from '$lib/components/retrieval-turn.svelte';
 	import PrivateTurn from '$lib/components/private-turn.svelte';
 	import WorkLedger from '$lib/components/work-ledger.svelte';
@@ -24,6 +25,7 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import { chatsStore } from '$lib/state/chats.svelte';
 	import { documentsStore } from '$lib/state/documents.svelte';
+	import { settingsStore } from '$lib/state/settings.svelte';
 	import { viewerStore } from '$lib/state/viewer.svelte';
 	import { myaiStore } from '$lib/state/myai.svelte';
 	import { llmStore } from '$lib/private-ai/llm.svelte';
@@ -284,6 +286,16 @@
 					</div>
 				{/if}
 				<div class="mx-auto max-w-3xl space-y-6 px-6 py-8">
+					{#if chatsStore.messages.length === 0 && !settingsStore.modeChosen}
+						<!-- First-run moment: no mode has ever been chosen. Make the trust
+						     decision explicit and start the download inline. Shows once. -->
+						<div class="py-8">
+							<ModeOnboarding
+								onselect={(m) => chatsStore.setMode(chatId, m)}
+								privateOnly={chatsStore.activeChat?.privateOnly ?? false}
+							/>
+						</div>
+					{/if}
 					{#each chatsStore.messages as message (message.id)}
 						{#if message.role === 'user'}
 							{#if editingId === message.id}

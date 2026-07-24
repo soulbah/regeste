@@ -104,6 +104,8 @@ export const fr: Record<keyof typeof en, string> = {
 	'modes.locked': 'Verrouillé · cette discussion est privée uniquement',
 	'modes.offlineOn': 'Le mode hors ligne est activé',
 	'modes.choose': 'Mode de réponse',
+	'onboard.modeTitle': 'Choisissez le mode de réponse',
+	'onboard.recommended': 'Recommandé',
 	'modes.state.ready': 'Prêt',
 	'modes.state.setup': 'Configurer',
 	'modes.state.signIn': 'Se connecter',
