@@ -103,7 +103,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'modes.error': 'Un problème est survenu',
 	'modes.locked': 'Verrouillé · cette discussion est privée uniquement',
 	'modes.offlineOn': 'Le mode hors ligne est activé',
-	'modes.choose': "Choisir l'IA",
+	'modes.choose': 'Mode de réponse',
 	'modes.state.ready': 'Prêt',
 	'modes.state.setup': 'Configurer',
 	'modes.state.signIn': 'Se connecter',
@@ -232,7 +232,12 @@ export const fr: Record<keyof typeof en, string> = {
 	'viewer.citedPage': 'cité : p.{n}',
 
 	// Home (new chat)
-	'home.headline': 'Discutez avec vos documents privés.',
+	'home.headline': 'Discutez avec vos documents.',
+	'home.privacy': 'Tout se passe sur votre appareil.',
+	'home.dropTitle': 'Déposez un document, ou cliquez pour parcourir',
+	'home.sampleLead': 'Première fois ?',
+	'home.sampleLink': 'Essayez avec un contrat d’exemple',
+	'home.steps': 'Ajoutez un document · Choisissez le mode de réponse · Posez votre question',
 	'home.sub': 'Ajoutez des documents, posez des questions et voyez exactement ce qui est partagé.',
 	'home.demoPreparing': 'Préparation de la démo…',
 	'home.demoCta': 'Essayer avec un contrat fictif',

@@ -26,7 +26,11 @@
 		// Dev-phase only: logs OTP codes to Workers Logs so the deployed app is
 		// testable before Email Service is wired. REMOVE before launch
 		// (tracked in docs/internal/OSS-LAUNCH.md).
-		"OTP_DEBUG": "1"
+		"OTP_DEBUG": "1",
+		// This hosted deployment offers Assisted (the maintainer-funded cloud
+		// mode). A self-hosted build without this variable is Private + My AI
+		// only, no backend — see src/lib/flags.ts.
+		"PUBLIC_ASSISTED_ENABLED": "true"
 	}
 	// Enabled by later specs (see docs/FEATURES.md):
 	// "send_email": [{ "name": "EMAIL", "allowed_sender_addresses": ["noreply@example.com"] }],

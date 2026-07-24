@@ -6,6 +6,7 @@ import { zipSync, strToU8 } from 'fflate';
 import { getLocalDb } from '$lib/local-db/client';
 import { readOriginal } from '$lib/opfs';
 import { guardedFetch } from '$lib/net';
+import { ASSISTED_ENABLED } from '$lib/flags';
 
 export interface StorageStatus {
 	usage: number;
@@ -37,7 +38,9 @@ class SettingsStore {
 		this.forceOffline = (await db.getSetting('force_offline')) === '1';
 		this.assistedConsented = (await db.getSetting('assisted_consented')) === '1';
 		const mode = await db.getSetting('default_mode');
-		if (mode === 'assisted' || mode === 'myai') this.defaultMode = mode;
+		// A build without Assisted must never seed it as the default (e.g. a
+		// profile carried over from a deployment that had it): fall back to Private.
+		if (mode === 'myai' || (mode === 'assisted' && ASSISTED_ENABLED)) this.defaultMode = mode;
 		this.modeChosen = (await db.getSetting('mode_chosen')) === '1';
 		await this.refreshStorage();
 	}

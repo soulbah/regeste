@@ -16,7 +16,14 @@
 	import { myaiStore } from '$lib/state/myai.svelte';
 	import { settingsStore } from '$lib/state/settings.svelte';
 	import { uiStore } from '$lib/state/ui.svelte';
+	import { ASSISTED_ENABLED } from '$lib/flags';
 	import type { ChatMode } from '$lib/types';
+
+	// Modes offered here: Assisted only when this build enables it (the
+	// maintainer's hosted deployment). A self-hosted build shows Private + My AI.
+	const MODE_IDS = (
+		ASSISTED_ENABLED ? (['private', 'assisted', 'myai'] as const) : (['private', 'myai'] as const)
+	) satisfies readonly ChatMode[];
 
 	let {
 		mode,
@@ -47,9 +54,14 @@
 	// keeps Private possible but slow, so Assisted stays the honest pick there.
 	const bestMode = $derived.by(() => {
 		if (llmStore.status === 'detecting') return null;
-		return llmStore.status === 'unavailable' || llmStore.tier?.id === 'lite'
-			? { id: 'assisted' as const, reason: t('modes.bestReason.noGpu') }
-			: { id: 'private' as const, reason: t('modes.bestReason.local') };
+		if (llmStore.status === 'unavailable' || llmStore.tier?.id === 'lite') {
+			// No usable in-browser model: Assisted is the honest pick when this
+			// build offers it, otherwise the user's own endpoint (My AI).
+			return ASSISTED_ENABLED
+				? { id: 'assisted' as const, reason: t('modes.bestReason.noGpu') }
+				: { id: 'myai' as const, reason: t('modes.bestReason.noGpu') };
+		}
+		return { id: 'private' as const, reason: t('modes.bestReason.local') };
 	});
 
 	const DESCRIPTIONS = {
@@ -65,7 +77,7 @@
 
 	// One row per mode: static description, readiness on the right.
 	const modes = $derived(
-		(['private', 'assisted', 'myai'] as const).map((id) => {
+		MODE_IDS.map((id) => {
 			const readiness = modeReadiness(id, { privateOnly });
 			return {
 				id,
@@ -140,9 +152,11 @@
 		{#snippet child({ props })}
 			<Button
 				{...props}
-				variant="ghost"
+				variant={current ? 'ghost' : 'outline'}
 				size="sm"
-				class="gap-1.5 {current ? '' : 'text-muted-foreground'}"
+				class={current
+					? 'gap-1.5'
+					: 'border-accent-foreground/40 bg-accent/40 text-accent-foreground hover:bg-accent/60 gap-1.5'}
 			>
 				{current ? current.label : t('modes.choose')}
 				{#if pillProgress !== null}

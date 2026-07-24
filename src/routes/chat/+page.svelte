@@ -2,9 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { toast } from 'svelte-sonner';
-	import FileIcon from '@lucide/svelte/icons/file';
-	import ScrollTextIcon from '@lucide/svelte/icons/scroll-text';
-	import { Button } from '$lib/components/ui/button';
+	import FileUpIcon from '@lucide/svelte/icons/file-up';
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import Composer from '$lib/components/composer.svelte';
 	import { DEMO_SAMPLES } from '$lib/demo/samples';
@@ -86,6 +84,9 @@
 		const files = Array.from(e.dataTransfer?.files ?? []);
 		if (files.length) handleUpload(files);
 	}
+
+	// Click-to-browse from the hero drop zone: the same ingest path as a drop.
+	let fileInput = $state<HTMLInputElement | null>(null);
 </script>
 
 <svelte:head><title>Regeste</title></svelte:head>
@@ -103,9 +104,9 @@
 >
 	{#if dragging}
 		<div
-			class="border-primary/40 bg-background/80 pointer-events-none absolute inset-4 z-10 flex items-center justify-center rounded-xl border-2 border-dashed"
+			class="border-accent-foreground/50 bg-background/85 pointer-events-none absolute inset-4 z-10 flex items-center justify-center rounded-2xl border-2 border-dashed"
 		>
-			<p class="text-muted-foreground font-mono text-xs tracking-widest uppercase">
+			<p class="text-accent-foreground font-mono text-xs tracking-widest uppercase">
 				{t('home.drop')}
 			</p>
 		</div>
@@ -115,19 +116,64 @@
 		<h1 class="font-display px-1 text-lg tracking-tight">{t('sidebar.newChat')}</h1>
 	</header>
 
-	<!-- One trust line, said once (copy rule); the demo CTA carries the proof. -->
-	<div class="flex flex-1 flex-col items-center justify-center gap-4 px-6">
-		<FileIcon class="text-muted-foreground size-10" />
-		<h2 class="font-display max-w-md text-center text-3xl tracking-tight">
-			{t('home.headline')}
-		</h2>
-		<p class="text-muted-foreground max-w-sm text-center text-sm">
-			{t('home.sub')}
-		</p>
-		<Button variant="outline" class="gap-2" disabled={demoStarting} onclick={startDemo}>
-			<ScrollTextIcon class="text-muted-foreground" />
-			{demoStarting ? t('home.demoPreparing') : t('home.demoCta')}
-		</Button>
+	<!-- Document-first onboarding: the drop zone is the one primary action; the
+	     privacy promise is said once here (copy rule allows the home empty state);
+	     the demo is demoted to a quiet fallback; three quiet beats set expectation. -->
+	<input
+		bind:this={fileInput}
+		type="file"
+		multiple
+		accept=".pdf,.docx,.md,.markdown,.txt"
+		class="hidden"
+		onchange={(e) => {
+			const files = Array.from(e.currentTarget.files ?? []);
+			e.currentTarget.value = '';
+			if (files.length) handleUpload(files);
+		}}
+	/>
+	<div class="flex flex-1 flex-col items-center justify-center px-6">
+		<div class="w-full max-w-lg space-y-8 text-center">
+			<div class="space-y-2.5">
+				<h2 class="font-display text-4xl tracking-tight text-balance">
+					{t('home.headline')}
+				</h2>
+				<p class="text-muted-foreground text-sm">{t('home.privacy')}</p>
+			</div>
+
+			<button
+				type="button"
+				onclick={() => fileInput?.click()}
+				class="group border-border bg-card/40 hover:border-accent-foreground/40 hover:bg-accent/25 focus-visible:ring-ring/50 flex w-full flex-col items-center gap-3 rounded-2xl border-2 border-dashed px-8 py-14 transition-colors outline-none focus-visible:ring-2"
+			>
+				<span
+					class="bg-background group-hover:text-accent-foreground flex size-14 items-center justify-center rounded-full border shadow-sm transition-colors"
+				>
+					<FileUpIcon
+						class="text-muted-foreground group-hover:text-accent-foreground size-6 transition-colors"
+					/>
+				</span>
+				<span class="text-base font-medium">{t('home.dropTitle')}</span>
+				<span class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
+					{t('docsPage.types')}
+				</span>
+			</button>
+
+			<p class="text-muted-foreground text-sm">
+				{t('home.sampleLead')}
+				<button
+					type="button"
+					class="text-foreground decoration-accent-foreground/50 hover:decoration-accent-foreground font-medium underline underline-offset-4 transition disabled:opacity-60"
+					disabled={demoStarting}
+					onclick={startDemo}
+				>
+					{demoStarting ? t('home.demoPreparing') : t('home.sampleLink')}
+				</button>
+			</p>
+
+			<p class="text-muted-foreground/70 font-mono text-[10px] tracking-widest uppercase">
+				{t('home.steps')}
+			</p>
+		</div>
 	</div>
 
 	<div class="px-6 pb-6">

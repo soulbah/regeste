@@ -12,6 +12,7 @@ import * as v from 'valibot';
 import { drizzle } from 'drizzle-orm/d1';
 import { checkAndIncrementQuota } from '$lib/server/quota';
 import { buildAssistedUserContent } from '$lib/server/assisted-prompt';
+import { ASSISTED_ENABLED } from '$lib/flags';
 import type { RequestHandler } from './$types';
 
 // glm-4.7-flash verified 2026-07-09: correct grounded answers but ~2 min per
@@ -50,6 +51,11 @@ interface ChatCompletion {
 }
 
 export const POST: RequestHandler = async ({ request, locals, platform }) => {
+	// Assisted is off unless this deployment enabled it. A self-hosted build
+	// without PUBLIC_ASSISTED_ENABLED never offers the mode in the UI, and the
+	// endpoint refuses so it can't be driven directly either.
+	if (!ASSISTED_ENABLED) throw error(404, 'Not found');
+
 	const session = await locals.auth.api.getSession({ headers: request.headers });
 	if (!session) throw error(401, 'Sign in to use Assisted mode');
 

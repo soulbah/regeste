@@ -100,7 +100,7 @@ export const en = {
 	'modes.error': 'Something went wrong',
 	'modes.locked': 'Locked · this chat is private-only',
 	'modes.offlineOn': 'Offline mode is on',
-	'modes.choose': 'Choose AI',
+	'modes.choose': 'Answer mode',
 	'modes.state.ready': 'Ready',
 	'modes.state.setup': 'Set up',
 	'modes.state.signIn': 'Sign in',
@@ -223,7 +223,12 @@ export const en = {
 	'viewer.citedPage': 'cited: p.{n}',
 
 	// Home (new chat)
-	'home.headline': 'Chat with your private documents.',
+	'home.headline': 'Chat with your documents.',
+	'home.privacy': 'Everything runs on your device.',
+	'home.dropTitle': 'Drop a document, or click to browse',
+	'home.sampleLead': 'New here?',
+	'home.sampleLink': 'Try a sample contract',
+	'home.steps': 'Add a document · Pick how it answers · Ask',
 	'home.sub': 'Add documents, ask questions, and see exactly what gets shared.',
 	'home.demoPreparing': 'Preparing the demo…',
 	'home.demoCta': 'Try with a sample contract',

@@ -9,6 +9,7 @@
 	import ArrowUpRightIcon from '@lucide/svelte/icons/arrow-up-right';
 	import WifiOffIcon from '@lucide/svelte/icons/wifi-off';
 	import { t } from '$lib/i18n/index.svelte';
+	import { ASSISTED_ENABLED } from '$lib/flags';
 
 	const modes = $derived([
 		{
@@ -18,13 +19,17 @@
 			stays: t('hiw.private.stays'),
 			server: t('hiw.private.server')
 		},
-		{
-			name: 'Assisted',
-			egress: true,
-			leaves: t('hiw.assisted.leaves'),
-			stays: t('hiw.assisted.stays'),
-			server: t('hiw.assisted.server')
-		},
+		...(ASSISTED_ENABLED
+			? [
+					{
+						name: 'Assisted',
+						egress: true,
+						leaves: t('hiw.assisted.leaves'),
+						stays: t('hiw.assisted.stays'),
+						server: t('hiw.assisted.server')
+					}
+				]
+			: []),
 		{
 			name: 'My AI',
 			egress: true,

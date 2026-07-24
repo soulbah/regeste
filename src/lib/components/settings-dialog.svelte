@@ -36,6 +36,7 @@
 	import { sessionStore } from '$lib/state/session.svelte';
 	import { settingsStore } from '$lib/state/settings.svelte';
 	import { uiStore } from '$lib/state/ui.svelte';
+	import { ASSISTED_ENABLED } from '$lib/flags';
 
 	type Tab = 'general' | 'data' | 'ai' | 'account';
 	let tab = $state<Tab>('general');
@@ -269,7 +270,9 @@
 										</Select.Trigger>
 										<Select.Content>
 											<Select.Item value="private">Private</Select.Item>
-											<Select.Item value="assisted">Assisted</Select.Item>
+											{#if ASSISTED_ENABLED}
+												<Select.Item value="assisted">Assisted</Select.Item>
+											{/if}
 											<Select.Item value="myai">My AI</Select.Item>
 										</Select.Content>
 									</Select.Root>
@@ -494,52 +497,57 @@
 										{/if}
 									</section>
 
-									<section class="bg-background/40 rounded-lg border p-4" data-mode-card="assisted">
-										<header class="flex items-center justify-between gap-3 pb-1.5">
-											<p class="text-sm font-semibold">Assisted</p>
-											{@render stateBadge(assistedR)}
-										</header>
-										{#snippet assistedControl()}
-											{#if !sessionStore.user && !sessionStore.loading}
-												<Button
-													variant="outline"
-													size="sm"
-													onclick={() => {
-														uiStore.pendingActivation = 'assisted';
-														uiStore.settingsOpen = false;
-														goto(resolve('/chat/account'));
-													}}
-												>
-													{t('menu.signIn')}
-												</Button>
+									{#if ASSISTED_ENABLED}
+										<section
+											class="bg-background/40 rounded-lg border p-4"
+											data-mode-card="assisted"
+										>
+											<header class="flex items-center justify-between gap-3 pb-1.5">
+												<p class="text-sm font-semibold">Assisted</p>
+												{@render stateBadge(assistedR)}
+											</header>
+											{#snippet assistedControl()}
+												{#if !sessionStore.user && !sessionStore.loading}
+													<Button
+														variant="outline"
+														size="sm"
+														onclick={() => {
+															uiStore.pendingActivation = 'assisted';
+															uiStore.settingsOpen = false;
+															goto(resolve('/chat/account'));
+														}}
+													>
+														{t('menu.signIn')}
+													</Button>
+												{/if}
+											{/snippet}
+											{@render row(
+												t('settings.tabs.account'),
+												assistedR.blockedLine ??
+													(sessionStore.user
+														? sessionStore.user.email
+														: sessionStore.loading
+															? ''
+															: t('settings.ai.assisted.none')),
+												assistedControl
+											)}
+											{#if settingsStore.quota}
+												<p class="text-muted-foreground pt-2 text-xs">
+													{t('settings.workspace.quota', {
+														used: settingsStore.quota.used,
+														limit: settingsStore.quota.limit
+													})}
+												</p>
+											{:else if !sessionStore.user && !sessionStore.loading}
+												<p class="text-muted-foreground pt-2 text-xs">
+													{t('settings.workspace.quotaSignIn')}
+												</p>
 											{/if}
-										{/snippet}
-										{@render row(
-											t('settings.tabs.account'),
-											assistedR.blockedLine ??
-												(sessionStore.user
-													? sessionStore.user.email
-													: sessionStore.loading
-														? ''
-														: t('settings.ai.assisted.none')),
-											assistedControl
-										)}
-										{#if settingsStore.quota}
-											<p class="text-muted-foreground pt-2 text-xs">
-												{t('settings.workspace.quota', {
-													used: settingsStore.quota.used,
-													limit: settingsStore.quota.limit
-												})}
-											</p>
-										{:else if !sessionStore.user && !sessionStore.loading}
-											<p class="text-muted-foreground pt-2 text-xs">
-												{t('settings.workspace.quotaSignIn')}
-											</p>
-										{/if}
-										{#if assistedR.state === 'ready'}
-											{@render useMode('assisted')}
-										{/if}
-									</section>
+											{#if assistedR.state === 'ready'}
+												{@render useMode('assisted')}
+											{/if}
+										</section>
+									{/if}
 
 									<section class="bg-background/40 rounded-lg border p-4" data-mode-card="myai">
 										<header class="flex items-center justify-between gap-3 pb-1.5">
