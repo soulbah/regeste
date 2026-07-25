@@ -59,12 +59,30 @@ export interface PrivateDocumentStressResult {
 	missingAnswerGroups: string[][];
 	unexpectedAnswerGroups: string[][];
 	answer: string;
+	answerSource: StressAnswerSource;
 	generationSkipped: boolean;
 	retrievalMs: number;
 	generationMs: number;
 }
 
 export type PrivateDocumentStressOutcome = 'answer' | 'qualified' | 'refusal';
+
+/**
+ * Which code path produced the answer. Without this the headline score is
+ * unattributable: a deterministic extraction, a replayed cache entry and a live
+ * model generation are three different claims about the product.
+ */
+export type StressAnswerSource = 'extractive' | 'cached' | 'llm' | 'skipped' | 'no-evidence';
+
+export type StressGeneration = string | { text: string; source: StressAnswerSource };
+
+function generationText(value: StressGeneration): string {
+	return typeof value === 'string' ? value : value.text;
+}
+
+function generationSource(value: StressGeneration): StressAnswerSource {
+	return typeof value === 'string' ? 'llm' : value.source;
+}
 
 function expectedOutcomeFor(test: PrivateDocumentStressCase): PrivateDocumentStressOutcome {
 	return test.expectedOutcome ?? (test.answerable ? 'answer' : 'refusal');
@@ -351,6 +369,30 @@ const MEASURE_NUMBER_WORDS: Readonly<Record<string, string>> = {
 	twelve: '12'
 };
 
+/** The oracle deliberately writes truncated stems ("declar", "renon", "couvre")
+ * so one alternative covers a family of inflections. Prefix tolerance keeps
+ * that, but only for alphabetic stems long enough to be unambiguous: plain
+ * substring matching also found "non" inside "renonciation" and "pas" inside
+ * "passage", which let a polar alternative match text saying the opposite. */
+function tokenMatches(candidate: string, expected: string): boolean {
+	if (candidate === expected) return true;
+	return expected.length >= 5 && !/\d/u.test(expected) && candidate.startsWith(expected);
+}
+
+/** Whole-token containment: every expected token must match a consecutive
+ * candidate token, in order. `normalizeForFuzzy` emits space-separated tokens,
+ * so this is a windowed scan rather than a substring test. */
+export function containsTokenSequence(normalizedText: string, normalizedNeedle: string): boolean {
+	const expected = normalizedNeedle.split(' ').filter(Boolean);
+	if (!expected.length) return false;
+	const candidates = normalizedText.split(' ').filter(Boolean);
+	for (let start = 0; start + expected.length <= candidates.length; start++) {
+		if (expected.every((token, offset) => tokenMatches(candidates[start + offset], token)))
+			return true;
+	}
+	return false;
+}
+
 export function matchesAnswerAlternative(answer: string, alternative: string): boolean {
 	const normalizedAnswer = normalizeForFuzzy(answer);
 	const normalizedAlternative = normalizeForFuzzy(alternative);
@@ -395,7 +437,7 @@ export function matchesAnswerAlternative(answer: string, alternative: string): b
 			(expected.length >= 6 && availableNumbers.some((available) => available.endsWith(expected)))
 	);
 	if (expectedNumbers.length > 0 && !numbersMatch) return false;
-	if (normalizedAnswer.includes(normalizedAlternative)) return true;
+	if (containsTokenSequence(normalizedAnswer, normalizedAlternative)) return true;
 	if (
 		expectedNumbers.length > 0 &&
 		normalizedAlternative.split(' ').every((token) => /^\d+$/.test(token))
@@ -426,7 +468,7 @@ export function matchesAnswerAlternative(answer: string, alternative: string): b
  * matching is unsafe here because it can erase polarity words ("pas", "si")
  * and turn a correct negation into a false positive. */
 export function matchesForbiddenAnswerAlternative(answer: string, alternative: string): boolean {
-	return normalizeForFuzzy(answer).includes(normalizeForFuzzy(alternative));
+	return containsTokenSequence(normalizeForFuzzy(answer), normalizeForFuzzy(alternative));
 }
 
 /** Benchmark-only lexical triage, also used to decide whether a cached local
@@ -467,7 +509,7 @@ export async function runPrivateDocumentStress(input: {
 		question: string,
 		route: 'targeted' | 'synthesis',
 		hits: SearchHit[]
-	) => Promise<string>;
+	) => Promise<StressGeneration>;
 	resolveRoute: (question: string) => Promise<'targeted' | 'synthesis'>;
 	retrievalConcurrency?: number;
 	skipGenerationOnRetrievalFailure?: boolean;
@@ -483,6 +525,8 @@ export async function runPrivateDocumentStress(input: {
 	answerPassed: number;
 	citationPassed: number;
 	score: number;
+	/** Headline score decomposed by the path that produced each answer. */
+	bySource: Record<StressAnswerSource, { total: number; passed: number }>;
 	failures: PrivateDocumentStressResult[];
 	results: PrivateDocumentStressResult[];
 }> {
@@ -519,21 +563,24 @@ export async function runPrivateDocumentStress(input: {
 			expectedOutcome !== 'refusal' &&
 			!answerBearing;
 		const generationStartedAt = performance.now();
-		const raw = hits.length
+		const generated: StressGeneration = hits.length
 			? generationSkipped
-				? groundedRefusal(test.question)
-				: stripThink(
-						await input.generate(
-							[
-								{ role: 'system', content: SYSTEM_PROMPT },
-								{ role: 'user', content: buildUserPrompt(test.question, hits) }
-							],
-							test.question,
-							route,
-							hits
-						)
+				? { text: groundedRefusal(test.question), source: 'skipped' }
+				: await input.generate(
+						[
+							{ role: 'system', content: SYSTEM_PROMPT },
+							{ role: 'user', content: buildUserPrompt(test.question, hits) }
+						],
+						test.question,
+						route,
+						hits
 					)
-			: groundedRefusal(test.question);
+			: { text: groundedRefusal(test.question), source: 'no-evidence' };
+		const answerSource = generationSource(generated);
+		const raw =
+			answerSource === 'skipped' || answerSource === 'no-evidence'
+				? generationText(generated)
+				: stripThink(generationText(generated));
 		const resolved =
 			route === 'synthesis'
 				? resolveCitations(raw, hits, test.question)
@@ -576,6 +623,7 @@ export async function runPrivateDocumentStress(input: {
 			missingAnswerGroups,
 			unexpectedAnswerGroups,
 			answer: resolved.text,
+			answerSource,
 			generationSkipped,
 			retrievalMs,
 			generationMs: generationSkipped ? 0 : performance.now() - generationStartedAt
@@ -585,9 +633,25 @@ export async function runPrivateDocumentStress(input: {
 		input.onGenerationProgress?.(results.length, retrievedCases.length);
 	}
 	const passed = results.filter((result) => result.passed).length;
+	const bySource = results.reduce(
+		(accumulator, result) => {
+			const bucket = accumulator[result.answerSource];
+			bucket.total++;
+			if (result.passed) bucket.passed++;
+			return accumulator;
+		},
+		{
+			extractive: { total: 0, passed: 0 },
+			cached: { total: 0, passed: 0 },
+			llm: { total: 0, passed: 0 },
+			skipped: { total: 0, passed: 0 },
+			'no-evidence': { total: 0, passed: 0 }
+		} as Record<StressAnswerSource, { total: number; passed: number }>
+	);
 	return {
 		total: results.length,
 		passed,
+		bySource,
 		retrievalPassed: results.filter((result) => result.retrievalPassed).length,
 		pageRecallPassed: results.filter((result) => result.pageRecallPassed).length,
 		answerGroupTriagePassed: results.filter((result) => result.answerGroupTriagePassed).length,

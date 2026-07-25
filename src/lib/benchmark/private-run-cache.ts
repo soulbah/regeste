@@ -32,6 +32,9 @@ export interface CompactPrivateRunResult {
 	missingAnswerGroups: string[][];
 	unexpectedAnswerGroups: string[][];
 	rawRetrievedEvidence: Array<{ page: number | null; text: string }>;
+	/** Archived so a finished run stays decomposable: an extraction, a replayed
+	 * cache entry and a live generation are three different claims. */
+	answerSource: PrivateDocumentStressResult['answerSource'];
 	generationSkipped: boolean;
 	retrievalMs: number;
 	generationMs: number;
@@ -124,6 +127,7 @@ export function compactPrivateRunResult(
 			page: item.page,
 			text: item.text.slice(0, 700)
 		})),
+		answerSource: result.answerSource,
 		generationSkipped: result.generationSkipped,
 		retrievalMs: result.retrievalMs,
 		generationMs: result.generationMs

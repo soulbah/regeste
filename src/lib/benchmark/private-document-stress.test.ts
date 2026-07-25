@@ -45,6 +45,16 @@ describe('private document stress matrix', () => {
 				'ne sont couverts que si'
 			)
 		).toBe(true);
+		// A polar token must not be found inside a longer word: substring matching
+		// scored "non" as present in "renonciation" and "pas" in "passage", which
+		// turned an answer saying the opposite into a match.
+		expect(matchesForbiddenAnswerAlternative('Le délai de renonciation court.', 'non')).toBe(false);
+		expect(matchesForbiddenAnswerAlternative('Ce passage est couvert.', 'pas')).toBe(false);
+		expect(matchesForbiddenAnswerAlternative('Ce risque est non couvert.', 'non')).toBe(true);
+		// Truncated stems stay deliberate: one alternative still covers a family
+		// of inflections, as long as the stem is long enough to be unambiguous.
+		expect(matchesAnswerAlternative('Le délai de renonciation court.', 'renon')).toBe(true);
+		expect(matchesAnswerAlternative('Le sinistre a été déclaré.', 'declar')).toBe(true);
 	});
 
 	it('reuses cached answers only when current lexical oracle still passes', () => {

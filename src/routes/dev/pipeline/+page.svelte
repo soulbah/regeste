@@ -46,7 +46,6 @@
 		runPublicAnswerStress
 	} from '$lib/benchmark/public-answer-stress';
 	import {
-		answerMatchesStressOracle,
 		assertPrivateDocumentStressPages,
 		parsePrivateDocumentStressMatrix,
 		runPrivateDocumentRetrievalStress,
@@ -812,7 +811,6 @@
 				);
 				return pending;
 			};
-			const testByQuestion = new Map(matrix.cases.map((test) => [test.question, test]));
 			privateDocumentBenchmarkProgress = { completed: 0, total: casesToRun.length };
 			const prepared = await preparePrivateBenchmarkPrimary(
 				casesToRun.map((test) => test.question),
@@ -853,9 +851,12 @@
 					const extractive = buildAuditedExtractiveAnswer(question, hits);
 					if (extractive) {
 						extractiveAnswers++;
-						return extractive.needsAudit
-							? verifyBenchmarkAnswer(question, route, hits, extractive.answer)
-							: enforceAnswerInvariants(question, extractive.answer);
+						return {
+							text: extractive.needsAudit
+								? await verifyBenchmarkAnswer(question, route, hits, extractive.answer)
+								: enforceAnswerInvariants(question, extractive.answer),
+							source: 'extractive' as const
+						};
 					}
 					const options = generationOptionsFor(question, route);
 					const cacheKey = await privateGenerationCacheKey({
@@ -873,10 +874,14 @@
 						messages
 					});
 					const cached = privateGenerationCache.get(cacheKey);
-					const test = testByQuestion.get(question);
-					if (cached !== undefined && test && answerMatchesStressOracle(test, cached)) {
+					// The cache key already pins model, document hash, retrieval version,
+					// prompt and options, so a hit is the same generation. Gating the hit
+					// on the oracle as well made a cached failure re-run while a cached
+					// success replayed, which is a one-directional ratchet: the score
+					// could only ever climb, and never for a reason the code caused.
+					if (cached !== undefined) {
 						generationCacheHits++;
-						return cached;
+						return { text: cached, source: 'cached' as const };
 					}
 					newGenerations++;
 					// Parity with the app path: the engine's context-overflow error
@@ -918,7 +923,7 @@
 					const corrected = await verifyBenchmarkAnswer(question, route, fitHits, draft);
 					privateGenerationCache.set(cacheKey, corrected);
 					saveGenerationCache(localStorage, privateGenerationCache);
-					return corrected;
+					return { text: corrected, source: 'llm' as const };
 				},
 				resolveRoute: async (question) => prepared.routeByQuestion.get(question) ?? 'targeted',
 				retrievalConcurrency: 4,

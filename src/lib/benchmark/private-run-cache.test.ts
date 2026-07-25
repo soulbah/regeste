@@ -83,6 +83,7 @@ describe('private benchmark run persistence', () => {
 					missingAnswerGroups: [],
 					unexpectedAnswerGroups: [],
 					answer: 'answer [1]',
+					answerSource: 'llm',
 					generationSkipped: false,
 					retrievalMs: 1,
 					generationMs: 2
@@ -141,6 +142,7 @@ describe('private benchmark run persistence', () => {
 			missingAnswerGroups: [],
 			unexpectedAnswerGroups: [],
 			answer: 'answer [1]',
+			answerSource: 'llm' as const,
 			generationSkipped: false,
 			retrievalMs: 1,
 			generationMs: 2
@@ -196,6 +198,7 @@ describe('private benchmark run persistence', () => {
 				missingAnswerGroups: [],
 				unexpectedAnswerGroups: [],
 				rawRetrievedEvidence: [],
+				answerSource: 'llm',
 				generationSkipped: false,
 				retrievalMs: 1,
 				generationMs: 1
