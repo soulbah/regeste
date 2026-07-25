@@ -21,6 +21,15 @@ describe('query embedding cache', () => {
 		expect([...second.data]).toEqual([...first.data]);
 	});
 
+	it('encodes the question as written, keying the cache on the normalized form', async () => {
+		const cache = new QueryEmbeddingCache();
+		const run = embedder();
+		// Passages are embedded with full orthography. Sending the normalized key
+		// to the encoder compared accent-stripped French against accented French.
+		await cache.embed(["Combien coûte l'assurance ?"], run);
+		expect(run).toHaveBeenLastCalledWith(["Combien coûte l'assurance ?"]);
+	});
+
 	it('embeds only missing unique queries and preserves requested order', async () => {
 		const cache = new QueryEmbeddingCache();
 		const run = embedder();

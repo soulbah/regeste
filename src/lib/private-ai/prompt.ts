@@ -790,6 +790,19 @@ export function resolveCitations(
 	};
 }
 
+/**
+ * Whole numbers as written, digits only, so "17 056,11 €" and "17056,11" are the
+ * same value and "page 12, 3 ans" is not the value 123. Comparing a stripped
+ * digit soup instead let an invented number match a passage by accident — and
+ * because the citation candidates are then narrowed to the passages carrying
+ * that accident, it also excluded the passage that spells the value in words.
+ */
+export function numberTokens(text: string): string[] {
+	return [...text.matchAll(/\d[\d\s.,]*\d|\d/gu)]
+		.map((match) => match[0].replace(/\D/gu, ''))
+		.filter((value) => value.length >= 2);
+}
+
 /** For one-fact answers, bind citation to passage that best supports words/numbers actually written. */
 export function resolveTargetedCitations(
 	text: string,
@@ -799,15 +812,13 @@ export function resolveTargetedCitations(
 	if (isPureRefusalLike(text)) return { text: groundedRefusal(question), citations: [] };
 	if (!hits.length) return resolveCitations(text, hits);
 	const answerIdentifiers = extractIdentifiers(text);
-	const answerNumbers = [...text.matchAll(/\b\d[\d\s.,]*\d\b/g)]
-		.map((match) => match[0].replace(/\D/g, ''))
-		.filter((value) => value.length >= 2);
+	const answerNumbers = numberTokens(text);
 	const candidatesWithAnswerSignals = hits.filter((hit) => {
 		const hitIdentifiers = extractIdentifiers(hit.text);
-		const hitDigits = hit.text.replace(/\D/g, '');
+		const hitNumbers = new Set(numberTokens(hit.text));
 		return (
 			answerIdentifiers.some((identifier) => hitIdentifiers.includes(identifier)) ||
-			answerNumbers.some((number) => hitDigits.includes(number))
+			answerNumbers.some((number) => hitNumbers.has(number))
 		);
 	});
 	const citationCandidates = candidatesWithAnswerSignals.length

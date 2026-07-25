@@ -21,9 +21,18 @@ export class QueryEmbeddingCache {
 	async embed(texts: string[], run: EmbedQueries): Promise<QueryEmbeddingBatch> {
 		if (!texts.length) throw new Error('Cannot embed an empty query list');
 		const keys = texts.map(normalizeForFuzzy);
-		const missingKeys = [...new Set(keys.filter((key) => !this.vectors.has(key)))];
-		if (missingKeys.length) {
-			const result = await run(missingKeys);
+		// The normalized form is the cache key only. What gets encoded is the
+		// question the user actually typed: passages are embedded with full French
+		// orthography, so sending an accent-stripped, lowercased, punctuation-free
+		// query put the two sides of the comparison in different scripts.
+		const missing = new Map<string, string>();
+		for (let index = 0; index < texts.length; index++) {
+			const key = keys[index];
+			if (!this.vectors.has(key) && !missing.has(key)) missing.set(key, texts[index]);
+		}
+		if (missing.size) {
+			const missingKeys = [...missing.keys()];
+			const result = await run([...missing.values()]);
 			if (result.data.length !== missingKeys.length * result.dims) {
 				throw new Error('Query embedding batch shape mismatch');
 			}

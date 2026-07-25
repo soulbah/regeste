@@ -132,8 +132,10 @@ const REQUIRED_ATTRIBUTE_GROUPS = [
 	[...PARTY_ROLE_ALIASES.seller]
 ];
 
+// French writes the first of the month as "1er" and spells it "premier"; both
+// are ordinary calendar dates that the digit-only day pattern could not see.
 const EXPLICIT_DATE =
-	/\b(?:\d{1,2}[./-]\d{1,2}[./-]\d{2,4}|\d{4}[./-]\d{1,2}[./-]\d{1,2}|\d{1,2}\s+(?:janvier|fevrier|mars|avril|mai|juin|juillet|aout|septembre|octobre|novembre|decembre|january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{4})\b/iu;
+	/\b(?:\d{1,2}[./-]\d{1,2}[./-]\d{2,4}|\d{4}[./-]\d{1,2}[./-]\d{1,2}|(?:premier|\d{1,2}(?:er|re|e|ème|eme)?)\s+(?:janvier|fevrier|mars|avril|mai|juin|juillet|aout|septembre|octobre|novembre|decembre|january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{4})\b/iu;
 const EXPLICIT_TIME = /\b(?:[01]?\d|2[0-3])(?::|h)[0-5]\d\b/iu;
 const EXPLICIT_DURATION =
 	/\b(?:(?:\d+|(?:un|une|one|a|an)|\p{L}+\s*\(\d+\))\s*(?:ans?|ann[eé]es?|jours?|mois|heures?|minutes?|years?|months?|days?|hours?|minutes?))\b/iu;
@@ -151,8 +153,46 @@ const EXACT_VALUE_QUESTION =
 const LABELED_EXACT_VALUE =
 	/\b(?:numero|number|telephone|phone|mobile|email|courriel|iban|bic)[^\n:]{0,80}(?::|=|n[°o]|\b(?:est|is)\b)\s*(?:[+A-Z0-9][A-Z0-9@+._/ -]{2,})/iu;
 
+/** Function words that are capitalised for emphasis, never acronyms. */
+const NON_ACRONYMS = new Set([
+	'le',
+	'la',
+	'les',
+	'de',
+	'du',
+	'des',
+	'un',
+	'une',
+	'et',
+	'ou',
+	'au',
+	'aux',
+	'en',
+	'ce',
+	'ces',
+	'sur',
+	'par',
+	'pour',
+	'the',
+	'and',
+	'or',
+	'of',
+	'in',
+	'on',
+	'for',
+	'to'
+]);
+
+/** An acronym in the question is evidence the answer must carry. Case is the
+ * only signal that a token IS one, so a question typed in capitals carries no
+ * signal at all: treating every word in it as mandatory refused answers that
+ * were present. */
 function requiredAcronyms(query: string): string[] {
-	return [...new Set(query.match(/\b[A-ZÀ-ÖØ-Þ][A-ZÀ-ÖØ-Þ0-9-]{1,9}\b/gu) ?? [])];
+	const letters = query.replace(/[^\p{L}]/gu, '');
+	if (!letters || letters === letters.toLocaleUpperCase()) return [];
+	return [...new Set(query.match(/\b[A-ZÀ-ÖØ-Þ][A-ZÀ-ÖØ-Þ0-9-]{1,9}\b/gu) ?? [])].filter(
+		(token) => !NON_ACRONYMS.has(token.toLocaleLowerCase())
+	);
 }
 
 /** Exact identifiers need a value bound to their label and requested entity,
@@ -334,8 +374,9 @@ export function hasAnswerBearingEvidence(
 	const acronyms = requiredAcronyms(query);
 	if (
 		acronyms.length &&
+		// A document that writes "Ipid" or "iban" still carries the acronym.
 		!acronyms.every((acronym) =>
-			eligibleHits.some((hit) => new RegExp(`\\b${acronym}\\b`, 'u').test(hit.text))
+			eligibleHits.some((hit) => new RegExp(`\\b${acronym}\\b`, 'iu').test(hit.text))
 		)
 	)
 		return false;

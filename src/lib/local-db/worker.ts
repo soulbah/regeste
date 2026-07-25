@@ -613,12 +613,17 @@ function searchFuzzyMany(
 }
 
 interface VectorScopeStats {
+	/** Every row in the vector table, ready or not. vec0's KNN searches the whole
+	 * table, so this — not the ready subset — bounds how many out-of-scope rows
+	 * can outrank the scoped ones. */
+	tableRows: number;
 	totalReady: number;
 	scopedReady: number;
 }
 
 function vectorScopeStats(table: string, documentIds: string[] | null): VectorScopeStats {
 	const scope = scopeSql(documentIds);
+	const tableRows = Number(db.selectValue(`SELECT count(*) FROM ${table}`));
 	const totalReady = Number(
 		db.selectValue(
 			`SELECT count(*) FROM ${table} v
@@ -636,12 +641,45 @@ function vectorScopeStats(table: string, documentIds: string[] | null): VectorSc
 				)
 			)
 		: totalReady;
-	return { totalReady, scopedReady };
+	return { tableRows, totalReady, scopedReady };
 }
 
-/** Exact scoped KNN. Fetching `limit + outside-scope rows` from the global KNN
- * is sufficient to guarantee the scoped top-k. Very narrow scopes retain the
- * manual pre-filtered scan instead of asking vec0 for almost the whole table. */
+/** vec0 refuses a larger k: "k value in knn query too large, provided %lld and
+ * the limit is %lld". Asking for more threw out of retrieval, so the turn
+ * produced no answer at all. */
+const VEC0_MAX_K = 4096;
+
+/** Returns null when vec0 declines the query, so the caller falls back to the
+ * pre-filtered scan instead of losing the turn. */
+function knnRows(
+	table: string,
+	vecBlob: Uint8Array,
+	knnK: number,
+	scope: { clause: string; bind: string[] },
+	limit: number
+): Array<Record<string, unknown>> | null {
+	try {
+		return db.selectObjects(
+			`WITH knn AS (
+			   SELECT rowid, distance FROM ${table} WHERE embedding MATCH ? AND k = ?
+			 )
+			 SELECT c.id AS chunk_id, c.document_id, d.name AS document_name, c.text, c.seq,
+			        c.page, c.heading_path, c.para_index, c.ocr_confidence, knn.distance
+			 FROM knn JOIN chunks c ON c.id = knn.rowid
+			 JOIN documents d ON d.id = c.document_id
+			 WHERE d.status = 'ready'${scope.clause}
+			 ORDER BY knn.distance LIMIT ?`,
+			[vecBlob, knnK, ...scope.bind, limit]
+		);
+	} catch (error) {
+		console.warn('[regeste] vec0 knn declined, using the pre-filtered scan:', error);
+		return null;
+	}
+}
+
+/** Exact scoped KNN. Fetching `limit + out-of-scope rows` from the global KNN
+ * is sufficient to guarantee the scoped top-k. Narrow scopes, and budgets vec0
+ * cannot serve, use the manual pre-filtered scan instead. */
 function searchVector(
 	queryEmbedding: Float32Array,
 	dims: number,
@@ -656,35 +694,35 @@ function searchVector(
 		queryEmbedding.byteLength
 	).slice();
 	const scope = scopeSql(documentIds);
-	const { totalReady, scopedReady } = stats ?? vectorScopeStats(table, documentIds);
-	const knnK = Math.min(totalReady, limit + Math.max(0, totalReady - scopedReady));
-	const useKnn = totalReady > 0 && knnK < totalReady * 0.8;
-	const rows = useKnn
-		? db.selectObjects(
-				`WITH knn AS (
-				   SELECT rowid, distance FROM ${table} WHERE embedding MATCH ? AND k = ?
-				 )
-				 SELECT c.id AS chunk_id, c.document_id, d.name AS document_name, c.text, c.seq,
-				        c.page, c.heading_path, c.para_index, c.ocr_confidence, knn.distance
-				 FROM knn JOIN chunks c ON c.id = knn.rowid
-				 JOIN documents d ON d.id = c.document_id
-				 WHERE d.status = 'ready'${scope.clause}
-				 ORDER BY knn.distance LIMIT ?`,
-				[vecBlob, knnK, ...scope.bind, limit]
-			)
-		: db.selectObjects(
-				`SELECT c.id AS chunk_id, c.document_id, d.name AS document_name, c.text, c.seq,
-				        c.page, c.heading_path, c.para_index, c.ocr_confidence,
-			        vec_distance_cosine(v.embedding, ?) AS distance
-			 FROM ${table} v
-			 JOIN chunks c ON c.id = v.rowid
-			 JOIN documents d ON d.id = c.document_id
-			 WHERE d.status = 'ready'${scope.clause}
-			 ORDER BY distance LIMIT ?`,
-				[vecBlob, ...scope.bind, limit]
-			);
+	const { tableRows, scopedReady } = stats ?? vectorScopeStats(table, documentIds);
+	// Every row the KNN could return ahead of the scoped ones has to fit inside k,
+	// and vec0 refuses k above VEC0_MAX_K ("k value in knn query too large").
+	// When the budget does not fit, the pre-filtered scan is the correct answer,
+	// not a truncated KNN: it is slower but it cannot silently drop the top hit.
+	const requiredK = limit + Math.max(0, tableRows - scopedReady);
+	const knnK = Math.min(tableRows, requiredK, VEC0_MAX_K);
+	const useKnn = tableRows > 0 && knnK < tableRows * 0.8 && knnK >= Math.min(requiredK, tableRows);
+	// vec0 stores L2 (no distance_metric on the table) and every vector is unit
+	// normalized, so `1 - d²/2` is the cosine similarity on the KNN path, while
+	// the scan asks for the cosine distance directly. The two conversions are not
+	// interchangeable: whichever query actually ran decides which one applies.
+	const knn = useKnn ? knnRows(table, vecBlob, knnK, scope, limit) : null;
+	const rows =
+		knn ??
+		db.selectObjects(
+			`SELECT c.id AS chunk_id, c.document_id, d.name AS document_name, c.text, c.seq,
+			        c.page, c.heading_path, c.para_index, c.ocr_confidence,
+		        vec_distance_cosine(v.embedding, ?) AS distance
+		 FROM ${table} v
+		 JOIN chunks c ON c.id = v.rowid
+		 JOIN documents d ON d.id = c.document_id
+		 WHERE d.status = 'ready'${scope.clause}
+		 ORDER BY distance LIMIT ?`,
+			[vecBlob, ...scope.bind, limit]
+		);
+	const fromKnn = knn !== null;
 	return rows.map((r: any) => {
-		const cosineSimilarity = useKnn
+		const cosineSimilarity = fromKnn
 			? 1 - (Number(r.distance) * Number(r.distance)) / 2
 			: 1 - Number(r.distance);
 		return {

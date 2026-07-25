@@ -99,6 +99,32 @@ describe('retrieval relevance', () => {
 		).toBe(false);
 	});
 
+	it('reads a shouted question as words, not as a wall of acronyms', () => {
+		// Case is the only signal that a token is an acronym, so an all-caps
+		// question has none: LE, LA and DE were required to appear verbatim in the
+		// evidence, and a lowercase document could never satisfy them.
+		expect(
+			hasAnswerBearingEvidence('QUELLE EST LA FRANCHISE DE LA GARANTIE ?', [
+				evidenceHit('La franchise de la garantie est de 300 € par sinistre.')
+			])
+		).toBe(true);
+		// A real acronym is still required, and a document that writes it in
+		// another case still carries it.
+		expect(
+			hasAnswerBearingEvidence('Que dit le document sur mon IBAN ?', [
+				evidenceHit('Votre iban figure sur le mandat de prélèvement.')
+			])
+		).toBe(true);
+	});
+
+	it('accepts the French first of the month as an explicit date', () => {
+		expect(
+			hasAnswerBearingEvidence("Quelle est la date d'effet du contrat ?", [
+				evidenceHit("La date d'effet du contrat est le 1er janvier 2027.")
+			])
+		).toBe(true);
+	});
+
 	it('keeps evidence mentioning the requested attribute or a morphological variant', () => {
 		expect(
 			hasAnswerBearingEvidence('CR-204 est-elle mariée ?', [
