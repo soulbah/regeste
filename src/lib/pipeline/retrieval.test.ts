@@ -58,6 +58,28 @@ describe('fuseCandidates', () => {
 		expect(result.map((item) => item.chunkId)).toEqual([1, 2]);
 	});
 
+	it('never lets added context evict a retrieved candidate', () => {
+		// Each anchor could contribute two neighbours. Sharing one budget filled
+		// the list after about twenty anchors, so ranks 21-60 of the channel were
+		// dropped before fusion ever saw them.
+		const anchors = Array.from({ length: 60 }, (_, index) => ({
+			...hit(index + 1, 'policy', 1 - index / 100),
+			seq: index * 10,
+			text: `Passage ${index + 1} sur la garantie.`
+		}));
+		const neighbors = anchors.flatMap((anchor, index) => [
+			{
+				...hit(1000 + index, 'policy', 0),
+				seq: anchor.seq + 1,
+				text: `Suite du passage ${index + 1} sur la garantie.`
+			}
+		]);
+		const result = expandChannelCandidatesWithNeighbors(anchors, neighbors, 'garantie passage');
+		for (const anchor of anchors) {
+			expect(result.map((item) => item.chunkId)).toContain(anchor.chunkId);
+		}
+	});
+
 	it('binds a requested money label to the nearby value instead of a later deductible', () => {
 		const query = 'C cbien la cotizasion menssuelle exacte ?';
 		const premium = 'Votre paiement mensuel exact est de 14,91 € par mois.';
@@ -791,20 +813,29 @@ describe('retrieval refinement', () => {
 		]);
 	});
 
-	it('expands typoed bilingual technical concepts without adding an answer', () => {
+	it('expands typoed concepts with vocabulary only, never with an answer', () => {
 		expect(expandRetrievalQuery('Quel est le prxi de vnete exct ?')).toContain(
 			'prix price vente sale montant amount euros'
-		);
-		expect(expandRetrievalQuery('Contnet Lenght peut il être négatif ?')).toContain(
-			'Content-Length content length field non-negative'
-		);
-		expect(expandRetrievalQuery('Quel efet a la planifcation de deux vehicules ?')).toContain(
-			'flight planning two vehicles effect'
 		);
 		expect(expandRetrievalQuery("Quelle datte d'entrée en viguer est indiquée ?")).toContain(
 			'effective date entry into force'
 		);
-		expect(expandRetrievalQuery('Quelle sectoin definit GET ?')).toContain(
+		// An expansion may add vocabulary a document uses; it may never add the
+		// value being asked for. These three used to inject the benchmark's own
+		// gold wording ("non-negative", "more than doubles", "expected due date")
+		// into the query, which measured the crib note and not the pipeline.
+		expect(expandRetrievalQuery('Contnet Lenght peut il être négatif ?')).not.toContain(
+			'non-negative'
+		);
+		expect(expandRetrievalQuery('Quel efet a la planifcation de deux vehicules ?')).not.toContain(
+			'more than doubles'
+		);
+		expect(expandRetrievalQuery('Quels commentaires sur cet ICR ?')).not.toContain(
+			'expected due date'
+		);
+		// "sectoin" was hardcoded as a trigger token. Typo tolerance is the fuzzy
+		// channel's job, not a table of the benchmark's own injected misspellings.
+		expect(expandRetrievalQuery('Quelle sectoin definit GET ?')).not.toContain(
 			'request method definition semantics'
 		);
 	});

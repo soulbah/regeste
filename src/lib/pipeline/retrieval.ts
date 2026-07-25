@@ -74,7 +74,8 @@ export function expandChannelCandidatesWithNeighbors(
 	neighbors: SearchHit[],
 	query: string,
 	anchorLimit = 48,
-	limit = 60
+	limit = 60,
+	neighborLimit = 24
 ): SearchHit[] {
 	const byLocation = new Map<string, SearchHit[]>();
 	for (const neighbor of neighbors) {
@@ -87,15 +88,24 @@ export function expandChannelCandidatesWithNeighbors(
 
 	const expanded: SearchHit[] = [];
 	const seen = new Set<number>();
-	const add = (hit: SearchHit) => {
-		if (seen.has(hit.chunkId) || expanded.length >= limit) return;
+	// Context and candidates draw on separate budgets. Sharing one meant each
+	// anchor's two neighbours ate two candidate slots, so the list filled after
+	// about twenty anchors and ranks 21-60 of every channel were dropped before
+	// fusion ever saw them — added context cost recall.
+	let anchorCount = 0;
+	let neighborCount = 0;
+	const add = (hit: SearchHit, isNeighbor: boolean) => {
+		if (seen.has(hit.chunkId)) return;
+		if (isNeighbor ? neighborCount >= neighborLimit : anchorCount >= limit) return;
 		seen.add(hit.chunkId);
+		if (isNeighbor) neighborCount++;
+		else anchorCount++;
 		expanded.push(hit);
 	};
 
-	for (let index = 0; index < ranked.length && expanded.length < limit; index++) {
+	for (let index = 0; index < ranked.length && anchorCount < limit; index++) {
 		const anchor = ranked[index];
-		add(anchor);
+		add(anchor, false);
 		if (index >= anchorLimit || anchor.seq === undefined) continue;
 
 		const contextual = [anchor.seq - 1, anchor.seq + 1]
@@ -119,10 +129,13 @@ export function expandChannelCandidatesWithNeighbors(
 			);
 
 		for (const { neighbor, utility } of contextual) {
-			add({
-				...neighbor,
-				score: anchor.score * 0.45 + utility * 0.02
-			});
+			add(
+				{
+					...neighbor,
+					score: anchor.score * 0.45 + utility * 0.02
+				},
+				true
+			);
 		}
 	}
 	return expanded;
@@ -170,7 +183,7 @@ const CONCEPT_EXPANSIONS: Array<[RegExp, string]> = [
 	],
 	[
 		/\b(?:major\w*|augment\w*|supplement\w*|pourcent\w*|percent)\b[\s\S]*\b(?:frais|costs?|stockage|storage|protection)\b/iu,
-		'plafond majoré 10% frais supplémentaires limit increased additional costs'
+		'plafond majoré frais supplémentaires limit increased additional costs'
 	],
 	[
 		/\b(?:objet pr[eé]cis|specific item|marque|brand|nom exact|exact name)\b[\s\S]*\b(?:poss[eè]de|owns?|souscripteur|policyholder)\b/iu,
@@ -188,45 +201,11 @@ const APPROXIMATE_CONCEPT_EXPANSIONS: Array<{
 	},
 	{
 		required: [
-			['content', 'contenu'],
-			['length', 'longueur']
-		],
-		expansion: 'Content-Length content length field non-negative'
-	},
-	{
-		required: [
-			['planning', 'planification'],
-			['vehicles', 'vehicules']
-		],
-		expansion: 'flight planning two vehicles effect increase operational systems constraints'
-	},
-	{
-		required: [['information'], ['hour', 'horaire'], ['vehicles', 'vehicules']],
-		expansion: 'information required each hour two vehicles more than doubles'
-	},
-	{
-		required: [
 			['date', 'quand', 'when'],
 			['effective', 'vigueur', 'commence', 'debut', 'couverture', 'coverage', 'start', 'starts']
 		],
 		expansion:
 			"date d'effet prise d'effet entrée en vigueur début commence survenant après effective date entry into force starts at"
-	},
-	{
-		required: [['comments', 'commentaires'], ['icr']],
-		expansion: 'comments on this ICR expected due date'
-	},
-	{
-		required: [['head'], ['content', 'contenu'], ['response', 'reponse']],
-		expansion: 'HEAD request method response content GET'
-	},
-	{
-		required: [
-			['section', 'sectoin'],
-			['define', 'defines', 'definit'],
-			['get', 'head', 'post', 'put', 'delete', 'connect', 'options', 'trace']
-		],
-		expansion: 'request method definition semantics'
 	}
 ];
 
