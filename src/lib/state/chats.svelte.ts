@@ -22,7 +22,7 @@ import {
 	missingDurationCarrier,
 	ordinalScheduleValue
 } from '$lib/pipeline/retrieval';
-import { assistedPayloadBytes } from '$lib/assisted-payload';
+import { assistedPayloadBytes, buildAssistedExcerpts } from '$lib/assisted-payload';
 import { questionLocale } from '$lib/analysis/query-router';
 import { resolveQuestion, type EmbedQuestions } from '$lib/nlu/semantic-resolver';
 import { buildExecutionPlan } from '$lib/nlu/execution-plan';
@@ -1502,10 +1502,7 @@ class ChatsStore {
 			}
 			this.streamingText = '';
 
-			const excerpts = selected.map((h) => ({
-				text: h.text,
-				label: `${h.documentName}${h.page ? ` · page ${h.page}` : h.headingPath ? ` · ${h.headingPath}` : ''}`
-			}));
+			const excerpts = buildAssistedExcerpts(selected);
 			const bytesSent = assistedPayloadBytes(question, excerpts, conversationContext);
 
 			let raw = '';

@@ -10,7 +10,7 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import { chatsStore } from '$lib/state/chats.svelte';
 	import { settingsStore } from '$lib/state/settings.svelte';
-	import { assistedPayloadBytes } from '$lib/assisted-payload';
+	import { assistedPayloadBytes, buildAssistedExcerpts } from '$lib/assisted-payload';
 	import { isWeakMatch, relevancePercent } from '$lib/pipeline/relevance';
 	import type { SearchHit } from '$lib/types';
 
@@ -26,7 +26,11 @@
 
 	const selected = $derived((pending?.hits ?? []).filter((h) => !excluded[h.chunkId]));
 	const bytes = $derived(
-		assistedPayloadBytes(pending?.question ?? '', selected, pending?.conversationContext ?? null)
+		assistedPayloadBytes(
+			pending?.question ?? '',
+			buildAssistedExcerpts(selected),
+			pending?.conversationContext ?? null
+		)
 	);
 
 	function locator(hit: SearchHit): string {
