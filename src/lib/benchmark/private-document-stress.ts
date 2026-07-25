@@ -376,6 +376,13 @@ const MEASURE_NUMBER_WORDS: Readonly<Record<string, string>> = {
  * "passage", which let a polar alternative match text saying the opposite. */
 function tokenMatches(candidate: string, expected: string): boolean {
 	if (candidate === expected) return true;
+	// French glues a value to its unit: "70m²", "300€", "18m2". Normalization
+	// leaves those as one token, so a bare numeric alternative has to reach past
+	// the unit. Requiring a letter immediately after the digits keeps "70" out of
+	// "706" and "7000" while letting it match "70m2".
+	if (/^\d+$/u.test(expected)) {
+		return candidate.startsWith(expected) && /^\p{L}/u.test(candidate.slice(expected.length));
+	}
 	return expected.length >= 5 && !/\d/u.test(expected) && candidate.startsWith(expected);
 }
 
@@ -490,7 +497,7 @@ export function answerMatchesStressOracle(
 	);
 }
 
-function evidenceCoversAnswerGroups(texts: string[], groups: string[][]): boolean {
+export function evidenceCoversAnswerGroups(texts: string[], groups: string[][]): boolean {
 	return groups.every((group) =>
 		group.some((alternative) => texts.some((text) => matchesAnswerAlternative(text, alternative)))
 	);
