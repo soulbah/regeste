@@ -92,6 +92,11 @@ class LlmStore {
 		this.status = this.prepared ? 'loading' : 'downloading';
 		this.progress = 0;
 		try {
+			// Ask for persistent storage BEFORE the ~2.4 GB download: without it,
+			// Safari (and Chrome on a low-disk machine) cap a single origin's
+			// quota well below the model size and the cache write fails with
+			// "Quota exceeded". Persisted origins get a much larger allowance.
+			if (!this.prepared) await navigator.storage?.persist?.().catch(() => false);
 			await (
 				await getWorker(this.tier.engine)
 			).load(
@@ -114,8 +119,12 @@ class LlmStore {
 				return this.prepare();
 			}
 			this.status = 'error';
-			this.errorMessage =
-				'Your device ran out of memory preparing the private AI. Try closing other tabs and retry.';
+			// A storage-quota failure is not the same as running out of memory:
+			// the browser refused to cache the weights. Say which one it is.
+			const message = err instanceof Error ? err.message : String(err);
+			this.errorMessage = /quota|storage/i.test(message)
+				? 'Your browser ran out of storage for the private AI. Free up disk space and retry, or use Assisted or My AI instead.'
+				: 'Your device ran out of memory preparing the private AI. Try closing other tabs and retry.';
 		}
 	}
 
