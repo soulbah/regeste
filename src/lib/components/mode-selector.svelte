@@ -7,6 +7,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
+	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { toast } from 'svelte-sonner';
@@ -147,82 +148,90 @@
 	});
 </script>
 
-<Popover.Root bind:open>
-	<Popover.Trigger>
-		{#snippet child({ props })}
-			<Button
-				{...props}
-				variant={current ? 'ghost' : 'outline'}
-				size="sm"
-				class={current
-					? 'gap-1.5'
-					: 'border-accent-foreground/40 bg-accent/40 text-accent-foreground hover:bg-accent/60 gap-1.5'}
-			>
-				{current ? current.label : t('modes.choose')}
-				{#if pillProgress !== null}
-					<span class="text-muted-foreground text-xs tabular-nums">· {pillProgress}%</span>
-				{/if}
-				<ChevronDownIcon class="text-muted-foreground size-3.5!" />
-			</Button>
-		{/snippet}
-	</Popover.Trigger>
-	<Popover.Content class="w-72 gap-0 p-1" align="start" side="top">
-		<div class="flex flex-col">
-			{#each modes as m (m.id)}
-				<Button
-					variant="ghost"
-					class="h-auto w-full justify-start px-2.5 py-2 text-left"
-					disabled={m.readiness.state === 'blocked'}
-					onclick={() => pick(m)}
-				>
-					<span class="min-w-0 flex-1">
-						<span class="flex items-center gap-1.5">
-							<span class="text-sm font-medium">{m.label}</span>
-							{#if bestMode?.id === m.id}
-								<span class="text-ring text-[10px]" title={bestMode.reason}>
-									{t('modes.best')}
+{#if !settingsStore.modeChosen}
+	<!-- First run: a clear button that opens the Settings AI cards (where the
+	     download, sign-in and endpoint config already live) instead of the
+	     subtle dropdown, so the very first choice is obvious. -->
+	<Button
+		variant="outline"
+		size="sm"
+		class="border-accent-foreground/40 bg-accent/40 text-accent-foreground hover:bg-accent/60 gap-1.5"
+		onclick={() => uiStore.openSettings('ai')}
+	>
+		<SlidersHorizontalIcon class="size-3.5!" />
+		{t('onboard.chooseMode')}
+	</Button>
+{:else}
+	<Popover.Root bind:open>
+		<Popover.Trigger>
+			{#snippet child({ props })}
+				<Button {...props} variant="ghost" size="sm" class="gap-1.5">
+					{current ? current.label : t('modes.choose')}
+					{#if pillProgress !== null}
+						<span class="text-muted-foreground text-xs tabular-nums">· {pillProgress}%</span>
+					{/if}
+					<ChevronDownIcon class="text-muted-foreground size-3.5!" />
+				</Button>
+			{/snippet}
+		</Popover.Trigger>
+		<Popover.Content class="w-72 gap-0 p-1" align="start" side="top">
+			<div class="flex flex-col">
+				{#each modes as m (m.id)}
+					<Button
+						variant="ghost"
+						class="h-auto w-full justify-start px-2.5 py-2 text-left"
+						disabled={m.readiness.state === 'blocked'}
+						onclick={() => pick(m)}
+					>
+						<span class="min-w-0 flex-1">
+							<span class="flex items-center gap-1.5">
+								<span class="text-sm font-medium">{m.label}</span>
+								{#if bestMode?.id === m.id}
+									<span class="text-ring text-[10px]" title={bestMode.reason}>
+										{t('modes.best')}
+									</span>
+								{/if}
+							</span>
+							<span class="text-muted-foreground block truncate text-xs">
+								{m.line}
+							</span>
+						</span>
+						<span class="ml-2 shrink-0">
+							{#if m.id === mode}
+								<CheckIcon class="text-ring size-4" />
+							{:else if m.readiness.state === 'ready'}
+								<span class="text-muted-foreground text-xs">{t('modes.state.ready')}</span>
+							{:else if m.readiness.state === 'setup'}
+								<span class="text-muted-foreground text-xs">{t(m.readiness.setupKey)} →</span>
+							{:else if m.readiness.state === 'progress'}
+								<span class="text-muted-foreground text-xs tabular-nums">
+									{m.readiness.pct > 0 ? `${m.readiness.pct}%` : '…'}
 								</span>
 							{/if}
 						</span>
-						<span class="text-muted-foreground block truncate text-xs">
-							{m.line}
-						</span>
-					</span>
-					<span class="ml-2 shrink-0">
-						{#if m.id === mode}
-							<CheckIcon class="text-ring size-4" />
-						{:else if m.readiness.state === 'ready'}
-							<span class="text-muted-foreground text-xs">{t('modes.state.ready')}</span>
-						{:else if m.readiness.state === 'setup'}
-							<span class="text-muted-foreground text-xs">{t(m.readiness.setupKey)} →</span>
-						{:else if m.readiness.state === 'progress'}
-							<span class="text-muted-foreground text-xs tabular-nums">
-								{m.readiness.pct > 0 ? `${m.readiness.pct}%` : '…'}
-							</span>
-						{/if}
-					</span>
+					</Button>
+				{/each}
+			</div>
+			<div class="mt-1 border-t pt-1">
+				<Button
+					variant="ghost"
+					size="sm"
+					class="text-muted-foreground h-7 w-full justify-start px-2.5 text-xs font-normal"
+					onclick={() => {
+						open = false;
+						uiStore.openSettings('ai');
+					}}
+				>
+					{t('modes.aiSettings')}
 				</Button>
-			{/each}
-		</div>
-		<div class="mt-1 border-t pt-1">
-			<Button
-				variant="ghost"
-				size="sm"
-				class="text-muted-foreground h-7 w-full justify-start px-2.5 text-xs font-normal"
-				onclick={() => {
-					open = false;
-					uiStore.openSettings('ai');
-				}}
-			>
-				{t('modes.aiSettings')}
-			</Button>
-			<a
-				href={resolve('/how-it-works')}
-				class="text-muted-foreground hover:text-foreground block px-2.5 py-1.5 text-xs underline-offset-2 hover:underline"
-				onclick={() => (open = false)}
-			>
-				{t('modes.whatLeaves')}
-			</a>
-		</div>
-	</Popover.Content>
-</Popover.Root>
+				<a
+					href={resolve('/how-it-works')}
+					class="text-muted-foreground hover:text-foreground block px-2.5 py-1.5 text-xs underline-offset-2 hover:underline"
+					onclick={() => (open = false)}
+				>
+					{t('modes.whatLeaves')}
+				</a>
+			</div>
+		</Popover.Content>
+	</Popover.Root>
+{/if}
