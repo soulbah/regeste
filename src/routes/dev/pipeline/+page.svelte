@@ -487,14 +487,15 @@
 			answerGroupTriagePassed: result.answerGroupTriagePassed,
 			retrievalPassed: result.retrievalPassed,
 			retrievalMs: result.retrievalMs,
-			...(includeEvidence
-				? {
-						evidence: result.rawHits.map((hit) => ({
-							page: hit.page,
-							text: hit.text.slice(0, 600)
-						}))
-					}
-				: {})
+			// The ranked evidence is what makes the gate measurable at the rank
+			// rather than pass/fail: a passing case whose answer sits at rank 12 is
+			// a different pipeline than one where it sits at rank 1. Failures keep
+			// the untruncated list for reading; everything else keeps enough to
+			// score every k the metrics report.
+			evidence: (includeEvidence ? result.rawHits : result.rawHits.slice(0, 30)).map((hit) => ({
+				page: hit.page,
+				text: hit.text.slice(0, 600)
+			}))
 		};
 	}
 
