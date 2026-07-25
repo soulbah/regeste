@@ -27,7 +27,11 @@ const MATRIX_PATH = '.benchmark-corpus/private/assurance-stress.json';
 interface ArchivedResult {
 	id: string;
 	rawRetrievedPages: Array<number | null>;
-	rawRetrievedEvidence: Array<{ page: number | null; text: string }>;
+	/** Full runs archive this as `rawRetrievedEvidence`; the model-free gate
+	 * emits the same ordered list as `evidence`. Both are accepted so one metric
+	 * reads both instruments. */
+	rawRetrievedEvidence?: Array<{ page: number | null; text: string }>;
+	evidence?: Array<{ page: number | null; text: string }>;
 	retrievalMs: number;
 	answerBearing: boolean;
 }
@@ -88,7 +92,7 @@ for (const runPath of runPaths) {
 		if (!test) continue;
 		const answerable = test.expectedOutcome !== 'refusal';
 		const rankedPages = result.rawRetrievedPages ?? [];
-		const rankedPassages = result.rawRetrievedEvidence ?? [];
+		const rankedPassages = result.rawRetrievedEvidence ?? result.evidence ?? [];
 
 		if (answerable) {
 			const wanted = new Set(test.pageGroups.flat());
