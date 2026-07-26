@@ -115,16 +115,23 @@ describe('the ladder', () => {
 		}
 	});
 
-	it('steps down one rung at a time and ends at null', () => {
+	it('recovers by dropping materially, not by trying the neighbour', () => {
+		// A failed load has already proved the machine cannot hold that much, so
+		// retrying the rung just below would spend gigabytes re-learning it.
 		let tier = TIERS[0];
 		const walked = [tier.id];
 		for (let step = 0; step < TIERS.length; step++) {
 			const next = downgrade(tier);
 			if (!next) break;
+			// Each retry either needs materially less VRAM, or is one of the
+			// non-WebGPU paths that exist for a different reason entirely.
+			if (next.vramMB > 0) expect(next.vramMB).toBeLessThanOrEqual(tier.vramMB * 0.65);
 			tier = next;
 			walked.push(tier.id);
 		}
-		expect(walked).toEqual(TIERS.map((candidate) => candidate.id));
+		// The whole descent costs a handful of attempts, not one per rung.
+		expect(walked.length).toBeLessThan(TIERS.length);
+		expect(walked[walked.length - 1]).toBe('lite');
 		expect(downgrade(TIERS[TIERS.length - 1])).toBeNull();
 	});
 });

@@ -242,11 +242,24 @@ export function pickTier(signals: DeviceSignals): Tier | null {
 	);
 }
 
-/** One step down the ladder when a load fails (ground truth beats heuristics).
- * The rungs sit close together, so one step is a small concession rather than
- * the cliff a three-tier ladder forced. */
+/**
+ * Where to retry after a load fails (ground truth beats heuristics).
+ *
+ * Density is for choosing, not for recovering. Stepping one rung would make a
+ * failed 5.1 GB attempt pull 4.5 GB next and 2.4 GB after that, spending most
+ * of a download budget discovering what one OOM already proved. A failure means
+ * this machine cannot hold that much, so the retry drops to a rung that needs
+ * materially less rather than to the neighbour.
+ */
+const RECOVERY_RATIO = 0.65;
+
 export function downgrade(tier: Tier): Tier | null {
 	const index = TIERS.findIndex((candidate) => candidate.id === tier.id);
 	if (index < 0) return null;
-	return TIERS[index + 1] ?? null;
+	const rest = TIERS.slice(index + 1);
+	// Below the WebGPU rungs sit the f32 and CPU paths, which exist for a
+	// different reason (no shader-f16, no WebGPU) and stay reachable in order.
+	return (
+		rest.find((candidate) => candidate.vramMB <= tier.vramMB * RECOVERY_RATIO) ?? rest[0] ?? null
+	);
 }
