@@ -128,6 +128,30 @@ describe('answerRecordColumn', () => {
 		expect(typical?.considered).toBe(4);
 	});
 
+	it('reads the recurring value even when the question also names the first row', () => {
+		// Found on the real document, not in a fixture: "une mensualité courante
+		// après la première" carries two selectors, and taking the ordinal gave
+		// the prorated first instalment again.
+		const typical = answerRecordColumn(
+			'Quel est le montant d’une mensualité courante après la première ?',
+			schedule()
+		);
+		expect(typical?.literal).toBe('75,81');
+		expect(typical?.selector).toBe('typical');
+	});
+
+	it('does not let a longer word swallow a shorter column name', () => {
+		// Also found on the real document: "le tableau d’amortissement" matched
+		// the column "Capital amorti" by prefix, so the last instalment was
+		// answered with the principal.
+		const last = answerRecordColumn(
+			'Quel est le montant de la dernière échéance du tableau d’amortissement ?',
+			schedule()
+		);
+		expect(last?.label).toBe('Montant échéance');
+		expect(last?.literal).toBe('76,25');
+	});
+
 	it('reads the last row when asked for it', () => {
 		const last = answerRecordColumn('Quel est le montant de la dernière échéance ?', schedule());
 		expect(last?.literal).toBe('76,25');

@@ -32,10 +32,13 @@ export interface ColumnAnswer {
 	considered: number;
 }
 
+// Order matters: a frequency adjective describes the value being asked for,
+// while an ordinal in the same sentence is usually only a reference point —
+// "une mensualité courante après la première" asks for the recurring one.
 const SELECTORS: Array<[ColumnSelector, RegExp]> = [
+	['typical', /\b(?:courante?|habituelle?|normale?|typique|reguliere?|usual|typical|regular)\b/u],
 	['first', /\b(?:premiere?|premier|1er|1re|first|initiale?)\b/u],
-	['last', /\b(?:derniere?|dernier|final|finale|last)\b/u],
-	['typical', /\b(?:courante?|habituelle?|normale?|typique|reguliere?|usual|typical|regular)\b/u]
+	['last', /\b(?:derniere?|dernier|final|finale|last)\b/u]
 ];
 
 /** Words that appear in almost every French column label and so cannot
@@ -118,6 +121,18 @@ function rowNouns(normalized: string): Set<string> {
 	return nouns;
 }
 
+/**
+ * Two words name the same thing, allowing for inflection but not for one
+ * swallowing the other. A bare prefix test let "amortissement" match the column
+ * "Capital amorti", so "la dernière échéance du tableau d'amortissement"
+ * answered with the principal column instead of the instalment.
+ */
+function tokensAgree(word: string, token: string): boolean {
+	if (word === token) return true;
+	const [shorter, longer] = word.length <= token.length ? [word, token] : [token, word];
+	return shorter.length >= 5 && longer.length - shorter.length <= 3 && longer.startsWith(shorter);
+}
+
 export function selectorFor(question: string): ColumnSelector | null {
 	const normalized = normalizeForFuzzy(question);
 	for (const [selector, pattern] of SELECTORS) if (pattern.test(normalized)) return selector;
@@ -142,9 +157,7 @@ export function matchColumnLabel(question: string, labels: string[]): string | n
 		const scored = labels.map((label) => {
 			const labelTokens = distinctiveTokens(label);
 			const matched = labelTokens.filter((token) =>
-				[...asked].some(
-					(word) => word === token || word.startsWith(token) || token.startsWith(word)
-				)
+				[...asked].some((word) => tokensAgree(word, token))
 			).length;
 			return { label, matched };
 		});

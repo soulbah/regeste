@@ -494,6 +494,7 @@ function reindexDocument(
 					chunk.seq,
 					chunk.text,
 					chunk.searchText,
+					chunk.structuralContext ?? null,
 					chunk.fuzzyText ?? chunk.searchText,
 					chunk.page,
 					chunk.headingPath,
