@@ -229,5 +229,14 @@ export const MIGRATIONS: string[] = [
 	// on document_id followed by a seq range is served by this composite index.
 	`
 	CREATE INDEX idx_chunks_document_seq ON chunks(document_id, seq);
+	`,
+
+	// v14 — a table row's own columns, named ("Intérêts: 18,46 | …"), from the
+	// header the layout stage identified. Stored apart from search_text because
+	// exact analytics read the labels on their own: blended with the document and
+	// section context they cannot be parsed back into columns. Existing rows stay
+	// NULL and gain labels on their next reindex.
+	`
+	ALTER TABLE chunks ADD COLUMN structural_context TEXT;
 	`
 ];

@@ -20,6 +20,15 @@ export interface FinancialRecordFact extends MoneyCandidate {
 	recordId: string | null;
 }
 
+/** One cell of a table row, under the column name the header gave it. */
+export interface RecordColumn {
+	label: string;
+	/** As written in the document, for citing. */
+	literal: string;
+	valueMinor: number;
+	currency: string;
+}
+
 export interface FinancialRecord {
 	key: string;
 	documentId: string;
@@ -29,6 +38,29 @@ export interface FinancialRecord {
 	page: number | null;
 	headingPath: string | null;
 	facts: FinancialRecordFact[];
+	/**
+	 * Every named column of this row, when it came from a table whose header was
+	 * identified. Kept apart from `facts` on purpose: the aggregate path picks one
+	 * representative fact per record, so adding four more facts there would
+	 * silently change which column a total sums.
+	 */
+	columns?: RecordColumn[];
+}
+
+/** Split "Intérêts: 18,46 | Capital amorti: 50,93" back into named cells.
+ * Cells the layout stage could not name carry no colon and are skipped. */
+export function parseLabelledCells(context: string): Array<{ label: string; value: string }> {
+	return context.split('|').flatMap((cell) => {
+		const match = /^\s*([^:]{1,60}?)\s*:\s*(\S.*?)\s*$/u.exec(cell);
+		return match ? [{ label: match[1], value: match[2] }] : [];
+	});
+}
+
+const AMOUNT_CELL = /^\d[\d\s]*,\d{2}$/u;
+
+function amountMinor(literal: string): number | null {
+	const value = Number(literal.replace(/[^\d,]/gu, '').replace(',', ''));
+	return Number.isFinite(value) ? value : null;
 }
 
 const MONTHS: Record<string, number> = {
@@ -140,6 +172,22 @@ export function extractScheduleRecords(chunks: SearchHit[]): FinancialRecord[] {
 			const valueMinor = Number(literal.replace(/[^\d,]/gu, '').replace(',', ''));
 			if (!Number.isFinite(valueMinor)) continue;
 			const recordKey = `${chunk.documentId}:schedule:${row.dateIso}`;
+			// A chunk can hold several rows, so pair each with the labelled line
+			// that carries its own date rather than trusting their order.
+			const [year, month, day] = row.dateIso.split('-');
+			const written = `${day}.${month}.${year}`;
+			const labelled = (chunk.structuralContext ?? '')
+				.split('\n')
+				.find((line) => line.includes(written));
+			const columns: RecordColumn[] = labelled
+				? parseLabelledCells(labelled).flatMap((cell) => {
+						if (!AMOUNT_CELL.test(cell.value)) return [];
+						const minor = amountMinor(cell.value);
+						return minor === null
+							? []
+							: [{ label: cell.label, literal: cell.value, valueMinor: minor, currency: 'EUR' }];
+					})
+				: [];
 			records.push({
 				key: recordKey,
 				documentId: chunk.documentId,
@@ -165,7 +213,8 @@ export function extractScheduleRecords(chunks: SearchHit[]): FinancialRecord[] {
 						recordDate: row.dateIso,
 						recordId: null
 					}
-				]
+				],
+				...(columns.length ? { columns } : {})
 			});
 		}
 	}

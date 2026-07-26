@@ -3,7 +3,7 @@ import { MIGRATIONS } from './schema';
 
 describe('local retrieval schema', () => {
 	it('adds a resumable independent fuzzy index in v11', () => {
-		expect(MIGRATIONS).toHaveLength(13);
+		expect(MIGRATIONS).toHaveLength(14);
 		const migration = MIGRATIONS[10];
 		expect(migration).toContain('retrieval_version');
 		expect(migration).toContain('fuzzy_text');
@@ -20,5 +20,12 @@ describe('local retrieval schema', () => {
 		expect(MIGRATIONS[12]).toContain(
 			'CREATE INDEX idx_chunks_document_seq ON chunks(document_id, seq)'
 		);
+	});
+
+	it('stores a table row own named columns in v14', () => {
+		// Apart from search_text on purpose: exact analytics parse the labels back
+		// into columns, which is impossible once document and section context is
+		// blended in.
+		expect(MIGRATIONS[13]).toContain('ALTER TABLE chunks ADD COLUMN structural_context TEXT');
 	});
 });

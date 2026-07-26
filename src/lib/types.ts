@@ -62,6 +62,11 @@ export interface Chunk {
 	text: string;
 	/** Retrieval-only representation enriched with document/section labels. */
 	searchText: string;
+	/** A table row's own columns, named ("Intérêts: 18,46 | …"). Null unless the
+	 * row belongs to a table whose header was identified. Kept separate from
+	 * `searchText` because exact analytics need the labels on their own, not
+	 * blended with the document and section context. */
+	structuralContext?: string | null;
 	/** Retrieval-only character-gram representation. */
 	fuzzyText?: string;
 	seq: number;
@@ -84,6 +89,8 @@ export interface SearchHit {
 	documentId: string;
 	documentName: string;
 	text: string;
+	/** This row's columns, named, when it came from a table with a header. */
+	structuralContext?: string | null;
 	page: number | null;
 	headingPath: string | null;
 	score: number;

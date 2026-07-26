@@ -218,6 +218,10 @@ export function chunkBlocks(blocks: ParsedBlock[], documentName = ''): Chunk[] {
 			chunks.push({
 				text,
 				searchText,
+				// Kept on its own as well as inside searchText: exact analytics need
+				// to read a row's column names without the document and section
+				// context blended in.
+				structuralContext: structuralContext || null,
 				fuzzyText: [
 					fuzzyIndexText(searchText),
 					headingPath ? fuzzyHeadingIndexText(headingPath) : ''
