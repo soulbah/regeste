@@ -12,7 +12,9 @@ import {
 	type PrivateDocumentStressCase
 } from '../src/lib/benchmark/private-document-stress';
 
-export const MATRIX_PATH = '.benchmark-corpus/private/assurance-stress.json';
+/** The dev corpus by default; set BENCH_MATRIX to score a held-out set. */
+export const MATRIX_PATH =
+	process.env.BENCH_MATRIX ?? '.benchmark-corpus/private/assurance-stress.json';
 
 export interface ArchivedResult {
 	id: string;

@@ -32,6 +32,29 @@ describe('private document stress matrix', () => {
 		expect(matchesAnswerAlternative('Le délai est de deux (2) ans.', 'deux ans')).toBe(true);
 	});
 
+	it('reads one cell of a table row, and an amount as a value', () => {
+		// Every digit, space, dot and comma used to form one run, so this row
+		// collapsed into a single 24-digit token: no individual cell was ever
+		// visible and a payment schedule could not be scored at all.
+		const row = '1 05.11.2025 14 949,07 69,39 50,93 18,46';
+		expect(matchesAnswerAlternative(row, '69,39')).toBe(true);
+		expect(matchesAnswerAlternative(row, '50,93')).toBe(true);
+		expect(matchesAnswerAlternative(row, '14 949,07')).toBe(true);
+		expect(matchesAnswerAlternative(row, '05.11.2025')).toBe(true);
+		// A neighbouring cell is not this cell, and a value spanning two of them
+		// never existed.
+		expect(matchesAnswerAlternative(row, '76,25')).toBe(false);
+		expect(matchesAnswerAlternative(row, '9 936')).toBe(false);
+		// Cents and trailing decimals are formatting, not a different amount.
+		expect(matchesAnswerAlternative('Montant du crédit : 15 000,00', '15 000')).toBe(true);
+		expect(matchesAnswerAlternative('Taux : 1,9900', '1,99')).toBe(true);
+		expect(matchesAnswerAlternative('Frais de dossier 180,00', '180')).toBe(true);
+		// Identifiers group their digits however the document pleases.
+		expect(matchesAnswerAlternative('Depuis l’étranger : +33 801 840506', '801 840 506')).toBe(
+			true
+		);
+	});
+
 	it('keeps polarity words exact for forbidden failure phrases', () => {
 		expect(
 			matchesForbiddenAnswerAlternative(

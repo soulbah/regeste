@@ -28,6 +28,20 @@ if (!page) {
 // before filling the textarea so the value is not discarded.
 await page.reload({ waitUntil: 'domcontentloaded' });
 await page.waitForSelector('textarea[aria-label="Private document benchmark JSON"]');
+// The library loads asynchronously after the reload, and the gate resolves its
+// document by name at click time: clicking too early fails with "Ready document
+// not found" for a document that is present and indexed.
+await page.waitForFunction(
+	async (name) => {
+		const { documentsStore } = await import('/src/lib/state/documents.svelte.ts');
+		await documentsStore.init();
+		return documentsStore.documents.some(
+			(document) => document.name === name && document.status === 'ready'
+		);
+	},
+	JSON.parse(matrix).documentName,
+	{ timeout: 120_000 }
+);
 
 await page.locator('textarea[aria-label="Private document benchmark JSON"]').fill(matrix);
 await page.getByRole('button', { name: 'Run fast retrieval gate' }).click();

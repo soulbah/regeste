@@ -400,6 +400,51 @@ export function containsTokenSequence(normalizedText: string, normalizedNeedle: 
 	return false;
 }
 
+/**
+ * One value at a time, in the order a French document writes them.
+ *
+ * Treating every digit, space, dot and comma as one run made a table row
+ * collapse into a single number: "1 05.11.2025 14 949,07 69,39 50,93 18,46"
+ * became one 24-digit token, so no individual cell was ever visible and the
+ * oracle could not read a schedule at all. The alternatives below are ordered
+ * so a date wins over a decimal, and a thousands group only continues on
+ * exactly three digits — which is what separates "14 949,07 69,39" (two
+ * amounts) from "0801 840 506" (one phone number).
+ */
+/** Space, no-break space and narrow no-break space are all used as a thousands
+ * separator in French typography, and a PDF picks whichever it likes. */
+const THOUSANDS_SEPARATOR = '[\\u0020\\u00a0\\u202f]';
+
+const NUMBER_RUN = new RegExp(
+	[
+		String.raw`\d{1,4}[./-]\d{1,2}[./-]\d{2,4}`, // 05.11.2025, 12/03/1994
+		String.raw`\d{1,2}[:h]\d{2}`, // 09:30, 9h30
+		String.raw`\d{1,3}(?:${THOUSANDS_SEPARATOR}\d{3})*[.,]\d+`, // 14 949,07 and 69,39
+		String.raw`\d{1,4}(?:${THOUSANDS_SEPARATOR}\d{3})+`, // 0801 840 506 and 15 000
+		String.raw`\d+`
+	].join('|'),
+	'gu'
+);
+
+const DATE_OR_TIME = /^\d{1,4}[./-]\d{1,2}[./-]\d{2,4}$|^\d{1,2}[:h]\d{2}$/u;
+
+/**
+ * The value a run denotes, not the digits it happens to be written with.
+ * "15 000,00" and "15 000" are the same amount, and so are "1,9900" and "1,99";
+ * comparing digit strings made those three pairs mismatch, which fails an
+ * oracle on a document that writes its amounts with cents and its rates with
+ * four decimals. Dates and times keep their digits: their separators are not
+ * decimal points and their trailing zeros are significant.
+ */
+function canonicalNumber(run: string): string {
+	if (DATE_OR_TIME.test(run)) return run.replace(/\D/gu, '');
+	const decimal = /^(.*)[.,](\d+)$/u.exec(run);
+	if (!decimal) return run.replace(/\D/gu, '');
+	const fraction = decimal[2].replace(/0+$/u, '');
+	const whole = decimal[1].replace(/\D/gu, '');
+	return fraction ? `${whole}.${fraction}` : whole;
+}
+
 export function matchesAnswerAlternative(answer: string, alternative: string): boolean {
 	const normalizedAnswer = normalizeForFuzzy(answer);
 	const normalizedAlternative = normalizeForFuzzy(alternative);
@@ -432,16 +477,23 @@ export function matchesAnswerAlternative(answer: string, alternative: string): b
 	}
 	const numericValues = (value: string) => {
 		const withoutListMarkers = value.replace(/(^|\n)\s*\d{1,3}[.)]\s+/g, '$1');
-		return (withoutListMarkers.match(/(?<!\d)\d(?:[\d \u00a0.,/:-]*\d)?(?!\d)/g) ?? []).map(
-			(match) => match.replace(/\D/g, '')
-		);
+		return (withoutListMarkers.match(NUMBER_RUN) ?? []).map(canonicalNumber);
 	};
-	const expectedNumbers = numericValues(alternative).filter((value) => value.length >= 3);
+	const expectedNumbers = numericValues(alternative).filter(
+		(value) => value.replace(/\D/gu, '').length >= 3
+	);
 	const availableNumbers = numericValues(answer);
+	// Long values are identifiers — phone numbers, IBANs, contract numbers — and
+	// documents group their digits however they please ("+33 801 840506"), so
+	// they may match anywhere in the digit stream. Short values are quantities,
+	// and a quantity has to be a discrete number: letting "6939" match inside a
+	// longer run makes every cell of a table row match every other, which is
+	// what stopped a payment schedule from being readable at all.
+	const digitStream = answer.replace(/\D/gu, '');
 	const numbersMatch = expectedNumbers.every(
 		(expected) =>
 			availableNumbers.includes(expected) ||
-			(expected.length >= 6 && availableNumbers.some((available) => available.endsWith(expected)))
+			(expected.length >= 6 && digitStream.includes(expected))
 	);
 	if (expectedNumbers.length > 0 && !numbersMatch) return false;
 	if (containsTokenSequence(normalizedAnswer, normalizedAlternative)) return true;

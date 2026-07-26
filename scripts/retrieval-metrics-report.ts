@@ -22,7 +22,8 @@ import {
 	type RetrievalEvaluation
 } from '../src/lib/benchmark/retrieval-metrics';
 
-const MATRIX_PATH = '.benchmark-corpus/private/assurance-stress.json';
+/** The dev corpus by default; set BENCH_MATRIX to score a held-out set. */
+const MATRIX_PATH = process.env.BENCH_MATRIX ?? '.benchmark-corpus/private/assurance-stress.json';
 
 interface ArchivedResult {
 	id: string;
