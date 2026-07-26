@@ -9,7 +9,7 @@
 
 import { wrap, proxy, type Remote } from 'comlink';
 import { detectTier } from './capability';
-import { downgrade, type Tier } from './tiers';
+import { downgrade, TIERS, type Tier } from './tiers';
 import type { LlmApi } from './llm-worker';
 import type { WllamaApi } from './wllama-worker';
 import { guardWorker } from '$lib/state/worker-health.svelte';
@@ -18,6 +18,25 @@ import type { GenerationResult } from './generation';
 import type { WebLlmClient } from './webllm-client';
 
 const PREPARED_KEY = 'regeste:private-prepared-model';
+/**
+ * Benchmark harness only: run a named tier instead of the one this machine is
+ * offered. Comparing two models is only a comparison if the model is pinned,
+ * otherwise the tier ladder decides what is being measured.
+ *
+ * It lives in localStorage rather than in a method because the dev harness and
+ * the app reach this module through different specifiers, which Vite resolves
+ * to two separate instances — pinning one left the other on its own tier.
+ */
+const FORCED_TIER_KEY = 'regeste:dev-force-tier';
+
+function forcedTier(): Tier | null {
+	try {
+		const id = localStorage.getItem(FORCED_TIER_KEY);
+		return id ? (TIERS.find((tier) => tier.id === id) ?? null) : null;
+	} catch {
+		return null;
+	}
+}
 const METRICS_KEY = 'regeste:private-last-metrics';
 
 export type PrivateStatus =
@@ -67,7 +86,7 @@ class LlmStore {
 		} catch {
 			// A corrupt optional benchmark must never block Private mode.
 		}
-		const tier = await detectTier();
+		const tier = forcedTier() ?? (await detectTier());
 		if (!tier) {
 			this.status = 'unavailable';
 			return;
@@ -78,18 +97,6 @@ class LlmStore {
 		// Consent was given on the first preparation. Later visits reconnect to
 		// the resident production worker or load weights from browser cache.
 		if (this.prepared) void this.prepare();
-	}
-
-	/**
-	 * Benchmark harness only: run a named tier instead of the one this machine
-	 * happens to be offered. A comparison between two models is only a
-	 * comparison if the model is pinned — otherwise the tier ladder silently
-	 * decides what is being measured.
-	 */
-	async pin(tier: Tier): Promise<void> {
-		this.tier = tier;
-		this.prepared = localStorage.getItem(PREPARED_KEY) === tier.model;
-		this.status = 'needs-download';
 	}
 
 	/** Explicit user consent → download (or fast cache load) then ready. */
