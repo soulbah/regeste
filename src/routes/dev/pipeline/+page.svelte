@@ -10,6 +10,9 @@
 	import { Progress } from '$lib/components/ui/progress';
 	import * as Card from '$lib/components/ui/card';
 	import { documentsStore } from '$lib/state/documents.svelte';
+	import { answerRecordColumn } from '$lib/analysis/record-columns';
+	import { formatColumnAnswer } from '$lib/analysis/format-column';
+	import { questionLocale } from '$lib/nlu/semantic-frame';
 	import { chatsStore } from '$lib/state/chats.svelte';
 	import {
 		runIntelligenceBenchmark,
@@ -822,9 +825,22 @@
 					privateDocumentBenchmarkProgress = { completed, total };
 				}
 			);
+			// The product consults its exact paths before retrieving. Reproduce that
+			// here or the benchmark scores a path the app does not take: the column
+			// route was correct in the product and completely invisible in a run.
+			const scheduleRecords = await documentsStore.scheduleRecords([document.id]);
 			const report = await runPrivateDocumentStress({
 				documentId: document.id,
 				cases: casesToRun,
+				directAnswer: async (question: string) => {
+					const answer = answerRecordColumn(question, scheduleRecords);
+					if (!answer) return null;
+					return {
+						text: formatColumnAnswer(answer, questionLocale(question)).text,
+						page: answer.record.page,
+						label: answer.label
+					};
+				},
 				retrieve: async (question, documentIds, route) => {
 					const key = privateRetrievalCacheKey('production', document, question, route);
 					let pending = privateRetrievalCache.get(key);

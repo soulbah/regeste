@@ -72,7 +72,8 @@ export type PrivateDocumentStressOutcome = 'answer' | 'qualified' | 'refusal';
  * unattributable: a deterministic extraction, a replayed cache entry and a live
  * model generation are three different claims about the product.
  */
-export type StressAnswerSource = 'extractive' | 'cached' | 'llm' | 'skipped' | 'no-evidence';
+export type StressAnswerSource =
+	'exact' | 'extractive' | 'cached' | 'llm' | 'skipped' | 'no-evidence';
 
 export type StressGeneration = string | { text: string; source: StressAnswerSource };
 
@@ -569,6 +570,17 @@ export async function runPrivateDocumentStress(input: {
 		route: 'targeted' | 'synthesis',
 		hits: SearchHit[]
 	) => Promise<StressGeneration>;
+	/**
+	 * The product's exact answer paths, which run before retrieval and answer
+	 * from extracted structure rather than from a passage.
+	 *
+	 * Without this the benchmark measures retrieval plus generation while the
+	 * app answers some questions another way entirely, so a route could be
+	 * correct in the product and invisible here.
+	 */
+	directAnswer?: (
+		question: string
+	) => Promise<{ text: string; page: number | null; label: string } | null>;
 	resolveRoute: (question: string) => Promise<'targeted' | 'synthesis'>;
 	retrievalConcurrency?: number;
 	skipGenerationOnRetrievalFailure?: boolean;
@@ -622,26 +634,32 @@ export async function runPrivateDocumentStress(input: {
 			expectedOutcome !== 'refusal' &&
 			!answerBearing;
 		const generationStartedAt = performance.now();
-		const generated: StressGeneration = hits.length
-			? generationSkipped
-				? { text: groundedRefusal(test.question), source: 'skipped' }
-				: await input.generate(
-						[
-							{ role: 'system', content: SYSTEM_PROMPT },
-							{ role: 'user', content: buildUserPrompt(test.question, hits) }
-						],
-						test.question,
-						route,
-						hits
-					)
-			: { text: groundedRefusal(test.question), source: 'no-evidence' };
+		// The app consults its exact paths before retrieving anything, so the
+		// benchmark has to as well or it scores a path the product does not take.
+		const direct = await input.directAnswer?.(test.question);
+		const generated: StressGeneration = direct
+			? { text: direct.text, source: 'exact' }
+			: hits.length
+				? generationSkipped
+					? { text: groundedRefusal(test.question), source: 'skipped' }
+					: await input.generate(
+							[
+								{ role: 'system', content: SYSTEM_PROMPT },
+								{ role: 'user', content: buildUserPrompt(test.question, hits) }
+							],
+							test.question,
+							route,
+							hits
+						)
+				: { text: groundedRefusal(test.question), source: 'no-evidence' };
 		const answerSource = generationSource(generated);
 		const raw =
-			answerSource === 'skipped' || answerSource === 'no-evidence'
+			answerSource === 'skipped' || answerSource === 'no-evidence' || answerSource === 'exact'
 				? generationText(generated)
 				: stripThink(generationText(generated));
-		const resolved =
-			route === 'synthesis'
+		const resolved = direct
+			? { text: raw, citations: [] as ReturnType<typeof resolveCitations>['citations'] }
+			: route === 'synthesis'
 				? resolveCitations(raw, hits, test.question)
 				: resolveTargetedCitations(raw, hits, test.question);
 		const missingAnswerGroups =
@@ -654,18 +672,25 @@ export async function runPrivateDocumentStress(input: {
 		const unexpectedAnswerGroups = (test.forbiddenAnswerGroups ?? []).filter((group) =>
 			group.some((alternative) => matchesForbiddenAnswerAlternative(resolved.text, alternative))
 		);
-		const answerPassed = !generationSkipped && answerMatchesStressOracle(test, resolved.text);
-		const citedPages = resolved.citations.map((citation) => citation.hit.page);
+		const answerPassed =
+			(!generationSkipped || !!direct) && answerMatchesStressOracle(test, resolved.text);
+		// An exact answer cites the row it read, which retrieval never handled.
+		const citedPages = direct ? [direct.page] : resolved.citations.map((c) => c.hit.page);
 		const citationPassed =
 			expectedOutcome !== 'refusal'
 				? test.pageGroups.every((group) => group.some((page) => citedPages.includes(page)))
 				: citedPages.length === 0;
+		// An exact path answers from extracted structure without retrieving, so
+		// the retrieval gate does not apply to it. Scoring it against a retrieval
+		// it never performed would report the product's behaviour wrongly in
+		// both directions.
+		const retrievalApplies = !direct;
 		const result: PrivateDocumentStressResult = {
 			id: test.id,
 			question: test.question,
 			expectedOutcome,
 			route,
-			passed: retrievalPassed && answerPassed && citationPassed,
+			passed: (!retrievalApplies || retrievalPassed) && answerPassed && citationPassed,
 			retrievalPassed,
 			pageRecallPassed,
 			answerGroupTriagePassed,
