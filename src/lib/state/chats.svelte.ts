@@ -1637,9 +1637,20 @@ class ChatsStore {
 				failed = err instanceof OfflineError ? err.message : t('notice.assistedUnreachable');
 			}
 
+			// The same guard the local and My AI paths apply, from the same
+			// function. A cloud model has no more claim than a local one to state a
+			// figure the excerpts it was sent do not carry, and this is the mode
+			// most people try first.
+			const answered = failed
+				? ''
+				: groundedOrRefused(
+						stripThink(raw).trim(),
+						selected.map((hit) => hit.text),
+						groundedRefusal(question)
+					).text;
 			const { text: cleaned, citations } = failed
 				? { text: failed, citations: [] }
-				: resolveCitations(stripThink(raw).trim() || t('notice.stopped'), selected);
+				: resolveCitations(answered || t('notice.stopped'), selected);
 
 			const messageId = crypto.randomUUID();
 			await db.insertMessage({
