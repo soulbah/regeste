@@ -80,6 +80,18 @@ class LlmStore {
 		if (this.prepared) void this.prepare();
 	}
 
+	/**
+	 * Benchmark harness only: run a named tier instead of the one this machine
+	 * happens to be offered. A comparison between two models is only a
+	 * comparison if the model is pinned — otherwise the tier ladder silently
+	 * decides what is being measured.
+	 */
+	async pin(tier: Tier): Promise<void> {
+		this.tier = tier;
+		this.prepared = localStorage.getItem(PREPARED_KEY) === tier.model;
+		this.status = 'needs-download';
+	}
+
 	/** Explicit user consent → download (or fast cache load) then ready. */
 	async prepare(): Promise<void> {
 		if (
