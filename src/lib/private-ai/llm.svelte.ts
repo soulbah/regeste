@@ -86,7 +86,8 @@ class LlmStore {
 		} catch {
 			// A corrupt optional benchmark must never block Private mode.
 		}
-		const tier = forcedTier() ?? (await detectTier());
+		const forced = forcedTier();
+		const tier = forced ?? (await detectTier());
 		if (!tier) {
 			this.status = 'unavailable';
 			return;
@@ -96,7 +97,10 @@ class LlmStore {
 		this.status = 'needs-download';
 		// Consent was given on the first preparation. Later visits reconnect to
 		// the resident production worker or load weights from browser cache.
-		if (this.prepared) void this.prepare();
+		// Forcing a tier is itself the instruction to load it: the harness has no
+		// other way to reach this instance, and waiting for a click it will never
+		// receive is what left benchmark runs stalled on a disabled button.
+		if (this.prepared || forced) void this.prepare();
 	}
 
 	/** Explicit user consent → download (or fast cache load) then ready. */
