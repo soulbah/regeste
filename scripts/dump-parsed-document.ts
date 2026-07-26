@@ -68,5 +68,9 @@ console.log(`${path} — ${pdf.numPages} page(s), showing ${first}..${last}`);
 for (let page = first; page <= last; page++) {
 	const lines = orderPdfText(normalized[page - 1], widths[page - 1]);
 	console.log(`\n───────── page ${page} ─────────`);
-	for (const line of lines) console.log(line);
+	for (const line of lines) {
+		console.log(line.text);
+		// The retrieval-only view: which column each value came from.
+		if (line.retrievalContext) console.log(`    ↳ ${line.retrievalContext}`);
+	}
 }

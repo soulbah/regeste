@@ -38,7 +38,10 @@ describe('PDF structural blocks', () => {
 			'Quand ça ?',
 			'Les dommages survenant après le 14 juillet 2026 à 00:01 sont couverts.'
 		];
-		const blocks = pageBlocks(lines, 2);
+		const blocks = pageBlocks(
+			lines.map((text) => ({ text })),
+			2
+		);
 		expect(blocks.map((block) => block.headingPath?.[0])).toEqual([
 			'La Version Pressée',
 			'La Version Pressée',

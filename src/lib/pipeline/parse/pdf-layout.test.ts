@@ -35,15 +35,15 @@ describe('orderPdfText', () => {
 			)
 		];
 		const lines = orderPdfText(items, 596);
-		const text = lines.join('\n');
+		const text = lines.map((line) => line.text).join('\n');
 		const cell = text.indexOf(
 			'90 unités par nuit et par\npersonne dans la limite de 3\nnuits par sinistre.'
 		);
 		expect(cell).toBeGreaterThanOrEqual(0);
 		expect(text).toContain('Jusqu’à 30 jours consécutifs\ndans la limite de 500 unités.');
 		// full-width prose stays in reading order around the table
-		expect(lines[0]).toContain('Les prestations suivantes');
-		expect(lines.at(-1)).toContain('Toute demande doit être déclarée');
+		expect(lines[0].text).toContain('Les prestations suivantes');
+		expect(lines.at(-1)?.text).toContain('Toute demande doit être déclarée');
 	});
 
 	it('emits amortization-style data rows row-major, one record per line', () => {
@@ -65,13 +65,37 @@ describe('orderPdfText', () => {
 			]).flat()
 		];
 		const lines = orderPdfText(items, 596);
-		const text = lines.join('\n');
+		const text = lines.map((line) => line.text).join('\n');
 		// The first record survives as one line: rank, date, balance, installment.
 		expect(text).toMatch(/1 05\.11\.2025 11962,45 57,20/);
 		expect(text).toMatch(/2 05\.12\.2025 11913,45 64,73/);
 		// The header stays a single line above the records, not a column title
 		// welded onto one column's values.
 		expect(text).toContain('N° Date Capital restant dû Montant échéance');
+		// Each record also carries which column every value came from. Without
+		// this a reader has to align columns by eye, and both a 4B and a 9B model
+		// were measured answering the interest column as the instalment.
+		const first = lines.find((line) => line.text.startsWith('1 05.11.2025'));
+		expect(first?.retrievalContext).toBe(
+			'N°: 1 | Date: 05.11.2025 | Capital restant dû: 11962,45 | Montant échéance: 57,20'
+		);
+		// The source text is never rewritten: citations point at the page, not at
+		// the labelled view.
+		expect(first?.text).toBe('1 05.11.2025 11962,45 57,20');
+		// The header labels itself and needs no context of its own.
+		expect(lines.find((line) => line.text.startsWith('N° Date'))?.retrievalContext).toBeUndefined();
+	});
+
+	it('refuses to invent a header when the table has none', () => {
+		// A wrong binding states a falsehood as structure, which is worse than
+		// leaving a reader to see bare values.
+		const items = Array.from({ length: 6 }, (_, row) => [
+			item(String(row + 1), 40, 680 - row * 16, 20),
+			item(`05.${String(row + 11).padStart(2, '0')}.2025`, 100, 680 - row * 16, 70),
+			item(`${11962 - row * 49},45`, 220, 680 - row * 16, 80)
+		]).flat();
+		const lines = orderPdfText(items, 596);
+		expect(lines.every((line) => line.retrievalContext === undefined)).toBe(true);
 	});
 
 	it('keeps the two-column article path for single-gutter layouts', () => {
@@ -81,8 +105,8 @@ describe('orderPdfText', () => {
 			items.push(item(`droite ligne ${row} avec du texte`, 320, 700 - row * 14, 240));
 		}
 		const lines = orderPdfText(items, 596);
-		expect(lines.slice(0, 12).every((line) => line.startsWith('gauche'))).toBe(true);
-		expect(lines.slice(12).every((line) => line.startsWith('droite'))).toBe(true);
+		expect(lines.slice(0, 12).every((line) => line.text.startsWith('gauche'))).toBe(true);
+		expect(lines.slice(12).every((line) => line.text.startsWith('droite'))).toBe(true);
 	});
 });
 
@@ -108,7 +132,7 @@ it('keeps a devis/invoice section-subtotal row intact (label + amount, not shear
 		]).flat()
 	];
 	const lines = orderPdfText(items, 595);
-	const text = lines.join('\n');
+	const text = lines.map((line) => line.text).join('\n');
 	// The section subtotal stays on one line with its label.
 	expect(text).toMatch(/2 Extension 17 056,11 €/);
 	// Each line item keeps its designation next to its amount.

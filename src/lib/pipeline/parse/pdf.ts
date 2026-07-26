@@ -9,7 +9,7 @@
 // all-or-nothing `scanned_pdf` throw that discarded the whole document.
 
 import type { ParsedDoc, ParsedBlock } from '$lib/types';
-import { orderPdfText } from './pdf-layout';
+import { orderPdfText, type ReconstructedLine } from './pdf-layout';
 import { normalizeFormMarks, type PositionedTextItem } from './pdf-form-marks';
 import { assessPdfTextLayer } from '../pdf-text-quality';
 
@@ -41,21 +41,24 @@ export function isLikelyPdfSectionHeading(line: string, nextLine = ''): boolean 
 	return words.length <= 8 && titleWords / words.length >= 0.7;
 }
 
-export function pageBlocks(lineTexts: string[], page: number): ParsedBlock[] {
+export function pageBlocks(lines: ReconstructedLine[], page: number): ParsedBlock[] {
 	const blocks: ParsedBlock[] = [];
 	let offset = 0;
 	let heading: string | null = null;
-	for (let index = 0; index < lineTexts.length; index++) {
-		const line = lineTexts[index];
-		if (isLikelyPdfSectionHeading(line, lineTexts[index + 1] ?? '')) heading = line.trim();
+	for (let index = 0; index < lines.length; index++) {
+		const { text, retrievalContext } = lines[index];
+		if (isLikelyPdfSectionHeading(text, lines[index + 1]?.text ?? '')) heading = text.trim();
 		blocks.push({
-			text: line,
+			text,
 			page,
 			headingPath: heading ? [heading] : undefined,
+			// A table row's columns, named. Retrieval-only: `text` and the offsets
+			// stay exactly what the page says, so citations are unaffected.
+			...(retrievalContext ? { retrievalContext } : {}),
 			charStart: offset,
-			charEnd: offset + line.length
+			charEnd: offset + text.length
 		});
-		offset += line.length + 1;
+		offset += text.length + 1;
 	}
 	return blocks;
 }
@@ -110,14 +113,17 @@ export async function parsePdf(data: ArrayBuffer): Promise<ParsedDoc> {
 	// Pass 2 — order text and build blocks from the normalized items.
 	const normalizedPages = normalizeFormMarks(pagesPositioned);
 	for (let pageNum = 1; pageNum <= normalizedPages.length; pageNum++) {
-		const lineTexts = orderPdfText(normalizedPages[pageNum - 1], pageWidths[pageNum - 1]);
-		const text = lineTexts.join('\n').trim();
+		const lines = orderPdfText(normalizedPages[pageNum - 1], pageWidths[pageNum - 1]);
+		const text = lines
+			.map((line) => line.text)
+			.join('\n')
+			.trim();
 		const quality = assessPdfTextLayer(text);
 		if (quality.reason) {
 			needsOcr.push(pageNum);
-			if (quality.reason !== 'sparse') ocrFallbackBlocks.push(...pageBlocks(lineTexts, pageNum));
+			if (quality.reason !== 'sparse') ocrFallbackBlocks.push(...pageBlocks(lines, pageNum));
 		} else {
-			blocks.push(...pageBlocks(lineTexts, pageNum));
+			blocks.push(...pageBlocks(lines, pageNum));
 		}
 	}
 

@@ -1,8 +1,23 @@
+import { tableRowContext } from './docx';
+
 export interface PositionedPdfText {
 	text: string;
 	x: number;
 	y: number;
 	width: number;
+}
+
+/**
+ * A reconstructed line of the page.
+ *
+ * `text` is the source text and the only thing ever cited — reconstruction must
+ * never rewrite it. `retrievalContext` is a retrieval-only view that names the
+ * column each value came from, present only on the rows of a table whose header
+ * was identified with confidence.
+ */
+export interface ReconstructedLine {
+	text: string;
+	retrievalContext?: string;
 }
 
 interface PdfLine {
@@ -76,6 +91,113 @@ function detectColumnGutters(lines: PdfLine[], pageWidth: number): number[] {
 	return gutters;
 }
 
+/** Paths that carry no column structure (prose, two-column articles) still emit
+ * lines; they simply have no header to bind. */
+function asLines(texts: string[]): ReconstructedLine[] {
+	return texts.map((text) => ({ text }));
+}
+
+const itemCentre = (item: PositionedPdfText) => item.x + Math.max(item.width, 1) / 2;
+
+/**
+ * Column centres, taken from the data rows themselves.
+ *
+ * A schedule's value rows are the most reliable description of its geometry:
+ * there are hundreds of them, each holds exactly one value per column, and the
+ * values are narrow and consistently placed. Deriving columns from them and
+ * then placing the header's words into those columns avoids having to guess
+ * where one multi-word label ends and the next begins — "Capital Restant dû
+ * Montant échéance" cannot be split by looking at spaces alone.
+ */
+function dataRowColumns(rows: PdfLine[], tolerance: number): number[] {
+	const centres = rows.flatMap((row) => row.items.map(itemCentre)).sort((a, b) => a - b);
+	if (!centres.length) return [];
+	const clusters: number[][] = [[centres[0]]];
+	for (const centre of centres.slice(1)) {
+		const current = clusters[clusters.length - 1];
+		if (centre - current[current.length - 1] <= tolerance) current.push(centre);
+		else clusters.push([centre]);
+	}
+	// A column every row populates; a stray annotation forms a thin cluster.
+	const floor = Math.max(2, Math.ceil(rows.length * 0.5));
+	return clusters
+		.filter((cluster) => cluster.length >= floor)
+		.map((cluster) => cluster.reduce((sum, value) => sum + value, 0) / cluster.length);
+}
+
+/** Nearest column to an item's centre. */
+function columnOfCentre(item: PositionedPdfText, columns: number[]): number {
+	let best = 0;
+	for (let index = 1; index < columns.length; index++) {
+		if (Math.abs(itemCentre(item) - columns[index]) < Math.abs(itemCentre(item) - columns[best]))
+			best = index;
+	}
+	return best;
+}
+
+function cellsByColumn(line: PdfLine, columns: number[]): string[] {
+	const cells = Array.from({ length: columns.length }, () => [] as PositionedPdfText[]);
+	for (const item of line.items) cells[columnOfCentre(item, columns)].push(item);
+	return cells.map((items) => joinItems(items));
+}
+
+/**
+ * Bind a data table's header to each of its rows, for the row-ordered paths.
+ *
+ * Returns one entry per input line. `text` is untouched; rows of a table whose
+ * header was found also carry the header-labelled view. Conservative by design:
+ * without a credible header, or without stable column geometry, nothing is
+ * bound — a wrong binding states a falsehood as structure, which is worse than
+ * leaving a reader to see bare values.
+ */
+function bindTableHeaders(
+	lines: PdfLine[],
+	pageWidth: number,
+	/** A line emitted just before this block that may be its header. Consulted
+	 * for labels, never emitted here — the caller already emitted it. */
+	headerHint: PdfLine | null = null
+): ReconstructedLine[] {
+	const plain = () => asLines(lines.map((line) => joinItems([...line.items])).filter(Boolean));
+	const isValueItem = (text: string) => /^[\d\s.,/€%'-]+$/.test(text) && /\d/.test(text);
+	const isDataRow = (line: PdfLine) =>
+		line.items.length >= 3 && line.items.every((item) => isValueItem(item.text));
+	const dataRows = lines.filter(isDataRow);
+	if (dataRows.length < 3) return plain();
+
+	const columns = dataRowColumns(dataRows, Math.max(6, pageWidth * 0.02));
+	// Fewer than three columns is a list, not a table worth labelling.
+	if (columns.length < 3) return plain();
+
+	/** A header names most of the columns and holds no values of its own. */
+	const labelsOf = (candidate: PdfLine): string[] | null => {
+		if (!candidate.items.length || candidate.items.some((item) => isValueItem(item.text)))
+			return null;
+		const cells = cellsByColumn(candidate, columns);
+		const named = cells.filter((cell) => /\p{L}/u.test(cell)).length;
+		return named >= Math.ceil(columns.length * 0.6) ? cells : null;
+	};
+
+	// The nearest line above the first data row, then the caller's hint.
+	const firstDataIndex = lines.findIndex(isDataRow);
+	let labels: string[] | null = null;
+	for (let index = firstDataIndex - 1; index >= 0 && index >= firstDataIndex - 3; index--) {
+		labels = labelsOf(lines[index]);
+		if (labels) break;
+	}
+	if (!labels && headerHint) labels = labelsOf(headerHint);
+	if (!labels) return plain();
+
+	return lines
+		.map((line) => {
+			const text = joinItems([...line.items]);
+			if (!text) return null;
+			return isDataRow(line)
+				? { text, retrievalContext: tableRowContext(labels!, cellsByColumn(line, columns)) }
+				: { text };
+		})
+		.filter((line): line is ReconstructedLine => line !== null);
+}
+
 function columnOf(item: PositionedPdfText, gutters: number[]): number {
 	let column = 0;
 	for (const gutter of gutters) if (item.x >= gutter) column++;
@@ -85,13 +207,21 @@ function columnOf(item: PositionedPdfText, gutters: number[]): number {
 /** Emit a multi-column table page region by region: full-width lines separate
  * regions, and inside a columnar region cells are emitted column-major so a
  * multi-line cell stays contiguous instead of interleaving with its neighbors. */
-function emitColumnRegions(lines: PdfLine[], gutters: number[]): string[] {
+function emitColumnRegions(
+	lines: PdfLine[],
+	gutters: number[],
+	pageWidth: number
+): ReconstructedLine[] {
 	const crossesGutter = (line: PdfLine) =>
 		line.items.some((item) =>
 			gutters.some((gutter) => item.x < gutter && item.x + Math.max(item.width, 1) > gutter)
 		);
-	const out: string[] = [];
+	const out: ReconstructedLine[] = [];
 	let region: PdfLine[] = [];
+	/** Cells of the last full-width line that looked like a table header, so the
+	 * region it introduces can bind to it. Reset by any other separator, so only
+	 * an immediately preceding header ever applies. */
+	let pendingHeaderLine: PdfLine | null = null;
 	// A data-table row is a self-contained record: two or more columns whose
 	// every cell is a bare value (number, amount, date). An amortization
 	// schedule is made of them; a fact-sheet table (checkbox grids, IPID-style
@@ -135,10 +265,14 @@ function emitColumnRegions(lines: PdfLine[], gutters: number[]): string[] {
 		const dataRows = region.filter((line) => isDataRow(line) || endsWithAmount(line)).length;
 		if (region.length >= 3 && dataRows >= Math.max(3, Math.ceil(region.length * 0.5))) {
 			// Row-major: each record stays one line, headers keep their own line.
-			for (const line of region) {
-				const text = joinItems([...line.items]);
-				if (text) out.push(text);
-			}
+			// One binder for both ordering paths, and it derives columns from the
+			// data rows rather than from the page's gutters: gutter bands are wide
+			// enough to merge two narrow numeric columns, which would label a value
+			// with its neighbour's name.
+			// A header's labels are wider than the numbers beneath them, so the
+			// header line often straddles a gutter and is emitted as a region
+			// separator before the region it heads; pass it in so it can be found.
+			out.push(...bindTableHeaders(region, pageWidth, pendingHeaderLine));
 		} else if (
 			region.length >= 3 &&
 			multiColumnLines >= Math.ceil(region.length * 0.3) &&
@@ -147,22 +281,25 @@ function emitColumnRegions(lines: PdfLine[], gutters: number[]): string[] {
 			for (let column = 0; column <= gutters.length; column++) {
 				for (const line of region) {
 					const cell = joinItems(line.items.filter((item) => columnOf(item, gutters) === column));
-					if (cell) out.push(cell);
+					if (cell) out.push({ text: cell });
 				}
 			}
 		} else {
 			for (const line of region) {
 				const text = joinItems([...line.items]);
-				if (text) out.push(text);
+				if (text) out.push({ text });
 			}
 		}
 		region = [];
+		// One region per header: a later region must not inherit it.
+		pendingHeaderLine = null;
 	};
 	for (const line of lines) {
 		if (crossesGutter(line)) {
 			flush();
 			const text = joinItems([...line.items]);
-			if (text) out.push(text);
+			if (text) out.push({ text });
+			if (text) pendingHeaderLine = line;
 		} else {
 			region.push(line);
 		}
@@ -174,7 +311,7 @@ function emitColumnRegions(lines: PdfLine[], gutters: number[]): string[] {
 /** Reconstruct reading order while avoiding the classic two-column
  * interleaving bug. A gutter is accepted only when it recurs at nearly the
  * same horizontal position on many lines; sparse tables remain line-ordered. */
-export function orderPdfText(items: PositionedPdfText[], pageWidth: number): string[] {
+export function orderPdfText(items: PositionedPdfText[], pageWidth: number): ReconstructedLine[] {
 	const lines: PdfLine[] = [];
 	for (const item of items) {
 		let line = lines.find((candidate) => Math.abs(candidate.y - item.y) <= 2);
@@ -226,7 +363,7 @@ export function orderPdfText(items: PositionedPdfText[], pageWidth: number): str
 		// single-gutter article treatment — never plain interleaved lines.
 		return regions.flatMap((regionLines, index) =>
 			regionGutters[index].length >= 2
-				? emitColumnRegions(regionLines, regionGutters[index])
+				? emitColumnRegions(regionLines, regionGutters[index], pageWidth)
 				: orderLinesWithSingleGutter(regionLines, pageWidth)
 		);
 	}
@@ -236,7 +373,7 @@ export function orderPdfText(items: PositionedPdfText[], pageWidth: number): str
 
 /** Original single-gutter path: split left/right only when a central gutter
  * recurs at nearly the same position on many lines; otherwise line order. */
-function orderLinesWithSingleGutter(lines: PdfLine[], pageWidth: number): string[] {
+function orderLinesWithSingleGutter(lines: PdfLine[], pageWidth: number): ReconstructedLine[] {
 	// Data-table guard, same reasoning as in emitColumnRegions: a page whose
 	// lines are rows of three-plus bare values (numbers, amounts, dates) is a
 	// schedule, and the two-column article split would shear every record in
@@ -258,7 +395,9 @@ function orderLinesWithSingleGutter(lines: PdfLine[], pageWidth: number): string
 		dataRowCount >= Math.max(3, Math.ceil(lines.length * 0.3)) ||
 		amountEndingCount >= Math.max(3, Math.ceil(lines.length * 0.4))
 	)
-		return lines.map((line) => joinItems([...line.items])).filter(Boolean);
+		// Row order is preserved, and where the table's header can be identified
+		// each row also carries which column every value came from.
+		return bindTableHeaders(lines, pageWidth);
 	const minimumGap = Math.max(10, pageWidth * 0.02);
 	const splitCandidates: number[] = [];
 	for (const line of lines) {
@@ -281,7 +420,7 @@ function orderLinesWithSingleGutter(lines: PdfLine[], pageWidth: number): string
 			? []
 			: splitCandidates.filter((candidate) => Math.abs(candidate - median) <= pageWidth * 0.08);
 	const twoColumns = consistent.length >= Math.max(8, Math.ceil(lines.length * 0.2));
-	if (!twoColumns) return lines.map((line) => joinItems([...line.items])).filter(Boolean);
+	if (!twoColumns) return asLines(lines.map((line) => joinItems([...line.items])).filter(Boolean));
 
 	const gutter = [...consistent].sort((left, right) => left - right)[
 		Math.floor(consistent.length / 2)
@@ -292,5 +431,5 @@ function orderLinesWithSingleGutter(lines: PdfLine[], pageWidth: number): string
 	const right = lines
 		.map((line) => joinItems(line.items.filter((item) => item.x >= gutter)))
 		.filter(Boolean);
-	return [...left, ...right];
+	return asLines([...left, ...right]);
 }
