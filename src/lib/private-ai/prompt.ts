@@ -14,6 +14,7 @@ import {
 import { normalizeQuestion } from '$lib/nlu/semantic-frame';
 import { isIdentityQuestion } from '$lib/pipeline/identity-evidence';
 import { isContestation } from '$lib/retrieval-context';
+import { canonicalNumbers } from '$lib/numbers';
 
 // A genuine directional change: "de 2018 à 2019", not the ubiquitous French
 // "de … à …" span (normalizeQuestion folds "à"→"a", which is also the verb).
@@ -791,16 +792,17 @@ export function resolveCitations(
 }
 
 /**
- * Whole numbers as written, digits only, so "17 056,11 €" and "17056,11" are the
- * same value and "page 12, 3 ans" is not the value 123. Comparing a stripped
- * digit soup instead let an invented number match a passage by accident — and
- * because the citation candidates are then narrowed to the passages carrying
- * that accident, it also excluded the passage that spells the value in words.
+ * The values a text states, so "17 056,11 €" and "17056,11" are one value and
+ * "page 12, 3 ans" is not the value 123. Comparing a stripped digit soup
+ * instead let an invented number match a passage by accident — and because the
+ * citation candidates are then narrowed to the passages carrying that accident,
+ * it also excluded the passage that spells the value in words.
+ *
+ * Single digits are dropped: an answer numbering its own list items must not
+ * bind a citation, and a fabricated amount is essentially never one digit.
  */
 export function numberTokens(text: string): string[] {
-	return [...text.matchAll(/\d[\d\s.,]*\d|\d/gu)]
-		.map((match) => match[0].replace(/\D/gu, ''))
-		.filter((value) => value.length >= 2);
+	return canonicalNumbers(text).filter((value) => value.replace(/\D/gu, '').length >= 2);
 }
 
 /** For one-fact answers, bind citation to passage that best supports words/numbers actually written. */

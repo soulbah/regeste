@@ -15,7 +15,9 @@ if (!paths.length) {
 	process.exit(1);
 }
 
-const cdp = await chromium.connectOverCDP('http://localhost:9223');
+// A page holding a multi-gigabyte model in VRAM answers the first CDP round
+// trip slowly; the 30 s default turns that into a spurious connect failure.
+const cdp = await chromium.connectOverCDP('http://localhost:9223', { timeout: 120_000 });
 const context = cdp.contexts()[0];
 let page = context.pages().find((candidate) => candidate.url().includes('/dev/pipeline'));
 if (!page) {

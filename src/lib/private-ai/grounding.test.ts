@@ -8,7 +8,7 @@ describe('checkNumericGrounding', () => {
 		const evidence = ['1 Toiture principale + Garage 21 884,73 €', 'Total net HT 38 940,84 €'];
 		expect(checkNumericGrounding('La toiture principale coûte 18 884,73 € [1].', evidence)).toEqual(
 			{
-				unsupported: ['1888473'],
+				unsupported: ['18884.73'],
 				grounded: false
 			}
 		);
@@ -42,6 +42,22 @@ describe('checkNumericGrounding', () => {
 			checkNumericGrounding('1. La franchise est de 300 € [1].\n2. Rien d’autre.', evidence)
 				.grounded
 		).toBe(true);
+	});
+
+	it('reads one figure per cell in a table flattened to text', () => {
+		// Measured regression, and the reason this file exists: a PDF table puts one
+		// figure per line, and the old grammar let `\s` swallow the line break, so
+		// "180,00\n0,00" became the single token 1800000. The answer then found no
+		// support for a figure printed right there in its evidence and a correct
+		// answer was refused.
+		const evidence = ['Commission :\n:\nFrais de dossier\n:\nFIXE\n180,00\n0,00'];
+		expect(
+			checkNumericGrounding('Les frais de dossier sont de 180,00 euros [1].', evidence).grounded
+		).toBe(true);
+		// The merge must not become permissive either: 18 000 is not in that cell.
+		expect(
+			checkNumericGrounding('Les frais de dossier sont de 18 000 euros [1].', evidence).unsupported
+		).toEqual(['18000']);
 	});
 
 	it('cannot see a number that is real but mislabelled', () => {
