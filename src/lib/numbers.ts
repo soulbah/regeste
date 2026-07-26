@@ -37,6 +37,12 @@ export const NUMBER_RUN = new RegExp(
 
 const DATE_OR_TIME = /^\d{1,4}[./-]\d{1,2}[./-]\d{2,4}$|^\d{1,2}[:h]\d{2}$/u;
 
+/** A run whose separators are not decimal points, so its digits denote a
+ * calendar position rather than a quantity you can do arithmetic with. */
+export function isDateOrTime(run: string): boolean {
+	return DATE_OR_TIME.test(run);
+}
+
 /**
  * The value a run denotes, not the digits it happens to be written with.
  * "15 000,00" and "15 000" are the same amount, and so are "1,9900" and "1,99";
@@ -57,4 +63,13 @@ export function canonicalNumber(run: string): string {
 /** Every number a text states, canonicalised, in order of appearance. */
 export function canonicalNumbers(text: string): string[] {
 	return (text.match(NUMBER_RUN) ?? []).map(canonicalNumber);
+}
+
+/** The quantities a text states, as values you can compute with. Dates and
+ * times are left out: their digits are a position on a calendar. */
+export function numericValues(text: string): number[] {
+	return (text.match(NUMBER_RUN) ?? [])
+		.filter((run) => !isDateOrTime(run))
+		.map((run) => Number(canonicalNumber(run)))
+		.filter((value) => Number.isFinite(value));
 }

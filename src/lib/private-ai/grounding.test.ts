@@ -60,6 +60,43 @@ describe('checkNumericGrounding', () => {
 		).toEqual(['18000']);
 	});
 
+	it('accepts arithmetic the answer shows over figures it was shown', () => {
+		// Both measured on the insurance set, and both correct answers the strict
+		// check refused: the document prints neither the product nor the gap.
+		const premium = [
+			'Cotisation mensuelle 14,91 € TTC',
+			'Cotisation annuelle 185,50 € TTC pour 12 mois'
+		];
+		expect(
+			checkNumericGrounding(
+				'12 × 14,91 € = 178,92 €. La prime annuelle indiquée est 185,50 €. Ils ne correspondent pas : l’écart est de 6,58 € [1].',
+				premium
+			).grounded
+		).toBe(true);
+
+		const ceilings = ['Plomberie intérieure : 300 € TTC', 'Plomberie extérieure : 3 000 € TTC'];
+		expect(
+			checkNumericGrounding('La différence est de 2 700 € (3 000 € - 300 €).', ceilings).grounded
+		).toBe(true);
+	});
+
+	it('refuses arithmetic that does not come out', () => {
+		const premium = ['Cotisation mensuelle 14,91 € TTC', 'Cotisation annuelle 185,50 € TTC'];
+		expect(checkNumericGrounding('12 × 14,91 € = 190,00 € [1].', premium).unsupported).toEqual([
+			'190'
+		]);
+	});
+
+	it('does not let a plain claim borrow the arithmetic licence', () => {
+		// The relaxation is keyed to an answer that shows it is computing. A
+		// fabricated figure asserted flat stays refused even though the evidence
+		// carries numbers it could have been built from.
+		const evidence = ['1 Toiture principale + Garage 21 884,73 €', 'Total net HT 38 940,84 €'];
+		expect(
+			checkNumericGrounding('La toiture principale coûte 18 884,73 € [1].', evidence).grounded
+		).toBe(false);
+	});
+
 	it('cannot see a number that is real but mislabelled', () => {
 		// The honest limit. A 9B reported "TAEG 1,9900 %" from a notice stating
 		// only a nominal rate: the digits are in the evidence, so this check
