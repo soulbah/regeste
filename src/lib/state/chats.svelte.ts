@@ -34,6 +34,7 @@ import {
 } from '$lib/nlu/semantic-frame';
 import { formatAggregateResult } from '$lib/analysis/format-aggregate';
 import { formatColumnAnswer } from '$lib/analysis/format-column';
+import { groundedOrRefused } from '$lib/private-ai/grounding';
 import { answerRecordColumn, type ColumnAnswer } from '$lib/analysis/record-columns';
 import { parseRelatedQuestions } from '$lib/related-questions';
 import { hasAnswerBearingEvidence } from '$lib/pipeline/relevance';
@@ -1159,6 +1160,15 @@ class ChatsStore {
 			}
 		}
 		raw = enforceAnswerInvariants(question, raw);
+		// A figure the excerpts do not carry is refused rather than shown under a
+		// clean-looking citation: measured across three unrelated documents, a
+		// local model will state a subtotal that is off by three thousand, or
+		// invent a whole series, and both read as authoritative.
+		raw = groundedOrRefused(
+			raw,
+			hits.map((hit) => hit.text),
+			groundedRefusal(question)
+		).text;
 		// Aborted or failed with nothing produced → an honest system notice.
 		const stopped = !raw.trim();
 
@@ -1428,11 +1438,18 @@ class ChatsStore {
 		const stopped = !failed && !raw.trim();
 		const isNotice = !!failed || stopped;
 
+		// Same guard as the local path, from the same function: My AI runs someone
+		// else's model and has no more claim to state an unsupported figure.
+		const checked = groundedOrRefused(
+			raw.trim(),
+			hits.map((hit) => hit.text),
+			groundedRefusal(question)
+		).text;
 		const { text: cleaned, citations } = isNotice
 			? { text: failed ?? t('notice.stopped'), citations: [] }
 			: grounded
-				? resolveCitations(raw.trim(), hits, question)
-				: { text: raw.trim(), citations: [] };
+				? resolveCitations(checked, hits, question)
+				: { text: checked, citations: [] };
 
 		const messageId = crypto.randomUUID();
 		await db.insertMessage({

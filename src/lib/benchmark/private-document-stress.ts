@@ -1,5 +1,6 @@
 import { damerauLevenshtein, normalizeForFuzzy, stemmedQueryCoverage } from '$lib/pipeline/fuzzy';
 import { hasAnswerBearingEvidence } from '$lib/pipeline/relevance';
+import { groundedOrRefused } from '$lib/private-ai/grounding';
 import {
 	buildUserPrompt,
 	fitEvidenceToContext,
@@ -653,10 +654,22 @@ export async function runPrivateDocumentStress(input: {
 						)
 				: { text: groundedRefusal(test.question), source: 'no-evidence' };
 		const answerSource = generationSource(generated);
-		const raw =
+		const generatedText =
 			answerSource === 'skipped' || answerSource === 'no-evidence' || answerSource === 'exact'
 				? generationText(generated)
 				: stripThink(generationText(generated));
+		// Same guard the app applies, from the same function, so the two cannot
+		// drift: a model answer stating a figure its excerpts do not carry is
+		// refused rather than shown with a clean-looking citation. An exact answer
+		// is read from the extracted cells and needs no such check.
+		const raw =
+			answerSource === 'exact'
+				? generatedText
+				: groundedOrRefused(
+						generatedText,
+						hits.map((hit) => hit.text),
+						groundedRefusal(test.question)
+					).text;
 		const resolved = direct
 			? { text: raw, citations: [] as ReturnType<typeof resolveCitations>['citations'] }
 			: route === 'synthesis'
