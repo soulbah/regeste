@@ -31,6 +31,7 @@ export interface ArchivedResult {
 	rawRetrievedEvidence?: Array<{ page: number | null; text: string }>;
 	evidence?: Array<{ page: number | null; text: string }>;
 	rawRetrievedPages?: Array<number | null>;
+	citedPages?: Array<number | null>;
 	retrievalMs?: number;
 }
 
@@ -65,6 +66,15 @@ function retrievalVerdict(test: PrivateDocumentStressCase, result: ArchivedResul
 	);
 }
 
+/** A cited page satisfies a group; a refusal must cite nothing at all. */
+function citationVerdict(
+	test: PrivateDocumentStressCase,
+	citedPages: Array<number | null>
+): boolean {
+	if (test.expectedOutcome === 'refusal') return citedPages.length === 0;
+	return test.pageGroups.every((group) => group.some((page) => citedPages.includes(page)));
+}
+
 export function loadScoredRun(
 	path: string,
 	cases: Map<string, PrivateDocumentStressCase>
@@ -78,7 +88,12 @@ export function loadScoredRun(
 		if (!test) return [];
 		const retrieval = retrievalVerdict(test, result);
 		const answer = !result.generationSkipped && answerMatchesStressOracle(test, result.answer);
-		const citation = result.citationPassed;
+		// All three gates depend on the oracle, so all three are replayed. Leaving
+		// the citation verdict as archived meant a correction to which pages carry
+		// a fact could not be re-scored without an hour-long re-run.
+		const citation = result.citedPages
+			? citationVerdict(test, result.citedPages)
+			: result.citationPassed;
 		return [
 			{
 				...result,
