@@ -44,7 +44,11 @@ import { embeddingPhaseProgress } from '$lib/ingest-readiness';
 import { QueryEmbeddingCache } from '$lib/pipeline/query-embedding-cache';
 import type { MoneyKind } from '$lib/analysis/money';
 import { analyzeQuestion } from '$lib/analysis/query-router';
-import { extractFinancialRecords } from '$lib/analysis/financial-records';
+import {
+	extractFinancialRecords,
+	extractScheduleRecords,
+	type FinancialRecord
+} from '$lib/analysis/financial-records';
 import {
 	aggregateMoneyFacts,
 	FACT_EXTRACTOR_VERSION,
@@ -814,6 +818,21 @@ class DocumentsStore {
 	}
 
 	/** Exhaustive local path for numerical questions: no top-k truncation. */
+	/**
+	 * Schedule rows with their named columns, straight from the chunks.
+	 *
+	 * Not cached through `document_facts` the way aggregates are: that table
+	 * stores one fact per record, which is exactly the shape a column question
+	 * cannot use. Reading the chunks is cheap next to a generation, and it keeps
+	 * the labels the layout stage produced intact.
+	 */
+	async scheduleRecords(documentIds: string[]): Promise<FinancialRecord[]> {
+		if (!documentIds.length) return [];
+		const { db } = await getLocalDb();
+		const chunks = await db.listChunksForDocuments(documentIds);
+		return extractScheduleRecords(chunks).filter((record) => record.columns?.length);
+	}
+
 	async aggregate(query: string, documentIds: string[]): Promise<AggregateResult> {
 		const { db } = await getLocalDb();
 		const cached = new Set(await db.listDocumentFactRunIds(documentIds, FACT_EXTRACTOR_VERSION));

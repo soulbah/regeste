@@ -33,6 +33,8 @@ import {
 	type SemanticFrame
 } from '$lib/nlu/semantic-frame';
 import { formatAggregateResult } from '$lib/analysis/format-aggregate';
+import { formatColumnAnswer } from '$lib/analysis/format-column';
+import { answerRecordColumn, type ColumnAnswer } from '$lib/analysis/record-columns';
 import { parseRelatedQuestions } from '$lib/related-questions';
 import { hasAnswerBearingEvidence } from '$lib/pipeline/relevance';
 import { retrieveWithLocalQueryFallback } from '$lib/pipeline/query-translation';
@@ -502,6 +504,16 @@ class ChatsStore {
 				await this.loadCitations(chatId);
 				return;
 			}
+			// One named cell of a table row is a lookup, not a passage to interpret.
+			const columnAnswer = await this.scheduleColumnAnswer(analysisQuestion, enabledDocs);
+			if (columnAnswer) {
+				this.ensureCalculateStep();
+				await this.generateColumnAnswer(chatId, columnAnswer, frame.locale, versionGroup);
+				await db.touchChat(chatId);
+				this.messages = await db.listMessages(chatId);
+				await this.refresh();
+				return;
+			}
 			const hits = enabledDocs.length
 				? (
 						await this.retrieveWithSearchFallback(
@@ -661,6 +673,10 @@ class ChatsStore {
 				return;
 			}
 			const route = buildExecutionPlan(analysisQuestion, frame).route;
+			const columnAnswer =
+				route === 'aggregate'
+					? null
+					: await this.scheduleColumnAnswer(analysisQuestion, enabledDocs);
 			if (
 				route === 'aggregate' ||
 				(await this.scheduleAggregateApplies(analysisQuestion, frame, enabledDocs))
@@ -671,6 +687,10 @@ class ChatsStore {
 					analysisQuestion,
 					enabledDocs.map((d) => d.id)
 				);
+			} else if (columnAnswer) {
+				// One named cell of a table row is a lookup, not a passage to interpret.
+				this.ensureCalculateStep();
+				await this.generateColumnAnswer(chatId, columnAnswer, frame.locale);
 			} else {
 				let hits: SearchHit[] = [];
 				let rejected: SearchHit[] = [];
@@ -1219,6 +1239,79 @@ class ChatsStore {
 		} catch {
 			return false;
 		}
+	}
+
+	/**
+	 * A question about one named column of a table row, answered in code.
+	 *
+	 * Runs before generation and only ever declines: no dated rows with named
+	 * columns, no row selector, or no single column matching the question all
+	 * leave the normal path untouched. What it does catch is the class both a 4B
+	 * and a 9B model were measured getting wrong — reading a neighbouring column
+	 * of a row that was in front of them.
+	 */
+	private async scheduleColumnAnswer(
+		question: string,
+		enabledDocs: ChatDocument[]
+	): Promise<ColumnAnswer | null> {
+		if (!enabledDocs.length) return null;
+		try {
+			const records = await documentsStore.scheduleRecords(enabledDocs.map((doc) => doc.id));
+			return answerRecordColumn(question, records);
+		} catch {
+			// An exact path that cannot run must never take the answer down with it.
+			return null;
+		}
+	}
+
+	private async generateColumnAnswer(
+		chatId: string,
+		answer: ColumnAnswer,
+		locale: 'fr' | 'en',
+		versionGroup: string | null = null
+	): Promise<void> {
+		const { db } = await getLocalDb();
+		this.advanceWork('inspect');
+		this.advanceWork('calculate', answer.considered);
+		const formatted = formatColumnAnswer(answer, locale);
+		this.advanceWork('write');
+		const messageId = crypto.randomUUID();
+		await db.insertMessage({
+			id: messageId,
+			chatId,
+			role: 'assistant',
+			content: formatted.text,
+			mode: 'private',
+			versionGroup
+		});
+		const fact = answer.record.facts[0];
+		const locator = answer.record.page ? `page ${answer.record.page}` : answer.record.headingPath;
+		if (fact) {
+			const excerpt = {
+				chunkId: fact.chunkId,
+				snippet: fact.text.slice(0, 240),
+				documentName: answer.record.documentName,
+				locator
+			};
+			await db.insertCitations(messageId, [excerpt]);
+			await db.insertMessageExcerpts(messageId, [{ ...excerpt, sent: false, excluded: false }]);
+		}
+		await db.insertPrivacyEvent({
+			chatId,
+			messageId,
+			mode: 'private',
+			destination: 'device',
+			excerptCount: fact ? 1 : 0,
+			bytesSent: 0
+		});
+		await db.insertMessageMethod(messageId, {
+			kind: 'aggregate',
+			documentCount: 1,
+			passageCount: fact ? 1 : 0,
+			reasoningUsed: false,
+			calculation: formatted.calculation
+		});
+		await this.loadCitations(chatId);
 	}
 
 	private async generateAggregate(
