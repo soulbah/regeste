@@ -511,6 +511,10 @@
 			const matrix = parsePrivateDocumentStressMatrix(
 				JSON.parse(privateBenchmarkMatrixText) as unknown
 			);
+			// The library may still be loading when a driver clicks Run: resolve the
+			// document against a refreshed list rather than against whatever this
+			// module instance happened to have.
+			await documentsStore.init();
 			const document = documentsStore.documents.find(
 				(candidate) => candidate.name === matrix.documentName && candidate.status === 'ready'
 			);
@@ -569,6 +573,10 @@
 			const matrix = parsePrivateDocumentStressMatrix(
 				JSON.parse(privateBenchmarkMatrixText) as unknown
 			);
+			// The library may still be loading when a driver clicks Run: resolve the
+			// document against a refreshed list rather than against whatever this
+			// module instance happened to have.
+			await documentsStore.init();
 			const document = documentsStore.documents.find(
 				(candidate) => candidate.name === matrix.documentName && candidate.status === 'ready'
 			);
@@ -742,6 +750,10 @@
 			const matrix = parsePrivateDocumentStressMatrix(
 				JSON.parse(privateBenchmarkMatrixText) as unknown
 			);
+			// The library may still be loading when a driver clicks Run: resolve the
+			// document against a refreshed list rather than against whatever this
+			// module instance happened to have.
+			await documentsStore.init();
 			const document = documentsStore.documents.find(
 				(candidate) => candidate.name === matrix.documentName && candidate.status === 'ready'
 			);
