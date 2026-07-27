@@ -23,6 +23,7 @@
 	import DocumentsPanel from '$lib/components/documents-panel.svelte';
 	import ViewerPanel from '$lib/components/viewer-panel.svelte';
 	import WhatAiSawPanel from '$lib/components/what-ai-saw-panel.svelte';
+	import DocumentPicker from '$lib/components/document-picker.svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import { chatsStore } from '$lib/state/chats.svelte';
 	import { documentsStore } from '$lib/state/documents.svelte';
@@ -70,6 +71,8 @@
 
 	// Empty-chat "Add a document" button opens the file picker (same ingest path).
 	let addInput = $state<HTMLInputElement | null>(null);
+	/** Library picker opened from the no-documents empty state. */
+	let emptyPickerOpen = $state(false);
 
 	let thread = $state<HTMLElement | null>(null);
 	// Stick to the bottom while the turn unfolds (ledger, draft notes, streamed
@@ -291,22 +294,34 @@
 				<div class="mx-auto max-w-3xl space-y-6 px-6 py-8">
 					{#if chatsStore.messages.length === 0 && chatsStore.chatDocumentsLoaded && chatsStore.chatDocuments.length === 0}
 						<!-- A chat answers from its own documents: without one there is
-						     nothing to ask about. Say so and point at the add control. -->
+						     nothing to ask about. Say so and point at the add control.
+						     Both ways in, because they do not cost the same: something
+						     already in the library is indexed and attaches instantly,
+						     while a new file has to be parsed and indexed first. Offering
+						     only the upload asked for a file the user may already have
+						     given us. -->
 						<div class="flex flex-col items-center justify-center gap-3 py-20 text-center">
 							<FileTextIcon class="text-muted-foreground size-7" />
 							<p class="font-display text-xl tracking-tight">{t('chat.emptyTitle')}</p>
 							<p class="text-muted-foreground max-w-xs text-sm text-balance">
 								{t('chat.emptyBody')}
 							</p>
-							<Button
-								variant="outline"
-								size="sm"
-								class="mt-1 gap-1.5"
-								onclick={() => addInput?.click()}
-							>
-								<PlusIcon class="size-4" />
-								{t('docsPage.add')}
-							</Button>
+							<div class="mt-1 flex flex-wrap items-center justify-center gap-2">
+								{#if documentsStore.library.some((d) => d.status === 'ready')}
+									<Button variant="outline" size="sm" onclick={() => (emptyPickerOpen = true)}>
+										{t('addDocs.choose')}
+									</Button>
+								{/if}
+								<Button
+									variant="outline"
+									size="sm"
+									class="gap-1.5"
+									onclick={() => addInput?.click()}
+								>
+									<PlusIcon class="size-4" />
+									{t('home.addNew')}
+								</Button>
+							</div>
 							<input
 								bind:this={addInput}
 								type="file"
@@ -318,6 +333,10 @@
 									e.currentTarget.value = '';
 									if (files.length) handleUpload(files);
 								}}
+							/>
+							<DocumentPicker
+								bind:open={emptyPickerOpen}
+								onpick={(docIds) => chatsStore.attachMany(chatId, docIds)}
 							/>
 						</div>
 					{/if}

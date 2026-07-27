@@ -244,6 +244,9 @@ export const fr: Record<keyof typeof en, string> = {
 	// Home (new chat)
 	'home.headline': 'Discutez avec vos documents.',
 	'home.dropTitle': 'Déposez un document, ou cliquez pour parcourir',
+	'home.pickLead': 'Interroger',
+	'home.pickAll': 'Les {count} documents',
+	'home.addNew': 'Ajouter un fichier',
 	'home.sampleLead': 'Première fois ?',
 	'home.sampleLink': 'Essayez avec un contrat d’exemple',
 	'home.sub': 'Ajoutez des documents, posez des questions et voyez exactement ce qui est partagé.',

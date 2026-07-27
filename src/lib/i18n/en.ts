@@ -235,6 +235,9 @@ export const en = {
 	// Home (new chat)
 	'home.headline': 'Chat with your documents.',
 	'home.dropTitle': 'Drop a document, or click to browse',
+	'home.pickLead': 'Ask about',
+	'home.pickAll': 'All {count} documents',
+	'home.addNew': 'Add a file',
 	'home.sampleLead': 'New here?',
 	'home.sampleLink': 'Try a sample contract',
 	'home.sub': 'Add documents, ask questions, and see exactly what gets shared.',
