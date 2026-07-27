@@ -131,7 +131,8 @@ export const fr: Record<keyof typeof en, string> = {
 	'cloudModel.balanced.line': 'Le choix du quotidien, et quatre fois plus de questions.',
 	'cloudModel.best': 'Approfondi',
 	'cloudModel.best.line': 'Un modèle plus grand, pour moins de questions par jour.',
-	'cloudModel.left': '≈ {count} réponses restantes aujourd’hui',
+	'cloudModel.left': '≈ {count} restantes aujourd’hui',
+	'cloudModel.perDay': '≈ {count} questions par jour',
 	'cloudModel.spent': 'Plus rien aujourd’hui',
 
 	// Page de connexion

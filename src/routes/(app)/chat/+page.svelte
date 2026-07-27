@@ -7,6 +7,7 @@
 	import Composer from '$lib/components/composer.svelte';
 	import OnboardingModes from '$lib/components/onboarding-modes.svelte';
 	import HomeSources from '$lib/components/home-sources.svelte';
+	import AmbientWash from '$lib/components/ambient-wash.svelte';
 	import { DEMO_SAMPLES } from '$lib/demo/samples';
 	import { t } from '$lib/i18n/index.svelte';
 	import { chatsStore } from '$lib/state/chats.svelte';
@@ -15,6 +16,7 @@
 	import { homeState } from '$lib/state/home-surface.svelte';
 	import { dispatchMode } from '$lib/state/mode-dispatch';
 	import { modeReadiness } from '$lib/state/mode-readiness.svelte';
+	import { llmStore } from '$lib/private-ai/llm.svelte';
 	import type { ChatMode } from '$lib/types';
 
 	// Spec 022 — null until the user has ever chosen a mode on this device;
@@ -32,7 +34,7 @@
 		myai: 'modes.myai.description'
 	} as const;
 
-	const home = $derived(homeState());
+	const home = $derived(homeState(mode));
 	const choosing = $derived(home.surface === 'choose-engine');
 	const firstRun = $derived(home.surface === 'first-run');
 	const pendingMode = $derived(home.pendingMode);
@@ -49,12 +51,26 @@
 		assisted: 'notice.signIn',
 		myai: 'onboard.needEndpoint'
 	} as const;
+	/**
+	 * Preparing an on-device model is two stages, and only the first has a
+	 * percentage.
+	 *
+	 * The weights download, then they are compiled and uploaded to the GPU,
+	 * which reports nothing and can take another minute on a large model.
+	 * Showing "Downloading… 100%" through that second stage says the work is
+	 * finished when it is not, and the number sitting still is exactly what
+	 * makes a wait feel broken.
+	 */
+	const preparingLoad = $derived(pendingMode === 'private' && llmStore.status === 'loading');
 	const setupLine = $derived.by(() => {
 		if (!pendingMode) return '';
 		const readiness = modeReadiness(pendingMode);
+		if (preparingLoad) return t('modes.private.loading');
 		if (home.downloadPct !== null) return t('onboard.downloading');
 		return readiness.blockedLine ?? t(NEEDS[pendingMode]);
 	});
+	/** Only while bytes are actually arriving. */
+	const showPct = $derived(home.downloadPct !== null && !preparingLoad);
 	/** "Sign in" or "Set up", from the same verdict the picker reads. */
 	const setupAction = $derived(pendingMode ? t(modeReadiness(pendingMode).setupKey) : '');
 
@@ -148,10 +164,16 @@
 			</p>
 		</div>
 	{/if}
-	<header class="flex h-14 shrink-0 items-center gap-1 border-b px-4">
+	<header class="relative flex h-14 shrink-0 items-center gap-1 border-b px-4">
 		<Sidebar.Trigger class="shrink-0 md:hidden" />
 		<h1 class="font-display px-1 text-lg tracking-tight">{t('sidebar.newChat')}</h1>
 	</header>
+
+	<!-- Only on the two guided surfaces, which are mostly empty by design. The
+	     launcher has the user's own documents on it and needs no atmosphere. -->
+	{#if choosing || firstRun}
+		<AmbientWash top="4%" />
+	{/if}
 
 	<!-- Three surfaces, not one screen with branches. The engine gate blocks
 	     everything because nothing can answer without it; the first run explains
@@ -242,7 +264,7 @@
 			<div
 				class="border-border bg-card/40 text-muted-foreground relative mx-auto flex max-w-3xl items-center gap-3 overflow-hidden rounded-lg border px-3 py-2 text-xs"
 			>
-				{#if home.downloadPct !== null}
+				{#if showPct}
 					<!-- The progress fills the line itself rather than sitting beside it
 					     as a number. Gigabytes take minutes, and a bar that visibly
 					     advances is what tells someone the wait is finite. -->
@@ -250,10 +272,17 @@
 						class="bg-accent-foreground/10 absolute inset-y-0 left-0 transition-[width] duration-500"
 						style="width: {home.downloadPct}%"
 					></div>
+				{:else if preparingLoad}
+					<!-- No percentage exists for the GPU stage, so the line sweeps
+					     instead of freezing at a number that has stopped meaning
+					     anything. -->
+					<div class="setup-sweep bg-accent-foreground/10 absolute inset-y-0 w-1/3"></div>
 				{/if}
 				<span class="relative flex-1 text-left">{setupLine}</span>
-				{#if home.downloadPct !== null}
+				{#if showPct}
 					<span class="relative tabular-nums">{home.downloadPct}%</span>
+				{:else if preparingLoad}
+					<span class="relative"></span>
 				{:else}
 					<!-- The same routing the picker uses, so the button lands where the
 					     blocker actually is: the sign-in page for Cloud, the mode's
@@ -294,3 +323,27 @@
 		</div>
 	{/if}
 </div>
+
+<style>
+	/* The GPU stage reports no progress, so the line sweeps to say the work is
+	   still moving. Slow on purpose: a fast shuttle reads as agitation. */
+	.setup-sweep {
+		animation: setup-sweep 1900ms ease-in-out infinite;
+	}
+
+	@keyframes setup-sweep {
+		from {
+			transform: translateX(-100%);
+		}
+		to {
+			transform: translateX(300%);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.setup-sweep {
+			animation: none;
+			width: 100%;
+		}
+	}
+</style>

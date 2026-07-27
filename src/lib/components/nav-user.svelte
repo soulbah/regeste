@@ -26,9 +26,15 @@
 		{ mode: 'system', label: 'settings.appearance.system' }
 	] as const;
 
+	// Sign-in is by email and nothing else, so most accounts have no name and the
+	// two lines printed the same address twice. When there is nothing to add
+	// under the address, the second line stays empty rather than echoing it.
 	const identity = $derived(
 		sessionStore.user
-			? { name: sessionStore.user.name || sessionStore.user.email, line: sessionStore.user.email }
+			? {
+					name: sessionStore.user.name || sessionStore.user.email,
+					line: sessionStore.user.name ? sessionStore.user.email : null
+				}
 			: { name: t('sidebar.guest'), line: t('sidebar.localWorkspace') }
 	);
 
@@ -55,7 +61,9 @@
 						</span>
 						<span class="grid min-w-0 flex-1 leading-tight">
 							<span class="truncate text-sm font-medium">{identity.name}</span>
-							<span class="text-muted-foreground truncate text-xs">{identity.line}</span>
+							{#if identity.line}<span class="text-muted-foreground truncate text-xs"
+									>{identity.line}</span
+								>{/if}
 						</span>
 						<ChevronsUpDownIcon class="text-muted-foreground ml-auto size-4" />
 					</Sidebar.MenuButton>
@@ -67,7 +75,9 @@
 					<DropdownMenu.Label class="font-normal">
 						<span class="grid leading-tight">
 							<span class="truncate text-sm font-medium">{identity.name}</span>
-							<span class="text-muted-foreground truncate text-xs">{identity.line}</span>
+							{#if identity.line}<span class="text-muted-foreground truncate text-xs"
+									>{identity.line}</span
+								>{/if}
 						</span>
 					</DropdownMenu.Label>
 					<DropdownMenu.Separator />

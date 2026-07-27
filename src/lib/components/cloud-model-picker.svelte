@@ -18,7 +18,13 @@
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import { t } from '$lib/i18n/index.svelte';
 	import { settingsStore } from '$lib/state/settings.svelte';
-	import { CLOUD_MODELS, answersLeft, type CloudModelKey } from '$lib/cloud-models';
+	import {
+		CLOUD_MODELS,
+		answersLeft,
+		answersPerDay,
+		costMultiplier,
+		type CloudModelKey
+	} from '$lib/cloud-models';
 
 	let { value, onselect }: { value: CloudModelKey; onselect: (key: CloudModelKey) => void } =
 		$props();
@@ -33,9 +39,12 @@
 			// should have to take "Standard" on faith.
 			model: model.name,
 			line: t(`cloudModel.${model.key}.line`),
-			// null until the budget is known: a made-up number here would be the
-			// one thing this control exists to avoid.
-			left: settingsStore.quota ? answersLeft(settingsStore.quota.remaining, model) : null
+			// The full daily allowance, which is true before anyone signs in, and
+			// what is left today once the budget is known.
+			perDay: answersPerDay(model),
+			left: settingsStore.quota ? answersLeft(settingsStore.quota.remaining, model) : null,
+			// The relative cost, which stays legible with no budget loaded at all.
+			multiplier: costMultiplier(model)
 		}))
 	);
 	const current = $derived(rows.find((r) => r.key === value) ?? rows[1]);
@@ -57,9 +66,11 @@
 			{t('cloudModel.label')}
 		</p>
 		{#each rows as row (row.key)}
+			<!-- whitespace-normal: the Button primitive sets nowrap, which clipped
+			     the description instead of wrapping it. -->
 			<Button
 				variant="ghost"
-				class="h-auto w-full justify-start gap-2.5 px-2.5 py-2 text-left font-normal"
+				class="h-auto w-full justify-start gap-2.5 px-2.5 py-2 text-left font-normal whitespace-normal"
 				onclick={() => {
 					onselect(row.key);
 					open = false;
@@ -75,14 +86,22 @@
 							{row.model}
 						</span>
 					</span>
-					<span class="text-muted-foreground block text-xs">{row.line}</span>
-					{#if row.left !== null}
-						<span class="text-muted-foreground/80 mt-0.5 block font-mono text-[10px]">
-							{row.left > 0
-								? t('cloudModel.left', { count: String(row.left) })
-								: t('cloudModel.spent')}
+					<span class="text-muted-foreground mt-0.5 block text-xs leading-snug">{row.line}</span>
+					<!-- The number of questions and the relative cost, both as figures.
+					     "×4" is readable with no account at all, and the count says what
+					     the allowance actually buys. -->
+					<span
+						class="text-muted-foreground/80 mt-1 flex items-baseline gap-2 font-mono text-[10px]"
+					>
+						<span>
+							{row.left !== null
+								? row.left > 0
+									? t('cloudModel.left', { count: String(row.left) })
+									: t('cloudModel.spent')
+								: t('cloudModel.perDay', { count: String(row.perDay) })}
 						</span>
-					{/if}
+						<span class="ml-auto shrink-0">×{row.multiplier}</span>
+					</span>
 				</span>
 			</Button>
 		{/each}

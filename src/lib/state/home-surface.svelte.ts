@@ -38,14 +38,21 @@ export interface HomeState {
 	libraryEmpty: boolean;
 }
 
-/** Reactive when read from a template or an effect. */
-export function homeState(): HomeState {
+/**
+ * Reactive when read from a template or an effect.
+ *
+ * `activeMode` is the mode the composer is actually on, which is not always the
+ * stored default: switching mode in the picker changes the former and leaves
+ * the latter alone. Reading the default here made the setup line ask for a
+ * server endpoint while the composer sat on Cloud, signed in and ready.
+ */
+export function homeState(activeMode: ChatMode | null = null): HomeState {
 	const libraryEmpty = documentsStore.library.length === 0;
 
 	if (!settingsStore.modeChosen)
 		return { surface: 'choose-engine', pendingMode: null, downloadPct: null, libraryEmpty };
 
-	const mode = settingsStore.defaultMode;
+	const mode = activeMode ?? settingsStore.defaultMode;
 	const readiness = modeReadiness(mode);
 
 	return {

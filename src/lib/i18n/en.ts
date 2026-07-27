@@ -139,7 +139,8 @@ export const en = {
 	'cloudModel.balanced.line': 'The everyday choice, and four times more of them.',
 	'cloudModel.best': 'Thorough',
 	'cloudModel.best.line': 'A larger model, for fewer questions a day.',
-	'cloudModel.left': '≈ {count} answers left today',
+	'cloudModel.left': '≈ {count} left today',
+	'cloudModel.perDay': '≈ {count} questions a day',
 	'cloudModel.spent': 'Nothing left today',
 
 	// Sign-in page

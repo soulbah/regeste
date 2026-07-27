@@ -12,6 +12,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
+	import AmbientWash from '$lib/components/ambient-wash.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
@@ -55,12 +56,7 @@
 <svelte:head><title>{t('auth.title')} · Regeste</title></svelte:head>
 
 <div class="bg-background relative flex min-h-svh flex-col overflow-hidden">
-	<!-- A single wash, sitting behind everything and catching no clicks. Enough
-	     to give the page a centre of gravity without decorating a form. -->
-	<div
-		aria-hidden="true"
-		class="bg-accent-foreground/8 pointer-events-none absolute top-[-20%] left-1/2 size-[36rem] -translate-x-1/2 rounded-full blur-[120px]"
-	></div>
+	<AmbientWash />
 
 	<header class="relative flex h-14 shrink-0 items-center px-4">
 		<Button variant="ghost" size="sm" class="text-muted-foreground gap-1.5" href={resolve('/chat')}>

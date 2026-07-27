@@ -106,3 +106,32 @@ export function typicalCost(model: CloudModel): number {
 export function answersLeft(remainingNeurons: number, model: CloudModel): number {
 	return Math.max(0, Math.floor(remainingNeurons / typicalCost(model)));
 }
+
+/**
+ * What one signed-in person may spend per day.
+ *
+ * Lives here rather than only on the server so the picker can state the
+ * allowance before anyone signs in. Cloudflare's free tier is 10,000 neurons a
+ * day for the whole account, so this figure decides how many people that
+ * covers before the account starts paying $0.011 per 1,000.
+ */
+export const DAILY_NEURONS = 3000;
+
+/** The full daily allowance expressed in answers on this model. */
+export function answersPerDay(model: CloudModel): number {
+	return Math.floor(DAILY_NEURONS / typicalCost(model));
+}
+
+/**
+ * How many of the cheapest model's answers this one costs.
+ *
+ * A count of answers left is only legible once a budget is loaded; a
+ * multiplier is true before anyone signs in, and it is the shape people
+ * already read on other tools that meter model choice. Rounded, because the
+ * exact ratio moves with the length of a given answer and false precision on
+ * an estimate is worse than none.
+ */
+export function costMultiplier(model: CloudModel): number {
+	const cheapest = Math.min(...CLOUD_MODELS.map(typicalCost));
+	return Math.max(1, Math.round(typicalCost(model) / cheapest));
+}
