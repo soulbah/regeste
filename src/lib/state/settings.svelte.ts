@@ -46,7 +46,7 @@ class SettingsStore {
 		if (mode === 'myai' || (mode === 'assisted' && ASSISTED_ENABLED)) this.defaultMode = mode;
 		this.modeChosen = (await db.getSetting('mode_chosen')) === '1';
 		const cloud = await db.getSetting('cloud_model');
-		if (cloud === 'fast' || cloud === 'balanced' || cloud === 'best') this.cloudModel = cloud;
+		if (cloud === 'balanced' || cloud === 'best') this.cloudModel = cloud;
 		await this.refreshStorage();
 	}
 

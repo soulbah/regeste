@@ -4,13 +4,6 @@
 	import { ModeWatcher } from 'mode-watcher';
 	import { toast } from 'svelte-sonner';
 	import { Toaster } from '$lib/components/ui/sonner';
-	import * as Sidebar from '$lib/components/ui/sidebar';
-	import * as Sheet from '$lib/components/ui/sheet';
-	import * as Tooltip from '$lib/components/ui/tooltip';
-	import AppSidebar from '$lib/components/app-sidebar.svelte';
-	import CommandPalette from '$lib/components/command-palette.svelte';
-	import SettingsDialog from '$lib/components/settings-dialog.svelte';
-	import ViewerPanel from '$lib/components/viewer-panel.svelte';
 	import { beforeNavigate, goto } from '$app/navigation';
 	import { browser } from '$app/environment';
 	import { resolve } from '$app/paths';
@@ -28,7 +21,6 @@
 	import { sessionStore } from '$lib/state/session.svelte';
 	import { settingsStore } from '$lib/state/settings.svelte';
 	import { viewerStore } from '$lib/state/viewer.svelte';
-	import { panelStore } from '$lib/state/panel.svelte';
 
 	let { children } = $props();
 
@@ -165,36 +157,12 @@
 	}}
 />
 
+<!-- Global concerns only. The sidebar, palette, settings modal and viewer sheet
+     belong to the (app) group: a sign-in screen must not carry the chrome of
+     the application it is the door to. -->
 <ModeWatcher defaultMode="system" />
 <Toaster position="bottom-right" />
-<CommandPalette />
-<SettingsDialog />
 <UpdateBanner />
 <WorkerFailureNotice />
 
-<Sheet.Root
-	open={viewerStore.isOpen && !panelStore.usingShell}
-	onOpenChange={(o) => !o && viewerStore.close()}
->
-	<Sheet.Content side="right" class="w-full gap-0 p-0 sm:max-w-md">
-		<!-- This sheet portals outside Sidebar.Provider (the app's Tooltip
-		     provider); the panel header's tooltips need their own. -->
-		<Tooltip.Provider delayDuration={300}>
-			<ViewerPanel />
-		</Tooltip.Provider>
-	</Sheet.Content>
-</Sheet.Root>
-
-<Sidebar.Provider>
-	<AppSidebar />
-	<!-- When a route mounts a PanelShell (chat, documents…), the inset stops being
-	     a card and becomes a transparent frame: the main content and the contextual
-	     panel float as their own cards on the workspace. Other routes keep the card. -->
-	<Sidebar.Inset
-		class={panelStore.usingShell
-			? 'md:overflow-visible md:bg-transparent md:peer-data-[variant=inset]:rounded-none md:peer-data-[variant=inset]:border-0 md:peer-data-[variant=inset]:shadow-none'
-			: undefined}
-	>
-		{@render children()}
-	</Sidebar.Inset>
-</Sidebar.Provider>
+{@render children()}

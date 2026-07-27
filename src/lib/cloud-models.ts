@@ -18,33 +18,39 @@ export const NEURONS_PER_DOLLAR = 1000 / 0.011;
 export interface CloudModel {
 	id: string;
 	/** Stable key used in the API contract and the local setting. */
-	key: 'fast' | 'balanced' | 'best';
+	key: 'balanced' | 'best';
 	neuronsPerMInput: number;
 	neuronsPerMOutput: number;
 }
 
+// Measured on 20 benchmark cases with retrieval held identical, so the only
+// variable is the answer (compare-cloud-models.ts):
+//
+//   qwen3-30b-a3b   19/20   2924 ms   21 neurons
+//   gemma-4-26b     19/20   5209 ms   33 neurons
+//   gpt-oss-120b    20/20   1412 ms   89 neurons
+//
+// Gemma-4 was the intended default and is gone: it ties qwen3 on score while
+// being 1.8x slower and 1.6x dearer, which is dominated on every axis. Nothing
+// defends a middle rung that loses to the cheap one.
+//
+// The surprise is gpt-oss-120b being the fastest of the three as well as the
+// most accurate, so the two on offer are not a speed trade at all. They are a
+// price trade: the same daily budget buys about 140 answers on one and 33 on
+// the other. One set of twenty cases cannot separate 19 from 20, so the copy
+// claims no accuracy difference either.
 export const CLOUD_MODELS: CloudModel[] = [
 	{
-		// 30B mixture of experts with ~3B active, so it answers at the speed of a
-		// small model. Cheapest input in the catalogue by a wide margin.
+		// 30B mixture of experts, ~3B active. The default: it answered 19 of 20
+		// and costs a quarter of the alternative.
 		id: '@cf/qwen/qwen3-30b-a3b-fp8',
-		key: 'fast',
+		key: 'balanced',
 		neuronsPerMInput: 4625,
 		neuronsPerMOutput: 30475
 	},
 	{
-		// The default. Also a mixture of experts (~4B active), so latency stays
-		// close to the fast tier, and its output is the cheapest of the three
-		// per token. Latency matters here: the owner rejected an earlier model
-		// outright for taking two minutes to answer.
-		id: '@cf/google/gemma-4-26b-a4b-it',
-		key: 'balanced',
-		neuronsPerMInput: 9091,
-		neuronsPerMOutput: 27273
-	},
-	{
-		// The 120B class, for when an answer is worth roughly three of the
-		// others. Still cheaper per output token than the model this replaces.
+		// The 120B class. Fastest and highest scoring of the three measured, for
+		// four times the cost per answer.
 		id: '@cf/openai/gpt-oss-120b',
 		key: 'best',
 		neuronsPerMInput: 31818,
@@ -57,7 +63,7 @@ export type CloudModelKey = CloudModel['key'];
 export const DEFAULT_MODEL_KEY: CloudModelKey = 'balanced';
 
 export function modelFor(key: string | null | undefined): CloudModel {
-	return CLOUD_MODELS.find((m) => m.key === key) ?? CLOUD_MODELS[1];
+	return CLOUD_MODELS.find((m) => m.key === key) ?? CLOUD_MODELS[0];
 }
 
 /**

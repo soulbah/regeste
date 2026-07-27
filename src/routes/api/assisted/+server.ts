@@ -21,7 +21,7 @@ const BodySchema = v.object({
 	context: v.optional(v.pipe(v.string(), v.minLength(1), v.maxLength(2000))),
 	// The caller names a tier, never a model id: the catalogue stays server-side
 	// so swapping a model out cannot strand an old client on a dead id.
-	model: v.optional(v.picklist(['fast', 'balanced', 'best'] as const)),
+	model: v.optional(v.picklist(['balanced', 'best'] as const)),
 	excerpts: v.pipe(
 		v.array(
 			v.object({

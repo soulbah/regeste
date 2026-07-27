@@ -124,17 +124,16 @@ export const fr: Record<keyof typeof en, string> = {
 	'modes.aiSettings': 'Réglages IA…',
 	// Sélecteur de modèle Cloud — l'unité est la réponse (voir en.ts).
 	'cloudModel.label': 'Qualité des réponses',
-	'cloudModel.fast': 'Rapide',
-	'cloudModel.fast.line': 'Questions factuelles courtes.',
 	'cloudModel.balanced': 'Standard',
-	'cloudModel.balanced.line': 'Le choix du quotidien.',
+	'cloudModel.balanced.line': 'Le choix du quotidien, et quatre fois plus de questions.',
 	'cloudModel.best': 'Approfondi',
-	'cloudModel.best.line': 'Documents longs et comparaisons.',
+	'cloudModel.best.line': 'Un modèle plus grand, pour moins de questions par jour.',
 	'cloudModel.left': '≈ {count} réponses restantes aujourd’hui',
 	'cloudModel.spent': 'Plus rien aujourd’hui',
 
 	// Page de connexion
 	'auth.title': 'Connexion',
+	'auth.checkInbox': 'Regardez votre boîte mail.',
 	'auth.back': 'Retour à la discussion',
 	'auth.headline': 'Connexion',
 	'auth.body': 'Seul le mode Cloud demande un compte. Les deux autres, jamais.',
@@ -208,7 +207,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'presend.match': 'pertinence {pct}%',
 	'presend.firstTime': 'Première fois que quelque chose quitte cet appareil',
 	'presend.firstTimeBody':
-		"Jusqu'ici, tout s'est passé sur votre appareil. Cet envoi transmet votre question et les extraits cochés au service Assisted, jamais vos fichiers. Vous recevez votre réponse, et rien n'est stocké ni journalisé.",
+		"Jusqu'ici, tout s'est passé sur votre appareil. Cet envoi transmet votre question et les extraits cochés au service Cloud, jamais vos fichiers. Vous recevez votre réponse, et rien n'est stocké ni journalisé.",
 	'presend.consent': "J'ai compris, continuer",
 	'presend.count': '{selected}/{total} extraits · {kb} Ko',
 	'presend.footer':
@@ -489,7 +488,7 @@ export const fr: Record<keyof typeof en, string> = {
 		"Supprime vos données de connexion et de quota du serveur. Vos documents et discussions n'y ont jamais été ; ils restent sur cet appareil.",
 	'settings.account.deleteCta': 'Supprimer mon compte',
 	'settings.account.deleteConfirm': 'Supprimer ce compte ?',
-	'settings.account.guest': 'Aucun compte. Connectez-vous pour débloquer le mode Assisted.',
+	'settings.account.guest': 'Aucun compte. Connectez-vous pour débloquer le mode Cloud.',
 	'palette.themeLight': 'Thème : clair',
 	'palette.themeDark': 'Thème : sombre',
 	'palette.themeSystem': 'Thème : système',
@@ -504,7 +503,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'settings.appearance.dark': 'Sombre',
 	'settings.offline.title': 'Forcer le hors ligne',
 	'settings.offline.label':
-		'Bloque toute requête sortante. Le mode Private et vos documents continuent de fonctionner ; les modes cloud et la connexion sont refusés avec un message clair.',
+		'Bloque toute requête sortante. Les réponses sur cet appareil et vos documents continuent de fonctionner ; les modes distants et la connexion sont refusés avec un message clair.',
 	'settings.offline.badge': 'Hors ligne · rien ne quitte cet appareil',
 	'settings.workspace.title': 'Espace de travail',
 	'settings.workspace.exportDesc':
@@ -522,11 +521,11 @@ export const fr: Record<keyof typeof en, string> = {
 		"Un court test privé mesure la vitesse de l'IA locale sur cet appareil.",
 	'settings.models.testing': 'Test…',
 	'settings.models.test': 'Tester mon appareil',
-	'settings.models.prepareFirst': "Préparez d'abord l'IA privée (sélecteur de mode → Private).",
+	'settings.models.prepareFirst':
+		"Préparez d'abord le modèle local (sélecteur de mode → Cet appareil).",
 	'settings.models.tps': '{tps} mots par seconde',
-	'settings.models.comfortable': 'cet appareil exécute le mode Private confortablement.',
-	'settings.models.slow':
-		'cet appareil est lent pour le mode Private ; Assisted sera nettement plus rapide.',
+	'settings.models.comfortable': 'cet appareil répond confortablement tout seul.',
+	'settings.models.slow': 'cet appareil est lent tout seul ; le Cloud sera nettement plus rapide.',
 	'settings.wipe.title': 'Tout supprimer',
 	'settings.wipe.desc':
 		"Efface tous les documents, discussions, index et IA téléchargées de cet appareil. Rien n'existe ailleurs, cette action est donc irréversible.",
@@ -586,31 +585,20 @@ export const fr: Record<keyof typeof en, string> = {
 	'hiw.step.question': 'Votre question',
 	'hiw.step.search': 'Recherche locale',
 	'hiw.step.passages': 'Meilleurs passages',
-	'hiw.step.modes': 'Private / Assisted / My AI',
+	'hiw.step.modes': 'Cet appareil / Cloud / Votre serveur',
 	'hiw.step.answer': 'Réponse + citations',
 	'hiw.frame': 'Ce navigateur',
 	'hiw.onlyMode':
-		"Seule l'étape du mode décide si quelque chose part, et seuls Assisted et My AI envoient les passages sélectionnés.",
+		"Seule l'étape du mode décide si quelque chose part, et seuls le Cloud et Votre serveur envoient les passages sélectionnés.",
 	'hiw.proofTitle': 'Vérifiez par vous-même',
 	'hiw.proofBody':
-		"Préparez le mode Private, puis coupez le Wi-Fi et posez à nouveau votre question. L'analyse, la recherche et la réponse continuent de fonctionner.",
+		"Préparez le modèle local, puis coupez le Wi-Fi et posez à nouveau votre question. L'analyse, la recherche et la réponse continuent de fonctionner.",
 	'hiw.footer':
-		'Le code est open source. Inspectez-le, hébergez-le vous-même, ou restez en mode Private sans réseau.',
+		'Le code est open source. Inspectez-le, hébergez-le vous-même, ou gardez tout sur cet appareil sans réseau.',
 
 	// Account
-	'account.kicker': 'Regeste · compte',
-	'account.headline': 'Une adresse. Un code.',
-	'account.body':
-		'Un compte déverrouille le mode Assisted. Pas de mot de passe : nous envoyons un code à six chiffres à votre adresse e-mail. Vos documents et discussions restent sur cet appareil.',
 	'account.signedInAs': 'Connecté en tant que',
 	'account.signOut': 'Se déconnecter',
-	'account.enterCode': 'Saisissez le code',
-	'account.sentTo': 'Envoyé à {email} · valable 5 minutes',
-	'account.otherAddress': 'Utiliser une autre adresse',
-	'account.resend': 'Renvoyer le code',
-	'account.email': 'E-mail',
-	'account.sending': 'Envoi…',
-	'account.sendCode': 'Recevoir un code',
 
 	// Toasts (layout + uploads)
 	'toast.ready': '{name} est prêt',
@@ -630,9 +618,9 @@ export const fr: Record<keyof typeof en, string> = {
 	'notice.myaiUnreachable':
 		"Votre serveur d'IA est injoignable. Vérifiez qu'il tourne, l'URL et ses réglages CORS.",
 	'notice.quota': 'Votre réserve du jour est épuisée. Elle revient demain.',
-	'notice.signIn': 'Connectez-vous pour utiliser le mode Assisted.',
-	'notice.assistedDown': 'Le service Assisted est indisponible pour le moment.',
-	'notice.assistedUnreachable': 'Le service Assisted est injoignable. Vérifiez votre connexion.',
+	'notice.signIn': 'Connectez-vous pour utiliser le mode Cloud.',
+	'notice.assistedDown': 'Le service Cloud est indisponible pour le moment.',
+	'notice.assistedUnreachable': 'Le service Cloud est injoignable. Vérifiez votre connexion.',
 
 	// Calculs exacts sur les documents
 	'aggregate.ambiguous':

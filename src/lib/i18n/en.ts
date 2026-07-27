@@ -132,17 +132,16 @@ export const en = {
 	// number of answers per model is the trade, stated in the only word that
 	// needs no explaining.
 	'cloudModel.label': 'Answer quality',
-	'cloudModel.fast': 'Quick',
-	'cloudModel.fast.line': 'Short factual questions.',
 	'cloudModel.balanced': 'Standard',
-	'cloudModel.balanced.line': 'The everyday choice.',
+	'cloudModel.balanced.line': 'The everyday choice, and four times more of them.',
 	'cloudModel.best': 'Thorough',
-	'cloudModel.best.line': 'Long documents and comparisons.',
+	'cloudModel.best.line': 'A larger model, for fewer questions a day.',
 	'cloudModel.left': '≈ {count} answers left today',
 	'cloudModel.spent': 'Nothing left today',
 
 	// Sign-in page
 	'auth.title': 'Sign in',
+	'auth.checkInbox': 'Check your inbox.',
 	'auth.back': 'Back to chat',
 	'auth.headline': 'Sign in',
 	'auth.body': 'Only the Cloud mode needs an account. The other two never do.',
@@ -214,7 +213,7 @@ export const en = {
 	'presend.match': 'match {pct}%',
 	'presend.firstTime': 'First time anything leaves this device',
 	'presend.firstTimeBody':
-		'Until now, everything happened on your device. Sending this transmits your question and the checked excerpts to the Assisted service, never your files. You get your answer back, and nothing is stored or logged.',
+		'Until now, everything happened on your device. Sending this transmits your question and the checked excerpts to the Cloud service, never your files. You get your answer back, and nothing is stored or logged.',
 	'presend.consent': 'I understand, continue',
 	'presend.count': '{selected}/{total} excerpts · {kb} KB',
 	'presend.footer': 'Only the checked excerpts and your question are sent. Your files stay here.',
@@ -467,7 +466,7 @@ export const en = {
 		'Removes every chat, its citations and its privacy history from this device. Documents stay in your library.',
 	'settings.deleteChats.cta': 'Delete all chats',
 	'settings.deleteChats.confirmTitle': 'Delete all chats?',
-	'settings.myai.title': 'My AI server',
+	'settings.myai.title': 'Your server',
 	'settings.myai.connection': 'Connection',
 	'settings.myai.model': 'Default model',
 	'settings.models.benchTitle': 'Speed test',
@@ -486,7 +485,7 @@ export const en = {
 		'Removes your sign-in and quota data from the server. Your documents and chats never were there; they stay on this device.',
 	'settings.account.deleteCta': 'Delete my account',
 	'settings.account.deleteConfirm': 'Delete this account?',
-	'settings.account.guest': 'No account. Sign in to unlock Assisted mode.',
+	'settings.account.guest': 'No account. Sign in to unlock the Cloud mode.',
 	'palette.themeLight': 'Theme: light',
 	'palette.themeDark': 'Theme: dark',
 	'palette.themeSystem': 'Theme: system',
@@ -501,7 +500,7 @@ export const en = {
 	'settings.appearance.dark': 'Dark',
 	'settings.offline.title': 'Force offline',
 	'settings.offline.label':
-		'Block every outgoing request. Private mode and your documents keep working; cloud modes and sign-in are refused with a clear message.',
+		'Block every outgoing request. Answering on this device and your documents keep working; the remote modes and sign-in are refused with a clear message.',
 	'settings.offline.badge': 'Offline · nothing leaves this device',
 	'settings.workspace.title': 'Workspace',
 	'settings.workspace.exportDesc':
@@ -521,8 +520,8 @@ export const en = {
 	'settings.models.test': 'Test my device',
 	'settings.models.prepareFirst': 'Prepare the private AI first (mode selector → Private).',
 	'settings.models.tps': '{tps} words a second',
-	'settings.models.comfortable': 'this device runs Private mode comfortably.',
-	'settings.models.slow': 'this device is slow for Private mode; Assisted will feel much faster.',
+	'settings.models.comfortable': 'this device answers comfortably on its own.',
+	'settings.models.slow': 'this device is slow on its own; Cloud will feel much faster.',
 	'settings.wipe.title': 'Delete everything',
 	'settings.wipe.desc':
 		'Erases every document, chat, search index and downloaded AI from this device. Nothing exists anywhere else, so this cannot be undone.',
@@ -581,31 +580,20 @@ export const en = {
 	'hiw.step.question': 'Your question',
 	'hiw.step.search': 'Local search',
 	'hiw.step.passages': 'Top passages',
-	'hiw.step.modes': 'Private / Assisted / My AI',
+	'hiw.step.modes': 'This device / Cloud / Your server',
 	'hiw.step.answer': 'Answer + citations',
 	'hiw.frame': 'This browser',
 	'hiw.onlyMode':
-		'Only the mode step decides whether anything leaves, and only Assisted and My AI send the selected passages.',
+		'Only the mode step decides whether anything leaves, and only Cloud and Your server send the selected passages.',
 	'hiw.proofTitle': 'Check it yourself',
 	'hiw.proofBody':
-		'Prepare Private mode, then turn off Wi-Fi and ask again. Reading, search and the answer keep working.',
+		'Prepare the on-device model, then turn off Wi-Fi and ask again. Reading, search and the answer keep working.',
 	'hiw.footer':
-		'The code is open source. Inspect it, self-host it, or stay in Private mode with the network off.',
+		'The code is open source. Inspect it, self-host it, or keep it on this device with the network off.',
 
-	// Account
-	'account.kicker': 'Regeste · account',
-	'account.headline': 'One address. One code.',
-	'account.body':
-		'An account unlocks Assisted mode. No password: we send a six-digit code to your email. Your documents and chats stay on this device.',
+	// Account. The sign-in copy moved to auth.* with the page itself.
 	'account.signedInAs': 'Signed in as',
 	'account.signOut': 'Sign out',
-	'account.enterCode': 'Enter the code',
-	'account.sentTo': 'Sent to {email} · valid 5 minutes',
-	'account.otherAddress': 'Use another address',
-	'account.resend': 'Resend code',
-	'account.email': 'Email',
-	'account.sending': 'Sending…',
-	'account.sendCode': 'Send me a code',
 
 	// Toasts (layout + uploads)
 	'toast.ready': '{name} is ready',
@@ -625,9 +613,9 @@ export const en = {
 	'notice.myaiUnreachable':
 		'Your AI server is unreachable. Check that it is running, plus the URL and its CORS settings.',
 	'notice.quota': "Today's allowance is spent. It comes back tomorrow.",
-	'notice.signIn': 'Sign in to use Assisted mode.',
-	'notice.assistedDown': 'The Assisted service is unavailable right now.',
-	'notice.assistedUnreachable': 'The Assisted service is unreachable. Check your connection.',
+	'notice.signIn': 'Sign in to use the Cloud mode.',
+	'notice.assistedDown': 'The Cloud service is unavailable right now.',
+	'notice.assistedUnreachable': 'The Cloud service is unreachable. Check your connection.',
 
 	// Exact document analytics
 	'aggregate.ambiguous':
