@@ -14,6 +14,8 @@
 	import { documentsStore } from '$lib/state/documents.svelte';
 	import { documentStatusKey } from '$lib/document-status';
 	import { ingestReadiness } from '$lib/ingest-readiness';
+	import { settingsStore } from '$lib/state/settings.svelte';
+	import CloudModelPicker from './cloud-model-picker.svelte';
 	import type { ChatMode } from '$lib/types';
 
 	let {
@@ -228,6 +230,14 @@
 			onaction={(q) => !sendBlocked && mode !== null && onsend(q)}
 		/>
 		<ModeSelector {mode} onselect={onmodeselect} {myaiModel} {privateOnly} />
+		<!-- Only in Cloud mode: the other two run on hardware the user already
+		     pays for, so there is no budget to spend and nothing to choose. -->
+		{#if mode === 'assisted'}
+			<CloudModelPicker
+				value={settingsStore.cloudModel}
+				onselect={(key) => settingsStore.setCloudModel(key)}
+			/>
+		{/if}
 		<div class="flex-1"></div>
 		<Tooltip.Root>
 			<Tooltip.Trigger>

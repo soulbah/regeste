@@ -117,7 +117,7 @@
 				open = false;
 				if (m.id === 'assisted') {
 					// Sign-in has its own page; the watcher picks the mode up on return.
-					goto(resolve('/chat/account'));
+					goto(resolve('/auth'));
 					return;
 				}
 				uiStore.openSettings('ai', m.id);

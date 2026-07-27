@@ -37,6 +37,7 @@
 	import { settingsStore } from '$lib/state/settings.svelte';
 	import { uiStore } from '$lib/state/ui.svelte';
 	import { ASSISTED_ENABLED } from '$lib/flags';
+	import { answersLeft, modelFor } from '$lib/cloud-models';
 
 	type Tab = 'general' | 'data' | 'ai' | 'account';
 	let tab = $state<Tab>('general');
@@ -518,7 +519,7 @@
 														onclick={() => {
 															uiStore.pendingActivation = 'assisted';
 															uiStore.settingsOpen = false;
-															goto(resolve('/chat/account'));
+															goto(resolve('/auth'));
 														}}
 													>
 														{t('menu.signIn')}
@@ -537,9 +538,13 @@
 											)}
 											{#if settingsStore.quota}
 												<p class="text-muted-foreground pt-2 text-xs">
+													<!-- Answers, on the model actually selected: a raw budget
+													     figure is a number nobody can act on. -->
 													{t('settings.workspace.quota', {
-														used: settingsStore.quota.used,
-														limit: settingsStore.quota.limit
+														answers: answersLeft(
+															settingsStore.quota.remaining,
+															modelFor(settingsStore.cloudModel)
+														)
 													})}
 												</p>
 											{:else if !sessionStore.user && !sessionStore.loading}
@@ -701,7 +706,7 @@
 										size="sm"
 										onclick={() => {
 											uiStore.settingsOpen = false;
-											goto(resolve('/chat/account'));
+											goto(resolve('/auth'));
 										}}
 									>
 										{t('menu.signIn')}

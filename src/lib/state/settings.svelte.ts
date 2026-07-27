@@ -6,6 +6,7 @@ import { zipSync, strToU8 } from 'fflate';
 import { getLocalDb } from '$lib/local-db/client';
 import { readOriginal } from '$lib/opfs';
 import { guardedFetch } from '$lib/net';
+import { DEFAULT_MODEL_KEY, type CloudModelKey } from '$lib/cloud-models';
 import { ASSISTED_ENABLED } from '$lib/flags';
 
 export interface StorageStatus {
@@ -23,11 +24,13 @@ class SettingsStore {
 	wiping = $state(false);
 	exporting = $state(false);
 	/** R5 — this month's Assisted usage; null when signed out/unknown. */
-	quota = $state<{ used: number; limit: number } | null>(null);
+	quota = $state<{ used: number; limit: number; remaining: number } | null>(null);
 	/** Spec 021 — mode applied to newly created chats. */
 	defaultMode = $state<'private' | 'assisted' | 'myai'>('private');
 	/** Spec 022 — false until the user picks a mode for the first time. */
 	modeChosen = $state(false);
+	/** Which Cloud model answers. Local, like every other preference. */
+	cloudModel = $state<CloudModelKey>(DEFAULT_MODEL_KEY);
 
 	private loaded = false;
 
@@ -42,6 +45,8 @@ class SettingsStore {
 		// profile carried over from a deployment that had it): fall back to Private.
 		if (mode === 'myai' || (mode === 'assisted' && ASSISTED_ENABLED)) this.defaultMode = mode;
 		this.modeChosen = (await db.getSetting('mode_chosen')) === '1';
+		const cloud = await db.getSetting('cloud_model');
+		if (cloud === 'fast' || cloud === 'balanced' || cloud === 'best') this.cloudModel = cloud;
 		await this.refreshStorage();
 	}
 
@@ -50,6 +55,12 @@ class SettingsStore {
 		this.modeChosen = true;
 		const { db } = await getLocalDb();
 		await db.setSetting('mode_chosen', '1');
+	}
+
+	async setCloudModel(key: CloudModelKey): Promise<void> {
+		this.cloudModel = key;
+		const { db } = await getLocalDb();
+		await db.setSetting('cloud_model', key === DEFAULT_MODEL_KEY ? null : key);
 	}
 
 	async setDefaultMode(mode: 'private' | 'assisted' | 'myai'): Promise<void> {

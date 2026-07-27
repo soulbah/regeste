@@ -3,6 +3,7 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { emailOTP } from 'better-auth/plugins';
 import { drizzle } from 'drizzle-orm/d1';
 import * as schema from './db/schema';
+import { sendOtpEmail } from './otp-email';
 
 // Bindings only exist per-request on Workers, so the auth instance is built
 // per request in hooks.server.ts — never at module top level.
@@ -12,7 +13,7 @@ import * as schema from './db/schema';
 //
 // Auth = email OTP only (owner decision, FEATURES 5ter). signIn.emailOtp
 // auto-registers unknown emails, so one flow covers sign-up and sign-in.
-export function createAuth(env: Env, origin: string) {
+export function createAuth(env: Env, origin: string, locale: 'fr' | 'en' = 'en') {
 	const db = drizzle(env.DB, { schema });
 	const dev = origin.includes('localhost') || origin.includes('127.0.0.1');
 	return betterAuth({
@@ -22,15 +23,17 @@ export function createAuth(env: Env, origin: string) {
 		plugins: [
 			emailOTP({
 				async sendVerificationOTP({ email, otp }) {
-					if (dev || env.OTP_DEBUG === '1') {
-						// No email sending yet: the code lands in the server logs
-						// (vite console locally, `wrangler tail` on a deploy).
-						// Production wiring: Cloudflare Email Service — and this
-						// branch must die before launch (docs/internal/OSS-LAUNCH.md).
-						console.log(`[regeste dev] OTP for ${email}: ${otp}`);
-						return;
+					// Local dev has no EMAIL binding, so the code goes to the console
+					// the developer is already watching. A deploy always sends: a
+					// silent fallback there would let a broken sender look healthy.
+					if (!env.EMAIL) {
+						if (dev) {
+							console.log(`[dev] sign-in code for ${email}: ${otp}`);
+							return;
+						}
+						throw new Error('EMAIL binding missing: cannot send the sign-in code');
 					}
-					throw new Error('Email delivery not configured yet');
+					await sendOtpEmail(env.EMAIL, email, otp, locale);
 				}
 			})
 		],

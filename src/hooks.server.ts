@@ -2,12 +2,19 @@ import type { Handle } from '@sveltejs/kit';
 import { building } from '$app/environment';
 import { svelteKitHandler } from 'better-auth/svelte-kit';
 import { createAuth } from '$lib/server/auth';
+import { pickLocale } from '$lib/server/otp-email';
 
 export const handle: Handle = async ({ event, resolve }) => {
 	if (building) {
 		return resolve(event);
 	}
-	const auth = createAuth(event.platform!.env, event.url.origin);
+	// The locale rides along so a sign-in code reaches someone in the language
+	// they are reading the app in.
+	const auth = createAuth(
+		event.platform!.env,
+		event.url.origin,
+		pickLocale(event.request.headers.get('accept-language'))
+	);
 	event.locals.auth = auth;
 	const response = await svelteKitHandler({ event, resolve, auth, building });
 	// Cross-origin isolation (spec 018): unlocks SharedArrayBuffer, which the

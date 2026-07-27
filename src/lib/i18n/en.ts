@@ -127,6 +127,35 @@ export const en = {
 	'modes.state.signIn': 'Sign in',
 	'modes.activated': '{mode} is ready and now selected.',
 	'modes.aiSettings': 'AI settings…',
+	// Cloud model picker. The unit is the answer, never a made-up currency and
+	// never the platform's billing unit: the same daily budget shown as a
+	// number of answers per model is the trade, stated in the only word that
+	// needs no explaining.
+	'cloudModel.label': 'Answer quality',
+	'cloudModel.fast': 'Quick',
+	'cloudModel.fast.line': 'Short factual questions.',
+	'cloudModel.balanced': 'Standard',
+	'cloudModel.balanced.line': 'The everyday choice.',
+	'cloudModel.best': 'Thorough',
+	'cloudModel.best.line': 'Long documents and comparisons.',
+	'cloudModel.left': '≈ {count} answers left today',
+	'cloudModel.spent': 'Nothing left today',
+
+	// Sign-in page
+	'auth.title': 'Sign in',
+	'auth.back': 'Back to chat',
+	'auth.headline': 'Sign in',
+	'auth.body': 'Only the Cloud mode needs an account. The other two never do.',
+	'auth.email': 'Email',
+	'auth.emailPlaceholder': 'you@example.com',
+	'auth.continue': 'Continue',
+	'auth.sending': 'Sending…',
+	'auth.or': 'or',
+	'auth.continueWith': 'Continue with {provider}',
+	'auth.providerSoon': 'Not available yet.',
+	'auth.codeSent': 'Enter the six-digit code sent to {email}.',
+	'auth.changeEmail': 'Use another address',
+	'auth.footnote': 'Your documents and chats stay on this device either way.',
 	'modes.whatLeaves': 'What leaves the device in each mode →',
 
 	// My AI configuration
@@ -479,8 +508,8 @@ export const en = {
 		'Export your documents, chats, citations and privacy history as a plain zip.',
 	'settings.workspace.packing': 'Packing…',
 	'settings.workspace.export': 'Export my workspace',
-	'settings.workspace.quota': 'Assisted usage this month: {used} / {limit}',
-	'settings.workspace.quotaSignIn': "Assisted usage appears here once you're signed in.",
+	'settings.workspace.quota': 'About {answers} answers left today',
+	'settings.workspace.quotaSignIn': "Your daily allowance appears here once you're signed in.",
 	'settings.models.title': 'Downloaded AI',
 	'settings.models.measuring': 'Measuring…',
 	'settings.models.none': 'Nothing downloaded yet.',
@@ -595,7 +624,7 @@ export const en = {
 	'notice.stopped': 'Generation stopped before an answer came through.',
 	'notice.myaiUnreachable':
 		'Your AI server is unreachable. Check that it is running, plus the URL and its CORS settings.',
-	'notice.quota': 'Monthly Assisted quota reached. It resets next month.',
+	'notice.quota': "Today's allowance is spent. It comes back tomorrow.",
 	'notice.signIn': 'Sign in to use Assisted mode.',
 	'notice.assistedDown': 'The Assisted service is unavailable right now.',
 	'notice.assistedUnreachable': 'The Assisted service is unreachable. Check your connection.',

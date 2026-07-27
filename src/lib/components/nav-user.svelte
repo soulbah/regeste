@@ -124,7 +124,7 @@
 						{t('account.signOut')}
 					</DropdownMenu.Item>
 				{:else}
-					<DropdownMenu.Item onclick={() => goto(resolve('/chat/account'))}>
+					<DropdownMenu.Item onclick={() => goto(resolve('/auth'))}>
 						<LogInIcon class="text-muted-foreground" />
 						{t('menu.signIn')}
 					</DropdownMenu.Item>

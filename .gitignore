@@ -42,3 +42,8 @@ static/ort/
 
 # Local benchmark scratch data and downloaded third-party corpora
 /tmp/
+
+# Cloudflare global API token, kept out of the repo and out of any agent's
+# context. Wrangler's own OAuth login is the normal path; this file is the
+# fallback and is read by the shell, never opened.
+/.cf_global_api_token

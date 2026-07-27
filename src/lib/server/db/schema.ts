@@ -54,8 +54,18 @@ export const verification = sqliteTable('verification', {
 	updatedAt: integer('updated_at', { mode: 'timestamp' })
 });
 
-// ── Quotas (Assisted mode) ───────────────────────────────────────────────────
-// One row per user per month, incremented in the same request that serves the call.
+// ── Quotas (Cloud mode) ──────────────────────────────────────────────────────
+// One row per user per day, written in the same request that serves the call.
+//
+// Neurons, not requests. Cloudflare bills and rate-limits Workers AI in
+// neurons, and the models on offer differ by a factor of four per answer, so a
+// request count would charge the same for a cheap answer and an expensive one
+// and make the model picker meaningless. Counting the unit the platform counts
+// keeps the budget honest in both directions.
+//
+// Daily, not monthly, because the free allocation resets daily at 00:00 UTC: a
+// monthly window lets one afternoon exhaust an allowance that had already come
+// back. Still no content: a neuron total says nothing about a document.
 
 export const quotaUsage = sqliteTable(
 	'quota_usage',
@@ -64,9 +74,16 @@ export const quotaUsage = sqliteTable(
 		userId: text('user_id')
 			.notNull()
 			.references(() => user.id, { onDelete: 'cascade' }),
-		month: text('month').notNull(), // 'YYYY-MM'
+		day: text('day').notNull().default(''), // 'YYYY-MM-DD' UTC, the platform's own reset
+		/** Cloudflare's billing unit for Workers AI. Never shown to a user: the
+		 * interface speaks in answers, which is the only unit that needs no
+		 * explaining and that changes visibly when a cheaper model is picked. */
+		neurons: integer('neurons').notNull().default(0),
 		requests: integer('requests').notNull().default(0),
+		/** Kept from the monthly scheme so this migration adds and never drops.
+		 * Written but no longer read. */
+		month: text('month').notNull(),
 		updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull()
 	},
-	(t) => [uniqueIndex('quota_usage_user_month').on(t.userId, t.month)]
+	(t) => [uniqueIndex('quota_usage_user_day').on(t.userId, t.day)]
 );

@@ -7,6 +7,7 @@ import type { CitationRow, MessageExcerptRow, MessagePrivacyRow } from '$lib/loc
 import { documentsStore } from './documents.svelte';
 import { guardedFetch, OfflineError } from '$lib/net';
 import { myaiStore, endpointHost, type ChatMessage } from './myai.svelte';
+import { settingsStore } from './settings.svelte';
 import { llmStore } from '$lib/private-ai/llm.svelte';
 import { generationOptionsFor, verificationOptionsFor } from '$lib/private-ai/generation';
 import {
@@ -1621,7 +1622,12 @@ class ChatsStore {
 				const res = await guardedFetch('/api/assisted', {
 					method: 'POST',
 					headers: { 'content-type': 'application/json' },
-					body: JSON.stringify({ question, excerpts, context: conversationContext ?? undefined })
+					body: JSON.stringify({
+						question,
+						excerpts,
+						context: conversationContext ?? undefined,
+						model: settingsStore.cloudModel
+					})
 				});
 				if (!res.ok) {
 					failed =

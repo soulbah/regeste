@@ -10,19 +10,18 @@
 import { error, json } from '@sveltejs/kit';
 import * as v from 'valibot';
 import { drizzle } from 'drizzle-orm/d1';
-import { checkAndIncrementQuota } from '$lib/server/quota';
+import { chargeQuota, readQuota } from '$lib/server/quota';
+import { modelFor, neuronsFor, typicalCost } from '$lib/cloud-models';
 import { buildAssistedUserContent } from '$lib/server/assisted-prompt';
 import { ASSISTED_ENABLED } from '$lib/flags';
 import type { RequestHandler } from './$types';
 
-// glm-4.7-flash verified 2026-07-09: correct grounded answers but ~2 min per
-// call (reasoning queue; reasoning_effort/enable_thinking had no effect via
-// the binding). llama-3.3-70b fp8 fast: same quality on grounded FR QA, seconds.
-const MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
-
 const BodySchema = v.object({
 	question: v.pipe(v.string(), v.minLength(1), v.maxLength(4000)),
 	context: v.optional(v.pipe(v.string(), v.minLength(1), v.maxLength(2000))),
+	// The caller names a tier, never a model id: the catalogue stays server-side
+	// so swapping a model out cannot strand an old client on a dead id.
+	model: v.optional(v.picklist(['fast', 'balanced', 'best'] as const)),
 	excerpts: v.pipe(
 		v.array(
 			v.object({
@@ -48,6 +47,8 @@ Rules:
 interface ChatCompletion {
 	choices?: Array<{ message?: { content?: string } }>;
 	response?: string;
+	/** Workers AI reports what the call actually consumed. */
+	usage?: { prompt_tokens?: number; completion_tokens?: number };
 }
 
 export const POST: RequestHandler = async ({ request, locals, platform }) => {
@@ -61,20 +62,25 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 
 	const parsed = v.safeParse(BodySchema, await request.json().catch(() => null));
 	if (!parsed.success) throw error(400, 'Invalid request');
-	const { question, excerpts, context } = parsed.output;
+	const { question, excerpts, context, model: modelKey } = parsed.output;
 
 	const env = platform!.env;
 	// Local dev runs without the AI binding (wrangler.dev.jsonc) — honest 503.
 	if (!env.AI) throw error(503, 'Assisted is not available in local dev — test against a deploy');
 	const db = drizzle(env.DB);
-	const quota = await checkAndIncrementQuota(db, session.user.id);
-	if (!quota.allowed) throw error(429, 'Monthly Assisted quota reached');
 
+	// Read before, charge after: the real cost is only known once the model
+	// reports the tokens it used, and refusing on an estimate would deny answers
+	// the budget actually covers.
+	const before = await readQuota(db, session.user.id);
+	if (before.remaining <= 0) throw error(429, "Today's quota is spent");
+
+	const model = modelFor(modelKey);
 	const userContent = buildAssistedUserContent(question, excerpts, context);
 
 	const t0 = Date.now();
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	const result = (await env.AI.run(MODEL as any, {
+	const result = (await env.AI.run(model.id as any, {
 		messages: [
 			{ role: 'system', content: SYSTEM },
 			{ role: 'user', content: userContent }
@@ -84,10 +90,21 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 
 	const answer = result.choices?.[0]?.message?.content ?? result.response ?? '';
 
+	// Charge what it cost. When the platform reports no usage the typical shape
+	// is charged instead: a free answer would be a hole in the budget, and
+	// silently not charging is how an allowance leaks.
+	const neurons = result.usage
+		? neuronsFor(model, result.usage.prompt_tokens ?? 0, result.usage.completion_tokens ?? 0)
+		: typicalCost(model);
+	const quota = await chargeQuota(db, session.user.id, neurons);
+
 	// Content-free observability.
 	console.log(
-		`[assisted] user=${session.user.id.slice(0, 8)} excerpts=${excerpts.length} quota=${quota.used}/${quota.limit} duration=${Date.now() - t0}ms answerChars=${answer.length}`
+		`[cloud] user=${session.user.id.slice(0, 8)} model=${model.key} excerpts=${excerpts.length} neurons=${neurons} quota=${quota.used}/${quota.limit} duration=${Date.now() - t0}ms answerChars=${answer.length}`
 	);
 
-	return json({ answer, quota: { used: quota.used, limit: quota.limit } });
+	return json({
+		answer,
+		quota: { used: quota.used, limit: quota.limit, remaining: quota.remaining }
+	});
 };
