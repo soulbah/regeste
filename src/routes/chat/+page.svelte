@@ -4,12 +4,17 @@
 	import { toast } from 'svelte-sonner';
 	import FileUpIcon from '@lucide/svelte/icons/file-up';
 	import * as Sidebar from '$lib/components/ui/sidebar';
+	import { Button } from '$lib/components/ui/button';
 	import Composer from '$lib/components/composer.svelte';
+	import OnboardingModes from '$lib/components/onboarding-modes.svelte';
 	import { DEMO_SAMPLES } from '$lib/demo/samples';
 	import { t } from '$lib/i18n/index.svelte';
 	import { chatsStore } from '$lib/state/chats.svelte';
 	import { documentsStore } from '$lib/state/documents.svelte';
 	import { settingsStore } from '$lib/state/settings.svelte';
+	import { uiStore } from '$lib/state/ui.svelte';
+	import { onboardingState } from '$lib/state/onboarding.svelte';
+	import { modeReadiness } from '$lib/state/mode-readiness.svelte';
 	import type { ChatMode } from '$lib/types';
 
 	// Spec 022 — null until the user has ever chosen a mode on this device;
@@ -20,6 +25,23 @@
 		if (!modeTouched) mode = settingsStore.modeChosen ? settingsStore.defaultMode : null;
 	});
 	let demoStarting = $state(false);
+
+	const MODE_LINE = {
+		private: 'modes.private.description',
+		assisted: 'modes.assisted.description',
+		myai: 'modes.myai.description'
+	} as const;
+
+	const onboarding = $derived(onboardingState());
+	const choosing = $derived(onboarding.step === 'choose-mode');
+	const pendingMode = $derived(onboarding.pendingMode);
+	/** Why setup is unfinished, in the words the picker already uses. */
+	const setupLine = $derived.by(() => {
+		if (!pendingMode) return '';
+		const readiness = modeReadiness(pendingMode);
+		if (onboarding.downloadPct !== null) return t('onboard.downloading');
+		return readiness.blockedLine ?? t('onboard.unfinished');
+	});
 
 	/** O1 — one click: a chat with the bundled fictional contracts. */
 	async function startDemo() {
@@ -116,9 +138,11 @@
 		<h1 class="font-display px-1 text-lg tracking-tight">{t('sidebar.newChat')}</h1>
 	</header>
 
-	<!-- Document-first onboarding: the drop zone is the one primary action; the
-	     privacy promise is said once here (copy rule allows the home empty state);
-	     the demo is demoted to a quiet fallback; three quiet beats set expectation. -->
+	<!-- Sequenced onboarding: one action at a time, in the order the app actually
+	     depends on. An engine has to exist before a document is worth adding, so
+	     the drop zone only appears once one is chosen. It appears during the
+	     download rather than after it: indexing runs on a separate, much smaller
+	     model that is already here, so the two never wait on each other. -->
 	<input
 		bind:this={fileInput}
 		type="file"
@@ -132,61 +156,91 @@
 		}}
 	/>
 	<div class="flex flex-1 flex-col items-center justify-center px-6">
-		<div class="w-full max-w-lg space-y-8 text-center">
+		<div class="w-full {choosing ? 'max-w-2xl' : 'max-w-lg'} space-y-8 text-center">
 			<div class="space-y-2.5">
 				<h2 class="font-display text-4xl tracking-tight text-balance">
-					{t('home.headline')}
+					{choosing ? t('onboard.headline') : t('home.headline')}
 				</h2>
-				<p class="text-muted-foreground text-sm">{t('home.privacy')}</p>
+				<!-- What the chosen mode actually does. A flat "everything runs on
+				     your device" used to print before the mode was picked, promising
+				     something My AI and Assisted do not keep. The picker's own
+				     descriptions are the single source for that claim. -->
+				<p class="text-muted-foreground text-sm">
+					{choosing ? t('onboard.headlineSub') : t(MODE_LINE[mode ?? 'private'])}
+				</p>
 			</div>
 
-			<button
-				type="button"
-				onclick={() => fileInput?.click()}
-				class="group border-border bg-card/40 hover:border-accent-foreground/40 hover:bg-accent/25 focus-visible:ring-ring/50 flex w-full flex-col items-center gap-3 rounded-2xl border-2 border-dashed px-8 py-14 transition-colors outline-none focus-visible:ring-2"
-			>
-				<span
-					class="bg-background group-hover:text-accent-foreground flex size-14 items-center justify-center rounded-full border shadow-sm transition-colors"
-				>
-					<FileUpIcon
-						class="text-muted-foreground group-hover:text-accent-foreground size-6 transition-colors"
-					/>
-				</span>
-				<span class="text-base font-medium">{t('home.dropTitle')}</span>
-				<span class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
-					{t('docsPage.types')}
-				</span>
-			</button>
-
-			<p class="text-muted-foreground text-sm">
-				{t('home.sampleLead')}
+			{#if choosing}
+				<OnboardingModes onchosen={(m) => ((modeTouched = true), (mode = m))} />
+			{:else}
 				<button
 					type="button"
-					class="text-foreground decoration-accent-foreground/50 hover:decoration-accent-foreground font-medium underline underline-offset-4 transition disabled:opacity-60"
-					disabled={demoStarting}
-					onclick={startDemo}
+					onclick={() => fileInput?.click()}
+					class="group border-border bg-card/40 hover:border-accent-foreground/40 hover:bg-accent/25 focus-visible:ring-ring/50 flex w-full flex-col items-center gap-3 rounded-2xl border-2 border-dashed px-8 py-14 transition-colors outline-none focus-visible:ring-2"
 				>
-					{demoStarting ? t('home.demoPreparing') : t('home.sampleLink')}
+					<span
+						class="bg-background group-hover:text-accent-foreground flex size-14 items-center justify-center rounded-full border shadow-sm transition-colors"
+					>
+						<FileUpIcon
+							class="text-muted-foreground group-hover:text-accent-foreground size-6 transition-colors"
+						/>
+					</span>
+					<span class="text-base font-medium">{t('home.dropTitle')}</span>
+					<span class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
+						{t('docsPage.types')}
+					</span>
 				</button>
-			</p>
 
-			<p class="text-muted-foreground/70 font-mono text-[10px] tracking-widest uppercase">
-				{t('home.steps')}
-			</p>
+				<p class="text-muted-foreground text-sm">
+					{t('home.sampleLead')}
+					<button
+						type="button"
+						class="text-foreground decoration-accent-foreground/50 hover:decoration-accent-foreground font-medium underline underline-offset-4 transition disabled:opacity-60"
+						disabled={demoStarting}
+						onclick={startDemo}
+					>
+						{demoStarting ? t('home.demoPreparing') : t('home.sampleLink')}
+					</button>
+				</p>
+			{/if}
 		</div>
 	</div>
 
-	<div class="px-6 pb-6">
-		<Composer
-			{mode}
-			onsend={handleSend}
-			onmodeselect={(m) => {
-				modeTouched = true;
-				mode = m;
-			}}
-			onupload={handleUpload}
-			onattach={handleAttach}
-			libraryEmpty={documentsStore.library.length === 0}
-		/>
-	</div>
+	<!-- Setting up and adding a document run side by side, so the wait is spent
+	     rather than watched. Quiet, persistent, never a modal. -->
+	{#if onboarding.step === 'finish-setup'}
+		<div class="px-6 pb-2">
+			<div
+				class="border-border bg-card/40 text-muted-foreground mx-auto flex max-w-lg items-center gap-3 rounded-lg border px-3 py-2 text-xs"
+			>
+				<span class="flex-1 text-left">{setupLine}</span>
+				{#if onboarding.downloadPct !== null}
+					<span class="tabular-nums">{onboarding.downloadPct}%</span>
+				{:else}
+					<Button variant="ghost" size="sm" onclick={() => uiStore.openSettings('ai', pendingMode)}>
+						{t('onboard.resume')}
+					</Button>
+				{/if}
+			</div>
+		</div>
+	{/if}
+
+	<!-- Hidden while choosing: with no engine and no document there is nothing to
+	     send, and leaving it up put a second call to action, in the accent colour,
+	     on the one step whose entire purpose is the first one. -->
+	{#if !choosing}
+		<div class="px-6 pb-6">
+			<Composer
+				{mode}
+				onsend={handleSend}
+				onmodeselect={(m) => {
+					modeTouched = true;
+					mode = m;
+				}}
+				onupload={handleUpload}
+				onattach={handleAttach}
+				libraryEmpty={documentsStore.library.length === 0}
+			/>
+		</div>
+	{/if}
 </div>
