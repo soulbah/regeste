@@ -175,14 +175,17 @@
 	     composer, because a returning user is reaching for the question box, not
 	     reading a hero. The two guided surfaces do centre, since there the screen
 	     itself is the instruction. -->
-	<!-- The guided surfaces sit above the mathematical centre. Centring a block
-	     exactly halfway reads as low, because the eye weights the empty space
-	     below more than the space above; pulling it up by a tenth of the
-	     viewport is what makes it look centred. -->
+	<!-- The engine choice sits above the mathematical centre: exact centring reads
+	     as low, because the eye weights the empty space below more than the space
+	     above. Only that surface, and only when there is room — the first run is
+	     tall enough (hero, drop zone, sample, setup line, composer) that the same
+	     shift pushed its headline under the header. -->
 	<div
-		class="flex flex-1 flex-col px-6 {choosing || firstRun
-			? 'items-center justify-center pb-[10vh]'
-			: 'items-center justify-end pb-4'}"
+		class="min-h-0 flex-1 overflow-y-auto px-6 {choosing
+			? 'flex flex-col items-center justify-center pb-[10vh]'
+			: firstRun
+				? 'flex flex-col items-center justify-center py-6'
+				: 'flex flex-col items-center justify-end pb-4'}"
 	>
 		<!-- Every surface shares the composer's max-w-3xl so the drop zone, the
 		     source list and the question box line up on one column instead of
@@ -237,11 +240,20 @@
 	{#if pendingMode}
 		<div class="px-6 pb-2">
 			<div
-				class="border-border bg-card/40 text-muted-foreground mx-auto flex max-w-3xl items-center gap-3 rounded-lg border px-3 py-2 text-xs"
+				class="border-border bg-card/40 text-muted-foreground relative mx-auto flex max-w-3xl items-center gap-3 overflow-hidden rounded-lg border px-3 py-2 text-xs"
 			>
-				<span class="flex-1 text-left">{setupLine}</span>
 				{#if home.downloadPct !== null}
-					<span class="tabular-nums">{home.downloadPct}%</span>
+					<!-- The progress fills the line itself rather than sitting beside it
+					     as a number. Gigabytes take minutes, and a bar that visibly
+					     advances is what tells someone the wait is finite. -->
+					<div
+						class="bg-accent-foreground/10 absolute inset-y-0 left-0 transition-[width] duration-500"
+						style="width: {home.downloadPct}%"
+					></div>
+				{/if}
+				<span class="relative flex-1 text-left">{setupLine}</span>
+				{#if home.downloadPct !== null}
+					<span class="relative tabular-nums">{home.downloadPct}%</span>
 				{:else}
 					<!-- The same routing the picker uses, so the button lands where the
 					     blocker actually is: the sign-in page for Cloud, the mode's

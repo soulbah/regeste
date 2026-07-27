@@ -8,6 +8,7 @@
 
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
+import { llmStore } from '$lib/private-ai/llm.svelte';
 import { modeReadiness } from '$lib/state/mode-readiness.svelte';
 import { uiStore } from '$lib/state/ui.svelte';
 import type { ChatMode } from '$lib/types';
@@ -39,10 +40,25 @@ export function dispatchMode(mode: ChatMode, onReady: (mode: ChatMode) => void):
 	if (readiness.state !== 'setup') return { activated: false };
 
 	uiStore.pendingActivation = mode;
+
+	// Each mode is missing exactly one thing, and each goes straight to it.
+	//
+	// This device is missing a file, and asking for a file is not a
+	// conversation: the download starts here, in place, and the progress rides
+	// the persistent line on the home while the user gets on with adding a
+	// document. Opening a modal to reveal a Download button was a step that
+	// existed only because the button happened to live there.
+	if (mode === 'private') {
+		void llmStore.prepare();
+		return { activated: false };
+	}
+	// Cloud is missing an account, which has its own page.
 	if (mode === 'assisted') {
 		void goto(resolve('/auth'));
 		return { activated: false };
 	}
+	// Your server is missing an address and a model choice: a real form, and
+	// the Settings card is where it lives.
 	uiStore.openSettings('ai', mode);
 	return { activated: false };
 }
