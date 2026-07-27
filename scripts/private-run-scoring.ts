@@ -85,6 +85,8 @@ export interface RunProvenance {
 	mode?: string;
 	generated?: number;
 	reusedFromCache?: number;
+	withoutModel?: number;
+	cacheEntries?: number;
 	replayMisses?: number;
 	wallSeconds?: number;
 	finishedAt?: string;
@@ -104,7 +106,7 @@ export function provenanceLine(path: string): string {
 	const cost =
 		p.generated === undefined
 			? ''
-			: ` · ${p.generated} generated, ${p.reusedFromCache} reused in ${p.wallSeconds}s`;
+			: ` · ${p.generated} generated, ${p.reusedFromCache} replayed, ${p.withoutModel ?? '?'} model-free in ${p.wallSeconds}s`;
 	// A replay miss is not a detail to bury at the end of a line: the score above
 	// it is wrong by that many cases.
 	const holes = p.replayMisses
