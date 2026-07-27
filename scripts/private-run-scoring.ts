@@ -75,6 +75,44 @@ function citationVerdict(
 	return test.pageGroups.every((group) => group.some((page) => citedPages.includes(page)));
 }
 
+/** What a run recorded about itself. Absent on anything archived before runs
+ * started stamping it, which is why every field is optional. */
+export interface RunProvenance {
+	commit?: string;
+	model?: string;
+	matrix?: string;
+	matrixSha?: string;
+	mode?: string;
+	generated?: number;
+	reusedFromCache?: number;
+	replayMisses?: number;
+	wallSeconds?: number;
+	finishedAt?: string;
+}
+
+export function readProvenance(path: string): RunProvenance | null {
+	const parsed: unknown = JSON.parse(readFileSync(path, 'utf8'));
+	if (Array.isArray(parsed)) return null;
+	return (parsed as { provenance?: RunProvenance }).provenance ?? null;
+}
+
+/** One line naming what produced a number, so two result files sitting side by
+ * side can be told apart without grepping their answers. */
+export function provenanceLine(path: string): string {
+	const p = readProvenance(path);
+	if (!p) return '  (no provenance: archived before runs stamped themselves)';
+	const cost =
+		p.generated === undefined
+			? ''
+			: ` · ${p.generated} generated, ${p.reusedFromCache} reused in ${p.wallSeconds}s`;
+	// A replay miss is not a detail to bury at the end of a line: the score above
+	// it is wrong by that many cases.
+	const holes = p.replayMisses
+		? `\n  ${p.replayMisses} REPLAY MISSES — this score is incomplete`
+		: '';
+	return `  ${p.commit ?? '?'} · ${p.model ?? '?'} · ${p.mode ?? '?'}${cost}${holes}`;
+}
+
 export function loadScoredRun(
 	path: string,
 	cases: Map<string, PrivateDocumentStressCase>

@@ -5,7 +5,13 @@
 //
 // Usage: bun scripts/compare-private-runs.ts <before.json> <after.json>
 import { basename } from 'node:path';
-import { gateLabel, loadMatrix, loadScoredRun, type ScoredResult } from './private-run-scoring';
+import {
+	gateLabel,
+	loadMatrix,
+	loadScoredRun,
+	provenanceLine,
+	type ScoredResult
+} from './private-run-scoring';
 
 const [beforePath, afterPath] = process.argv.slice(2);
 if (!beforePath || !afterPath) {
@@ -41,7 +47,9 @@ for (const [id, next] of after) {
 const score = (map: Map<string, ScoredResult>) =>
 	`${[...map.values()].filter((result) => result.scored.passed).length}/${map.size}`;
 console.log(`${basename(beforePath)} ${score(before)}`);
+console.log(provenanceLine(beforePath));
 console.log(`${basename(afterPath)} ${score(after)}`);
+console.log(provenanceLine(afterPath));
 console.log(
 	`\ngained ${gained.length}, lost ${lost.length}, same verdict through different gates ${churned.length}`
 );

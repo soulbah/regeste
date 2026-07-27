@@ -810,6 +810,7 @@
 			let generationCacheHits = 0;
 			let newGenerations = 0;
 			let extractiveAnswers = 0;
+			let replayMisses = 0;
 			let rewriteQueue: Promise<void> = Promise.resolve();
 			const serializedRewrite = (
 				messages: Array<{ role: 'system' | 'user'; content: string }>
@@ -912,6 +913,16 @@
 						generationCacheHits++;
 						return { text: cached, source: 'cached' as const };
 					}
+					// Replay mode exists so a change to scoring, the numeric guard or
+					// citation binding can be measured across the whole corpus in
+					// minutes: none of them touches a prompt, so every generation
+					// should be a hit. A miss means something upstream did move the
+					// prompt, and silently spending an hour regenerating would hide
+					// exactly the fact worth knowing. Record it and carry on.
+					if (localStorage.getItem('regeste:dev-bench-cache-mode') === 'replay') {
+						replayMisses++;
+						return { text: '', source: 'replay-miss' as const };
+					}
 					newGenerations++;
 					// Parity with the app path: the engine's context-overflow error
 					// shrinks tail excerpts and replays — the survivors keep their
@@ -999,7 +1010,8 @@
 				generationCache: {
 					hits: generationCacheHits,
 					misses: newGenerations,
-					extractive: extractiveAnswers
+					extractive: extractiveAnswers,
+					replayMisses
 				},
 				humanReview: humanReviewSummary(checkpoint),
 				answers: report.results.map((result) => ({

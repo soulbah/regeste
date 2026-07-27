@@ -75,7 +75,16 @@ export type PrivateDocumentStressOutcome = 'answer' | 'qualified' | 'refusal';
  * model generation are three different claims about the product.
  */
 export type StressAnswerSource =
-	'exact' | 'extractive' | 'cached' | 'llm' | 'skipped' | 'no-evidence';
+	| 'exact'
+	| 'extractive'
+	| 'cached'
+	| 'llm'
+	| 'skipped'
+	| 'no-evidence'
+	/** Replay mode refused to generate because the prompt was not in the cache.
+	 * It scores as a failure on purpose: a run carrying any of these is measuring
+	 * a hole, and the per-source breakdown puts the count in front of you. */
+	| 'replay-miss';
 
 export type StressGeneration = string | { text: string; source: StressAnswerSource };
 

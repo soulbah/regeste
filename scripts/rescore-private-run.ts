@@ -6,7 +6,7 @@
 //
 // Usage: bun scripts/rescore-private-run.ts <run.json> [more-runs.json...]
 import { basename } from 'node:path';
-import { gateLabel, loadMatrix, loadScoredRun } from './private-run-scoring';
+import { gateLabel, loadMatrix, loadScoredRun, provenanceLine } from './private-run-scoring';
 
 const runPaths = process.argv.slice(2);
 if (!runPaths.length) {
@@ -39,6 +39,7 @@ for (const runPath of runPaths) {
 	}
 
 	console.log(`\n${basename(runPath)}`);
+	console.log(provenanceLine(runPath));
 	console.log(
 		`  as archived ${archived}/${results.length}   under the current oracle ${rescored}/${results.length}`
 	);
