@@ -58,9 +58,9 @@
 	}
 
 	function modeLabel(mode: string): string {
-		if (mode === 'private') return 'Private';
-		if (mode === 'assisted') return 'Assisted';
-		if (mode === 'myai') return 'My AI';
+		if (mode === 'private') return t('modes.private.name');
+		if (mode === 'assisted') return t('modes.assisted.name');
+		if (mode === 'myai') return t('modes.myai.name');
 		return mode;
 	}
 

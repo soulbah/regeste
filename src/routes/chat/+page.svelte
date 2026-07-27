@@ -166,8 +166,12 @@
 			? 'items-center justify-center'
 			: 'items-center justify-end pb-4'}"
 	>
+		<!-- Every surface shares the composer's max-w-3xl so the drop zone, the
+		     source list and the question box line up on one column instead of
+		     three different widths stacked. The engine cards get more room again:
+		     three of them at max-w-3xl would be cramped. -->
 		<div
-			class="w-full space-y-8 {choosing ? 'max-w-2xl' : 'max-w-lg'} {choosing || firstRun
+			class="w-full space-y-8 {choosing ? 'max-w-4xl' : 'max-w-3xl'} {choosing || firstRun
 				? 'text-center'
 				: ''}"
 		>
@@ -215,7 +219,7 @@
 	{#if pendingMode}
 		<div class="px-6 pb-2">
 			<div
-				class="border-border bg-card/40 text-muted-foreground mx-auto flex max-w-lg items-center gap-3 rounded-lg border px-3 py-2 text-xs"
+				class="border-border bg-card/40 text-muted-foreground mx-auto flex max-w-3xl items-center gap-3 rounded-lg border px-3 py-2 text-xs"
 			>
 				<span class="flex-1 text-left">{setupLine}</span>
 				{#if home.downloadPct !== null}

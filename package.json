@@ -9,7 +9,7 @@
 	},
 	"packageManager": "bun@1.2.22",
 	"scripts": {
-		"dev": "vite dev",
+		"dev": "PUBLIC_ASSISTED_ENABLED=true vite dev",
 		"build": "vite build && node scripts/check-asset-limits.mjs",
 		"preview": "bun run build && wrangler dev",
 		"prepare": "svelte-kit sync && bun run vendor || echo ''",

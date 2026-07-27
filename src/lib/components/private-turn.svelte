@@ -80,7 +80,11 @@
 	let stripExpanded = $state(false);
 	const stripSources = $derived(stripExpanded ? citations : citations.slice(0, STRIP_CAP));
 
-	const modeLabel = { private: 'Private', assisted: 'Assisted', myai: 'My AI' } as const;
+	const modeLabel = $derived({
+		private: t('modes.private.name'),
+		assisted: t('modes.assisted.name'),
+		myai: t('modes.myai.name')
+	});
 	const metaLine = $derived(
 		mode === 'private'
 			? t('turn.privateMeta', { count: excerpts.length, s: excerpts.length === 1 ? '' : 's' })

@@ -1,6 +1,6 @@
 // French dictionary (spec 016). Typed against the English dictionary so a
-// missing key fails typecheck. Vouvoiement; mode names (Private, Assisted,
-// My AI) are product names and stay untranslated.
+// missing key fails typecheck. Vouvoiement; mode names say where the answer is
+// computed and ARE translated (see modes.*.name).
 
 import type { en } from './en';
 
@@ -85,11 +85,14 @@ export const fr: Record<keyof typeof en, string> = {
 	'addDocs.choose': 'Mes documents',
 	'addDocs.upload': 'Importer un fichier',
 
-	// Mode selector
+	// Mode selector — les noms disent OÙ la réponse est calculée (voir en.ts).
+	'modes.private.name': 'Cet appareil',
+	'modes.assisted.name': 'Cloud',
+	'modes.myai.name': 'Votre serveur',
 	'modes.private.description': 'Tout reste sur cet appareil.',
 	'modes.assisted.description': 'Seuls les extraits pertinents sont traités en ligne.',
 	'modes.myai.description': "Utilisez votre propre fournisseur d'IA.",
-	'modes.best': 'Idéal pour cet appareil',
+	'modes.best': 'Idéal pour votre machine',
 	'modes.bestReason.noGpu': "ce navigateur ne peut pas exécuter l'IA sur votre appareil",
 	'modes.bestReason.local': "cet appareil peut exécuter l'IA localement",
 	'modes.private.checking': 'Vérification de cet appareil…',

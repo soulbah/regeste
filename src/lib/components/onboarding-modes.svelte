@@ -28,7 +28,13 @@
 		ASSISTED_ENABLED ? (['private', 'assisted', 'myai'] as const) : (['private', 'myai'] as const)
 	) satisfies readonly ChatMode[];
 
-	const LABELS = { private: 'Private', assisted: 'Assisted', myai: 'My AI' } as const;
+	// Derived, not a plain const: the names come from the dictionary and have to
+	// follow a language switch.
+	const LABELS = $derived({
+		private: t('modes.private.name'),
+		assisted: t('modes.assisted.name'),
+		myai: t('modes.myai.name')
+	});
 	const DESCRIPTIONS = {
 		private: 'modes.private.description',
 		assisted: 'modes.assisted.description',

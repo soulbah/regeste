@@ -54,7 +54,11 @@
 		{ value: 'dark', label: 'settings.appearance.dark', icon: MoonIcon }
 	] as const;
 
-	const modeLabels = { private: 'Private', assisted: 'Assisted', myai: 'My AI' } as const;
+	const modeLabels = $derived({
+		private: t('modes.private.name'),
+		assisted: t('modes.assisted.name'),
+		myai: t('modes.myai.name')
+	});
 
 	let wipeOpen = $state(false);
 	let wipeArmed = $state(false);
@@ -269,11 +273,11 @@
 											{modeLabels[settingsStore.defaultMode]}
 										</Select.Trigger>
 										<Select.Content>
-											<Select.Item value="private">Private</Select.Item>
+											<Select.Item value="private">{modeLabels.private}</Select.Item>
 											{#if ASSISTED_ENABLED}
-												<Select.Item value="assisted">Assisted</Select.Item>
+												<Select.Item value="assisted">{modeLabels.assisted}</Select.Item>
 											{/if}
-											<Select.Item value="myai">My AI</Select.Item>
+											<Select.Item value="myai">{modeLabels.myai}</Select.Item>
 										</Select.Content>
 									</Select.Root>
 								{/snippet}
@@ -389,7 +393,7 @@
 								<div class="space-y-4 py-3.5">
 									<section class="bg-background/40 rounded-lg border p-4" data-mode-card="private">
 										<header class="flex items-center justify-between gap-3 pb-1.5">
-											<p class="text-sm font-semibold">Private</p>
+											<p class="text-sm font-semibold">{modeLabels.private}</p>
 											{@render stateBadge(privateR)}
 										</header>
 										{#snippet privateModelControl()}
@@ -503,7 +507,7 @@
 											data-mode-card="assisted"
 										>
 											<header class="flex items-center justify-between gap-3 pb-1.5">
-												<p class="text-sm font-semibold">Assisted</p>
+												<p class="text-sm font-semibold">{modeLabels.assisted}</p>
 												{@render stateBadge(assistedR)}
 											</header>
 											{#snippet assistedControl()}
@@ -551,7 +555,7 @@
 
 									<section class="bg-background/40 rounded-lg border p-4" data-mode-card="myai">
 										<header class="flex items-center justify-between gap-3 pb-1.5">
-											<p class="text-sm font-semibold">My AI</p>
+											<p class="text-sm font-semibold">{modeLabels.myai}</p>
 											{@render stateBadge(myaiR)}
 										</header>
 										<div class="flex gap-1 pb-2">

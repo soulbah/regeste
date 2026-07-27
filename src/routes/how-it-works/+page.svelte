@@ -13,7 +13,7 @@
 
 	const modes = $derived([
 		{
-			name: 'Private',
+			name: t('modes.private.name'),
 			egress: false,
 			leaves: t('hiw.private.leaves'),
 			stays: t('hiw.private.stays'),
@@ -22,7 +22,7 @@
 		...(ASSISTED_ENABLED
 			? [
 					{
-						name: 'Assisted',
+						name: t('modes.assisted.name'),
 						egress: true,
 						leaves: t('hiw.assisted.leaves'),
 						stays: t('hiw.assisted.stays'),
@@ -31,7 +31,7 @@
 				]
 			: []),
 		{
-			name: 'My AI',
+			name: t('modes.myai.name'),
 			egress: true,
 			leaves: t('hiw.myai.leaves'),
 			stays: t('hiw.myai.stays'),

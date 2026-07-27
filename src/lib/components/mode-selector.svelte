@@ -82,7 +82,11 @@
 			const readiness = modeReadiness(id, { privateOnly });
 			return {
 				id,
-				label: { private: 'Private', assisted: 'Assisted', myai: 'My AI' }[id],
+				label: {
+					private: t('modes.private.name'),
+					assisted: t('modes.assisted.name'),
+					myai: t('modes.myai.name')
+				}[id],
 				line:
 					readiness.blockedLine ??
 					(id === 'myai' && readiness.state === 'ready'
@@ -141,7 +145,11 @@
 			select(pending);
 			toast.success(
 				t('modes.activated', {
-					mode: { private: 'Private', assisted: 'Assisted', myai: 'My AI' }[pending]
+					mode: {
+						private: t('modes.private.name'),
+						assisted: t('modes.assisted.name'),
+						myai: t('modes.myai.name')
+					}[pending]
 				})
 			);
 		}

@@ -82,11 +82,22 @@ export const en = {
 	'addDocs.choose': 'My documents',
 	'addDocs.upload': 'Upload a file',
 
-	// Mode selector
+	// Mode selector.
+	//
+	// The names say WHERE the answer is computed, because that is the only thing
+	// that actually differs and the only thing a user can verify (turn off the
+	// network: one of the three keeps working). "Private" claimed a virtue the
+	// other two also have — your own server is no less private — while
+	// "Assisted" said nothing at all about the one mode that leaves the device.
+	// Research is consistent that users assume an AI feature runs locally and
+	// are usually wrong, so the label has to carry the location.
+	'modes.private.name': 'This device',
+	'modes.assisted.name': 'Cloud',
+	'modes.myai.name': 'Your server',
 	'modes.private.description': 'Everything stays on this device.',
 	'modes.assisted.description': 'Only relevant excerpts are processed online.',
 	'modes.myai.description': 'Use your own configured AI provider.',
-	'modes.best': 'Best for this device',
+	'modes.best': 'Best for your hardware',
 	'modes.bestReason.noGpu': "this browser can't run the AI on your device",
 	'modes.bestReason.local': 'this device can run the AI locally',
 	'modes.private.checking': 'Checking this device…',
