@@ -15,6 +15,7 @@
 	import * as Popover from '$lib/components/ui/popover';
 	import { Button } from '$lib/components/ui/button';
 	import CheckIcon from '@lucide/svelte/icons/check';
+	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import { t } from '$lib/i18n/index.svelte';
 	import { settingsStore } from '$lib/state/settings.svelte';
 	import { CLOUD_MODELS, answersLeft, type CloudModelKey } from '$lib/cloud-models';
@@ -28,6 +29,9 @@
 		CLOUD_MODELS.map((model) => ({
 			key: model.key,
 			name: t(`cloudModel.${model.key}`),
+			// The tier name says what to expect, this says what is running. Nobody
+			// should have to take "Standard" on faith.
+			model: model.name,
 			line: t(`cloudModel.${model.key}.line`),
 			// null until the budget is known: a made-up number here would be the
 			// one thing this control exists to avoid.
@@ -42,10 +46,13 @@
 		{#snippet child({ props })}
 			<Button {...props} variant="ghost" size="sm" class="text-muted-foreground gap-1.5">
 				{current.name}
+				<ChevronDownIcon class="size-3.5!" />
 			</Button>
 		{/snippet}
 	</Popover.Trigger>
-	<Popover.Content class="w-72 gap-0 p-1" align="start" side="top">
+	<!-- Right-aligned: it sits at the right edge of the composer, beside Send,
+	     so the panel opens back over the input rather than off the card. -->
+	<Popover.Content class="w-72 gap-0 p-1" align="end" side="top">
 		<p class="text-muted-foreground px-2.5 py-2 font-mono text-[10px] tracking-widest uppercase">
 			{t('cloudModel.label')}
 		</p>
@@ -59,11 +66,14 @@
 				}}
 			>
 				<span class="min-w-0 flex-1">
-					<span class="flex items-center gap-1.5 text-sm">
+					<span class="flex items-baseline gap-1.5 text-sm">
 						{row.name}
 						{#if row.key === value}
-							<CheckIcon class="text-muted-foreground size-3.5 shrink-0" />
+							<CheckIcon class="text-muted-foreground size-3.5 shrink-0 self-center" />
 						{/if}
+						<span class="text-muted-foreground/60 ml-auto shrink-0 font-mono text-[10px]">
+							{row.model}
+						</span>
 					</span>
 					<span class="text-muted-foreground block text-xs">{row.line}</span>
 					{#if row.left !== null}

@@ -14,6 +14,7 @@
 	import { documentsStore } from '$lib/state/documents.svelte';
 	import { documentStatusKey } from '$lib/document-status';
 	import { ingestReadiness } from '$lib/ingest-readiness';
+	import { modeReadiness } from '$lib/state/mode-readiness.svelte';
 	import { settingsStore } from '$lib/state/settings.svelte';
 	import CloudModelPicker from './cloud-model-picker.svelte';
 	import type { ChatMode } from '$lib/types';
@@ -80,7 +81,14 @@
 			.filter((item) => item !== null)
 	);
 	const readiness = $derived(ingestReadiness(attachedIngest));
-	const sendBlocked = $derived(disabled || readiness.blocking);
+	// A mode that cannot answer yet blocks Send. Without this the button looked
+	// live while signed out of Cloud, and pressing it produced a thread message
+	// instead of an answer: the refusal belongs before the question is spent,
+	// not after.
+	const modeNotReady = $derived(
+		mode !== null && modeReadiness(mode, { privateOnly }).state !== 'ready'
+	);
+	const sendBlocked = $derived(disabled || readiness.blocking || modeNotReady);
 
 	$effect(() => {
 		if (readiness.preparingCount > 0) {
@@ -230,15 +238,17 @@
 			onaction={(q) => !sendBlocked && mode !== null && onsend(q)}
 		/>
 		<ModeSelector {mode} onselect={onmodeselect} {myaiModel} {privateOnly} />
-		<!-- Only in Cloud mode: the other two run on hardware the user already
-		     pays for, so there is no budget to spend and nothing to choose. -->
-		{#if mode === 'assisted'}
+		<div class="flex-1"></div>
+		<!-- Beside Send, which is where every chat composer worth copying puts the
+		     model choice: the left of the bar is what you attach, the right is how
+		     the answer comes back. Only in Cloud mode, since the other two run on
+		     hardware the user already pays for and have no budget to spend. -->
+		{#if mode === 'assisted' && !modeNotReady}
 			<CloudModelPicker
 				value={settingsStore.cloudModel}
 				onselect={(key) => settingsStore.setCloudModel(key)}
 			/>
 		{/if}
-		<div class="flex-1"></div>
 		<Tooltip.Root>
 			<Tooltip.Trigger>
 				{#snippet child({ props })}
@@ -273,9 +283,11 @@
 						? t('disabled.indexingChat')
 						: mode === null
 							? t('disabled.chooseMode')
-							: !text.trim()
-								? t('disabled.emptyMessage')
-								: t('composer.sendTip')}
+							: modeNotReady
+								? t('disabled.modeNotReady')
+								: !text.trim()
+									? t('disabled.emptyMessage')
+									: t('composer.sendTip')}
 			</Tooltip.Content>
 		</Tooltip.Root>
 	</div>

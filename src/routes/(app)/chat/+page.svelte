@@ -12,8 +12,8 @@
 	import { chatsStore } from '$lib/state/chats.svelte';
 	import { documentsStore } from '$lib/state/documents.svelte';
 	import { settingsStore } from '$lib/state/settings.svelte';
-	import { uiStore } from '$lib/state/ui.svelte';
 	import { homeState } from '$lib/state/home-surface.svelte';
+	import { dispatchMode } from '$lib/state/mode-dispatch';
 	import { modeReadiness } from '$lib/state/mode-readiness.svelte';
 	import type { ChatMode } from '$lib/types';
 
@@ -36,13 +36,27 @@
 	const choosing = $derived(home.surface === 'choose-engine');
 	const firstRun = $derived(home.surface === 'first-run');
 	const pendingMode = $derived(home.pendingMode);
-	/** Why setup is unfinished, in the words the picker already uses. */
+	/**
+	 * What is actually missing, named.
+	 *
+	 * A generic "finish setting up" told someone who was simply not signed in
+	 * nothing at all, and the button beside it said "Finish", which is not an
+	 * action anyone can picture. Each mode is blocked by exactly one thing and
+	 * the line says which.
+	 */
+	const NEEDS = {
+		private: 'onboard.needDownload',
+		assisted: 'notice.signIn',
+		myai: 'onboard.needEndpoint'
+	} as const;
 	const setupLine = $derived.by(() => {
 		if (!pendingMode) return '';
 		const readiness = modeReadiness(pendingMode);
 		if (home.downloadPct !== null) return t('onboard.downloading');
-		return readiness.blockedLine ?? t('onboard.unfinished');
+		return readiness.blockedLine ?? t(NEEDS[pendingMode]);
 	});
+	/** "Sign in" or "Set up", from the same verdict the picker reads. */
+	const setupAction = $derived(pendingMode ? t(modeReadiness(pendingMode).setupKey) : '');
 
 	/** O1 — one click: a chat with the bundled fictional contracts. */
 	async function startDemo() {
@@ -161,9 +175,13 @@
 	     composer, because a returning user is reaching for the question box, not
 	     reading a hero. The two guided surfaces do centre, since there the screen
 	     itself is the instruction. -->
+	<!-- The guided surfaces sit above the mathematical centre. Centring a block
+	     exactly halfway reads as low, because the eye weights the empty space
+	     below more than the space above; pulling it up by a tenth of the
+	     viewport is what makes it look centred. -->
 	<div
 		class="flex flex-1 flex-col px-6 {choosing || firstRun
-			? 'items-center justify-center'
+			? 'items-center justify-center pb-[10vh]'
 			: 'items-center justify-end pb-4'}"
 	>
 		<!-- Every surface shares the composer's max-w-3xl so the drop zone, the
@@ -225,8 +243,20 @@
 				{#if home.downloadPct !== null}
 					<span class="tabular-nums">{home.downloadPct}%</span>
 				{:else}
-					<Button variant="ghost" size="sm" onclick={() => uiStore.openSettings('ai', pendingMode)}>
-						{t('onboard.resume')}
+					<!-- The same routing the picker uses, so the button lands where the
+					     blocker actually is: the sign-in page for Cloud, the mode's
+					     Settings card for the two that have configuration. -->
+					<Button
+						variant="ghost"
+						size="sm"
+						onclick={() =>
+							pendingMode &&
+							dispatchMode(pendingMode, (m) => {
+								modeTouched = true;
+								mode = m;
+							})}
+					>
+						{setupAction}
 					</Button>
 				{/if}
 			</div>

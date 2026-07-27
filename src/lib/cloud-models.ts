@@ -19,6 +19,10 @@ export interface CloudModel {
 	id: string;
 	/** Stable key used in the API contract and the local setting. */
 	key: 'balanced' | 'best';
+	/** What the model is actually called, shown beside the tier name. The tier
+	 * says what to expect; this says what is running, so nobody has to take
+	 * "Standard" on faith. Short form: the full id is a path, not a name. */
+	name: string;
 	neuronsPerMInput: number;
 	neuronsPerMOutput: number;
 }
@@ -44,6 +48,7 @@ export const CLOUD_MODELS: CloudModel[] = [
 		// 30B mixture of experts, ~3B active. The default: it answered 19 of 20
 		// and costs a quarter of the alternative.
 		id: '@cf/qwen/qwen3-30b-a3b-fp8',
+		name: 'Qwen3 30B',
 		key: 'balanced',
 		neuronsPerMInput: 4625,
 		neuronsPerMOutput: 30475
@@ -52,6 +57,7 @@ export const CLOUD_MODELS: CloudModel[] = [
 		// The 120B class. Fastest and highest scoring of the three measured, for
 		// four times the cost per answer.
 		id: '@cf/openai/gpt-oss-120b',
+		name: 'GPT-OSS 120B',
 		key: 'best',
 		neuronsPerMInput: 31818,
 		neuronsPerMOutput: 68182

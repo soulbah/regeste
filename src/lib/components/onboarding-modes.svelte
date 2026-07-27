@@ -18,7 +18,7 @@
 	import { modeReadiness } from '$lib/state/mode-readiness.svelte';
 	import { myaiStore } from '$lib/state/myai.svelte';
 	import { settingsStore } from '$lib/state/settings.svelte';
-	import { uiStore } from '$lib/state/ui.svelte';
+	import { dispatchMode } from '$lib/state/mode-dispatch';
 	import { ASSISTED_ENABLED } from '$lib/flags';
 	import type { ChatMode } from '$lib/types';
 
@@ -77,24 +77,34 @@
 	);
 
 	function choose(id: ChatMode) {
+		// The choice is recorded either way: it is what moves the home off this
+		// screen and on to "here is what is still missing". What is NOT recorded
+		// is activation — dispatchMode only calls back when the mode can answer,
+		// so nobody ends up with Cloud showing as the active mode while signed
+		// out. It also owns the routing, so this screen and the composer's picker
+		// can no longer disagree about where a sign-in lives.
 		void settingsStore.setDefaultMode(id);
 		void settingsStore.markModeChosen();
-		onchosen(id);
-		// Setup lives in the AI cards, which already own the download, the
-		// sign-in and the endpoint form. Nothing is duplicated here.
-		if (modeReadiness(id).state !== 'ready') uiStore.openSettings('ai', id);
+		dispatchMode(id, onchosen);
 	}
 </script>
 
 <!-- Two columns self-hosted, three when this build offers Assisted. Written
      out because Tailwind only emits classes it can see in the source. -->
 <div class="grid gap-3 {MODE_IDS.length === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}">
-	{#each cards as card (card.id)}
+	{#each cards as card, index (card.id)}
 		<div
-			class="border-border bg-card/40 flex flex-col gap-3 rounded-xl border p-4 text-left {card.blocked
+			class="onboard-card border-border bg-card/40 hover:border-foreground/20 relative flex flex-col gap-3 overflow-hidden rounded-xl border p-4 text-left transition-[transform,border-color] duration-300 hover:-translate-y-0.5 {card.blocked
 				? 'opacity-60'
 				: ''}"
+			style="--enter-delay: {120 + index * 70}ms"
 		>
+			{#if card.best}
+				<!-- One sweep of light across the recommended card as the screen
+				     settles, then nothing. A loop would pull the eye forever on a
+				     screen whose job is to be left. -->
+				<span aria-hidden="true" class="onboard-sheen"></span>
+			{/if}
 			<div class="flex items-baseline justify-between gap-2">
 				<span class="text-sm font-medium">{card.label}</span>
 				{#if card.best}
@@ -116,3 +126,52 @@
 		</div>
 	{/each}
 </div>
+
+<style>
+	/* One orchestrated entrance, nothing that repeats. The cards rise in turn as
+	   the page settles, which reads as the interface arriving rather than as
+	   decoration; anything looping would compete with the choice being asked. */
+	.onboard-card {
+		animation: onboard-rise 480ms cubic-bezier(0.16, 1, 0.3, 1) both;
+		animation-delay: var(--enter-delay);
+	}
+
+	@keyframes onboard-rise {
+		from {
+			opacity: 0;
+			transform: translateY(10px);
+		}
+	}
+
+	.onboard-sheen {
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+		background: linear-gradient(
+			105deg,
+			transparent 35%,
+			color-mix(in oklab, var(--accent-foreground) 14%, transparent) 50%,
+			transparent 65%
+		);
+		transform: translateX(-100%);
+		animation: onboard-sweep 1100ms ease-out both;
+		/* After the cards have landed. */
+		animation-delay: 620ms;
+	}
+
+	@keyframes onboard-sweep {
+		to {
+			transform: translateX(100%);
+		}
+	}
+
+	/* Someone who asked their system for less motion gets the layout, instantly. */
+	@media (prefers-reduced-motion: reduce) {
+		.onboard-card {
+			animation: none;
+		}
+		.onboard-sheen {
+			display: none;
+		}
+	}
+</style>
