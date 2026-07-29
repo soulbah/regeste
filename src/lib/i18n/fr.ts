@@ -504,6 +504,8 @@ export const fr: Record<keyof typeof en, string> = {
 	'help.network.fix2':
 		'Sur un réseau d’entreprise, demandez que ce site et le CDN du modèle soient autorisés, ou utilisez Cet appareil, qui n’a besoin du réseau qu’une fois.',
 
+	'app.reportProblem': 'Signaler un problème',
+	'app.reportSubject': 'Signalement de problème',
 	'app.whatToDo': 'Que faire',
 	'app.dbBusy':
 		'Vous avez déjà ceci ouvert dans un autre onglet. Fermez-le, puis rechargez cette page.',
@@ -637,12 +639,13 @@ export const fr: Record<keyof typeof en, string> = {
 	'landing.nav.how': 'Comment ça marche',
 	'landing.nav.guides': 'Guides',
 	'landing.nav.github': 'GitHub',
+	'landing.nav.contact': 'Contact',
 	'landing.cta': 'Ouvrir le chat',
 	'landing.cta.code': 'Voir le code',
 	'landing.hero.title': 'Vos documents ont la réponse.',
 	'landing.hero.sub':
 		'Posez une question, recevez une réponse rédigée qui cite les passages exacts dont elle vient. Tout se passe dans votre navigateur, et avec le modèle sur l’appareil vos fichiers ne quittent jamais votre machine.',
-	'landing.hero.facts': 'Gratuit et open source · Sans compte pour commencer',
+	'landing.hero.facts': 'Gratuit et open source. Sans compte pour commencer.',
 	'landing.modes.title': 'Choisissez où la réponse s’écrit.',
 	'landing.modes.sub':
 		'La lecture de vos documents et leur recherche se font dans ce navigateur. Les trois modes ne diffèrent que sur un point : qui rédige la réponse.',

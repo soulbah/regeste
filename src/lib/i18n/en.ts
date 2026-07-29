@@ -501,6 +501,8 @@ export const en = {
 	'help.network.fix2':
 		'On a company network, ask for this site and the model CDN to be allowed, or use This device, which needs the network only once.',
 
+	'app.reportProblem': 'Report a problem',
+	'app.reportSubject': 'Problem report',
 	'app.whatToDo': 'What to do',
 	'app.dbBusy': 'You already have this open in another tab. Close it there, then reload.',
 	'app.dbBlocked':
@@ -632,12 +634,13 @@ export const en = {
 	'landing.nav.how': 'How it works',
 	'landing.nav.guides': 'Guides',
 	'landing.nav.github': 'GitHub',
+	'landing.nav.contact': 'Contact',
 	'landing.cta': 'Open the chat',
 	'landing.cta.code': 'View the code',
 	'landing.hero.title': 'Your documents have the answer.',
 	'landing.hero.sub':
 		'Ask a question and get a written answer that cites the exact passages it came from. Everything runs in your browser, and with the on-device model your files never leave your machine.',
-	'landing.hero.facts': 'Free and open source · No account to start',
+	'landing.hero.facts': 'Free and open source. No account to start.',
 	'landing.modes.title': 'Choose where the answer is written.',
 	'landing.modes.sub':
 		'Reading your documents and searching them happen in this browser. The three modes differ on one point: who writes the answer.',

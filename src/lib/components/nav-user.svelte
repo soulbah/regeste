@@ -11,11 +11,14 @@
 	import ShieldIcon from '@lucide/svelte/icons/shield';
 	import CircleHelpIcon from '@lucide/svelte/icons/circle-help';
 	import LifeBuoyIcon from '@lucide/svelte/icons/life-buoy';
+	import MessageSquareWarningIcon from '@lucide/svelte/icons/message-square-warning';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
 	import LogInIcon from '@lucide/svelte/icons/log-in';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { openInNewTab } from '$lib/external-page';
+	import { CONTACT_EMAIL } from '$lib/links';
 	import { setMode, userPrefersMode } from 'mode-watcher';
 	import { i18n, t } from '$lib/i18n/index.svelte';
 	import { sessionStore } from '$lib/state/session.svelte';
@@ -120,16 +123,33 @@
 					<ShieldIcon class="text-muted-foreground" />
 					{t('sidebar.privacyReport')}
 				</DropdownMenu.Item>
-				<DropdownMenu.Item onclick={() => goto(resolve('/how-it-works'))}>
+				<DropdownMenu.Item onclick={() => openInNewTab(resolve('/how-it-works'))}>
 					<CircleHelpIcon class="text-muted-foreground" />
 					{t('hiw.title')}
 				</DropdownMenu.Item>
 				<!-- A permanent way in, not only the link a failure hands you: the
 				     research on consent surfaces applies here too — a page you can
 				     only reach by breaking something is one nobody reads first. -->
-				<DropdownMenu.Item onclick={() => goto(resolve('/help/[[topic]]', { topic: undefined }))}>
+				<DropdownMenu.Item
+					onclick={() => openInNewTab(resolve('/(marketing)/help/[[topic]]', { topic: undefined }))}
+				>
 					<LifeBuoyIcon class="text-muted-foreground" />
 					{t('help.title')}
+				</DropdownMenu.Item>
+				<!-- Reporting a problem is a different job from reading a guide, and it
+				     has to work for someone who will never open a GitHub issue. A plain
+				     mail link: subject only, nothing prefilled from this session. A
+				     report that carried a chunk of someone's document would be the one
+				     leak this product cannot afford, and a form would mean a server
+				     collecting what nothing here collects. -->
+				<DropdownMenu.Item
+					onclick={() =>
+						openInNewTab(
+							`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(t('app.reportSubject'))}`
+						)}
+				>
+					<MessageSquareWarningIcon class="text-muted-foreground" />
+					{t('app.reportProblem')}
 				</DropdownMenu.Item>
 				<DropdownMenu.Separator />
 				<DropdownMenu.Item onclick={() => uiStore.openSettings()}>

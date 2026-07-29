@@ -27,3 +27,14 @@ export function isAppNavigation(pathname: string): boolean {
 export function isMarketingAsset(pathname: string): boolean {
 	return pathname.startsWith('/landing/') || pathname.startsWith('/dev/');
 }
+
+/**
+ * True for the pages under `src/routes/(marketing)` — the landing, how-it-works
+ * and the guides. None of them may open the local database: it is single-owner,
+ * so a visitor reading a guide would take the lock and trip the two-tabs guard
+ * on the app running in their other tab. Sign-in is deliberately absent: it
+ * reads the session, so it boots like an app route.
+ */
+export function isMarketingPage(pathname: string): boolean {
+	return pathname === '/' || pathname === '/how-it-works' || pathname.startsWith('/help');
+}

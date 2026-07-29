@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isAppNavigation, isMarketingAsset } from './sw-routing';
+import { isAppNavigation, isMarketingAsset, isMarketingPage } from './sw-routing';
 
 describe('service worker scope', () => {
 	it('claims the chat and its subroutes', () => {
@@ -28,5 +28,21 @@ describe('service worker scope', () => {
 		expect(isMarketingAsset('/dev/landing/bail-location-meublee.pdf')).toBe(true);
 		expect(isMarketingAsset('/vendor/sqlite/sqlite3.wasm')).toBe(false);
 		expect(isMarketingAsset('/icons/icon-192.png')).toBe(false);
+	});
+});
+
+describe('isMarketingPage', () => {
+	it('covers every page under (marketing)', () => {
+		for (const path of ['/', '/how-it-works', '/help', '/help/two-tabs', '/help/storage-blocked']) {
+			expect(isMarketingPage(path)).toBe(true);
+		}
+	});
+
+	it('leaves the app and sign-in to boot the database', () => {
+		// /auth reads the session, so it is not a marketing page even though it
+		// sits outside the app shell. Getting this wrong would sign nobody in.
+		for (const path of ['/chat', '/chat/documents', '/chat/abc', '/auth']) {
+			expect(isMarketingPage(path)).toBe(false);
+		}
 	});
 });

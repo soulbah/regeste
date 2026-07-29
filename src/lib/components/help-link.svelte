@@ -9,6 +9,7 @@
 	import ArrowUpRightIcon from '@lucide/svelte/icons/arrow-up-right';
 	import { Button } from '$lib/components/ui/button';
 	import { t } from '$lib/i18n/index.svelte';
+	import { NEW_TAB } from '$lib/external-page';
 	import type { HelpTopic } from '$lib/help-topics';
 
 	let { topic, class: className = '' }: { topic: HelpTopic['id']; class?: string } = $props();
@@ -18,7 +19,8 @@
 	variant="ghost"
 	size="sm"
 	class="text-muted-foreground hover:text-foreground h-auto gap-1 px-1.5 py-0.5 text-xs {className}"
-	href={resolve('/help/[[topic]]', { topic })}
+	href={resolve('/(marketing)/help/[[topic]]', { topic })}
+	{...NEW_TAB}
 >
 	{t('app.whatToDo')}
 	<ArrowUpRightIcon class="size-3!" />

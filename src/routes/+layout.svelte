@@ -6,6 +6,8 @@
 	import { beforeNavigate, goto } from '$app/navigation';
 	import { browser } from '$app/environment';
 	import { resolve } from '$app/paths';
+	import { openInNewTab } from '$lib/external-page';
+	import { isMarketingPage } from '$lib/pwa/sw-routing';
 	import UpdateBanner from '$lib/components/update-banner.svelte';
 	import { isShellCache } from '$lib/pwa/cache-names';
 	import { pwaStore } from '$lib/state/pwa.svelte';
@@ -61,8 +63,8 @@
 					action: {
 						label: t('app.whatToDo'),
 						onClick: () =>
-							goto(
-								resolve('/help/[[topic]]', {
+							openInNewTab(
+								resolve('/(marketing)/help/[[topic]]', {
 									topic: key === 'app.dbBlocked' ? 'storage-blocked' : 'two-tabs'
 								})
 							)
@@ -75,13 +77,17 @@
 		});
 	}
 
-	// The landing must not touch the local database: a visitor reading marketing
-	// has no reason to take the single-owner lock (and would trip the two-tabs
-	// guard while the app is open elsewhere). Everything boots on the first
-	// navigation into an app route instead.
+	// No marketing page may touch the local database: a visitor reading a guide
+	// has no reason to take the single-owner lock, and taking it would trip the
+	// two-tabs guard on the app running in their other tab. Everything boots on
+	// the first navigation into an app route instead.
+	//
+	// This used to test for '/' alone, which was right when the landing was the
+	// only marketing page. how-it-works and the guides have joined it under
+	// src/routes/(marketing), and they were booting the database to render prose.
 	let dbBooted = false;
 	$effect(() => {
-		if (page.url.pathname === '/') {
+		if (isMarketingPage(page.url.pathname)) {
 			i18n.initWithoutDb();
 			return;
 		}

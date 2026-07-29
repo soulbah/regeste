@@ -10,6 +10,7 @@
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { NEW_TAB } from '$lib/external-page';
 	import { toast } from 'svelte-sonner';
 	import { t } from '$lib/i18n/index.svelte';
 	import { llmStore } from '$lib/private-ai/llm.svelte';
@@ -232,13 +233,16 @@
 				>
 					{t('modes.aiSettings')}
 				</Button>
-				<a
+				<Button
+					variant="ghost"
+					size="sm"
+					class="text-muted-foreground hover:text-foreground h-auto w-full justify-start px-2.5 py-1.5 text-xs font-normal"
 					href={resolve('/how-it-works')}
-					class="text-muted-foreground hover:text-foreground block px-2.5 py-1.5 text-xs underline-offset-2 hover:underline"
+					{...NEW_TAB}
 					onclick={() => (open = false)}
 				>
 					{t('modes.whatLeaves')}
-				</a>
+				</Button>
 			</div>
 		</Popover.Content>
 	</Popover.Root>
