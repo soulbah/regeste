@@ -467,7 +467,8 @@ export const en = {
 	'settings.tabs.usage': 'Usage',
 	'settings.usage.kicker': 'Cloud mode',
 	'settings.usage.left': 'answers left today on {model}',
-	'settings.usage.resets': 'Resets at midnight UTC',
+	'settings.usage.resets': 'Resets at {time}',
+	'settings.usage.current': 'Selected',
 	'settings.review.title': 'Review before sending',
 	'settings.review.desc':
 		'Check the excerpts each time before they leave. Turn this off and remote answers send straight away.',

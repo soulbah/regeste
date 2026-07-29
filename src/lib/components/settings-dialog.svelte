@@ -38,7 +38,7 @@
 	import { settingsStore } from '$lib/state/settings.svelte';
 	import { uiStore } from '$lib/state/ui.svelte';
 	import { ASSISTED_ENABLED } from '$lib/flags';
-	import { answersLeft, modelFor } from '$lib/cloud-models';
+	import { CLOUD_MODELS, answersLeft, modelFor } from '$lib/cloud-models';
 
 	type Tab = 'general' | 'usage' | 'data' | 'ai' | 'account';
 	let tab = $state<Tab>('general');
@@ -49,6 +49,19 @@
 		{ id: 'ai', label: 'settings.tabs.ai', icon: CpuIcon },
 		{ id: 'account', label: 'settings.tabs.account', icon: UserRoundIcon }
 	] as const;
+	/** The platform resets the allowance at 00:00 UTC; people live in their own
+	 * time zone, so the tab states the moment it happens where they are. */
+	const resetTime = $derived.by(() => {
+		const now = new Date();
+		const next = new Date(
+			Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0)
+		);
+		return next.toLocaleTimeString(i18n.locale === 'fr' ? 'fr-FR' : 'en-GB', {
+			hour: '2-digit',
+			minute: '2-digit'
+		});
+	});
+
 	const activeTab = $derived(tabs.find((x) => x.id === tab) ?? tabs[0]);
 
 	const themeChoices = [
@@ -295,26 +308,38 @@
 								     without wanting to open a composer popover to answer it. -->
 								{@render kicker(t('settings.usage.kicker'))}
 								{#if sessionStore.user && settingsStore.quota}
-									<div class="py-3">
-										<p class="font-display text-3xl tracking-tight">
-											{answersLeft(
-												settingsStore.quota.remaining,
-												modelFor(settingsStore.cloudModel)
-											)}
-										</p>
-										<p class="text-muted-foreground mt-1 text-xs">
-											{t('settings.usage.left', {
-												model: t(`cloudModel.${settingsStore.cloudModel}`)
-											})}
-										</p>
-										<Progress
-											value={(100 * settingsStore.quota.remaining) / settingsStore.quota.limit}
-											class="mt-3 h-1"
-										/>
-										<p class="text-muted-foreground/70 mt-2 font-mono text-[10px]">
-											{t('settings.usage.resets')}
-										</p>
+									<!-- One figure per model, because one budget buys a different
+									     number of answers on each and quoting only the selected one
+									     hides the trade this tab exists to show. -->
+									<div class="grid gap-3 py-3 sm:grid-cols-2">
+										{#each CLOUD_MODELS as model (model.key)}
+											<div class="border-border rounded-lg border p-3">
+												<div class="flex items-baseline justify-between gap-2">
+													<p class="font-display text-3xl tracking-tight">
+														{answersLeft(settingsStore.quota.remaining, model)}
+													</p>
+													{#if model.key === settingsStore.cloudModel}
+														<Badge variant="secondary" class="text-[10px]">
+															{t('settings.usage.current')}
+														</Badge>
+													{/if}
+												</div>
+												<p class="text-muted-foreground mt-1 text-xs">
+													{t('settings.usage.left', { model: t(`cloudModel.${model.key}`) })}
+												</p>
+												<p class="text-muted-foreground/60 mt-1 font-mono text-[10px]">
+													{model.name}
+												</p>
+											</div>
+										{/each}
 									</div>
+									<Progress
+										value={(100 * settingsStore.quota.remaining) / settingsStore.quota.limit}
+										class="h-1"
+									/>
+									<p class="text-muted-foreground/70 mt-2 font-mono text-[10px]">
+										{t('settings.usage.resets', { time: resetTime })}
+									</p>
 								{:else}
 									<p class="text-muted-foreground py-3 text-xs">
 										{t('settings.workspace.quotaSignIn')}

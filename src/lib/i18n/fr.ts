@@ -470,7 +470,8 @@ export const fr: Record<keyof typeof en, string> = {
 	'settings.tabs.usage': 'Utilisation',
 	'settings.usage.kicker': 'Mode Cloud',
 	'settings.usage.left': 'réponses restantes aujourd’hui en {model}',
-	'settings.usage.resets': 'Remise à zéro à minuit UTC',
+	'settings.usage.resets': 'Remise à zéro à {time}',
+	'settings.usage.current': 'Sélectionné',
 	'settings.review.title': 'Vérifier avant d’envoyer',
 	'settings.review.desc':
 		'Contrôlez les extraits à chaque fois avant qu’ils partent. Désactivez et les réponses distantes partent directement.',
