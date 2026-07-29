@@ -13,6 +13,7 @@
 	import { resolve } from '$app/paths';
 	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
 	import AmbientWash from '$lib/components/ambient-wash.svelte';
+	import BrandMark from '$lib/components/brand-mark.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
@@ -68,9 +69,13 @@
 	<div class="relative flex flex-1 items-center justify-center px-6 pb-24">
 		<div class="w-full max-w-[22rem]">
 			<div class="mb-9 text-center">
-				<p class="font-display mb-6 text-lg tracking-tight">
-					<span class="text-accent-foreground">[</span>Regeste
-				</p>
+				<!-- The mark, door-size: on a dedicated sign-in screen the brand is
+				     the landmark (Linear, Notion, Claude all set a ~40px mark over
+				     the heading). The name stays in the tab title; a second serif
+				     line above the serif heading would compete with it. -->
+				<div class="mb-7 flex justify-center">
+					<BrandMark size={44} />
+				</div>
 				<h1 class="font-display text-[1.75rem] leading-tight tracking-tight text-balance">
 					{sessionStore.otpSentTo ? t('auth.checkInbox') : t('auth.headline')}
 				</h1>
