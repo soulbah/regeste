@@ -654,6 +654,8 @@ export const en = {
 	'hiw.step.passages': 'Top passages',
 	'hiw.step.modes': 'This device / Cloud / Your server',
 	'hiw.step.answer': 'Answer + citations',
+	'hiw.boundaryIntact': 'Nothing crosses',
+	'hiw.boundaryCrossed': 'What crosses',
 	'hiw.frame': 'This browser',
 	'hiw.onlyMode':
 		'Only the mode step decides whether anything leaves, and only Cloud and Your server send the selected passages.',

@@ -660,6 +660,8 @@ export const fr: Record<keyof typeof en, string> = {
 	'hiw.step.passages': 'Meilleurs passages',
 	'hiw.step.modes': 'Cet appareil / Cloud / Votre serveur',
 	'hiw.step.answer': 'Réponse + citations',
+	'hiw.boundaryIntact': 'Rien ne traverse',
+	'hiw.boundaryCrossed': 'Ce qui traverse',
 	'hiw.frame': 'Ce navigateur',
 	'hiw.onlyMode':
 		"Seule l'étape du mode décide si quelque chose part, et seuls le Cloud et Votre serveur envoient les passages sélectionnés.",
