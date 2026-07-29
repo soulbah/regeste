@@ -139,6 +139,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'auth.title': 'Connexion',
 	'auth.checkInbox': 'Regardez votre boîte mail.',
 	'auth.back': 'Retour à la discussion',
+	'auth.backGeneric': 'Retour',
 	'auth.headline': 'Connexion',
 	'auth.body': 'Seul le mode Cloud demande un compte. Les deux autres, jamais.',
 	'auth.email': 'Email',

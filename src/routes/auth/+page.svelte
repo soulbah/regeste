@@ -9,7 +9,7 @@
 	// rest of the identity (serif display, mono kicker, single green accent) is
 	// the app's own, unchanged, because this is a door into it and not a
 	// different product.
-	import { goto } from '$app/navigation';
+	import { afterNavigate, goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
 	import AmbientWash from '$lib/components/ambient-wash.svelte';
@@ -22,10 +22,31 @@
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { t } from '$lib/i18n/index.svelte';
 	import { sessionStore } from '$lib/state/session.svelte';
+	import type { ResolvedPathname } from '$app/types';
 
 	let email = $state('');
 	let otp = $state('');
 	const emailValid = $derived(/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim()));
+
+	// Leaving without signing in goes back where you were; signing in goes to the
+	// chat, because that is what you came to use.
+	//
+	// The previous page comes from the router, not from a ?from= parameter. Five
+	// different places navigate here — the mode picker, two settings cards, the
+	// mode dispatcher and the sidebar menu — and a parameter is a thing four of
+	// them would eventually forget to pass. It is also the safer of the two: a
+	// path taken from the query string is an open redirect unless every caller is
+	// validated, while this one can only ever be a page the router itself served.
+	const HOME = resolve('/chat');
+	let returnTo = $state<ResolvedPathname>(HOME);
+	afterNavigate((nav) => {
+		const from = nav.from?.url.pathname;
+		// A fresh load or a reload has no previous page, and coming from this page
+		// means the form re-rendered rather than that anyone arrived from it.
+		// A narrowing, not a trust decision: the router only ever reports a path it
+		// just served.
+		if (from && from !== nav.to?.url.pathname) returnTo = from as ResolvedPathname;
+	});
 
 	async function requestCode(e: SubmitEvent) {
 		e.preventDefault();
@@ -60,9 +81,9 @@
 	<AmbientWash />
 
 	<header class="relative flex h-14 shrink-0 items-center px-4">
-		<Button variant="ghost" size="sm" class="text-muted-foreground gap-1.5" href={resolve('/chat')}>
+		<Button variant="ghost" size="sm" class="text-muted-foreground gap-1.5" href={returnTo}>
 			<ArrowLeftIcon class="size-3.5!" />
-			{t('auth.back')}
+			{returnTo === HOME ? t('auth.back') : t('auth.backGeneric')}
 		</Button>
 	</header>
 

@@ -147,6 +147,8 @@ export const en = {
 	'auth.title': 'Sign in',
 	'auth.checkInbox': 'Check your inbox.',
 	'auth.back': 'Back to chat',
+	// Where you were, when that was somewhere other than the chat.
+	'auth.backGeneric': 'Back',
 	'auth.headline': 'Sign in',
 	'auth.body': 'Only the Cloud mode needs an account. The other two never do.',
 	'auth.email': 'Email',
