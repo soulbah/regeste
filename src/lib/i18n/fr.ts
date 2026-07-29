@@ -444,6 +444,62 @@ export const fr: Record<keyof typeof en, string> = {
 	'clarification.document': 'Quel document ou quelle version faut-il utiliser ?',
 	'clarification.unitCurrency': 'Quelle devise ou unité cible faut-il utiliser ?',
 	'clarification.multiPart': 'À quelle partie faut-il répondre en premier ?',
+	// Page d'aide — le symptôme d'abord, c'est ce qu'on reconnaît.
+	'help.title': 'Quand le navigateur bloque',
+	'help.intro':
+		'Tout se passe dans votre navigateur, donc ses réglages font partie du fonctionnement. Voici les cas qui l’empêchent de tourner, et ce qui les débloque.',
+	'help.symptom': 'Ce que vous voyez',
+	'help.cause': 'Pourquoi',
+	'help.fix': 'Que faire',
+	'help.footnote':
+		'Aucun de ces réglages n’envoie vos documents où que ce soit. Ce sont des paramètres de votre machine, et ils sont tous réversibles.',
+
+	'help.blocked.title': 'Rien ne peut être enregistré',
+	'help.blocked.symptom':
+		'Les documents refusent d’être ajoutés, ou l’app signale que le stockage est bloqué pour ce site.',
+	'help.blocked.cause':
+		'Vos documents vivent dans le navigateur, dans un espace appelé OPFS. Une fenêtre privée et un blocage de contenu strict le refusent tous les deux, et il n’y a pas de repli : sans espace de stockage, un document n’a nulle part où aller.',
+	'help.blocked.fix1': 'Ouvrez l’app dans une fenêtre normale plutôt qu’une fenêtre privée.',
+	'help.blocked.fix2':
+		'Dans Firefox, cliquez sur le bouclier dans la barre d’adresse et désactivez les protections pour ce site. Dans Safari, autorisez le stockage pour ce site dans les réglages de confidentialité.',
+	'help.blocked.fix3': 'Rechargez la page.',
+
+	'help.tabs.title': 'Déjà ouvert dans un autre onglet',
+	'help.tabs.symptom': 'L’app annonce qu’elle est déjà ouverte ailleurs et s’arrête de charger.',
+	'help.tabs.cause':
+		'Un seul onglet possède la base à la fois. Deux onglets qui écrivent dans le même espace, c’est ainsi qu’il se corrompt, donc le second refuse plutôt que de risquer vos données.',
+	'help.tabs.fix1': 'Fermez l’autre onglet, puis rechargez celui-ci.',
+
+	'help.eviction.title': 'Des documents ont disparu',
+	'help.eviction.symptom':
+		'Des documents ajoutés plus tôt ne sont plus là après un moment, ou après un redémarrage.',
+	'help.eviction.cause':
+		'Un navigateur reprend l’espace des sites qu’il juge inactifs, sauf si le site a demandé à être conservé. L’app le demande à chaque démarrage, et le navigateur l’accorde en silence une fois que vous l’avez utilisée quelques fois.',
+	'help.eviction.fix1':
+		'Réglages, puis Données, indique si le stockage est conservé. Sinon, le bouton présent redemande.',
+	'help.eviction.fix2':
+		'Exportez votre espace de travail depuis le même onglet pour garder une copie hors du navigateur.',
+
+	'help.gpu.title': 'Le modèle local ne s’installe pas',
+	'help.gpu.symptom':
+		'Choisir Cet appareil affiche indisponible, ou le téléchargement se termine et le modèle refuse de démarrer.',
+	'help.gpu.cause':
+		'Faire tourner un modèle dans un onglet demande WebGPU, et les navigateurs diffèrent. Firefox autorise moins de buffers par shader que le modèle n’en demande. Safari ne prend pas en charge l’isolation dont le repli processeur a besoin.',
+	'help.gpu.fix1':
+		'Utilisez un navigateur Chromium pour Cet appareil : Chrome, Edge, Brave, Arc et Opera fonctionnent.',
+	'help.gpu.fix2':
+		'Ou gardez ce navigateur et choisissez Cloud ou Votre serveur, qui ne demandent aucun modèle local.',
+
+	'help.network.title': 'Un téléchargement ou une réponse n’arrive jamais',
+	'help.network.symptom':
+		'Le téléchargement du modèle se fige, ou une réponse Cloud annonce le service injoignable.',
+	'help.network.cause':
+		'Un VPN, un proxy d’entreprise ou une extension peuvent bloquer les requêtes. Les poids du modèle viennent d’un CDN public, et les réponses Cloud vont vers l’endpoint de cette app ; les deux peuvent être filtrés.',
+	'help.network.fix1': 'Désactivez le VPN ou l’extension de blocage pour ce site, puis réessayez.',
+	'help.network.fix2':
+		'Sur un réseau d’entreprise, demandez que ce site et le CDN du modèle soient autorisés, ou utilisez Cet appareil, qui n’a besoin du réseau qu’une fois.',
+
+	'app.whatToDo': 'Que faire',
 	'app.dbBusy':
 		'Vous avez déjà ceci ouvert dans un autre onglet. Fermez-le, puis rechargez cette page.',
 	'app.dbBlocked':

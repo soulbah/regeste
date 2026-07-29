@@ -54,7 +54,21 @@
 					: null;
 			if (key && !dbNoticeShown) {
 				dbNoticeShown = true;
-				toast.error(t(key), { duration: Number.POSITIVE_INFINITY });
+				// The toast says what happened; the action opens the entry that says
+				// what to change. A message with no way forward is the reason people
+				// give up on a page like this one.
+				toast.error(t(key), {
+					duration: Number.POSITIVE_INFINITY,
+					action: {
+						label: t('app.whatToDo'),
+						onClick: () =>
+							goto(
+								resolve('/help/[[topic]]', {
+									topic: key === 'app.dbBlocked' ? 'storage-blocked' : 'two-tabs'
+								})
+							)
+					}
+				});
 				return;
 			}
 			if (key) return;

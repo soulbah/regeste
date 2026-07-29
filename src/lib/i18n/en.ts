@@ -442,6 +442,61 @@ export const en = {
 	'clarification.document': 'Which document or revision should I use?',
 	'clarification.unitCurrency': 'Which target currency or unit should I use?',
 	'clarification.multiPart': 'Which part should I answer first?',
+	// Help page. Symptom first, because that is what someone recognises.
+	'help.title': 'When the browser gets in the way',
+	'help.intro':
+		'Everything here runs in your browser, so your browser settings are part of how it runs. These are the cases that stop it, and what changes each one.',
+	'help.symptom': 'What you see',
+	'help.cause': 'Why',
+	'help.fix': 'What to do',
+	'help.footnote':
+		'None of these send your documents anywhere. They are settings on your machine, and you can undo any of them.',
+
+	'help.blocked.title': 'Nothing can be saved',
+	'help.blocked.symptom':
+		'Documents refuse to be added, or the app reports that storage is blocked for this site.',
+	'help.blocked.cause':
+		'Your documents live in the browser, in a store called OPFS. A private window and strict content blocking both refuse it, and there is no fallback: with no store, there is nowhere to put a document.',
+	'help.blocked.fix1': 'Open the app in a normal window rather than a private one.',
+	'help.blocked.fix2':
+		'In Firefox, click the shield in the address bar and turn protections off for this site. In Safari, allow storage for this site in the privacy settings.',
+	'help.blocked.fix3': 'Reload the page.',
+
+	'help.tabs.title': 'Open in another tab',
+	'help.tabs.symptom': 'The app says it is already open somewhere else and stops loading.',
+	'help.tabs.cause':
+		'One tab owns the database at a time. Two tabs writing to the same store is how a store gets corrupted, so the second one refuses rather than risk it.',
+	'help.tabs.fix1': 'Close the other tab, then reload this one.',
+
+	'help.eviction.title': 'Documents disappeared',
+	'help.eviction.symptom': 'Documents added earlier are gone after a while, or after a restart.',
+	'help.eviction.cause':
+		'A browser reclaims space from sites it considers idle unless the site asked to be kept. The app asks on every start, and the browser grants it silently once you have used the app a few times.',
+	'help.eviction.fix1':
+		'Settings, then Data, shows whether storage is kept. If it is not, the button there asks again.',
+	'help.eviction.fix2':
+		'Export your workspace from the same tab to keep a copy outside the browser.',
+
+	'help.gpu.title': 'The on-device model will not install',
+	'help.gpu.symptom':
+		'Choosing This device says it is unavailable, or the download finishes and the model fails to start.',
+	'help.gpu.cause':
+		'Running a model in a tab needs WebGPU, and the browsers differ. Firefox allows fewer buffers per shader than the model needs. Safari does not support the isolation the processor fallback requires.',
+	'help.gpu.fix1':
+		'Use a Chromium browser for This device: Chrome, Edge, Brave, Arc and Opera all work.',
+	'help.gpu.fix2':
+		'Or keep this browser and pick Cloud or Your server, which need no local model at all.',
+
+	'help.network.title': 'A download or an answer never arrives',
+	'help.network.symptom':
+		'The model download stalls, or a Cloud answer reports the service as unreachable.',
+	'help.network.cause':
+		'A VPN, a company proxy or an extension can block the requests. The model weights come from a public CDN, and Cloud answers go to this app’s own endpoint; either can be filtered.',
+	'help.network.fix1': 'Turn the VPN or the blocking extension off for this site and retry.',
+	'help.network.fix2':
+		'On a company network, ask for this site and the model CDN to be allowed, or use This device, which needs the network only once.',
+
+	'app.whatToDo': 'What to do',
 	'app.dbBusy': 'You already have this open in another tab. Close it there, then reload.',
 	'app.dbBlocked':
 		'This browser is blocking storage for this site, so nothing can be saved here. Leave private browsing, or allow storage for this site, then reload.',
