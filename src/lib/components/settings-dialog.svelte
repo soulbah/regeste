@@ -431,37 +431,48 @@
 								{@const privateR = modeReadiness('private')}
 								{@const assistedR = modeReadiness('assisted')}
 								{@const myaiR = modeReadiness('myai')}
-								{#snippet stateBadge(r: ReturnType<typeof modeReadiness>)}
+								<!-- The card's state and its one action share the header, because a
+								     ready mode's only useful move is to be used and a button that
+								     works already says "ready" better than a badge beside it. The
+								     action used to sit alone in a row at the foot of the card,
+								     detached from everything it referred to. -->
+								{#snippet stateBadge(
+									r: ReturnType<typeof modeReadiness>,
+									id: 'private' | 'assisted' | 'myai'
+								)}
 									<span class="flex shrink-0 items-center gap-1.5">
-										<Badge variant="outline" class="font-mono text-[10px] uppercase">
-											{r.state === 'ready'
-												? t('settings.ai.status.ready')
-												: r.state === 'setup'
+										{#if r.state === 'ready'}
+											{#if settingsStore.defaultMode === id}
+												<Badge variant="outline" class="font-mono text-[10px] uppercase">
+													{t('settings.usage.current')}
+												</Badge>
+											{:else}
+												<Button
+													size="sm"
+													onclick={() => {
+														uiStore.requestedMode = id;
+														uiStore.settingsOpen = false;
+													}}
+												>
+													{t('settings.ai.use')}
+												</Button>
+											{/if}
+										{:else}
+											<Badge variant="outline" class="font-mono text-[10px] uppercase">
+												{r.state === 'setup'
 													? t('settings.ai.status.setup')
 													: r.state === 'progress'
 														? t('settings.ai.status.progress', { pct: r.pct })
 														: t('settings.ai.status.blocked')}
-										</Badge>
+											</Badge>
+										{/if}
 									</span>
-								{/snippet}
-								{#snippet useMode(id: 'private' | 'assisted' | 'myai')}
-									<div class="mt-3 flex justify-end">
-										<Button
-											size="sm"
-											onclick={() => {
-												uiStore.requestedMode = id;
-												uiStore.settingsOpen = false;
-											}}
-										>
-											{t('settings.ai.use')}
-										</Button>
-									</div>
 								{/snippet}
 								<div class="space-y-4 py-3.5">
 									<section class="bg-background/40 rounded-lg border p-4" data-mode-card="private">
 										<header class="flex items-center justify-between gap-3 pb-1.5">
 											<p class="text-sm font-semibold">{modeLabels.private}</p>
-											{@render stateBadge(privateR)}
+											{@render stateBadge(privateR, 'private')}
 										</header>
 										{#snippet privateModelControl()}
 											{#if privateR.state === 'setup'}
@@ -503,10 +514,17 @@
 											<Separator />
 											<div class="space-y-2 py-3">
 												{@render kicker(t('settings.models.title'))}
-												{#each modelsStore.cached as model (model.cacheName)}
+												{#each modelsStore.cached as model (model.key)}
 													<div class="flex items-center justify-between gap-3">
 														<div class="min-w-0">
-															<p class="truncate text-sm">{model.label}</p>
+															<!-- One row per model, not per cache: WebLLM spans three and
+															     naming each of them after the model printed the same line
+															     three times with three Deletes, none of which removed it. -->
+															<p class="truncate text-sm">
+																{model.label.startsWith('models.')
+																	? t(model.label as Parameters<typeof t>[0])
+																	: model.label}
+															</p>
 															<p class="text-muted-foreground font-mono text-[10px]">
 																{model.bytes
 																	? fmtBytes(model.bytes)
@@ -516,7 +534,7 @@
 														<Button
 															variant="outline"
 															size="sm"
-															onclick={() => modelsStore.remove(model.cacheName)}
+															onclick={() => modelsStore.remove(model)}
 														>
 															{t('settings.models.delete')}
 														</Button>
@@ -563,9 +581,6 @@
 												: t('settings.models.benchDesc'),
 											benchControl
 										)}
-										{#if privateR.state === 'ready'}
-											{@render useMode('private')}
-										{/if}
 									</section>
 
 									{#if ASSISTED_ENABLED}
@@ -575,7 +590,7 @@
 										>
 											<header class="flex items-center justify-between gap-3 pb-1.5">
 												<p class="text-sm font-semibold">{modeLabels.assisted}</p>
-												{@render stateBadge(assistedR)}
+												{@render stateBadge(assistedR, 'assisted')}
 											</header>
 											{#snippet assistedControl()}
 												{#if !sessionStore.user && !sessionStore.loading}
@@ -618,16 +633,13 @@
 													{t('settings.workspace.quotaSignIn')}
 												</p>
 											{/if}
-											{#if assistedR.state === 'ready'}
-												{@render useMode('assisted')}
-											{/if}
 										</section>
 									{/if}
 
 									<section class="bg-background/40 rounded-lg border p-4" data-mode-card="myai">
 										<header class="flex items-center justify-between gap-3 pb-1.5">
 											<p class="text-sm font-semibold">{modeLabels.myai}</p>
-											{@render stateBadge(myaiR)}
+											{@render stateBadge(myaiR, 'myai')}
 										</header>
 										<div class="flex gap-1 pb-2">
 											{#each MYAI_PRESETS as preset (preset.id)}
@@ -718,9 +730,6 @@
 												</Select.Root>
 											{/snippet}
 											{@render row(t('settings.myai.model'), null, modelControl)}
-										{/if}
-										{#if myaiR.state === 'ready'}
-											{@render useMode('myai')}
 										{/if}
 									</section>
 								</div>

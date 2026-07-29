@@ -446,6 +446,8 @@ export const fr: Record<keyof typeof en, string> = {
 	'clarification.multiPart': 'À quelle partie faut-il répondre en premier ?',
 	'app.dbBusy':
 		'Vous avez déjà ceci ouvert dans un autre onglet. Fermez-le, puis rechargez cette page.',
+	'app.dbBlocked':
+		'Ce navigateur bloque le stockage pour ce site, donc rien ne peut être enregistré ici. Quittez la navigation privée, ou autorisez le stockage pour ce site, puis rechargez.',
 	'app.workerFailed.title': "Cette page n'a pas fini de se charger",
 	'app.workerFailed.body': 'Rechargez pour continuer.',
 	'app.workerFailed.cta': 'Recharger',
@@ -525,6 +527,8 @@ export const fr: Record<keyof typeof en, string> = {
 	'settings.workspace.export': 'Exporter mon espace de travail',
 	'settings.workspace.quota': "Environ {answers} réponses restantes aujourd'hui",
 	'settings.workspace.quotaSignIn': 'Votre réserve du jour apparaît ici une fois connecté.',
+	'models.onDevice': 'Modèle sur cet appareil',
+	'models.index': 'Modèle d’indexation',
 	'settings.models.title': 'IA téléchargée',
 	'settings.models.measuring': 'Mesure…',
 	'settings.models.none': 'Rien de téléchargé pour le moment.',

@@ -22,6 +22,16 @@ export async function detectSignals(): Promise<DeviceSignals> {
 		// signal that behaves identically in Chrome, Firefox and Safari.
 		maxBufferBytes = adapter ? Number(adapter.limits.maxBufferSize) : null;
 		maxStorageBindingBytes = adapter ? Number(adapter.limits.maxStorageBufferBindingSize) : null;
+		// WebLLM's kernels bind ten storage buffers per shader stage. Firefox
+		// caps that at eight, so an adapter exists, reports f16, passes every
+		// size check, and then fails at runtime with "requested=10, limit=8" —
+		// after the weights have already been downloaded. Treating the adapter
+		// as absent moves that refusal to before the download, where it can be
+		// acted on, and hands the user the CPU tier instead.
+		if (adapter && Number(adapter.limits.maxStorageBuffersPerShaderStage) < 10) {
+			hasWebGpu = false;
+			hasF16 = false;
+		}
 	} catch {
 		hasWebGpu = false;
 	}

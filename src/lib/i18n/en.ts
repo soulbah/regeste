@@ -443,6 +443,8 @@ export const en = {
 	'clarification.unitCurrency': 'Which target currency or unit should I use?',
 	'clarification.multiPart': 'Which part should I answer first?',
 	'app.dbBusy': 'You already have this open in another tab. Close it there, then reload.',
+	'app.dbBlocked':
+		'This browser is blocking storage for this site, so nothing can be saved here. Leave private browsing, or allow storage for this site, then reload.',
 	'app.workerFailed.title': "This page didn't finish loading",
 	'app.workerFailed.body': 'Reload to continue.',
 	'app.workerFailed.cta': 'Reload',
@@ -522,6 +524,8 @@ export const en = {
 	'settings.workspace.export': 'Export my workspace',
 	'settings.workspace.quota': 'About {answers} answers left today',
 	'settings.workspace.quotaSignIn': "Your daily allowance appears here once you're signed in.",
+	'models.onDevice': 'On-device model',
+	'models.index': 'Document index model',
 	'settings.models.title': 'Downloaded AI',
 	'settings.models.measuring': 'Measuring…',
 	'settings.models.none': 'Nothing downloaded yet.',

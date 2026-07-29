@@ -54,6 +54,9 @@ export interface DbInfo {
  * exclusive Web Lock, held for the worker's lifetime, guarantees a single
  * owner; later tabs fail fast with 'regeste-db-busy' instead of destroying data.
  */
+/** Releases the single-owner lock; set once it is held. */
+let releaseLock: (() => void) | null = null;
+
 async function acquireSingleOwnerLock(): Promise<void> {
 	const acquired = await new Promise<boolean>((resolve) => {
 		navigator.locks
@@ -63,8 +66,14 @@ async function acquireSingleOwnerLock(): Promise<void> {
 					return;
 				}
 				resolve(true);
-				// Hold until this worker dies with its tab.
-				return new Promise<never>(() => {});
+				// Hold until this worker dies with its tab, or until an init that
+				// failed after taking it hands it back. Holding it through a failure
+				// made the retry report "open in another tab", which sent people
+				// hunting for a tab that did not exist while the real fault — the
+				// browser refusing storage — scrolled past above it.
+				return new Promise<never>((_, reject) => {
+					releaseLock = () => reject(new Error('released'));
+				});
 			})
 			.catch(() => resolve(false));
 	});
@@ -96,13 +105,38 @@ function forceOpfsDisable(): void {
 
 async function init(): Promise<DbInfo> {
 	await acquireSingleOwnerLock();
+	try {
+		return await openPool();
+	} catch (err) {
+		// Hand the lock back so a retry reports the real fault instead of
+		// inheriting a "busy" that this failure caused.
+		releaseLock?.();
+		releaseLock = null;
+		throw err;
+	}
+}
+
+async function openPool(): Promise<DbInfo> {
 	forceOpfsDisable();
 	const { default: sqlite3InitModule } = await import(/* @vite-ignore */ SQLITE_DIST_URL);
 	const sqlite3 = await sqlite3InitModule({
 		print: () => {},
 		printErr: (msg: string) => console.error('[sqlite]', msg)
 	});
-	poolUtil = await sqlite3.installOpfsSAHPoolVfs({ name: 'regeste' });
+	try {
+		poolUtil = await sqlite3.installOpfsSAHPoolVfs({ name: 'regeste' });
+	} catch (err) {
+		// Firefox and Safari refuse getDirectory() outright when site storage is
+		// blocked — a private window, or content blocking set to strict. Nothing
+		// in this app works without it, and the raw SecurityError names neither
+		// the cause nor the fix.
+		const name = (err as { name?: string })?.name ?? '';
+		const message = String((err as { message?: string })?.message ?? err);
+		if (name === 'SecurityError' || /GetDirectory|SecurityError/i.test(message)) {
+			throw new Error('regeste-db-blocked', { cause: err });
+		}
+		throw err;
+	}
 	db = new poolUtil.OpfsSAHPoolDb('/regeste.db');
 
 	// Feature asserts: this build must ship vec0 + FTS5, and we must be on OPFS.

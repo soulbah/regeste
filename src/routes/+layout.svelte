@@ -37,16 +37,27 @@
 		if (navigation.from?.url?.pathname !== navigation.to?.url?.pathname) viewerStore.close();
 	});
 
-	// A second tab must fail loudly, not silently orphan the database (the OPFS
-	// SAH pool is single-owner; the worker refuses with 'regeste-db-busy').
-	let dbBusyShown = false;
+	// Two ways the local database can refuse to open, and they need different
+	// answers. A second tab is the app's own single-owner rule and closing the
+	// other tab fixes it. Blocked storage is the browser refusing getDirectory
+	// altogether — a private window, or content blocking set to strict — and no
+	// amount of closing tabs helps. Reporting the second as the first is what
+	// sent someone hunting for a tab that did not exist.
+	let dbNoticeShown = false;
 	function guardDb<T>(p: Promise<T>): Promise<T | void> {
 		return p.catch((err) => {
-			if (String(err).includes('regeste-db-busy') && !dbBusyShown) {
-				dbBusyShown = true;
-				toast.error(t('app.dbBusy'), { duration: Number.POSITIVE_INFINITY });
+			const text = String(err);
+			const key = text.includes('regeste-db-blocked')
+				? 'app.dbBlocked'
+				: text.includes('regeste-db-busy')
+					? 'app.dbBusy'
+					: null;
+			if (key && !dbNoticeShown) {
+				dbNoticeShown = true;
+				toast.error(t(key), { duration: Number.POSITIVE_INFINITY });
 				return;
 			}
+			if (key) return;
 			throw err;
 		});
 	}

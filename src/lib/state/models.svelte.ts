@@ -5,9 +5,11 @@ import { llmStore } from '$lib/private-ai/llm.svelte';
 import { isShellCache } from '$lib/pwa/cache-names';
 
 export interface CachedModel {
-	cacheName: string;
-	/** Human label: WebLLM weights vs embedding model vs other. */
+	/** Groups the several caches one model spans. */
+	key: string;
+	/** i18n key, or the raw cache name for anything unrecognised. */
 	label: string;
+	cacheNames: string[];
 	bytes: number;
 	entries: number;
 }
@@ -17,11 +19,20 @@ export interface BenchmarkResult {
 	recommendPrivate: boolean;
 }
 
-function labelFor(cacheName: string): string {
+/**
+ * Which model a cache belongs to.
+ *
+ * One model is several caches — WebLLM keeps its weights, its wasm and its
+ * config apart — and naming each of them after the model printed the same line
+ * three times with three Delete buttons, none of which deleted the model. The
+ * key groups them; the label is the thing a person thinks they are deleting.
+ */
+function familyOf(cacheName: string): { key: string; label: string } {
 	const lower = cacheName.toLowerCase();
-	if (lower.includes('webllm')) return 'Private AI model (WebLLM)';
-	if (lower.includes('transformers')) return 'Document index model (embeddings)';
-	return cacheName;
+	if (lower.includes('webllm') || lower.includes('wllama'))
+		return { key: 'engine', label: 'models.onDevice' };
+	if (lower.includes('transformers')) return { key: 'embeddings', label: 'models.index' };
+	return { key: cacheName, label: cacheName };
 }
 
 class ModelsStore {
@@ -36,7 +47,10 @@ class ModelsStore {
 			// The app-shell cache is infrastructure, not a model: listing it here
 			// would offer a Delete button that breaks offline startup.
 			const names = (await caches.keys()).filter((name) => !isShellCache(name));
-			const out: CachedModel[] = [];
+			// A plain object, not a Map: this is a local accumulator inside one
+			// async pass, never reactive state, and the lint rule that asks for
+			// SvelteMap is about the latter.
+			const groups: Record<string, CachedModel> = {};
 			for (const name of names) {
 				const cache = await caches.open(name);
 				const keys = await cache.keys();
@@ -46,18 +60,34 @@ class ModelsStore {
 					const len = res?.headers.get('content-length');
 					if (len) bytes += Number(len);
 				}
-				out.push({ cacheName: name, label: labelFor(name), bytes, entries: keys.length });
+				const family = familyOf(name);
+				const existing = groups[family.key];
+				if (existing) {
+					existing.bytes += bytes;
+					existing.entries += keys.length;
+					existing.cacheNames.push(name);
+				} else {
+					groups[family.key] = {
+						key: family.key,
+						label: family.label,
+						cacheNames: [name],
+						bytes,
+						entries: keys.length
+					};
+				}
 			}
-			this.cached = out.sort((a, b) => b.bytes - a.bytes);
+			this.cached = Object.values(groups).sort((a, b) => b.bytes - a.bytes);
 		} finally {
 			this.loading = false;
 		}
 	}
 
-	async remove(cacheName: string): Promise<void> {
-		await caches.delete(cacheName);
-		// Deleting Private weights invalidates the "prepared" fast path.
-		if (cacheName.toLowerCase().includes('webllm')) {
+	/** Delete every cache a model spans. Deleting one of the three and leaving
+	 * the others is not what anyone means by removing a model. */
+	async remove(model: CachedModel): Promise<void> {
+		for (const name of model.cacheNames) await caches.delete(name);
+		// Losing the weights invalidates the "already prepared" fast path.
+		if (model.key === 'engine') {
 			localStorage.removeItem('regeste:private-prepared-model');
 			llmStore.prepared = false;
 			if (llmStore.status === 'ready') location.reload();
