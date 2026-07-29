@@ -10,6 +10,7 @@
 	import LanguagesIcon from '@lucide/svelte/icons/languages';
 	import ShieldIcon from '@lucide/svelte/icons/shield';
 	import CircleHelpIcon from '@lucide/svelte/icons/circle-help';
+	import LifeBuoyIcon from '@lucide/svelte/icons/life-buoy';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
 	import LogInIcon from '@lucide/svelte/icons/log-in';
@@ -122,6 +123,13 @@
 				<DropdownMenu.Item onclick={() => goto(resolve('/how-it-works'))}>
 					<CircleHelpIcon class="text-muted-foreground" />
 					{t('hiw.title')}
+				</DropdownMenu.Item>
+				<!-- A permanent way in, not only the link a failure hands you: the
+				     research on consent surfaces applies here too — a page you can
+				     only reach by breaking something is one nobody reads first. -->
+				<DropdownMenu.Item onclick={() => goto(resolve('/help/[[topic]]', { topic: undefined }))}>
+					<LifeBuoyIcon class="text-muted-foreground" />
+					{t('help.title')}
 				</DropdownMenu.Item>
 				<DropdownMenu.Separator />
 				<DropdownMenu.Item onclick={() => uiStore.openSettings()}>

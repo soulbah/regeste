@@ -15,6 +15,7 @@
 	import { Separator } from '$lib/components/ui/separator';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Switch } from '$lib/components/ui/switch';
+	import HelpLink from '$lib/components/help-link.svelte';
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import DatabaseIcon from '@lucide/svelte/icons/database';
 	import CpuIcon from '@lucide/svelte/icons/cpu';
@@ -356,13 +357,19 @@
 							{:else if tab === 'data'}
 								{#snippet storageControl()}
 									{#if settingsStore.storage && !settingsStore.storage.persisted}
-										<Button
-											variant="outline"
-											size="sm"
-											onclick={() => settingsStore.requestPersistence()}
-										>
-											{t('settings.storage.ask')}
-										</Button>
+										<!-- Not kept means the browser may reclaim the documents, which is
+										     the one failure here that loses data rather than blocking a
+										     feature, so it gets the explanation beside the ask. -->
+										<span class="flex items-center gap-1">
+											<HelpLink topic="eviction" />
+											<Button
+												variant="outline"
+												size="sm"
+												onclick={() => settingsStore.requestPersistence()}
+											>
+												{t('settings.storage.ask')}
+											</Button>
+										</span>
 									{:else if settingsStore.storage?.persisted}
 										<Badge class="text-[10px]">{t('settings.storage.persistent')}</Badge>
 									{/if}
@@ -485,6 +492,11 @@
 												<div class="w-32">
 													<Progress value={privateR.pct} />
 												</div>
+											{:else if privateR.state === 'blocked'}
+												<!-- Blocked here means this browser cannot run a model at all,
+												     which no button in this card can change. The link is the
+												     only useful control left. -->
+												<HelpLink topic="no-webgpu" />
 											{/if}
 										{/snippet}
 										{@render row(

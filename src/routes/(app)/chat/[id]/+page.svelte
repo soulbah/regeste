@@ -24,6 +24,7 @@
 	import ViewerPanel from '$lib/components/viewer-panel.svelte';
 	import WhatAiSawPanel from '$lib/components/what-ai-saw-panel.svelte';
 	import DocumentPicker from '$lib/components/document-picker.svelte';
+	import HelpLink from '$lib/components/help-link.svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import { chatsStore } from '$lib/state/chats.svelte';
 	import { documentsStore } from '$lib/state/documents.svelte';
@@ -414,6 +415,13 @@
 								<div>
 									<p class="text-muted-foreground text-sm">{message.content}</p>
 									<div class="flex items-center gap-1">
+										<!-- A transport failure is the one notice a retry may never fix:
+										     a VPN, a proxy or an extension is filtering the request, and
+										     nothing inside the app changes that. Retry stays, with the
+										     explanation beside it. -->
+										{#if /unreachable|injoignable|indisponible|unavailable/i.test(message.content)}
+											<HelpLink topic="network" class="-ml-1.5" />
+										{/if}
 										{#if message.id === lastMessage?.id && !chatsStore.sending}
 											<Button
 												variant="ghost"

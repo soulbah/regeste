@@ -13,6 +13,7 @@
 	// the free space this origin has, so the promise is one we have checked.
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
+	import HelpLink from '$lib/components/help-link.svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import { llmStore } from '$lib/private-ai/llm.svelte';
 	import { modeReadiness } from '$lib/state/mode-readiness.svelte';
@@ -115,14 +116,19 @@
 			<p class="text-muted-foreground/80 font-mono text-[10px] tracking-wide uppercase">
 				{card.cost}
 			</p>
-			<Button
-				variant={card.best ? 'default' : 'outline'}
-				size="sm"
-				disabled={card.blocked}
-				onclick={() => choose(card.id)}
-			>
-				{t('onboard.pick')}
-			</Button>
+			{#if card.blocked}
+				<!-- A disabled button with no explanation is a dead end on the one
+				     screen someone cannot get past. -->
+				<HelpLink topic={card.id === 'private' ? 'no-webgpu' : 'network'} class="self-start" />
+			{:else}
+				<Button
+					variant={card.best ? 'default' : 'outline'}
+					size="sm"
+					onclick={() => choose(card.id)}
+				>
+					{t('onboard.pick')}
+				</Button>
+			{/if}
 		</div>
 	{/each}
 </div>
