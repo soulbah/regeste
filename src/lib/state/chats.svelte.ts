@@ -636,31 +636,46 @@ class ChatsStore {
 	 * on-device generation with validated citations; anything else → a
 	 * retrieval-only preview turn (Assisted/My AI land in spec 005).
 	 */
-	async send(chatId: string, text: string): Promise<void> {
+	async send(
+		chatId: string,
+		text: string,
+		/** Set when a Cloud send has already put the question in the thread and
+		 * opened the ledger, and is handing the turn back because the question
+		 * turned out to need the on-device path (a clarification, an aggregate).
+		 * Without it the guard below would swallow the delegation and the turn
+		 * would hang with the ledger open. */
+		opts: { staged?: boolean } = {}
+	): Promise<void> {
 		const question = text.trim();
-		if (!question || this.sending) return;
-		this.sending = true;
-		this.related = null;
-		// Immediate feedback: the ledger appears with the send, not after the
-		// question analysis (embedding) that precedes retrieval.
-		this.startWork(
-			'targeted',
-			this.chatDocuments.filter((d) => d.enabled && d.status === 'ready').length
-		);
+		if (!question || (this.sending && !opts.staged)) return;
+		if (!opts.staged) {
+			this.sending = true;
+			this.related = null;
+			// Immediate feedback: the ledger appears with the send, not after the
+			// question analysis (embedding) that precedes retrieval.
+			this.startWork(
+				'targeted',
+				this.chatDocuments.filter((d) => d.enabled && d.status === 'ready').length
+			);
+		}
 		try {
 			const { db } = await getLocalDb();
 			const chat = this.chats.find((c) => c.id === chatId);
-			if (chat && chat.title === 'New chat' && this.messages.length === 0) {
-				await db.renameChat(chatId, titleFromMessage(question));
+			// A staged turn already did both, and doing them twice would print the
+			// question in the thread a second time.
+			if (!opts.staged) {
+				if (chat && chat.title === 'New chat' && this.messages.length === 0) {
+					await db.renameChat(chatId, titleFromMessage(question));
+				}
+				await db.insertMessage({
+					id: crypto.randomUUID(),
+					chatId,
+					role: 'user',
+					content: question,
+					mode: null
+				});
+				this.messages = await db.listMessages(chatId);
 			}
-			await db.insertMessage({
-				id: crypto.randomUUID(),
-				chatId,
-				role: 'user',
-				content: question,
-				mode: null
-			});
-			this.messages = await db.listMessages(chatId);
 			const context = this.retrievalContext(question);
 
 			const enabledDocs = this.chatDocuments.filter((d) => d.enabled && d.status === 'ready');
@@ -1519,11 +1534,39 @@ class ChatsStore {
 		);
 	}
 
-	/** Stage an assisted send for review in the right panel. */
+	/**
+	 * Stage a Cloud send, through the same turn every other mode uses.
+	 *
+	 * The question lands in the thread and the work ledger opens with it, exactly
+	 * as on this device: only the last step differs, waiting on the user instead
+	 * of on the model. Before this, a Cloud send produced no message and no
+	 * ledger, just a line saying to look at the side panel — the one mode whose
+	 * send needs the most trust was the one that showed the least.
+	 */
 	async stageAssisted(
 		chatId: string,
 		question: string
 	): Promise<'staged' | 'no-excerpts' | 'handled'> {
+		this.sending = true;
+		this.related = null;
+		this.startWork(
+			'targeted',
+			this.chatDocuments.filter((d) => d.enabled && d.status === 'ready').length
+		);
+		const { db } = await getLocalDb();
+		const chat = this.chats.find((c) => c.id === chatId);
+		if (chat && chat.title === 'New chat' && this.messages.length === 0) {
+			await db.renameChat(chatId, titleFromMessage(question));
+		}
+		await db.insertMessage({
+			id: crypto.randomUUID(),
+			chatId,
+			role: 'user',
+			content: question,
+			mode: null
+		});
+		this.messages = await db.listMessages(chatId);
+
 		const context = this.retrievalContext(question);
 		const frame = await resolveQuestion(context?.analysisQuery ?? question, this.embedQuestions);
 		const plan = buildExecutionPlan(context?.analysisQuery ?? question, frame);
@@ -1534,7 +1577,9 @@ class ChatsStore {
 			this.chatDocuments.filter((document) => document.enabled).length
 		);
 		if (clarification || plan.route === 'aggregate') {
-			await this.send(chatId, question);
+			// The question turned out to be answerable here. Hand the turn back
+			// without restarting it: the thread already holds the question.
+			await this.send(chatId, question, { staged: true });
 			return 'handled';
 		}
 		const hits = await this.retrieveForActive(
@@ -1542,7 +1587,12 @@ class ChatsStore {
 			question,
 			plan.route
 		);
-		if (!hits.length || !hasAnswerBearingEvidence(question, hits)) return 'no-excerpts';
+		if (!hits.length || !hasAnswerBearingEvidence(question, hits)) {
+			this.sending = false;
+			this.workSteps = [];
+			return 'no-excerpts';
+		}
+		this.advanceWork('inspect', hits.length);
 		this.pendingAssisted = {
 			chatId,
 			question,
@@ -1550,6 +1600,17 @@ class ChatsStore {
 			conversationContext: context?.promptContext ?? null,
 			route: plan.route
 		};
+
+		// Trusted: nothing to approve, so the turn runs straight on and the ledger
+		// never stops. Otherwise the last step waits, which is the one state in
+		// this app whose next move belongs to the user.
+		if (!settingsStore.reviewBeforeSending()) {
+			await this.confirmAssisted(hits);
+			return 'handled';
+		}
+		this.workSteps = this.workSteps.map((step) =>
+			step.id === 'write' ? { ...step, status: 'waiting' as const } : step
+		);
 		return 'staged';
 	}
 
@@ -1557,6 +1618,7 @@ class ChatsStore {
 		const pending = this.pendingAssisted;
 		if (!pending) return;
 		this.pendingAssisted = null;
+		this.advanceWork('write');
 		const selectedIds = new Set(selected.map((h) => h.chunkId));
 		const excluded = pending.hits.filter((h) => !selectedIds.has(h.chunkId));
 		await this.sendAssisted(
@@ -1569,8 +1631,12 @@ class ChatsStore {
 		);
 	}
 
+	/** Abandon the staged turn: the ledger closes and the question stays in the
+	 * thread, because it was asked and cancelling the send is not unasking it. */
 	cancelAssisted(): void {
 		this.pendingAssisted = null;
+		this.sending = false;
+		this.workSteps = [];
 	}
 
 	/**

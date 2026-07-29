@@ -18,6 +18,7 @@
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import DatabaseIcon from '@lucide/svelte/icons/database';
 	import CpuIcon from '@lucide/svelte/icons/cpu';
+	import GaugeIcon from '@lucide/svelte/icons/gauge';
 	import UserRoundIcon from '@lucide/svelte/icons/user-round';
 	import MonitorIcon from '@lucide/svelte/icons/monitor';
 	import SunIcon from '@lucide/svelte/icons/sun';
@@ -39,11 +40,12 @@
 	import { ASSISTED_ENABLED } from '$lib/flags';
 	import { answersLeft, modelFor } from '$lib/cloud-models';
 
-	type Tab = 'general' | 'data' | 'ai' | 'account';
+	type Tab = 'general' | 'usage' | 'data' | 'ai' | 'account';
 	let tab = $state<Tab>('general');
 	const tabs = [
 		{ id: 'general', label: 'settings.tabs.general', icon: SlidersHorizontalIcon },
 		{ id: 'data', label: 'settings.tabs.data', icon: DatabaseIcon },
+		{ id: 'usage', label: 'settings.tabs.usage', icon: GaugeIcon },
 		{ id: 'ai', label: 'settings.tabs.ai', icon: CpuIcon },
 		{ id: 'account', label: 'settings.tabs.account', icon: UserRoundIcon }
 	] as const;
@@ -287,6 +289,45 @@
 									t('modes.private.description'),
 									modeControl
 								)}
+							{:else if tab === 'usage'}
+								<!-- Its own tab rather than a line buried in the model picker:
+								     how much of your day is left is a question people ask
+								     without wanting to open a composer popover to answer it. -->
+								{@render kicker(t('settings.usage.kicker'))}
+								{#if sessionStore.user && settingsStore.quota}
+									<div class="py-3">
+										<p class="font-display text-3xl tracking-tight">
+											{answersLeft(
+												settingsStore.quota.remaining,
+												modelFor(settingsStore.cloudModel)
+											)}
+										</p>
+										<p class="text-muted-foreground mt-1 text-xs">
+											{t('settings.usage.left', {
+												model: t(`cloudModel.${settingsStore.cloudModel}`)
+											})}
+										</p>
+										<Progress
+											value={(100 * settingsStore.quota.remaining) / settingsStore.quota.limit}
+											class="mt-3 h-1"
+										/>
+										<p class="text-muted-foreground/70 mt-2 font-mono text-[10px]">
+											{t('settings.usage.resets')}
+										</p>
+									</div>
+								{:else}
+									<p class="text-muted-foreground py-3 text-xs">
+										{t('settings.workspace.quotaSignIn')}
+									</p>
+								{/if}
+								<Separator />
+								{#snippet reviewControl()}
+									<Switch
+										checked={settingsStore.reviewBeforeSend}
+										onCheckedChange={(v) => settingsStore.setReviewBeforeSend(v)}
+									/>
+								{/snippet}
+								{@render row(t('settings.review.title'), t('settings.review.desc'), reviewControl)}
 							{:else if tab === 'data'}
 								{#snippet storageControl()}
 									{#if settingsStore.storage && !settingsStore.storage.persisted}

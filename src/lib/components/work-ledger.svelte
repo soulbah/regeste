@@ -3,6 +3,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import CircleIcon from '@lucide/svelte/icons/circle';
+	import CircleDotIcon from '@lucide/svelte/icons/circle-dot';
 	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import { t } from '$lib/i18n/index.svelte';
@@ -33,6 +34,7 @@
 	});
 
 	function label(step: WorkStep): string {
+		if (step.status === 'waiting') return t('work.write.waiting');
 		const state = step.status === 'done' ? 'done' : 'active';
 		const text = t(`work.${step.id}.${state}` as Parameters<typeof t>[0], {
 			count: step.count ?? 0
@@ -104,6 +106,10 @@
 						<CheckIcon class="size-3.5" />
 					{:else if step.status === 'active'}
 						<LoaderCircleIcon class="size-3.5 motion-safe:animate-spin" />
+					{:else if step.status === 'waiting'}
+						<!-- Amber, the app's one mark for data about to leave, and the only
+						     step whose next move belongs to the user rather than the app. -->
+						<CircleDotIcon class="size-3.5 text-amber-500" />
 					{:else}
 						<CircleIcon class="size-3.5 opacity-30" />
 					{/if}

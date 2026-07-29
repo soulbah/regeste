@@ -31,6 +31,17 @@ class SettingsStore {
 	modeChosen = $state(false);
 	/** Which Cloud model answers. Local, like every other preference. */
 	cloudModel = $state<CloudModelKey>(DEFAULT_MODEL_KEY);
+	/**
+	 * Whether every remote send waits for approval of what leaves.
+	 *
+	 * On by default, and turned off only deliberately: the point of the review
+	 * is that someone saw the excerpts before they left. Research on consent is
+	 * consistent that repeating a prompt someone always accepts trains them to
+	 * accept without reading, so the honest design is one durable choice made
+	 * once, revocable here, rather than a "don't ask again" tucked inside the
+	 * prompt itself.
+	 */
+	reviewBeforeSend = $state(true);
 
 	private loaded = false;
 
@@ -47,6 +58,7 @@ class SettingsStore {
 		this.modeChosen = (await db.getSetting('mode_chosen')) === '1';
 		const cloud = await db.getSetting('cloud_model');
 		if (cloud === 'balanced' || cloud === 'best') this.cloudModel = cloud;
+		this.reviewBeforeSend = (await db.getSetting('review_before_send')) !== '0';
 		await this.refreshStorage();
 	}
 
@@ -55,6 +67,19 @@ class SettingsStore {
 		this.modeChosen = true;
 		const { db } = await getLocalDb();
 		await db.setSetting('mode_chosen', '1');
+	}
+
+	/** Whether the next remote send needs approval. A per-conversation
+	 * override belongs here when it lands; today every chat follows the one
+	 * global choice. */
+	reviewBeforeSending(): boolean {
+		return this.reviewBeforeSend;
+	}
+
+	async setReviewBeforeSend(on: boolean): Promise<void> {
+		this.reviewBeforeSend = on;
+		const { db } = await getLocalDb();
+		await db.setSetting('review_before_send', on ? null : '0');
 	}
 
 	async setCloudModel(key: CloudModelKey): Promise<void> {

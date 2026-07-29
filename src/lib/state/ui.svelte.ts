@@ -5,7 +5,7 @@
 
 import type { ChatMode } from '$lib/types';
 
-export type SettingsTab = 'general' | 'data' | 'ai' | 'account';
+export type SettingsTab = 'general' | 'usage' | 'data' | 'ai' | 'account';
 
 class UiStore {
 	settingsOpen = $state(false);

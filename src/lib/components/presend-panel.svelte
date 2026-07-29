@@ -62,7 +62,11 @@
 		{/if}
 	</div>
 
-	<ScrollArea class="flex-1">
+	<!-- min-h-0 is what makes this scroll at all: a flex child defaults to
+	     min-height:auto, so it refuses to shrink below its content and the list
+	     pushes the actions off the panel instead of scrolling under them. The
+	     header and the footer stay put; only the excerpts move. -->
+	<ScrollArea class="min-h-0 flex-1">
 		<div class="space-y-2 p-3">
 			<p class="text-muted-foreground px-1 font-mono text-[10px] tracking-widest uppercase">
 				{t('presend.excerpts')}

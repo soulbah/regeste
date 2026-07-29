@@ -471,14 +471,9 @@
 							<div class="text-sm">{message.content}</div>
 						{/if}
 					{/each}
-					{#if reviewing}
-						<div class="flex items-center gap-2">
-							<span class="bg-mode-assisted size-1.5 animate-pulse rounded-full"></span>
-							<span class="text-muted-foreground font-mono text-[10px]">
-								{t('chat.reviewing')}
-							</span>
-						</div>
-					{/if}
+					<!-- No separate line for a staged Cloud send: the work ledger below
+					     carries it, with its last step waiting instead of running. One
+					     turn shape for every mode was the whole point. -->
 					{#if chatsStore.streamingText !== null}
 						<div class="space-y-2">
 							<!-- Live draft notes only until readable answer text streams:
