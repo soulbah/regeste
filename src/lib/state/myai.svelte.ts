@@ -75,6 +75,15 @@ class MyAiStore {
 		return this.baseUrl ? endpointHost(this.baseUrl) : null;
 	}
 
+	/** Declare the settings already read, so `init()` never opens the database.
+	 * The landing renders the app's own composer inert, and the composer's mode
+	 * selector calls `init()` on mount: without this the marketing page would
+	 * take the single-owner lock and could lock the real app out of another tab.
+	 * `llmStore` gets the same treatment there by being pinned to 'ready'. */
+	skipPersistence(): void {
+		this.loaded = true;
+	}
+
 	async init(): Promise<void> {
 		if (this.loaded) return;
 		this.loaded = true;

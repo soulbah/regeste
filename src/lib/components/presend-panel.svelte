@@ -14,14 +14,23 @@
 	import { isWeakMatch, relevancePercent } from '$lib/pipeline/relevance';
 	import type { SearchHit } from '$lib/types';
 
-	let { onhide = null }: { onhide?: (() => void) | null } = $props();
+	let {
+		onhide = null,
+		excludedChunkIds = []
+	}: {
+		onhide?: (() => void) | null;
+		/** Passages already unticked when the review opens. Empty in the app, where
+		 * every passage starts selected; the landing uses it to show a review a
+		 * visitor has already worked on. */
+		excludedChunkIds?: number[];
+	} = $props();
 
 	const pending = $derived(chatsStore.pendingAssisted);
 	let excluded = $state<Record<number, boolean>>({});
 
 	$effect(() => {
 		void pending?.question;
-		excluded = {};
+		excluded = Object.fromEntries(excludedChunkIds.map((id) => [id, true]));
 	});
 
 	const selected = $derived((pending?.hits ?? []).filter((h) => !excluded[h.chunkId]));

@@ -6,15 +6,24 @@
 	//
 	// The hero runs the product live in the DOM (landing-demo.svelte) — the same
 	// choice every reference site makes, and the only way UI text stays sharp at
-	// every pixel density. The chapters below show stills photographed off the
-	// capture stage (/dev/landing-stage): the real panels, a real lease PDF put
-	// through the real pipeline and opened by the real viewer on the highlighted
-	// clause. Regenerate with .benchmark-corpus/scripts/landing-capture.mjs.
+	// every pixel density.
 	//
-	// Composition follows the reference grammar (Linear): a chapter is a header
-	// row, one wide capture, then two mono footnotes; the modes section breathes
-	// between chapters without a capture. Privacy appears twice, deliberately:
-	// the hero fact and the review proof. Nowhere else.
+	// Three chapters, deliberately three different shapes, because four sections
+	// built from one template is what made the middle read as filler: an inverted
+	// full-bleed band holding a drawing you operate, then contained text beside a
+	// picture cropped by the viewport, then a margin column beside a stacked
+	// dossier. Tall, short, tall.
+	//
+	// One line grammar ties them together: a solid hairline is inside the machine,
+	// a dashed one is a crossing, a bordered rectangle with a mono header rail is
+	// a room. Privacy is stated twice and nowhere else — the hero fact, and the
+	// boundary in [ 01 where it is the whole message.
+	//
+	// The one still left (chapter 02) comes off the capture stage
+	// (/dev/landing-stage): a real lease PDF put through the real pipeline and
+	// opened by the real viewer on the highlighted clause. Regenerate with
+	// .benchmark-corpus/scripts/landing-capture.mjs. It stays a still because a
+	// live citation click needs the local database, which this page must not open.
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { mode } from 'mode-watcher';
@@ -22,11 +31,14 @@
 	import { Button } from '$lib/components/ui/button';
 	import BrandMark from '$lib/components/brand-mark.svelte';
 	import LandingDemo from '$lib/components/landing-demo.svelte';
-	import LandingPanel from '$lib/components/landing-panel.svelte';
+	import LandingModes from '$lib/components/landing-modes.svelte';
+	import LandingDossier from '$lib/components/landing-dossier.svelte';
 	import { t, i18n } from '$lib/i18n/index.svelte';
-	import { reveal, revealStagger } from '$lib/landing-motion';
+	import { reveal } from '$lib/landing-motion';
 
 	const GITHUB = 'https://github.com/soulbah/regeste';
+
+	const CITE_NOTES = ['landing.cite.f1', 'landing.cite.f2'] as const;
 
 	// Exactly what the file picker accepts: .pdf, .docx, .md, .txt — a fifth
 	// badge would be a promise the app does not keep. Hand-placed and lightly
@@ -56,47 +68,6 @@
 		window.addEventListener('scroll', on, { passive: true });
 		return () => window.removeEventListener('scroll', on);
 	});
-
-	const MODES = [
-		{
-			name: 'modes.private.name',
-			desc: 'landing.modes.private',
-			fact: 'landing.modes.private.fact'
-		},
-		{
-			name: 'modes.assisted.name',
-			desc: 'landing.modes.assisted',
-			fact: 'landing.modes.assisted.fact'
-		},
-		{ name: 'modes.myai.name', desc: 'landing.modes.myai', fact: 'landing.modes.myai.fact' }
-	] as const;
-
-	const CHAPTERS = [
-		{
-			index: '02',
-			id: 'citations',
-			scene: 'cite',
-			title: 'landing.cite.title',
-			sub: 'landing.cite.sub',
-			notes: ['landing.cite.f1', 'landing.cite.f2']
-		},
-		{
-			index: '03',
-			id: 'review',
-			panel: 'review',
-			title: 'landing.review.title',
-			sub: 'landing.review.sub',
-			notes: ['landing.review.f1', 'landing.review.f2']
-		},
-		{
-			index: '04',
-			id: 'record',
-			panel: 'record',
-			title: 'landing.wais.title',
-			sub: 'landing.wais.sub',
-			notes: ['landing.wais.f1', 'landing.wais.f2']
-		}
-	] as const;
 </script>
 
 <svelte:head>
@@ -117,19 +88,6 @@
 		<span class="text-accent-foreground">[</span>
 		{index}
 	</p>
-{/snippet}
-
-<!-- A capture of the real application, framed in window chrome. -->
-{#snippet capture(scene: string, alt: string, eager: boolean)}
-	<div class="border-border bg-card/40 overflow-hidden rounded-2xl border shadow-xl shadow-black/5">
-		<img
-			src={`/landing/${scene}-${i18n.locale}-${scheme}.webp`}
-			{alt}
-			class="block w-full"
-			loading={eager ? 'eager' : 'lazy'}
-			decoding="async"
-		/>
-	</div>
 {/snippet}
 
 <div class="bg-background min-h-svh">
@@ -241,144 +199,180 @@
 		</div>
 	</section>
 
-	<!-- ——— Modes: the chapter break, no capture. ——— -->
-	<section class="mx-auto max-w-7xl px-6 pt-24 sm:pt-32">
-		<div use:reveal>
-			{@render kicker('01', 'modes')}
-			<h2 class="font-display mt-4 text-3xl leading-tight tracking-tight text-balance">
-				{t('landing.modes.title')}
-			</h2>
-			<p class="text-muted-foreground mt-3 max-w-xl leading-relaxed">{t('landing.modes.sub')}</p>
-		</div>
-
-		<div class="mt-10 grid gap-x-10 gap-y-8 sm:grid-cols-3" use:revealStagger={{ step: 0.1 }}>
-			{#each MODES as m (m.name)}
-				<div class="border-border border-t pt-5">
-					<h3 class="font-medium">{t(m.name)}</h3>
-					<p class="text-muted-foreground mt-2 text-sm leading-relaxed">{t(m.desc)}</p>
-					<p class="text-muted-foreground mt-4 font-mono text-[11px] leading-relaxed">
-						{t(m.fact)}
-					</p>
-				</div>
-			{/each}
-		</div>
-
-		<Button
-			variant="ghost"
-			size="sm"
-			class="text-muted-foreground mt-8 -ml-3 gap-1.5"
-			href={resolve('/how-it-works')}
-		>
-			{t('landing.modes.link')}
-			<ArrowRightIcon class="size-3.5" />
-		</Button>
-	</section>
-
-	<!-- ——— Chapters: header row, one wide capture, two footnotes. ——— -->
-	{#each CHAPTERS as chapter (chapter.id)}
-		<section class="mx-auto max-w-7xl px-6 pt-24 sm:pt-32">
+	<!-- ——— [ 01 — the drawing, on an inverted band. ———
+	     The one full-bleed moment on the page. In light mode the band carries the
+	     `dark` class, so every token inside resolves to the dark scope with no
+	     per-element work; in dark mode it would vanish against the page, so it
+	     becomes the card surface between two hairlines instead. -->
+	<section
+		class={scheme === 'light'
+			? 'dark bg-background text-foreground mt-24 py-20 sm:mt-32 sm:py-28'
+			: 'bg-card border-border mt-24 border-y py-20 sm:mt-32 sm:py-28'}
+	>
+		<div class="mx-auto max-w-7xl px-6">
 			<div class="grid items-end gap-x-12 gap-y-4 lg:grid-cols-2" use:reveal>
 				<div>
-					{@render kicker(chapter.index, chapter.id)}
+					{@render kicker('01', 'modes')}
 					<h2 class="font-display mt-4 text-3xl leading-tight tracking-tight text-balance">
-						{t(chapter.title)}
+						{t('landing.modes.title')}
 					</h2>
 				</div>
 				<p class="text-muted-foreground max-w-xl leading-relaxed lg:justify-self-end">
-					{t(chapter.sub)}
+					{t('landing.modes.sub')}
 				</p>
 			</div>
 
-			<div class="mt-10" use:reveal={{ delay: 0.1 }}>
-				{#if 'panel' in chapter}
-					<LandingPanel kind={chapter.panel} />
-				{:else}
-					{@render capture(chapter.scene, t(chapter.title), false)}
-				{/if}
-			</div>
-
-			<div class="mt-6 grid gap-x-10 gap-y-3 sm:grid-cols-2">
-				{#each chapter.notes as note (note)}
-					<p class="text-muted-foreground font-mono text-[11px] leading-relaxed">
-						<span class="text-accent-foreground">[</span>
-						{t(note)}
-					</p>
-				{/each}
-			</div>
-		</section>
-	{/each}
-
-	<!-- ——— Open source ——— -->
-	<section class="mx-auto max-w-7xl px-6 pt-24 pb-8 sm:pt-32">
-		<div class="border-border border-t pt-16 text-center sm:pt-20" use:reveal>
-			<div class="flex justify-center"><BrandMark size={40} /></div>
-			<h2 class="font-display mt-6 text-3xl leading-tight tracking-tight text-balance">
-				{t('landing.oss.title')}
-			</h2>
-			<p class="text-muted-foreground mx-auto mt-3 max-w-md leading-relaxed text-balance">
-				{t('landing.oss.sub')}
-			</p>
-			<div class="mt-8 flex flex-wrap items-center justify-center gap-3">
-				<Button size="lg" href={resolve('/chat')} class="gap-2">
-					{t('landing.cta')}
-					<ArrowRightIcon class="size-4" />
-				</Button>
-				<Button
-					size="lg"
-					variant="outline"
-					href={GITHUB}
-					target="_blank"
-					rel="noopener"
-					class="gap-2"
-				>
-					{@render githubIcon('size-4')}
-					{t('landing.oss.cta')}
-				</Button>
+			<div class="mt-12" use:reveal={{ delay: 0.1 }}>
+				<LandingModes />
 			</div>
 		</div>
 	</section>
 
-	<!-- ——— Footer ——— -->
-	<footer class="mx-auto max-w-7xl px-6 pt-16 pb-10">
-		<div class="border-border flex flex-wrap items-center justify-between gap-4 border-t pt-6">
-			<p class="text-muted-foreground text-sm">
-				<span class="font-display text-foreground text-base tracking-tight">
-					<span class="text-accent-foreground">[</span>Regeste
-				</span>
-				<span class="mx-2">·</span>
-				{t('landing.footer.copyright')}
-			</p>
-			<nav class="flex items-center gap-1">
-				<Button
-					variant="ghost"
-					size="sm"
-					class="text-muted-foreground"
-					href={resolve('/how-it-works')}
+	<!-- ——— [ 02 — the plate that runs off the page. ———
+	     Contained text, escaping picture, weight hard right: maximum contrast with
+	     the symmetric band above. The footnotes move into the text column, because
+	     a two-across row of footnotes under every picture is a third of why the
+	     page read as a template. -->
+	<section class="overflow-x-clip pt-24 sm:pt-28">
+		<div
+			class="mx-auto grid max-w-7xl items-center gap-y-10 px-6 lg:grid-cols-[20rem_minmax(0,1fr)] lg:gap-x-14 xl:grid-cols-[26rem_minmax(0,1fr)]"
+		>
+			<div use:reveal>
+				{@render kicker('02', 'citations')}
+				<h2 class="font-display mt-4 text-3xl leading-tight tracking-tight text-balance">
+					{t('landing.cite.title')}
+				</h2>
+				<p class="text-muted-foreground mt-3 leading-relaxed">{t('landing.cite.sub')}</p>
+
+				<div class="border-border mt-8 space-y-3 border-t pt-6">
+					{#each CITE_NOTES as note (note)}
+						<p class="text-muted-foreground font-mono text-[11px] leading-relaxed">
+							<span class="text-accent-foreground">[</span>
+							{t(note)}
+						</p>
+					{/each}
+				</div>
+
+				<!-- The leader points at the picture, not at a pixel inside it, so it
+				     survives both locales and both schemes. -->
+				<div class="mt-8 hidden items-center gap-3 lg:-mr-14 lg:flex" aria-hidden="true">
+					<span
+						class="border-border text-accent-foreground rounded-md border px-2 py-0.5 font-mono text-[11px]"
+					>
+						[1]
+					</span>
+					<span class="border-border h-px flex-1 border-t"></span>
+				</div>
+			</div>
+
+			<div class="lg:mr-[max(calc((1232px-100vw)/2),-8rem)]" use:reveal={{ delay: 0.1 }}>
+				<!-- Bordered on three sides only. That single square corner is what
+				     says "cropped by the page" rather than "mistake". -->
+				<div
+					class="border-border bg-card/40 overflow-hidden rounded-l-2xl border-y border-l shadow-xl shadow-black/5 max-lg:rounded-2xl max-lg:border-r"
 				>
-					{t('landing.nav.how')}
-				</Button>
-				<Button
-					variant="ghost"
-					size="sm"
-					class="text-muted-foreground"
-					href={resolve('/help/[[topic]]', { topic: undefined })}
-				>
-					{t('landing.nav.guides')}
-				</Button>
-				<Button
-					variant="ghost"
-					size="sm"
-					class="text-muted-foreground gap-1.5"
-					href={GITHUB}
-					target="_blank"
-					rel="noopener"
-				>
-					{@render githubIcon('size-4')}
-					{t('landing.nav.github')}
-				</Button>
-			</nav>
+					<img
+						src={`/landing/cite-${i18n.locale}-${scheme}.webp`}
+						alt={t('landing.cite.title')}
+						class="block w-full lg:w-[52rem] lg:max-w-none xl:w-[68rem]"
+						loading="lazy"
+						decoding="async"
+					/>
+				</div>
+				<p class="text-muted-foreground mt-3 font-mono text-[10px] tracking-widest uppercase">
+					{t('landing.cite.fig')}
+				</p>
+			</div>
 		</div>
-	</footer>
+	</section>
+
+	<!-- ——— [ 03 — the dossier. Two moments of one question, stacked. ——— -->
+	<section class="mx-auto max-w-7xl px-6 pt-32 sm:pt-40" use:reveal>
+		<LandingDossier />
+	</section>
+
+	<!-- ——— The foot: open source, then the footer, on one inverted band. ———
+	     Inverted for the same reason the closing band is dark on every reference
+	     page: the page needs a full stop, and ink is the only one available on
+	     paper. The footer comes inside it, because ending the CTA on ink and then
+	     switching back to paper for six links puts a seam two centimetres from the
+	     bottom of the page. -->
+	<div
+		class={scheme === 'light'
+			? 'dark bg-background text-foreground mt-24 sm:mt-32'
+			: 'bg-card border-border mt-24 border-t sm:mt-32'}
+	>
+		<section class="mx-auto max-w-7xl px-6 pt-20 pb-8 sm:pt-28">
+			<div class="text-center" use:reveal>
+				<div class="flex justify-center"><BrandMark size={40} /></div>
+				<h2 class="font-display mt-6 text-3xl leading-tight tracking-tight text-balance">
+					{t('landing.oss.title')}
+				</h2>
+				<p class="text-muted-foreground mx-auto mt-3 max-w-md leading-relaxed text-balance">
+					{t('landing.oss.sub')}
+				</p>
+				<div class="mt-8 flex flex-wrap items-center justify-center gap-3">
+					<Button size="lg" href={resolve('/chat')} class="gap-2">
+						{t('landing.cta')}
+						<ArrowRightIcon class="size-4" />
+					</Button>
+					<Button
+						size="lg"
+						variant="outline"
+						href={GITHUB}
+						target="_blank"
+						rel="noopener"
+						class="gap-2"
+					>
+						{@render githubIcon('size-4')}
+						{t('landing.oss.cta')}
+					</Button>
+				</div>
+			</div>
+		</section>
+
+		<!-- ——— Footer ——— -->
+		<footer class="mx-auto max-w-7xl px-6 pt-16 pb-10">
+			<div class="border-border flex flex-wrap items-center justify-between gap-4 border-t pt-6">
+				<p class="text-muted-foreground text-sm">
+					<span class="font-display text-foreground text-base tracking-tight">
+						<span class="text-accent-foreground">[</span>Regeste
+					</span>
+					<span class="mx-2">·</span>
+					{t('landing.footer.copyright')}
+				</p>
+				<nav class="flex items-center gap-1">
+					<Button
+						variant="ghost"
+						size="sm"
+						class="text-muted-foreground"
+						href={resolve('/how-it-works')}
+					>
+						{t('landing.nav.how')}
+					</Button>
+					<Button
+						variant="ghost"
+						size="sm"
+						class="text-muted-foreground"
+						href={resolve('/help/[[topic]]', { topic: undefined })}
+					>
+						{t('landing.nav.guides')}
+					</Button>
+					<Button
+						variant="ghost"
+						size="sm"
+						class="text-muted-foreground gap-1.5"
+						href={GITHUB}
+						target="_blank"
+						rel="noopener"
+					>
+						{@render githubIcon('size-4')}
+						{t('landing.nav.github')}
+					</Button>
+				</nav>
+			</div>
+		</footer>
+	</div>
 </div>
 
 <style>

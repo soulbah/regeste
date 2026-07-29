@@ -15,6 +15,7 @@
 	// none of these components touch it outside event handlers, which cannot
 	// fire here: the whole thing is inert.
 	import { onMount } from 'svelte';
+	import MonitorIcon from '@lucide/svelte/icons/monitor';
 	import ChatHeader from '$lib/components/chat-header.svelte';
 	import PrivateTurn from '$lib/components/private-turn.svelte';
 	import WorkLedger from '$lib/components/work-ledger.svelte';
@@ -25,7 +26,8 @@
 	import { settingsStore } from '$lib/state/settings.svelte';
 	import { sessionStore } from '$lib/state/session.svelte';
 	import { llmStore } from '$lib/private-ai/llm.svelte';
-	import { i18n } from '$lib/i18n/index.svelte';
+	import { myaiStore } from '$lib/state/myai.svelte';
+	import { t, i18n } from '$lib/i18n/index.svelte';
 	import { LANDING_FIXTURE } from '$lib/landing-fixture';
 	import type { WorkStep } from '$lib/types';
 
@@ -51,6 +53,9 @@
 	/** In-memory only: the header, the panel and the composer read these. */
 	function seed() {
 		llmStore.status = 'ready';
+		// The composer's mode selector calls both stores' init() on mount. Pinning
+		// the status above is what stops llmStore; myaiStore needs telling.
+		myaiStore.skipPersistence();
 		sessionStore.user = { id: 'landing', email: 'demo@example.org', name: 'Demo' };
 		settingsStore.modeChosen = true;
 		chatsStore.activeChat = {
@@ -113,9 +118,15 @@
 		});
 	}
 
+	// Seed during initialisation, not in an effect: the composer's mode selector
+	// opens the database from its own $effect, and child effects run before this
+	// component's would. Pinning the two stores here means the selector finds
+	// them already settled and never reaches for the lock.
+	let seeded = i18n.locale;
+	seed();
+
 	// The page applies ?lang= after we mount, and the header reads the chat's
 	// title: re-seed whenever the fixture's language changes.
-	let seeded = '';
 	$effect(() => {
 		const key = i18n.locale;
 		if (seeded === key) return;
@@ -124,7 +135,6 @@
 	});
 
 	onMount(() => {
-		seed();
 		const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 		if (reduced) {
 			// No motion: land straight on the finished state, which is the frame
@@ -152,73 +162,86 @@
 
 <!-- Inert: a demo, not a control surface. Nothing here is focusable and no
      handler can fire, which is what keeps the app's stores untouched. The
-     provider is required because the app's own controls carry tooltips. -->
+     provider is required because the app's own controls carry tooltips.
+
+     The room, the same one the data-flow drawing and the dossier use: a bordered
+     rectangle under a mono header rail that names where you are. Three surfaces
+     carrying the same frame is what makes the page argue one thing, and the
+     label says the product's whole claim without spending a sentence on it. -->
 <Tooltip.Provider delayDuration={300}>
-	<div bind:this={root} class="h-[600px] lg:h-[720px]" aria-hidden="true" inert>
-		<div class="grid h-full gap-2 lg:grid-cols-[1fr_380px]">
-			<div
-				class="border-border bg-background flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border shadow-sm"
-			>
-				<ChatHeader panelOpen={true} sidebarTrigger={false} />
-				<div class="flex min-h-0 flex-1 flex-col justify-end gap-6 overflow-hidden px-6 pt-6 pb-2">
-					<div class="mx-auto w-full max-w-2xl space-y-6">
-						<div class="flex justify-end">
-							<div class="bg-muted max-w-[85%] rounded-2xl rounded-br-md px-4 py-2.5 text-sm">
-								{fix.presendQ}
-							</div>
-						</div>
-						<PrivateTurn
-							content={fix.subletAnswer}
-							citations={fix.subletCitations}
-							excerpts={excerptsOf(fix.subletCitations, 'prior-1')}
-							messageId="prior-1"
-							mode="private"
-						/>
-						{#if phase !== 'idle' && phase !== 'typing'}
-							<div class="demo-in flex justify-end">
+	<div class="border-border bg-muted/30 overflow-hidden rounded-2xl border">
+		<div class="border-border flex items-center gap-2.5 border-b px-5 py-3.5" aria-hidden="true">
+			<MonitorIcon class="text-muted-foreground size-4" />
+			<span class="font-mono text-[10px] tracking-widest uppercase">{t('hiw.frame')}</span>
+		</div>
+		<div bind:this={root} class="h-[600px] p-3 lg:h-[720px]" aria-hidden="true" inert>
+			<div class="grid h-full gap-2 lg:grid-cols-[1fr_380px]">
+				<div
+					class="border-border bg-background flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border shadow-sm"
+				>
+					<ChatHeader panelOpen={true} sidebarTrigger={false} />
+					<div
+						class="flex min-h-0 flex-1 flex-col justify-end gap-6 overflow-hidden px-6 pt-6 pb-2"
+					>
+						<div class="mx-auto w-full max-w-2xl space-y-6">
+							<div class="flex justify-end">
 								<div class="bg-muted max-w-[85%] rounded-2xl rounded-br-md px-4 py-2.5 text-sm">
-									{fix.question}
+									{fix.presendQ}
 								</div>
 							</div>
-						{/if}
-						{#if phase === 'working'}
-							<div class="demo-in"><WorkLedger {steps} /></div>
-						{:else if phase === 'answered'}
-							<div class="demo-in">
-								<PrivateTurn
-									content={fix.answer}
-									citations={fix.citations}
-									excerpts={excerptsOf(fix.citations, 'live')}
-									messageId="live"
-									mode="private"
-								/>
-							</div>
-						{/if}
+							<PrivateTurn
+								content={fix.subletAnswer}
+								citations={fix.subletCitations}
+								excerpts={excerptsOf(fix.subletCitations, 'prior-1')}
+								messageId="prior-1"
+								mode="private"
+							/>
+							{#if phase !== 'idle' && phase !== 'typing'}
+								<div class="demo-in flex justify-end">
+									<div class="bg-muted max-w-[85%] rounded-2xl rounded-br-md px-4 py-2.5 text-sm">
+										{fix.question}
+									</div>
+								</div>
+							{/if}
+							{#if phase === 'working'}
+								<div class="demo-in"><WorkLedger {steps} /></div>
+							{:else if phase === 'answered'}
+								<div class="demo-in">
+									<PrivateTurn
+										content={fix.answer}
+										citations={fix.citations}
+										excerpts={excerptsOf(fix.citations, 'live')}
+										messageId="live"
+										mode="private"
+									/>
+								</div>
+							{/if}
+						</div>
+					</div>
+					<div class="shrink-0 px-6 pb-6">
+						<div class="mx-auto w-full max-w-2xl">
+							<Composer
+								mode="private"
+								followUp={true}
+								hasReadyDocs={true}
+								libraryEmpty={false}
+								onsend={() => {}}
+								onmodeselect={() => {}}
+								onupload={() => {}}
+								onattach={() => {}}
+							/>
+						</div>
 					</div>
 				</div>
-				<div class="shrink-0 px-6 pb-6">
-					<div class="mx-auto w-full max-w-2xl">
-						<Composer
-							mode="private"
-							followUp={true}
-							hasReadyDocs={true}
-							libraryEmpty={false}
-							onsend={() => {}}
-							onmodeselect={() => {}}
-							onupload={() => {}}
-							onattach={() => {}}
-						/>
-					</div>
+				<div
+					class="border-border bg-background h-full min-h-0 min-w-0 overflow-hidden rounded-xl border shadow-sm max-lg:hidden"
+				>
+					<DocumentsPanel chatId="landing" onhide={() => {}} />
 				</div>
-			</div>
-			<div
-				class="border-border bg-background h-full min-h-0 min-w-0 overflow-hidden rounded-xl border shadow-sm max-lg:hidden"
-			>
-				<DocumentsPanel chatId="landing" onhide={() => {}} />
 			</div>
 		</div>
-	</div>
-</Tooltip.Provider>
+	</div></Tooltip.Provider
+>
 
 <style>
 	/* Each beat arrives the way the app's own turns do; nothing loops. */
