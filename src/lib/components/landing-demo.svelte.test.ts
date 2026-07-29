@@ -57,12 +57,13 @@ describe('landing hero demo', () => {
 		const previous = i18n.locale;
 		i18n.locale = 'fr';
 		const { stop } = render();
-		expect(chatsStore.activeChat?.title).toContain('dépôt de garantie');
+		// The chat is named after the question that opened the thread.
+		expect(chatsStore.activeChat?.title).toContain('sous-location');
 		// The page applies ?lang= after mount, so a later switch must re-seed the
 		// stores the header and the panel read.
 		i18n.locale = 'en';
 		flushSync();
-		expect(chatsStore.activeChat?.title).toContain('security deposit');
+		expect(chatsStore.activeChat?.title).toContain('subletting');
 		stop();
 		i18n.locale = previous;
 	});

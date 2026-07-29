@@ -86,9 +86,9 @@
 		inert
 	>
 		{#if kind === 'review'}
-			<PresendPanel />
+			<PresendPanel onhide={() => {}} />
 		{:else}
-			<WhatAiSawPanel />
+			<WhatAiSawPanel onhide={() => {}} />
 		{/if}
 	</div>
 </Tooltip.Provider>

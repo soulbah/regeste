@@ -55,7 +55,9 @@
 		settingsStore.modeChosen = true;
 		chatsStore.activeChat = {
 			id: 'landing',
-			title: fix.question,
+			// The chat is named after the question that opened it — here the sublet
+			// one, which sits at the top of the thread.
+			title: fix.presendQ,
 			mode: 'private',
 			privateOnly: false,
 			reviewSend: null
@@ -212,7 +214,7 @@
 			<div
 				class="border-border bg-background h-full min-h-0 min-w-0 overflow-hidden rounded-xl border shadow-sm max-lg:hidden"
 			>
-				<DocumentsPanel chatId="landing" />
+				<DocumentsPanel chatId="landing" onhide={() => {}} />
 			</div>
 		</div>
 	</div>
