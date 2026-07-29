@@ -18,14 +18,24 @@ class I18nStore {
 	async init(): Promise<void> {
 		if (this.loaded) return;
 		this.loaded = true;
-		const auto: Locale = navigator.language?.toLowerCase().startsWith('fr') ? 'fr' : 'en';
 		try {
 			const { db } = await getLocalDb();
 			const saved = await db.getSetting('locale');
-			this.locale = saved === 'fr' || saved === 'en' ? saved : auto;
+			this.locale = saved === 'fr' || saved === 'en' ? saved : this.autoLocale();
 		} catch {
-			this.locale = auto;
+			this.locale = this.autoLocale();
 		}
+	}
+
+	/** Browser-language detection alone: the landing localizes without opening
+	 * the local database, whose lock belongs to the app. */
+	initWithoutDb(): void {
+		if (this.loaded) return;
+		this.locale = this.autoLocale();
+	}
+
+	private autoLocale(): Locale {
+		return navigator.language?.toLowerCase().startsWith('fr') ? 'fr' : 'en';
 	}
 
 	async setLocale(locale: Locale): Promise<void> {

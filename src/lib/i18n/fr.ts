@@ -633,6 +633,37 @@ export const fr: Record<keyof typeof en, string> = {
 	'privacy.errorTitle': "Ce rapport n'a pas pu être chargé",
 	'privacy.errorBody': 'Fermez tout autre onglet où cette application est ouverte, puis réessayez.',
 
+	// Landing
+	'landing.nav.how': 'Comment ça marche',
+	'landing.nav.guides': 'Guides',
+	'landing.nav.github': 'GitHub',
+	'landing.cta': 'Ouvrir le chat',
+	'landing.cta.code': 'Voir le code',
+	'landing.hero.title': 'Vos documents ont la réponse.',
+	'landing.hero.sub':
+		'Posez une question, recevez une réponse rédigée qui cite les passages exacts dont elle vient. Tout se passe dans votre navigateur, et avec le modèle sur l’appareil vos fichiers ne quittent jamais votre machine.',
+	'landing.hero.facts': 'Sans compte pour commencer · Open source',
+	'landing.modes.title': 'Choisissez où la réponse s’écrit.',
+	'landing.modes.sub': 'Trois modes, nommés d’après la seule chose qui les distingue.',
+	'landing.modes.private': 'Un petit modèle tourne dans l’onglet de votre navigateur.',
+	'landing.modes.private.fact': 'Coupez le réseau, il continue de répondre.',
+	'landing.modes.assisted': 'Connectez-vous, un modèle plus rapide répond en ligne.',
+	'landing.modes.assisted.fact': 'Un budget quotidien, compté en réponses.',
+	'landing.modes.myai': 'Branchez votre propre serveur d’IA.',
+	'landing.modes.myai.fact': 'De votre navigateur à votre serveur, en direct.',
+	'landing.modes.link': 'Le flux de données complet, dessiné',
+	'landing.cite.title': 'Chaque affirmation montre sa source.',
+	'landing.cite.sub':
+		'Les réponses portent des citations numérotées. Cliquez, le document s’ouvre sur le passage exact, surligné.',
+	'landing.review.title': 'Voyez ce qui part avant que ça parte.',
+	'landing.review.sub':
+		'Le mode Cloud n’envoie jamais rien en silence. Les passages retenus pour votre question s’alignent d’abord, et vous décochez ce qui reste ici avant tout envoi.',
+	'landing.oss.title': 'Open source, de bout en bout',
+	'landing.oss.sub':
+		'Le code est public, sous licence AGPL. Lisez-le, ou faites tourner l’ensemble sur votre propre domaine.',
+	'landing.oss.cta': 'Lire le code sur GitHub',
+	'landing.footer.tagline': 'Des réponses tirées de vos documents.',
+
 	// How it works
 	'hiw.title': 'Comment circulent vos données',
 	'hiw.intro':

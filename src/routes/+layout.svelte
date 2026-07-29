@@ -75,7 +75,18 @@
 		});
 	}
 
+	// The landing must not touch the local database: a visitor reading marketing
+	// has no reason to take the single-owner lock (and would trip the two-tabs
+	// guard while the app is open elsewhere). Everything boots on the first
+	// navigation into an app route instead.
+	let dbBooted = false;
 	$effect(() => {
+		if (page.url.pathname === '/') {
+			i18n.initWithoutDb();
+			return;
+		}
+		if (dbBooted) return;
+		dbBooted = true;
 		i18n.init();
 		pwaStore.init();
 		guardDb(documentsStore.init());

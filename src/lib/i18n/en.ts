@@ -628,6 +628,37 @@ export const en = {
 	'privacy.errorTitle': "This report couldn't be loaded",
 	'privacy.errorBody': 'Close any other tab with this app open, then try again.',
 
+	// Landing
+	'landing.nav.how': 'How it works',
+	'landing.nav.guides': 'Guides',
+	'landing.nav.github': 'GitHub',
+	'landing.cta': 'Open the chat',
+	'landing.cta.code': 'View the code',
+	'landing.hero.title': 'Your documents have the answer.',
+	'landing.hero.sub':
+		'Ask a question and get a written answer that cites the exact passages it came from. Everything runs in your browser, and with the on-device model your files never leave your machine.',
+	'landing.hero.facts': 'No account to start · Open source',
+	'landing.modes.title': 'Choose where the answer is written.',
+	'landing.modes.sub': 'Three modes, named for the one thing that differs between them.',
+	'landing.modes.private': 'A small model runs inside your browser tab.',
+	'landing.modes.private.fact': 'Turn off the network, it keeps answering.',
+	'landing.modes.assisted': 'Sign in and a faster model answers online.',
+	'landing.modes.assisted.fact': 'A daily allowance, counted in answers.',
+	'landing.modes.myai': 'Plug in your own AI server.',
+	'landing.modes.myai.fact': 'Straight from your browser to your server.',
+	'landing.modes.link': 'The full data flow, drawn',
+	'landing.cite.title': 'Every claim shows its source.',
+	'landing.cite.sub':
+		'Answers carry numbered citations. Click one and the document opens on the exact passage, highlighted.',
+	'landing.review.title': 'See what leaves before it leaves.',
+	'landing.review.sub':
+		'The Cloud mode never sends anything silently. The passages picked for your question line up first, and you untick what stays back before anything is sent.',
+	'landing.oss.title': 'Open source, end to end',
+	'landing.oss.sub':
+		'The code is public, under the AGPL. Read it, or run the whole thing on your own domain.',
+	'landing.oss.cta': 'Read the code on GitHub',
+	'landing.footer.tagline': 'Answers from your documents.',
+
 	// How it works
 	'hiw.title': 'How your data flows',
 	'hiw.intro':
