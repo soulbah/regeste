@@ -145,6 +145,9 @@ export interface LocalChat {
 	title: string;
 	mode: ChatMode;
 	privateOnly: boolean;
+	/** Per-chat send policy: null follows the global setting, true always
+	 * reviews what leaves, false never does. */
+	reviewSend: boolean | null;
 	/** Model id for My AI mode, chosen in the mode selector (spec 007). */
 	myaiModel: string | null;
 	/** C6 — pinned chats group at the top of the sidebar. */

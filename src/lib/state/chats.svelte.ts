@@ -410,6 +410,14 @@ class ChatsStore {
 		}));
 	}
 
+	/** Pin this chat's send policy, or clear it back to following the global
+	 * setting. */
+	async setReviewSend(chatId: string, value: boolean | null): Promise<void> {
+		const { db } = await getLocalDb();
+		await db.setChatReviewSend(chatId, value);
+		await this.refresh();
+	}
+
 	async setPrivateOnly(chatId: string, on: boolean): Promise<void> {
 		const { db } = await getLocalDb();
 		await db.setChatPrivateOnly(chatId, on);
@@ -1604,7 +1612,7 @@ class ChatsStore {
 		// Trusted: nothing to approve, so the turn runs straight on and the ledger
 		// never stops. Otherwise the last step waits, which is the one state in
 		// this app whose next move belongs to the user.
-		if (!settingsStore.reviewBeforeSending()) {
+		if (!settingsStore.reviewBeforeSending(this.activeChat?.reviewSend)) {
 			await this.confirmAssisted(hits);
 			return 'handled';
 		}

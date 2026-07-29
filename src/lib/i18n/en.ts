@@ -185,6 +185,7 @@ export const en = {
 	'sources.subtitle': 'Attached to this chat',
 	// Documents (library page + shared rows)
 	'docs.title': 'Documents',
+	'docs.reviewSend': 'Always check what leaves this chat',
 	'docs.privateOnly': 'Private only: no cloud mode in this chat',
 	'docs.useAria': 'Use {name} for questions',
 	'docs.openAria': 'Open {name} in the viewer',

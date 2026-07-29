@@ -238,5 +238,15 @@ export const MIGRATIONS: string[] = [
 	// NULL and gain labels on their next reindex.
 	`
 	ALTER TABLE chunks ADD COLUMN structural_context TEXT;
+	`,
+
+	// v15 — per-chat send policy, replacing the private-only lock in the UI.
+	// NULL follows the global setting, 1 always reviews what leaves, 0 never
+	// does. The lock it replaces duplicated a choice the mode picker already
+	// makes per chat: two controls for one fact is how they drift apart.
+	// private_only stays in the table, written by nothing, because applied
+	// migrations are append-only.
+	`
+	ALTER TABLE chats ADD COLUMN review_send INTEGER;
 	`
 ];

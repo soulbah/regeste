@@ -988,6 +988,8 @@ function rowToChat(r: any): LocalChat {
 		title: r.title,
 		mode: r.mode,
 		privateOnly: !!r.private_only,
+		// null follows the global setting; 1 always reviews, 0 never does.
+		reviewSend: r.review_send === null || r.review_send === undefined ? null : !!r.review_send,
 		myaiModel: r.myai_model ?? null,
 		pinned: !!r.pinned,
 		createdAt: r.created_at,
@@ -1504,6 +1506,13 @@ function weekPrivacySummary(): PrivacySummaryRow[] {
 		.map((r: any) => ({ destination: r.destination, requests: r.requests, bytes: r.bytes }));
 }
 
+function setChatReviewSend(id: string, reviewSend: boolean | null): void {
+	db.exec({
+		sql: 'UPDATE chats SET review_send = ? WHERE id = ?',
+		bind: [reviewSend === null ? null : reviewSend ? 1 : 0, id]
+	});
+}
+
 function setChatPrivateOnly(id: string, privateOnly: boolean): void {
 	db.exec({
 		sql: 'UPDATE chats SET private_only = ? WHERE id = ?',
@@ -1799,6 +1808,7 @@ const api = {
 	insertMessageMethod,
 	listChatMessageMethods,
 	setChatPrivateOnly,
+	setChatReviewSend,
 	searchAll
 };
 

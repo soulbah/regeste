@@ -45,15 +45,19 @@
 <div class="flex h-full flex-col">
 	<PanelHeader title={t('sources.title')} subtitle={t('sources.subtitle')} {onhide} />
 
-	<!-- P7: hard lock — cloud modes are unselectable while this is on. -->
+	<!-- Replaces the private-only lock, which duplicated a choice the mode picker
+	     already makes per chat: two controls for one fact is how they drift. This
+	     one says something the picker cannot — whether THIS conversation checks
+	     what leaves before it leaves, whatever the global setting says. Off it
+	     follows the global choice; on it always reviews. -->
 	<div class="flex items-center justify-between gap-3 border-b px-4 py-2.5">
-		<Label for="private-only" class="text-muted-foreground text-xs font-normal">
-			{t('docs.privateOnly')}
+		<Label for="review-send" class="text-muted-foreground text-xs font-normal">
+			{t('docs.reviewSend')}
 		</Label>
 		<Switch
-			id="private-only"
-			checked={chatsStore.activeChat?.privateOnly ?? false}
-			onCheckedChange={(v) => chatsStore.setPrivateOnly(chatId, v === true)}
+			id="review-send"
+			checked={chatsStore.activeChat?.reviewSend === true}
+			onCheckedChange={(v) => chatsStore.setReviewSend(chatId, v === true ? true : null)}
 		/>
 	</div>
 

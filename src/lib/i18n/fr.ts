@@ -178,6 +178,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'sources.subtitle': 'Jointes à cette discussion',
 	// Documents (library page + shared rows)
 	'docs.title': 'Documents',
+	'docs.reviewSend': 'Toujours vérifier ce qui part de cette discussion',
 	'docs.privateOnly': 'Privé uniquement : aucun mode cloud dans cette discussion',
 	'docs.useAria': 'Utiliser {name} pour les questions',
 	'docs.openAria': 'Ouvrir {name} dans la visionneuse',

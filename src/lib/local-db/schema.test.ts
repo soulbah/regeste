@@ -3,7 +3,10 @@ import { MIGRATIONS } from './schema';
 
 describe('local retrieval schema', () => {
 	it('adds a resumable independent fuzzy index in v11', () => {
-		expect(MIGRATIONS).toHaveLength(14);
+		// Pinned on purpose: migrations are append-only, so a changed count is
+		// either a deliberate addition or an edit to one already applied on real
+		// devices. Bumping this is the moment to be sure it is the former.
+		expect(MIGRATIONS).toHaveLength(15);
 		const migration = MIGRATIONS[10];
 		expect(migration).toContain('retrieval_version');
 		expect(migration).toContain('fuzzy_text');

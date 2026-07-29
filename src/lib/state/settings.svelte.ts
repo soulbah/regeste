@@ -69,11 +69,16 @@ class SettingsStore {
 		await db.setSetting('mode_chosen', '1');
 	}
 
-	/** Whether the next remote send needs approval. A per-conversation
-	 * override belongs here when it lands; today every chat follows the one
-	 * global choice. */
-	reviewBeforeSending(): boolean {
-		return this.reviewBeforeSend;
+	/**
+	 * Whether this chat's next remote send needs approval.
+	 *
+	 * A chat may pin the answer either way — a sensitive conversation keeps the
+	 * review even when the global switch is off, a routine one skips it even
+	 * when the switch is on. Null, the default, follows the global choice, so
+	 * the setting still means something for every chat that never opted out.
+	 */
+	reviewBeforeSending(chatOverride: boolean | null | undefined): boolean {
+		return chatOverride ?? this.reviewBeforeSend;
 	}
 
 	async setReviewBeforeSend(on: boolean): Promise<void> {
