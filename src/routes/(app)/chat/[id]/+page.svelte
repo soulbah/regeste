@@ -1,7 +1,5 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { resolve } from '$app/paths';
-	import * as Sidebar from '$lib/components/ui/sidebar';
 	import PanelShell from '$lib/components/panel-shell.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { Skeleton } from '$lib/components/ui/skeleton';
@@ -12,13 +10,13 @@
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import InfoIcon from '@lucide/svelte/icons/info';
 	import VersionNav from '$lib/components/version-nav.svelte';
-	import PanelRightIcon from '@lucide/svelte/icons/panel-right';
 	import MessageSquareQuoteIcon from '@lucide/svelte/icons/message-square-quote';
 	import Composer from '$lib/components/composer.svelte';
 	import RetrievalTurn from '$lib/components/retrieval-turn.svelte';
 	import PrivateTurn from '$lib/components/private-turn.svelte';
 	import WorkLedger from '$lib/components/work-ledger.svelte';
 	import Markdown from '$lib/components/markdown/markdown.svelte';
+	import ChatHeader from '$lib/components/chat-header.svelte';
 	import PresendPanel from '$lib/components/presend-panel.svelte';
 	import DocumentsPanel from '$lib/components/documents-panel.svelte';
 	import ViewerPanel from '$lib/components/viewer-panel.svelte';
@@ -208,67 +206,7 @@
 <PanelShell bind:open={panelOpen} onOpenChange={(o) => !o && clearPanelState()}>
 	{#snippet main()}
 		<div class="flex h-full flex-col">
-			<header class="flex h-14 shrink-0 items-center justify-between gap-3 border-b px-4">
-				<div class="flex min-w-0 items-center gap-1">
-					<Sidebar.Trigger class="shrink-0 md:hidden" />
-					<div class="min-w-0 px-1">
-						<h1 class="font-display truncate text-base leading-tight tracking-tight">
-							{chatsStore.activeChat?.title ?? t('chat.fallback')}
-						</h1>
-						<p class="text-muted-foreground truncate text-[11px] leading-tight">
-							{t('chat.docCount', {
-								count: chatsStore.chatDocuments.length,
-								s: chatsStore.chatDocuments.length === 1 ? '' : 's'
-							})}
-						</p>
-					</div>
-				</div>
-				<div class="flex shrink-0 items-center gap-2">
-					<a
-						href={resolve('/chat/privacy')}
-						class="focus-visible:ring-ring rounded-full focus-visible:ring-2"
-					>
-						{#if chatsStore.chatEgress && chatsStore.chatEgress.cloudRequests > 0}
-							<span
-								class="bg-mode-assisted/15 text-mode-assisted flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[11px]"
-							>
-								<span class="bg-mode-assisted size-1.5 rounded-full"></span>
-								{t('chat.cloudRequests', {
-									count: chatsStore.chatEgress.cloudRequests,
-									s: chatsStore.chatEgress.cloudRequests === 1 ? '' : 's',
-									kb: (chatsStore.chatEgress.bytes / 1024).toFixed(1)
-								})}
-							</span>
-						{:else}
-							<span
-								class="text-muted-foreground bg-muted flex items-center rounded-full px-2.5 py-1 font-mono text-[11px]"
-							>
-								{t('chat.zeroBytes')}
-							</span>
-						{/if}
-					</a>
-					<!-- Opens only: once the panel shows, its own ✕ is the sole close control
-					     (standard pattern), so the opener disappears instead of flipping icon. -->
-					{#if !panelOpen}
-						<Tooltip.Root>
-							<Tooltip.Trigger>
-								{#snippet child({ props })}
-									<Button
-										{...props}
-										variant="ghost"
-										size="icon-sm"
-										aria-label={t('chat.panelToggleAria')}
-										onclick={() => (panelOpen = !panelOpen)}
-									>
-										<PanelRightIcon />
-									</Button>
-								{/snippet}
-							</Tooltip.Trigger>
-							<Tooltip.Content side="bottom">{t('chat.panelTip.show')}</Tooltip.Content>
-						</Tooltip.Root>
-					{/if}
-				</div>
-			</header>
+			<ChatHeader {panelOpen} ontogglepanel={() => (panelOpen = !panelOpen)} />
 
 			<div
 				bind:this={thread}

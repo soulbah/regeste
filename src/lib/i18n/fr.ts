@@ -662,7 +662,17 @@ export const fr: Record<keyof typeof en, string> = {
 	'landing.oss.sub':
 		'Le code est public, sous licence AGPL. Lisez-le, ou faites tourner l’ensemble sur votre propre domaine.',
 	'landing.oss.cta': 'Lire le code sur GitHub',
-	'landing.footer.tagline': 'Des réponses tirées de vos documents.',
+	'landing.wais.title': 'Chaque réponse garde sa trace.',
+	'landing.wais.sub':
+		'Ouvrez la trace d’une réponse et lisez les passages sur lesquels elle s’appuie, chacun marqué envoyé ou resté. Elle vit aussi longtemps que la discussion.',
+	'landing.cite.f1': 'Les sources s’alignent au-dessus de la réponse.',
+	'landing.cite.f2': 'Un document supprimé garde ses passages cités.',
+	'landing.review.f1':
+		'Le consentement est demandé une fois, la première fois que quelque chose partirait.',
+	'landing.review.f2': 'Ce qui part se compte en kilo-octets avant l’envoi.',
+	'landing.wais.f1': 'Ouvrez-la depuis n’importe quelle réponse, à tout moment.',
+	'landing.wais.f2': 'Le Rapport de confidentialité additionne chaque événement.',
+	'landing.footer.copyright': '© 2026 · AGPL-3.0',
 
 	// How it works
 	'hiw.title': 'Comment circulent vos données',

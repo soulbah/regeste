@@ -7,6 +7,7 @@ import { build, files, version } from '$service-worker';
 import { CreateMLCEngine, type MLCEngineInterface } from '@mlc-ai/web-llm';
 import { proxiedAppConfig } from '$lib/private-ai/webllm-config';
 import { isShellCache, shellCacheName } from '$lib/pwa/cache-names';
+import { APP_SCOPE, isAppNavigation, isMarketingAsset } from '$lib/pwa/sw-routing';
 import type { GenerationOptions, GenerationResult } from '$lib/private-ai/generation';
 
 const sw = self as unknown as ServiceWorkerGlobalScope;
@@ -21,7 +22,7 @@ let loadedModel: string | null = null;
 // ---------------------------------------------------------------------------
 
 const SHELL_CACHE = shellCacheName(version);
-const SHELL_KEY = '/chat';
+const SHELL_KEY = APP_SCOPE;
 
 /** The SQLite engine is needed by 100% of sessions: without it the app opens
  * and then the database throws. Everything else large stays out of the eager
@@ -215,10 +216,18 @@ sw.addEventListener('fetch', (event: FetchEvent) => {
 	if (url.pathname === '/service-worker.js' || url.pathname.startsWith('/_app/version.json'))
 		return;
 
+	// The installed app is the chat and nothing else: manifest scope says /chat,
+	// and so does this worker. Marketing routes (the landing, how-it-works, the
+	// guides, sign-in) go to the network like any web page — answering them from
+	// the app shell would replace the landing with the chat for every returning
+	// visitor, which is exactly what a catch-all navigate handler used to do.
 	if (request.mode === 'navigate') {
-		event.respondWith(serveFromCache(request, SHELL_KEY));
+		if (isAppNavigation(url.pathname)) {
+			event.respondWith(serveFromCache(request, SHELL_KEY));
+		}
 		return;
 	}
+	if (isMarketingAsset(url.pathname)) return;
 	if (
 		isEagerBuildAsset(url.pathname) ||
 		isRuntimeCacheable(url.pathname) ||

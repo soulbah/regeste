@@ -657,7 +657,16 @@ export const en = {
 	'landing.oss.sub':
 		'The code is public, under the AGPL. Read it, or run the whole thing on your own domain.',
 	'landing.oss.cta': 'Read the code on GitHub',
-	'landing.footer.tagline': 'Answers from your documents.',
+	'landing.wais.title': 'Every answer keeps its record.',
+	'landing.wais.sub':
+		'Open an answer’s record and read the passages it worked from, each marked sent or stayed. It survives as long as the chat does.',
+	'landing.cite.f1': 'Sources line up above the answer.',
+	'landing.cite.f2': 'A deleted document keeps its cited snapshot.',
+	'landing.review.f1': 'Consent is asked once, the first time anything would leave.',
+	'landing.review.f2': 'What leaves is counted in kilobytes before sending.',
+	'landing.wais.f1': 'Open it from any answer, at any time.',
+	'landing.wais.f2': 'The Privacy Report adds up every event.',
+	'landing.footer.copyright': '© 2026 · AGPL-3.0',
 
 	// How it works
 	'hiw.title': 'How your data flows',
