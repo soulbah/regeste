@@ -82,7 +82,7 @@
 						{#if row.key === value}
 							<CheckIcon class="text-muted-foreground size-3.5 shrink-0 self-center" />
 						{/if}
-						<span class="text-muted-foreground/60 ml-auto shrink-0 font-mono text-[10px]">
+						<span class="text-muted-foreground ml-auto shrink-0 font-mono text-[10px]">
 							{row.model}
 						</span>
 					</span>
@@ -90,9 +90,7 @@
 					<!-- The number of questions and the relative cost, both as figures.
 					     "×4" is readable with no account at all, and the count says what
 					     the allowance actually buys. -->
-					<span
-						class="text-muted-foreground/80 mt-1 flex items-baseline gap-2 font-mono text-[10px]"
-					>
+					<span class="text-muted-foreground mt-1 flex items-baseline gap-2 font-mono text-[10px]">
 						<span>
 							{row.left !== null
 								? row.left > 0

@@ -1,86 +1,133 @@
 <script lang="ts">
-	// What to do when the browser gets in the way.
+	// A small library of guides, and one article per guide.
 	//
-	// Its own page, outside the (app) group, for the same reason sign-in is: you
-	// arrive here because something is broken, and the app's chrome behind it
-	// would offer a dozen things that are broken too. The way back is one link.
+	// The first version stacked all five problems as bordered cards on one page.
+	// That fragments what should read as a document, and hands someone with one
+	// problem a wall of four others they do not have. Cards are for things you
+	// choose between; prose is for things you read.
 	//
-	// Written as a reference rather than a wall: symptom first, because that is
-	// what someone recognises, then the cause in one sentence, then the steps.
-	// Every entry has an id, and every failure inside the app links straight to
-	// its own — landing on a page of five problems when you have one is how a
-	// help page stops being read.
+	// So it is set as an article: back link, category, headline, the symptom as
+	// a lead paragraph, a rule, then cause and steps. Recognising the symptom is
+	// what tells a reader they are on the right page, which is why it is the
+	// lead and not a labelled field halfway down.
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
+	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
 	import { Button } from '$lib/components/ui/button';
-	import AmbientWash from '$lib/components/ambient-wash.svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import { HELP_TOPICS } from '$lib/help-topics';
 
 	// A route param rather than a fragment: /help/storage-blocked is a URL
-	// someone can paste to a colleague, and it survives a reload. The entry
-	// named is lifted; the rest stay legible below it.
-	const focused = $derived(page.params.topic ?? '');
+	// someone can paste to a colleague, and it survives a reload.
+	const topic = $derived(HELP_TOPICS.find((entry) => entry.id === page.params.topic) ?? null);
+	const others = $derived(HELP_TOPICS.filter((entry) => entry.id !== topic?.id).slice(0, 3));
 </script>
 
-<svelte:head><title>{t('help.title')} · Regeste</title></svelte:head>
+<svelte:head>
+	<title>{topic ? t(topic.title) : t('help.title')} · Regeste</title>
+</svelte:head>
 
-<div class="bg-background relative min-h-svh">
-	<AmbientWash top="-6%" />
-
-	<header class="relative flex h-14 items-center px-4">
-		<Button variant="ghost" size="sm" class="text-muted-foreground gap-1.5" href={resolve('/chat')}>
+<div class="bg-background min-h-svh">
+	<header class="flex h-14 items-center px-4">
+		<Button
+			variant="ghost"
+			size="sm"
+			class="text-muted-foreground gap-1.5"
+			href={topic ? resolve('/help/[[topic]]', { topic: undefined }) : resolve('/chat')}
+		>
 			<ArrowLeftIcon class="size-3.5!" />
-			{t('auth.back')}
+			{topic ? t('help.allGuides') : t('auth.back')}
 		</Button>
 	</header>
 
-	<div class="relative mx-auto max-w-2xl px-6 pt-8 pb-24">
-		<h1 class="font-display text-3xl tracking-tight">{t('help.title')}</h1>
-		<p class="text-muted-foreground mt-2.5 text-sm leading-relaxed text-balance">
-			{t('help.intro')}
-		</p>
+	{#if topic}
+		<article class="mx-auto max-w-2xl px-6 pt-10 pb-28">
+			<p class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
+				{t(topic.kind)}
+			</p>
+			<h1 class="font-display mt-3.5 text-[2.2rem] leading-[1.15] tracking-tight text-balance">
+				{t(topic.title)}
+			</h1>
+			<p class="text-muted-foreground mt-5 text-lg leading-relaxed text-balance">
+				{t(topic.symptom)}
+			</p>
 
-		<div class="mt-10 space-y-4">
-			{#each HELP_TOPICS as topic (topic.id)}
-				<section
-					id={topic.id}
-					class="scroll-mt-20 rounded-xl border p-5 transition-colors {focused === topic.id
-						? 'border-accent-foreground/40 bg-card/60'
-						: 'border-border bg-card/25'}"
-				>
-					<h2 class="font-display text-lg tracking-tight">{t(topic.title)}</h2>
+			<hr class="border-border my-10" />
 
-					<p class="text-muted-foreground mt-3 font-mono text-[10px] tracking-widest uppercase">
-						{t('help.symptom')}
-					</p>
-					<p class="mt-1 text-sm leading-relaxed">{t(topic.symptom)}</p>
+			<h2 class="text-base font-semibold">{t('help.cause')}</h2>
+			<p class="mt-3 leading-relaxed">{t(topic.cause)}</p>
 
-					<p class="text-muted-foreground mt-4 font-mono text-[10px] tracking-widest uppercase">
-						{t('help.cause')}
-					</p>
-					<p class="text-muted-foreground mt-1 text-sm leading-relaxed">{t(topic.cause)}</p>
+			<h2 class="mt-10 text-base font-semibold">{t('help.fix')}</h2>
+			<ol class="mt-5 space-y-4">
+				{#each topic.fix as step, index (step)}
+					<li class="flex gap-4">
+						<span
+							class="bg-accent-foreground/10 text-accent-foreground mt-px flex size-6 shrink-0 items-center justify-center rounded-full font-mono text-[11px]"
+						>
+							{index + 1}
+						</span>
+						<span class="leading-relaxed">{t(step)}</span>
+					</li>
+				{/each}
+			</ol>
 
-					<p class="text-muted-foreground mt-4 font-mono text-[10px] tracking-widest uppercase">
-						{t('help.fix')}
-					</p>
-					<ol class="mt-2 space-y-1.5">
-						{#each topic.fix as step, index (step)}
-							<li class="flex gap-2.5 text-sm leading-relaxed">
-								<span class="text-muted-foreground/70 shrink-0 font-mono text-xs">
-									{index + 1}
-								</span>
-								<span>{t(step)}</span>
-							</li>
-						{/each}
-					</ol>
-				</section>
-			{/each}
+			<hr class="border-border my-10" />
+
+			<p class="text-muted-foreground text-sm leading-relaxed">{t('help.footnote')}</p>
+
+			<!-- The other guides, at the end rather than alongside: someone who got
+			     here with a problem reads one article, and only then wants a list. -->
+			<p class="text-muted-foreground mt-14 font-mono text-[10px] tracking-widest uppercase">
+				{t('help.more')}
+			</p>
+			<div class="mt-3 divide-y">
+				{#each others as entry (entry.id)}
+					<a
+						href={resolve('/help/[[topic]]', { topic: entry.id })}
+						class="group hover:text-accent-foreground flex items-center gap-4 py-3 text-sm transition-colors"
+					>
+						<span class="min-w-0 flex-1 truncate">{t(entry.title)}</span>
+						<ArrowRightIcon
+							class="text-muted-foreground size-3.5 shrink-0 transition-transform group-hover:translate-x-0.5"
+						/>
+					</a>
+				{/each}
+			</div>
+		</article>
+	{:else}
+		<!-- The index: every guide, one entry each, symptom first. -->
+		<div class="mx-auto max-w-2xl px-6 pt-10 pb-28">
+			<h1 class="font-display text-[2.2rem] leading-[1.15] tracking-tight">{t('help.title')}</h1>
+			<p class="text-muted-foreground mt-4 text-lg leading-relaxed text-balance">
+				{t('help.intro')}
+			</p>
+
+			<div class="mt-12 divide-y border-t">
+				{#each HELP_TOPICS as entry (entry.id)}
+					<a
+						href={resolve('/help/[[topic]]', { topic: entry.id })}
+						class="group flex items-start gap-5 py-6"
+					>
+						<div class="min-w-0 flex-1">
+							<p class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
+								{t(entry.kind)}
+							</p>
+							<p class="group-hover:text-accent-foreground mt-2 font-medium transition-colors">
+								{t(entry.title)}
+							</p>
+							<p class="text-muted-foreground mt-1.5 text-sm leading-relaxed">
+								{t(entry.symptom)}
+							</p>
+						</div>
+						<ArrowRightIcon
+							class="text-muted-foreground mt-7 size-4 shrink-0 transition-transform group-hover:translate-x-0.5"
+						/>
+					</a>
+				{/each}
+			</div>
+
+			<p class="text-muted-foreground mt-12 text-sm leading-relaxed">{t('help.footnote')}</p>
 		</div>
-
-		<p class="text-muted-foreground/70 mt-10 text-xs leading-relaxed text-balance">
-			{t('help.footnote')}
-		</p>
-	</div>
+	{/if}
 </div>

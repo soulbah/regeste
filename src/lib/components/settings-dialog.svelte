@@ -328,7 +328,7 @@
 												<p class="text-muted-foreground mt-1 text-xs">
 													{t('settings.usage.left', { model: t(`cloudModel.${model.key}`) })}
 												</p>
-												<p class="text-muted-foreground/60 mt-1 font-mono text-[10px]">
+												<p class="text-muted-foreground mt-1 font-mono text-[10px]">
 													{model.name}
 												</p>
 											</div>
@@ -338,7 +338,7 @@
 										value={(100 * settingsStore.quota.remaining) / settingsStore.quota.limit}
 										class="h-1"
 									/>
-									<p class="text-muted-foreground/70 mt-2 font-mono text-[10px]">
+									<p class="text-muted-foreground mt-2 font-mono text-[10px]">
 										{t('settings.usage.resets', { time: resetTime })}
 									</p>
 								{:else}

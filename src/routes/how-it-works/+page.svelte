@@ -1,25 +1,41 @@
 <script lang="ts">
-	// One diagram, three states, and a dashed line.
+	// Two rooms and one line between them.
 	//
-	// This was three columns of prose saying the same three things about three
-	// modes, which is a table pretending to be an explanation. The subject is a
-	// data flow, so it is drawn as one, in the grammar that field settled on
-	// long ago: a trust boundary is a dashed line, and the whole story is what
-	// crosses it.
+	// The first version drew the flow as a row of grey pills with arrows, which
+	// is a breadcrumb trail, not a data flow: everything had the same weight,
+	// nothing was contained by anything, and the trust boundary was a rule with
+	// pills floating near it. A boundary diagram only says something when the
+	// things on each side are visibly *inside* something.
 	//
-	// Everything happens above the line except one step. Choosing a mode moves
-	// that step, and only that step — which is exactly the claim the product
-	// makes, and the one a reader can check by cutting the network. The node
-	// animates when it changes sides, because seeing it move IS the argument;
-	// nothing else on the page moves.
+	// So: containers. The browser holds every step that never leaves. Cloud and
+	// Your server get a second room below the dashed line; This device gets no
+	// second room at all, because there is nothing to put in one. Choosing a
+	// mode moves the answer step across, and the line states its payload. That
+	// single movement is the whole product claim, and it is the only thing on
+	// the page that animates.
 	import { resolve } from '$app/paths';
 	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
+	import BinaryIcon from '@lucide/svelte/icons/binary';
+	import BookOpenIcon from '@lucide/svelte/icons/book-open';
+	import CloudIcon from '@lucide/svelte/icons/cloud';
+	import DatabaseIcon from '@lucide/svelte/icons/database';
+	import FileTextIcon from '@lucide/svelte/icons/file-text';
+	import MessageSquareTextIcon from '@lucide/svelte/icons/message-square-text';
+	import MonitorIcon from '@lucide/svelte/icons/monitor';
+	import QuoteIcon from '@lucide/svelte/icons/quote';
+	import ScissorsIcon from '@lucide/svelte/icons/scissors';
+	import SearchIcon from '@lucide/svelte/icons/search';
+	import ServerIcon from '@lucide/svelte/icons/server';
+	import SparklesIcon from '@lucide/svelte/icons/sparkles';
 	import WifiOffIcon from '@lucide/svelte/icons/wifi-off';
 	import { Button } from '$lib/components/ui/button';
-	import AmbientWash from '$lib/components/ambient-wash.svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import { ASSISTED_ENABLED } from '$lib/flags';
 	import type { ChatMode } from '$lib/types';
+	import type { Component } from 'svelte';
+	import type { MessageKey } from '$lib/i18n/index.svelte';
+
+	type Step = { key: MessageKey; icon: Component<{ class?: string }> };
 
 	const MODES = (
 		ASSISTED_ENABLED ? (['private', 'assisted', 'myai'] as const) : (['private', 'myai'] as const)
@@ -36,15 +52,23 @@
 	/** Only This device keeps the answer on this side of the line. */
 	const crosses = $derived(mode !== 'private');
 
-	// The steps that never move, in the order they happen.
+	// The steps that never move, in the order they happen. Each carries an icon
+	// because five identical grey rectangles are not a sequence — a reader needs
+	// to tell reading from splitting at a glance.
 	const INGEST = [
-		'hiw.step.document',
-		'hiw.step.parsing',
-		'hiw.step.chunking',
-		'hiw.step.embeddings',
-		'hiw.step.index'
-	] as const;
-	const ASK = ['hiw.step.question', 'hiw.step.search', 'hiw.step.passages'] as const;
+		{ key: 'hiw.step.document', icon: FileTextIcon },
+		{ key: 'hiw.step.parsing', icon: BookOpenIcon },
+		{ key: 'hiw.step.chunking', icon: ScissorsIcon },
+		{ key: 'hiw.step.embeddings', icon: BinaryIcon },
+		{ key: 'hiw.step.index', icon: DatabaseIcon }
+	] satisfies Step[];
+	const ASK = [
+		{ key: 'hiw.step.question', icon: MessageSquareTextIcon },
+		{ key: 'hiw.step.search', icon: SearchIcon },
+		{ key: 'hiw.step.passages', icon: QuoteIcon }
+	] satisfies Step[];
+
+	const ZONE_ICON = $derived(mode === 'assisted' ? CloudIcon : ServerIcon);
 
 	const detail = $derived({
 		leaves: t(`hiw.${mode}.leaves` as Parameters<typeof t>[0]),
@@ -53,27 +77,78 @@
 	});
 </script>
 
+{#snippet lane(label: string, index: string, steps: Step[])}
+	<div>
+		<p
+			class="text-muted-foreground mb-5 flex items-baseline justify-center gap-2.5 font-mono text-[10px] tracking-widest uppercase"
+		>
+			<span class="text-accent-foreground">{index}</span>
+			{label}
+		</p>
+		<!-- Centred, fixed-width nodes rather than a stretched row. Five steps,
+		     then three, then one: centring them is what makes that a funnel you can
+		     see, where left-aligning the same nodes just reads as ragged rows.
+		     The connector sits at mt-[22px], the vertical centre of a node, so it
+		     meets the icons instead of the labels. -->
+		<div class="flex flex-wrap items-start justify-center gap-y-6">
+			{#each steps as step, i (step.key)}
+				{#if i > 0}
+					<span class="border-border mt-[22px] hidden w-10 border-t md:block lg:w-16"></span>
+				{/if}
+				<div class="flex w-32 flex-col items-center gap-3 text-center lg:w-36">
+					<span
+						class="border-border bg-card flex size-11 items-center justify-center rounded-xl border"
+					>
+						<step.icon class="text-muted-foreground size-[18px]" />
+					</span>
+					<span class="text-[13px] leading-snug">{t(step.key)}</span>
+				</div>
+			{/each}
+		</div>
+	</div>
+{/snippet}
+
+{#snippet answerNode()}
+	<!-- Centred, not parked in the first column: this step is alone in its room,
+	     and a lone node hugging the left edge reads as a lane that got cut off
+	     rather than as a destination. -->
+	<div class="hiw-node flex justify-center">
+		<div class="flex w-32 flex-col items-center gap-3 text-center lg:w-36">
+			<span
+				class="flex size-11 items-center justify-center rounded-xl border {crosses
+					? 'border-amber-500/40 bg-amber-500/10'
+					: 'border-accent-foreground/30 bg-accent-foreground/10'}"
+			>
+				<SparklesIcon
+					class="size-[18px] {crosses
+						? 'text-amber-700 dark:text-amber-500'
+						: 'text-accent-foreground'}"
+				/>
+			</span>
+			<span class="text-[13px] leading-snug">{t('hiw.step.answer')}</span>
+		</div>
+	</div>
+{/snippet}
+
 <svelte:head><title>{t('hiw.title')} · Regeste</title></svelte:head>
 
-<div class="bg-background relative min-h-svh">
-	<AmbientWash top="-8%" />
-
-	<header class="relative flex h-14 items-center px-4">
+<div class="bg-background min-h-svh">
+	<header class="flex h-14 items-center px-4">
 		<Button variant="ghost" size="sm" class="text-muted-foreground gap-1.5" href={resolve('/chat')}>
 			<ArrowLeftIcon class="size-3.5!" />
 			{t('auth.back')}
 		</Button>
 	</header>
 
-	<div class="relative mx-auto max-w-3xl px-6 pt-6 pb-24">
-		<h1 class="font-display text-3xl tracking-tight">{t('hiw.title')}</h1>
-		<p class="text-muted-foreground mt-2.5 max-w-xl text-sm leading-relaxed text-balance">
+	<div class="mx-auto max-w-6xl px-6 pt-8 pb-28">
+		<h1 class="font-display text-[2.4rem] leading-[1.1] tracking-tight">{t('hiw.title')}</h1>
+		<p class="text-muted-foreground mt-4 max-w-2xl text-lg leading-relaxed text-balance">
 			{t('hiw.intro')}
 		</p>
 
 		<!-- The only control on the page, because the mode is the only variable in
 		     the flow. -->
-		<div class="bg-muted/60 mt-8 inline-flex gap-0.5 rounded-lg p-0.5">
+		<div class="bg-muted/60 mt-9 inline-flex gap-0.5 rounded-lg p-0.5">
 			{#each MODES as id (id)}
 				<Button
 					variant="ghost"
@@ -89,62 +164,54 @@
 			{/each}
 		</div>
 
-		<div class="mt-8">
-			<div class="border-border bg-card/25 rounded-xl border p-5 sm:p-7">
-				<p class="text-muted-foreground/70 mb-5 font-mono text-[10px] tracking-widest uppercase">
-					{t('hiw.frame')}
-				</p>
-
-				<div class="space-y-5">
-					<div class="flex flex-wrap items-center gap-x-1.5 gap-y-2">
-						{#each INGEST as step, i (step)}
-							{#if i > 0}<span class="text-muted-foreground/40 text-xs">→</span>{/if}
-							<span class="bg-muted/70 rounded-md px-2.5 py-1 text-xs">{t(step)}</span>
-						{/each}
-					</div>
-					<div class="flex flex-wrap items-center gap-x-1.5 gap-y-2">
-						{#each ASK as step, i (step)}
-							{#if i > 0}<span class="text-muted-foreground/40 text-xs">→</span>{/if}
-							<span class="bg-muted/70 rounded-md px-2.5 py-1 text-xs">{t(step)}</span>
-						{/each}
-					</div>
-				</div>
-
-				<!-- The boundary: dashed, because that is what a trust boundary is,
-				     and labelled so the line reads without a legend. -->
-				<div class="my-7 flex items-center gap-3">
-					<span class="border-border flex-1 border-t border-dashed"></span>
-					<span
-						class="font-mono text-[10px] tracking-widest whitespace-nowrap uppercase {crosses
-							? 'text-amber-600 dark:text-amber-500'
-							: 'text-muted-foreground/60'}"
-					>
-						{crosses ? t('hiw.boundaryCrossed') : t('hiw.boundaryIntact')}
-					</span>
-					<span class="border-border flex-1 border-t border-dashed"></span>
-				</div>
-
-				<!-- Where the answer is written: above the line for This device, below
-				     it for the other two. The movement is the explanation. -->
-				<div class="flex justify-center">
-					{#key mode}
-						<span
-							class="hiw-node inline-flex items-center gap-2 rounded-lg border px-3.5 py-2 text-sm {crosses
-								? 'border-amber-500/40 bg-amber-500/10'
-								: 'border-border bg-muted/70'}"
-						>
-							<span
-								class="size-1.5 rounded-full {crosses ? 'bg-amber-500' : 'bg-muted-foreground/40'}"
-							></span>
-							{NAMES[mode]}
-							<span class="text-muted-foreground/60 text-xs">· {t('hiw.step.answer')}</span>
-						</span>
-					{/key}
-				</div>
+		<!-- Room one. Everything in here happens on the machine in front of you,
+		     in every mode, which is why it is drawn as a container and not as a
+		     list. -->
+		<div class="border-border bg-card/25 mt-8 rounded-2xl border">
+			<div class="border-border flex items-center gap-2.5 border-b px-6 py-3.5">
+				<MonitorIcon class="text-muted-foreground size-4" />
+				<span class="font-mono text-[10px] tracking-widest uppercase">{t('hiw.frame')}</span>
 			</div>
 
+			<div class="space-y-9 px-6 pt-8 sm:px-8">
+				{@render lane(t('hiw.lane.ingest'), '01', INGEST)}
+				{@render lane(t('hiw.lane.ask'), '02', ASK)}
+			</div>
+
+			<!-- The descent. The answer comes out of the question chain, not out of
+			     indexing, so it hangs below lane 02 on a vertical connector rather
+			     than sitting in a third row of its own: a third row implied the two
+			     passes above it narrowed into one, and they do not.
+			     When the mode crosses, the connector runs out of the bottom of the
+			     room and the boundary cuts it. -->
+			<div class="flex flex-col items-center px-6 pb-8 sm:px-8">
+				<span class="h-8 border-l {crosses ? 'border-amber-500/40' : 'border-border'}"></span>
+				{#if !crosses}
+					<div class="pt-4">{@render answerNode()}</div>
+				{/if}
+			</div>
+		</div>
+
+		<!-- The line, and its payload. What crosses is the single most important
+		     sentence on the page, so it is written on the boundary itself rather
+		     than in a footnote under a diagram. -->
+		<div class="px-2 py-7">
+			<div class="flex items-center gap-4">
+				<span class="border-border flex-1 border-t border-dashed"></span>
+				<span
+					class="font-mono text-[10px] tracking-widest whitespace-nowrap uppercase {crosses
+						? 'text-amber-700 dark:text-amber-500'
+						: 'text-muted-foreground'}"
+				>
+					{crosses ? t('hiw.boundaryCrossed') : t('hiw.boundaryIntact')}
+				</span>
+				<span class="border-border flex-1 border-t border-dashed"></span>
+			</div>
+			<!-- max-w-3xl, not xl: the longest of the three payloads fits on one line
+			     at this measure, so switching modes does not reflow the sentence from
+			     one line to two and back. -->
 			<p
-				class="mt-3 text-xs leading-relaxed {crosses
+				class="mx-auto mt-3.5 max-w-3xl text-center text-sm leading-relaxed {crosses
 					? 'text-amber-700 dark:text-amber-500/90'
 					: 'text-muted-foreground'}"
 			>
@@ -152,42 +219,62 @@
 			</p>
 		</div>
 
-		<!-- The two facts a diagram cannot draw, for the mode on screen. -->
-		<div class="mt-8 grid gap-4 sm:grid-cols-2">
+		<!-- Room two, only when there is one. On This device nothing sits below the
+		     line, which the other two modes make legible by putting a room there:
+		     the absence is the statement, and it does not need a sentence saying so
+		     on top of the label, the payload line and the proof below. -->
+		{#if crosses}
+			<div class="rounded-2xl border border-amber-500/30 bg-amber-500/[0.04]">
+				<div class="flex items-center gap-2.5 border-b border-amber-500/25 px-6 py-3.5">
+					<ZONE_ICON class="size-4 text-amber-700 dark:text-amber-500" />
+					<span class="font-mono text-[10px] tracking-widest uppercase">{NAMES[mode]}</span>
+				</div>
+				<!-- The connector picks up where the boundary cut it. -->
+				<div class="flex flex-col items-center px-6 pt-0 pb-8 sm:px-8">
+					<span class="h-8 border-l border-amber-500/40"></span>
+					<div class="pt-4">{@render answerNode()}</div>
+				</div>
+			</div>
+		{/if}
+
+		<!-- The facts a diagram cannot draw. Hairlines rather than boxes: three
+		     more bordered cards under a bordered diagram turns the page into
+		     packaging. -->
+		<div class="mt-14 grid gap-x-12 gap-y-8 sm:grid-cols-2">
 			{#each [{ label: t('hiw.whatStays'), body: detail.stays }, { label: t('hiw.server'), body: detail.server }] as fact (fact.label)}
-				<div class="border-border bg-card/25 rounded-xl border p-4">
-					<p class="text-muted-foreground/70 font-mono text-[10px] tracking-widest uppercase">
+				<div class="border-border border-t pt-5">
+					<p class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
 						{fact.label}
 					</p>
-					<p class="mt-2 text-sm leading-relaxed">{fact.body}</p>
+					<p class="mt-2.5 leading-relaxed">{fact.body}</p>
 				</div>
 			{/each}
 		</div>
 
 		<!-- A claim is only worth something if it can be checked. -->
-		<div class="border-border bg-card/25 mt-4 flex items-start gap-3 rounded-xl border p-4">
-			<WifiOffIcon class="text-muted-foreground mt-0.5 size-4 shrink-0" />
+		<div class="border-border mt-8 flex items-start gap-3 border-t pt-5">
+			<WifiOffIcon class="text-muted-foreground mt-1 size-4 shrink-0" />
 			<div>
-				<p class="text-sm font-medium">{t('hiw.proofTitle')}</p>
-				<p class="text-muted-foreground mt-1 text-sm leading-relaxed">{t('hiw.proofBody')}</p>
+				<p class="font-medium">{t('hiw.proofTitle')}</p>
+				<p class="text-muted-foreground mt-1.5 leading-relaxed">{t('hiw.proofBody')}</p>
 			</div>
 		</div>
 
-		<p class="text-muted-foreground/70 mt-8 text-xs leading-relaxed">{t('hiw.footer')}</p>
+		<p class="text-muted-foreground mt-14 text-sm leading-relaxed">{t('hiw.footer')}</p>
 	</div>
 </div>
 
 <style>
-	/* The node re-enters when the mode changes. One movement, on the one element
-	   that actually changed sides. */
+	/* The answer step re-enters when it changes rooms. One movement, on the one
+	   element that actually moved; nothing else on the page animates. */
 	.hiw-node {
-		animation: hiw-drop 340ms cubic-bezier(0.16, 1, 0.3, 1) both;
+		animation: hiw-drop 380ms cubic-bezier(0.16, 1, 0.3, 1) both;
 	}
 
 	@keyframes hiw-drop {
 		from {
 			opacity: 0;
-			transform: translateY(-10px);
+			transform: translateY(-8px);
 		}
 	}
 

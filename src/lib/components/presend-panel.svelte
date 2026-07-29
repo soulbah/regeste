@@ -69,7 +69,7 @@
 	<ScrollArea class="min-h-0 flex-1">
 		<div class="space-y-2 p-3">
 			<p class="text-muted-foreground px-1 font-mono text-[10px] tracking-widest uppercase">
-				{t('presend.excerpts')}
+				{t('presend.passages')}
 			</p>
 			{#if isWeakMatch(pending?.hits ?? [])}
 				<p class="text-muted-foreground px-1 text-xs">
@@ -158,7 +158,7 @@
 					<Tooltip.Content side="top">
 						{!settingsStore.assistedConsented
 							? t('disabled.consentFirst')
-							: t('disabled.selectExcerpts')}
+							: t('disabled.selectPassages')}
 					</Tooltip.Content>
 				{/if}
 			</Tooltip.Root>

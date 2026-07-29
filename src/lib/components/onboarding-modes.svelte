@@ -113,7 +113,7 @@
 				{/if}
 			</div>
 			<p class="text-muted-foreground flex-1 text-xs leading-relaxed">{card.line}</p>
-			<p class="text-muted-foreground/80 font-mono text-[10px] tracking-wide uppercase">
+			<p class="text-muted-foreground font-mono text-[10px] tracking-wide uppercase">
 				{card.cost}
 			</p>
 			{#if card.blocked}

@@ -7,9 +7,13 @@
 	// reads as an error state rather than as a considered one. Everywhere else
 	// there is content to carry the page and this would just be haze.
 	//
-	// One wash, never two. Low opacity and a very large blur so it is felt more
-	// than seen: at this size the eye reads it as the page having a light
-	// source, not as a coloured shape.
+	// One wash, never two, and only on those screens: the reference pages that
+	// carry real content (how it works, the guides) were tried with it and it
+	// read as haze over the text, which is the opposite of sober.
+	//
+	// Low opacity and a very large blur so it is felt more than seen: at this
+	// size the eye should read it as the page having a light source, not as a
+	// coloured shape.
 	let {
 		/** Vertical placement as a percentage of the container. */
 		top = '-18%',
@@ -19,6 +23,6 @@
 
 <div
 	aria-hidden="true"
-	class="bg-accent-foreground/12 pointer-events-none absolute left-1/2 -translate-x-1/2 rounded-full blur-[140px]"
+	class="bg-accent-foreground/10 pointer-events-none absolute left-1/2 -translate-x-1/2 rounded-full blur-[150px]"
 	style="top: {top}; width: {size}; height: {size}"
 ></div>

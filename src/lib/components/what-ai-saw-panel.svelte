@@ -82,7 +82,7 @@
 				{t('wais.destination')}
 			</p>
 			<p class="mt-1 text-sm">
-				{destinationLabel} · {t('common.excerpts', {
+				{destinationLabel} · {t('common.passages', {
 					count: event.excerptCount,
 					s: event.excerptCount === 1 ? '' : 's'
 				})} ·

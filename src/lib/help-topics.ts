@@ -13,8 +13,11 @@
 import type { MessageKey } from '$lib/i18n/index.svelte';
 
 export interface HelpTopic {
-	/** URL fragment, and the id a failure links to. */
+	/** URL segment, and the id a failure links to. */
 	id: string;
+	/** Shown as a chip above the title, so the index reads as a library rather
+	 * than a list of complaints. */
+	kind: MessageKey;
 	/** i18n keys. `fix` is a list of steps. */
 	title: MessageKey;
 	symptom: MessageKey;
@@ -25,6 +28,7 @@ export interface HelpTopic {
 export const HELP_TOPICS: HelpTopic[] = [
 	{
 		id: 'storage-blocked',
+		kind: 'help.kind.storage',
 		title: 'help.blocked.title',
 		symptom: 'help.blocked.symptom',
 		cause: 'help.blocked.cause',
@@ -32,6 +36,7 @@ export const HELP_TOPICS: HelpTopic[] = [
 	},
 	{
 		id: 'two-tabs',
+		kind: 'help.kind.storage',
 		title: 'help.tabs.title',
 		symptom: 'help.tabs.symptom',
 		cause: 'help.tabs.cause',
@@ -39,6 +44,7 @@ export const HELP_TOPICS: HelpTopic[] = [
 	},
 	{
 		id: 'eviction',
+		kind: 'help.kind.storage',
 		title: 'help.eviction.title',
 		symptom: 'help.eviction.symptom',
 		cause: 'help.eviction.cause',
@@ -46,6 +52,7 @@ export const HELP_TOPICS: HelpTopic[] = [
 	},
 	{
 		id: 'no-webgpu',
+		kind: 'help.kind.browser',
 		title: 'help.gpu.title',
 		symptom: 'help.gpu.symptom',
 		cause: 'help.gpu.cause',
@@ -53,6 +60,7 @@ export const HELP_TOPICS: HelpTopic[] = [
 	},
 	{
 		id: 'network',
+		kind: 'help.kind.network',
 		title: 'help.network.title',
 		symptom: 'help.network.symptom',
 		cause: 'help.network.cause',

@@ -149,7 +149,7 @@
 									{...props}
 									variant="ghost"
 									size="icon-sm"
-									class="text-muted-foreground/70 hover:text-foreground -mt-0.5 shrink-0"
+									class="text-muted-foreground hover:text-foreground -mt-0.5 shrink-0"
 									aria-label={t('docs.optionsAria', { name: doc.name })}
 								>
 									<EllipsisIcon />
@@ -175,9 +175,9 @@
 				</div>
 			{:else}
 				<div class="flex flex-col items-center gap-2 px-6 py-16 text-center">
-					<FileTextIcon class="text-muted-foreground/70 size-8" />
+					<FileTextIcon class="text-muted-foreground size-8" />
 					<p class="text-muted-foreground text-sm">{t('docs.empty')}</p>
-					<p class="text-muted-foreground/80 text-xs">{t('docs.emptyHint')}</p>
+					<p class="text-muted-foreground text-xs">{t('docs.emptyHint')}</p>
 				</div>
 			{/each}
 		{/if}

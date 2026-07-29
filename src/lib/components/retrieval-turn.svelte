@@ -116,7 +116,7 @@
 		<div class="space-y-1">
 			<p class="text-muted-foreground text-sm">{notice}</p>
 			{#if parsed.hits.length && isWeakMatch(parsed.hits)}
-				<p class="text-muted-foreground/80 text-xs">{t('retrieval.weak')}</p>
+				<p class="text-muted-foreground text-xs">{t('retrieval.weak')}</p>
 			{/if}
 		</div>
 	</div>

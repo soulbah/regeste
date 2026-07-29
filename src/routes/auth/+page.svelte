@@ -140,7 +140,7 @@
 
 				<div class="my-6 flex items-center gap-3">
 					<Separator class="flex-1" />
-					<span class="text-muted-foreground/70 font-mono text-[10px] tracking-widest uppercase">
+					<span class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
 						{t('auth.or')}
 					</span>
 					<Separator class="flex-1" />
@@ -165,7 +165,7 @@
 				</div>
 			{/if}
 
-			<p class="text-muted-foreground/70 mt-9 text-center text-xs leading-relaxed text-balance">
+			<p class="text-muted-foreground mt-9 text-center text-xs leading-relaxed text-balance">
 				{t('auth.footnote')}
 			</p>
 		</div>

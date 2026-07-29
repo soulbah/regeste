@@ -47,7 +47,7 @@
 	</button>
 {:else}
 	<div class="space-y-3 text-left">
-		<p class="text-muted-foreground/70 px-1 font-mono text-[10px] tracking-widest uppercase">
+		<p class="text-muted-foreground px-1 font-mono text-[10px] tracking-widest uppercase">
 			{t('home.pickLead')}
 		</p>
 		<div class="space-y-1.5">

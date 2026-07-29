@@ -15,7 +15,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'disabled.indexing': 'Ce document est encore en cours de préparation.',
 	'disabled.indexingChat': 'Attendez que le premier document soit prêt.',
 	'disabled.needEmail': "Saisissez d'abord un email valide.",
-	'disabled.selectExcerpts': 'Sélectionnez au moins un passage.',
+	'disabled.selectPassages': 'Sélectionnez au moins un passage.',
 	'disabled.selectDoc': 'Sélectionnez au moins un document.',
 	'disabled.consentFirst': "Acceptez d'abord l'envoi des passages.",
 	'common.save': 'Enregistrer',
@@ -25,7 +25,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'common.page': 'page {n}',
 	'common.pages': '{n} pages',
 	'common.requests': '{count} requête{s}',
-	'common.excerpts': '{count} extrait{s}',
+	'common.passages': '{count} passage{s}',
 	'common.cloudAi': 'IA cloud',
 
 	// Sidebar
@@ -91,7 +91,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'modes.assisted.name': 'Cloud',
 	'modes.myai.name': 'Votre serveur',
 	'modes.private.description': 'Tout reste sur cet appareil.',
-	'modes.assisted.description': 'Seuls les extraits pertinents sont traités en ligne.',
+	'modes.assisted.description': 'Seuls les passages pertinents sont traités en ligne.',
 	'modes.myai.description': "Utilisez votre propre fournisseur d'IA.",
 	'modes.best': 'Idéal pour vous',
 	'modes.bestReason.noGpu': "ce navigateur ne peut pas exécuter l'IA sur votre appareil",
@@ -205,20 +205,20 @@ export const fr: Record<keyof typeof en, string> = {
 	'presend.subtitle': 'Vérifiez ce qui quitte votre appareil',
 	'presend.question': 'Votre question',
 	'presend.context': 'Contexte de la discussion',
-	'presend.excerpts': 'Extraits trouvés dans vos documents',
+	'presend.passages': 'Passages trouvés dans vos documents',
 	'presend.weak':
 		'Ces passages ont peu de rapport avec la question. La réponse peut être peu fiable.',
-	'presend.includeAria': 'Inclure cet extrait',
+	'presend.includeAria': 'Inclure ce passage',
 	'presend.match': 'pertinence {pct}%',
 	'presend.firstTime': 'Première fois que quelque chose quitte cet appareil',
 	'presend.firstTimeBody':
-		"Jusqu'ici, tout s'est passé sur votre appareil. Cet envoi transmet votre question et les extraits cochés au service Cloud, jamais vos fichiers. Vous recevez votre réponse, et rien n'est stocké ni journalisé.",
+		"Jusqu'ici, tout s'est passé sur votre appareil. Cet envoi transmet votre question et les passages cochés au service Cloud, jamais vos fichiers. Vous recevez votre réponse, et rien n'est stocké ni journalisé.",
 	'presend.consent': "J'ai compris, continuer",
-	'presend.count': '{selected}/{total} extraits · {kb} Ko',
+	'presend.count': '{selected}/{total} passages · {kb} Ko',
 	'presend.footer':
-		'Seuls les extraits cochés et votre question sont envoyés. Vos fichiers restent ici.',
+		'Seuls les passages cochés et votre question sont envoyés. Vos fichiers restent ici.',
 	'presend.footerWithContext':
-		'Votre question, ce contexte et les extraits cochés sont envoyés. Vos fichiers restent ici.',
+		'Votre question, ce contexte et les passages cochés sont envoyés. Vos fichiers restent ici.',
 
 	// Answer turn
 	'turn.whatAiSaw': "Ce que l'IA a reçu",
@@ -304,7 +304,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'chat.writing': 'Préparation de votre réponse…',
 	'chat.reading': 'Recherche dans vos documents…',
 	'chat.stop': 'Arrêter',
-	'chat.meta': '{count} extrait{s} · {kb} Ko · {dest}',
+	'chat.meta': '{count} passage{s} · {kb} Ko · {dest}',
 	'chat.editedAria': 'Question modifiée',
 	'chat.resend': 'Renvoyer',
 
@@ -347,7 +347,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'sheet.privacy': 'Confidentialité',
 	'sheet.loading': 'Chargement…',
 	'sheet.detailUnavailable': 'Les détails de ce document n’ont pas pu être lus pour l’instant.',
-	'sheet.neverSent': 'Aucun extrait n’a quitté votre appareil',
+	'sheet.neverSent': 'Aucun passage n’a quitté votre appareil',
 	'sheet.usedIn': 'Utilisé dans',
 	'sheet.noChats': 'Aucune discussion pour le moment.',
 	'sheet.open': 'Ouvrir',
@@ -362,7 +362,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'sheet.replaceFailedKeep': 'La version actuelle reste active.',
 	'sheet.replaced': 'Document remplacé',
 	'sheet.replacedDesc': 'Les anciennes citations conservent leurs instantanés.',
-	'sheet.egressLine': '{date} : extraits envoyés à {dest}',
+	'sheet.egressLine': '{date} : passages envoyés à {dest}',
 	'sheet.language': 'Langue',
 	'sheet.sentCount': 'Envoyé {count} fois',
 	'sheet.seeAll': 'Voir tout ({count})',
@@ -446,10 +446,14 @@ export const fr: Record<keyof typeof en, string> = {
 	'clarification.unitCurrency': 'Quelle devise ou unité cible faut-il utiliser ?',
 	'clarification.multiPart': 'À quelle partie faut-il répondre en premier ?',
 	// Page d'aide — le symptôme d'abord, c'est ce qu'on reconnaît.
-	'help.title': 'Quand le navigateur bloque',
+	'help.title': 'Si le navigateur bloque',
+	'help.kind.storage': 'Stockage',
+	'help.kind.browser': 'Navigateur',
+	'help.kind.network': 'Réseau',
+	'help.allGuides': 'Tous les guides',
+	'help.more': 'Autres guides',
 	'help.intro':
 		'Tout se passe dans votre navigateur, donc ses réglages font partie du fonctionnement. Voici les cas qui l’empêchent de tourner, et ce qui les débloque.',
-	'help.symptom': 'Ce que vous voyez',
 	'help.cause': 'Pourquoi',
 	'help.fix': 'Que faire',
 	'help.footnote':
@@ -533,7 +537,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'settings.usage.current': 'Sélectionné',
 	'settings.review.title': 'Vérifier avant d’envoyer',
 	'settings.review.desc':
-		'Contrôlez les extraits à chaque fois avant qu’ils partent. Désactivez et les réponses distantes partent directement.',
+		'Contrôlez les passages à chaque fois avant qu’ils partent. Désactivez et les réponses distantes partent directement.',
 	'settings.tabs.account': 'Compte',
 	'settings.defaultMode.title': 'Mode par défaut des nouvelles discussions',
 	'settings.deleteChats.title': 'Supprimer toutes les discussions',
@@ -625,32 +629,29 @@ export const fr: Record<keyof typeof en, string> = {
 		'Chaque document, index et discussion est stocké localement. Ce rapport ne se remplit que si vous choisissez un mode cloud.',
 	'privacy.onDevice': 'Sur cet appareil',
 	'privacy.privateAnswers': '{count} réponse{s} privée{s}',
-	'privacy.event': '{count} extrait{s} · {bytes} → {dest}',
+	'privacy.event': '{count} passage{s} · {bytes} → {dest}',
 	'privacy.errorTitle': "Ce rapport n'a pas pu être chargé",
 	'privacy.errorBody': 'Fermez tout autre onglet où cette application est ouverte, puis réessayez.',
 
 	// How it works
 	'hiw.title': 'Comment circulent vos données',
-	'hiw.subtitle': 'Par mode · vérifiable dans le code source',
 	'hiw.intro':
 		'Vos documents sont analysés, indexés et cherchés dans ce navigateur. Les modes ne diffèrent que sur un point : qui rédige la réponse, et donc ce qui doit partir.',
-	'hiw.whatLeaves': 'Ce qui part',
 	'hiw.whatStays': 'Ce qui reste',
 	'hiw.server': 'Le serveur',
 	'hiw.private.leaves': "Rien. L'IA privée tourne dans votre navigateur (téléchargement unique).",
 	'hiw.private.stays': "Documents, index, discussions, l'IA privée, vos questions et réponses.",
 	'hiw.private.server': 'Jamais contacté pour répondre. Aucun compte requis.',
 	'hiw.assisted.leaves':
-		"Votre question et les extraits approuvés à l'étape de vérification. Jamais les documents entiers, jamais les noms de fichiers.",
-	'hiw.assisted.stays': 'Documents, index, discussions. Les extraits que vous excluez.',
+		"Votre question et les passages approuvés à l'étape de vérification. Jamais les documents entiers, jamais les noms de fichiers.",
+	'hiw.assisted.stays': 'Documents, index, discussions. Les passages que vous excluez.',
 	'hiw.assisted.server':
-		"Relaie les extraits à l'IA et renvoie la réponse en continu. Stocke votre e-mail, votre offre et un compteur d'utilisation. Ne stocke ni ne journalise jamais de contenu.",
+		"Relaie les passages à l'IA et renvoie la réponse en continu. Stocke votre e-mail, votre offre et un compteur d'utilisation. Ne stocke ni ne journalise jamais de contenu.",
 	'hiw.myai.leaves':
-		"Votre question plus les extraits pertinents, envoyés directement au serveur d'IA que vous avez configuré.",
+		"Votre question plus les passages pertinents, envoyés directement au serveur d'IA que vous avez configuré.",
 	'hiw.myai.stays': 'Documents, index, discussions.',
 	'hiw.myai.server':
 		"Aucun serveur intermédiaire. Le trafic va de votre navigateur à votre serveur d'IA.",
-	'hiw.pipeline': 'Le pipeline',
 	'hiw.step.document': 'Votre document',
 	'hiw.step.parsing': 'Analyse',
 	'hiw.step.chunking': 'Découpage',
@@ -659,13 +660,12 @@ export const fr: Record<keyof typeof en, string> = {
 	'hiw.step.question': 'Votre question',
 	'hiw.step.search': 'Recherche locale',
 	'hiw.step.passages': 'Meilleurs passages',
-	'hiw.step.modes': 'Cet appareil / Cloud / Votre serveur',
 	'hiw.step.answer': 'Réponse + citations',
 	'hiw.boundaryIntact': 'Rien ne traverse',
 	'hiw.boundaryCrossed': 'Ce qui traverse',
 	'hiw.frame': 'Ce navigateur',
-	'hiw.onlyMode':
-		"Seule l'étape du mode décide si quelque chose part, et seuls le Cloud et Votre serveur envoient les passages sélectionnés.",
+	'hiw.lane.ingest': 'Ajouter un document',
+	'hiw.lane.ask': 'Poser une question',
 	'hiw.proofTitle': 'Vérifiez par vous-même',
 	'hiw.proofBody':
 		"Préparez le modèle local, puis coupez le Wi-Fi et posez à nouveau votre question. L'analyse, la recherche et la réponse continuent de fonctionner.",
