@@ -119,15 +119,21 @@
 	});
 </script>
 
+<!-- Chapter 02's composition exactly, mirrored: the same single text column
+     against the same large visual, on the same column widths and the same
+     centring, with the sides swapped. Mirroring is the variation; changing the
+     structure as well made it a third layout that rhymed with nothing. -->
 <Tabs.Root
 	bind:value={() => moment, (v) => (moment = v as Moment)}
-	class="grid gap-y-12 lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-center lg:gap-x-10 xl:grid-cols-[27rem_minmax(0,1fr)] xl:gap-x-16"
+	class="grid items-center gap-y-10 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-x-14 xl:grid-cols-[minmax(0,1fr)_26rem]"
 >
-	<!-- Left: the words. The ledger is the readable content of each moment, so it
-	     is what the tabs actually control; the deck on the right is a picture of
-	     the product. bits-ui resolves aria-controls by id, so the panels living in
-	     a different grid column than the list is legal. -->
-	<div>
+	<!-- The words. The ledger is the readable content of each moment, so it is
+	     what the tabs actually control; the deck is a picture of the product.
+	     bits-ui resolves aria-controls by id, so the panels living in a different
+	     grid column than the list is legal. Second in the DOM and second on wide
+	     screens too, but the stage takes order-1 there: on a phone the heading has
+	     to arrive before the picture. -->
+	<div class="lg:order-2">
 		<p class="text-muted-foreground font-mono text-[11px] tracking-widest uppercase" id="dossier">
 			<span class="text-accent-foreground">[</span>
 			03
@@ -162,8 +168,8 @@
 		</div>
 	</div>
 
-	<!-- Right: the stage. -->
-	<div class="min-w-0">
+	<!-- The stage. First on wide screens, so the mass sits opposite chapter 02's. -->
+	<div class="min-w-0 lg:order-1">
 		<!-- The rail names both moments in words before anyone clicks, so the
 		     section still says what it has to say at zero clicks.
 		     The two moments are chips sitting ON the rule, not labels under a pair

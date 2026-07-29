@@ -642,7 +642,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'landing.hero.title': 'Vos documents ont la réponse.',
 	'landing.hero.sub':
 		'Posez une question, recevez une réponse rédigée qui cite les passages exacts dont elle vient. Tout se passe dans votre navigateur, et avec le modèle sur l’appareil vos fichiers ne quittent jamais votre machine.',
-	'landing.hero.facts': 'Sans compte pour commencer · Open source',
+	'landing.hero.facts': 'Gratuit et open source · Sans compte pour commencer',
 	'landing.modes.title': 'Choisissez où la réponse s’écrit.',
 	'landing.modes.sub':
 		'La lecture de vos documents et leur recherche se font dans ce navigateur. Les trois modes ne diffèrent que sur un point : qui rédige la réponse.',

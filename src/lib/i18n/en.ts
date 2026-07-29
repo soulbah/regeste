@@ -637,7 +637,7 @@ export const en = {
 	'landing.hero.title': 'Your documents have the answer.',
 	'landing.hero.sub':
 		'Ask a question and get a written answer that cites the exact passages it came from. Everything runs in your browser, and with the on-device model your files never leave your machine.',
-	'landing.hero.facts': 'No account to start · Open source',
+	'landing.hero.facts': 'Free and open source · No account to start',
 	'landing.modes.title': 'Choose where the answer is written.',
 	'landing.modes.sub':
 		'Reading your documents and searching them happen in this browser. The three modes differ on one point: who writes the answer.',
