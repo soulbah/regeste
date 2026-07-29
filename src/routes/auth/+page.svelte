@@ -68,7 +68,9 @@
 	<div class="relative flex flex-1 items-center justify-center px-6 pb-24">
 		<div class="w-full max-w-[22rem]">
 			<div class="mb-9 text-center">
-				<p class="font-display mb-6 text-lg tracking-tight">Regeste</p>
+				<p class="font-display mb-6 text-lg tracking-tight">
+					<span class="text-accent-foreground">[</span>Regeste
+				</p>
 				<h1 class="font-display text-[1.75rem] leading-tight tracking-tight text-balance">
 					{sessionStore.otpSentTo ? t('auth.checkInbox') : t('auth.headline')}
 				</h1>

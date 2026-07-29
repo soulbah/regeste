@@ -16,7 +16,7 @@
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import DownloadIcon from '@lucide/svelte/icons/download';
 	import Trash2Icon from '@lucide/svelte/icons/trash-2';
-	import FileIcon from '@lucide/svelte/icons/file';
+	import BrandMark from '$lib/components/brand-mark.svelte';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
@@ -96,8 +96,11 @@
 				href={resolve('/chat')}
 				class="flex min-w-0 items-center gap-2 px-2 py-1.5 group-data-[collapsible=icon]:hidden"
 			>
-				<FileIcon class="size-4 shrink-0" />
-				<span class="font-display text-lg tracking-tight">Regeste</span>
+				<!-- The lockup is typographic: the accent bracket opens the name, the
+				     same glyph the mark and favicon are built from. No pictogram. -->
+				<span class="font-display text-lg tracking-tight">
+					<span class="text-accent-foreground">[</span>Regeste
+				</span>
 			</a>
 			<Tooltip.Root>
 				<Tooltip.Trigger>
@@ -114,7 +117,7 @@
 				<span
 					class="pointer-events-none absolute inset-0 flex items-center justify-center transition-opacity group-hover/logo:opacity-0"
 				>
-					<FileIcon class="size-4" />
+					<BrandMark size={18} />
 				</span>
 				<Tooltip.Root>
 					<Tooltip.Trigger>
