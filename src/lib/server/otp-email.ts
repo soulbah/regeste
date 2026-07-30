@@ -26,8 +26,10 @@ const VALID_MINUTES = 5;
 interface OtpCopy {
 	subject: string;
 	line: string;
+	label: string;
 	expiry: string;
 	ignore: string;
+	sender: string;
 }
 
 // Both languages, chosen from the request rather than guessed: someone reading
@@ -35,15 +37,19 @@ interface OtpCopy {
 const COPY: Record<'fr' | 'en', OtpCopy> = {
 	fr: {
 		subject: 'Votre code de connexion',
-		line: 'Voici votre code de connexion.',
-		expiry: `Il est valable ${VALID_MINUTES} minutes.`,
-		ignore: "Si vous n'avez rien demandé, ignorez ce message."
+		line: 'Saisissez ce code pour vous connecter.',
+		label: 'Code de connexion',
+		expiry: `Valable ${VALID_MINUTES} minutes.`,
+		ignore: "Si vous n'avez rien demandé, ignorez ce message.",
+		sender: 'Envoyé par mail.regeste.com. Ce message ne contient aucun lien.'
 	},
 	en: {
 		subject: 'Your sign-in code',
-		line: 'Here is your sign-in code.',
-		expiry: `It is valid for ${VALID_MINUTES} minutes.`,
-		ignore: 'If you did not ask for it, ignore this message.'
+		line: 'Enter this code to sign in.',
+		label: 'Sign-in code',
+		expiry: `Valid for ${VALID_MINUTES} minutes.`,
+		ignore: 'If you did not ask for it, ignore this message.',
+		sender: 'Sent by mail.regeste.com. This message contains no links.'
 	}
 };
 
@@ -53,15 +59,48 @@ export function pickLocale(header: string | null): 'fr' | 'en' {
 }
 
 function html(code: string, copy: OtpCopy): string {
-	// Deliberately plain: table-free, image-free, one accent. Anything richer
-	// renders badly across clients and reads like marketing, and this is a
-	// message someone opens for four seconds to copy six digits.
+	// The identity, carried by type rather than by an image.
+	//
+	// No images at all: they are blocked by default in most clients, a remote one
+	// is a tracking pixel whether or not it is meant as one, and this product does
+	// not get to make an exception for its own mail. So the wordmark is text — the
+	// bracket that opens it everywhere else, in the accent green — set in a serif
+	// stack, because a webfont cannot be relied on and Georgia is the closest
+	// thing to Newsreader that every client already has.
+	//
+	// One table, for centring. The earlier version was proud of being table-free,
+	// which is backwards: Outlook's Word engine ignores max-width on a div, so a
+	// table is the only layout that holds up. It is one cell, not a grid.
+	//
+	// And no links, stated in the footer. A sign-in message with nothing to click
+	// is the one shape phishing cannot imitate usefully, and saying so teaches the
+	// reader what to distrust next time.
+	const serif = "Newsreader,Georgia,'Times New Roman',serif";
+	const mono = 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace';
+	const sans = 'ui-sans-serif,system-ui,-apple-system,Segoe UI,Helvetica,Arial,sans-serif';
 	return `<!doctype html>
-<html><body style="margin:0;padding:32px;background:#faf8f4;font-family:ui-sans-serif,system-ui,sans-serif;color:#1c1a17">
-<p style="margin:0 0 20px;font-size:15px">${copy.line}</p>
-<p style="margin:0 0 20px;font-family:ui-monospace,monospace;font-size:32px;letter-spacing:6px;font-weight:600">${code}</p>
-<p style="margin:0 0 6px;font-size:13px;color:#6b6660">${copy.expiry}</p>
-<p style="margin:0;font-size:13px;color:#6b6660">${copy.ignore}</p>
+<html lang="${copy === COPY.fr ? 'fr' : 'en'}"><head><meta charset="utf-8" />
+<meta name="color-scheme" content="light" /><meta name="supported-color-schemes" content="light" />
+</head>
+<body style="margin:0;padding:0;background:#f5f3ef;color:#1c1a17;font-family:${sans}">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f5f3ef">
+<tr><td align="center" style="padding:40px 20px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:420px">
+<tr><td style="padding:0 0 30px">
+<span style="font-family:${serif};font-size:22px;letter-spacing:-0.01em"><span style="color:#3f7357">[</span>Regeste</span>
+</td></tr>
+<tr><td style="padding:0 0 22px;font-size:15px;line-height:1.6">${copy.line}</td></tr>
+<tr><td style="padding:0 0 22px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#fffefb;border:1px solid #e3dfd7;border-radius:12px">
+<tr><td align="center" style="padding:22px 16px 20px">
+<div style="font-family:${mono};font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#6b6660;padding-bottom:12px">${copy.label}</div>
+<div style="font-family:${mono};font-size:34px;letter-spacing:0.24em;font-weight:600;line-height:1;text-indent:0.24em">${code}</div>
+</td></tr></table>
+</td></tr>
+<tr><td style="padding:0 0 30px;font-size:13px;line-height:1.6;color:#6b6660">${copy.expiry} ${copy.ignore}</td></tr>
+<tr><td style="border-top:1px solid #e3dfd7;padding:16px 0 0;font-family:${mono};font-size:11px;line-height:1.6;color:#8a8580">${copy.sender}</td></tr>
+</table>
+</td></tr></table>
 </body></html>`;
 }
 
@@ -80,7 +119,7 @@ export async function sendOtpEmail(
 		from: FROM,
 		to,
 		subject: copy.subject,
-		text: `${copy.line}\n\n${code}\n\n${copy.expiry}\n${copy.ignore}\n`,
+		text: `${copy.line}\n\n${copy.label}: ${code}\n\n${copy.expiry} ${copy.ignore}\n\n${copy.sender}\n`,
 		html: html(code, copy)
 	});
 }

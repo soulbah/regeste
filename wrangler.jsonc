@@ -11,6 +11,24 @@
 	"observability": {
 		"enabled": true
 	},
+	// Production hostnames. Routes rather than custom_domain on purpose: a route
+	// intercepts at the edge without touching the zone's DNS, so removing it puts
+	// the previous record back and the change is reversible in one deploy. The
+	// apex and www both point here, and hooks.server.ts sends www to the apex —
+	// two live origins would mean two cookie jars, and anyone who signed in on one
+	// would look signed out on the other.
+	//
+	// workers.dev is off, and wrangler did that on its own: declaring routes
+	// without an explicit "workers_dev": true disables it. That is the right end
+	// state — a second origin serving the same app is a duplicate for search
+	// engines and another place where sessions work — but it happened in the same
+	// deploy as the route rather than after it, so there was no fallback origin
+	// while the route settled. Set "workers_dev": true here if one is ever needed
+	// again for staging.
+	"routes": [
+		{ "pattern": "regeste.com/*", "zone_name": "regeste.com" },
+		{ "pattern": "www.regeste.com/*", "zone_name": "regeste.com" }
+	],
 	"d1_databases": [
 		{
 			"binding": "DB",
