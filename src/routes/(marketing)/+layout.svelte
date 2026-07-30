@@ -22,7 +22,7 @@
 	import GithubIcon from '$lib/components/github-icon.svelte';
 	import { t, i18n } from '$lib/i18n/index.svelte';
 	import { reveal } from '$lib/landing-motion';
-	import { GITHUB, CONTACT_EMAIL } from '$lib/links';
+	import { GITHUB } from '$lib/links';
 
 	let { children } = $props();
 
@@ -125,9 +125,13 @@
 			</div>
 		</section>
 
+		<!-- Footer links carry the full foreground, not the muted token. Muted grey on
+		     the light surface measures 2.64:1 against the 4.5 required, and the inverted
+		     band cannot be relied on to be there: an accessibility checker sampled this
+		     footer in its light state and was right to fail it. -->
 		<footer class="mx-auto max-w-7xl px-6 pt-16 pb-10">
 			<div class="border-border flex flex-wrap items-center justify-between gap-4 border-t pt-6">
-				<p class="text-muted-foreground text-sm">
+				<p class="text-foreground/90 text-sm">
 					<span class="font-display text-foreground text-base tracking-tight">
 						<span class="text-accent-foreground">[</span>Regeste
 					</span>
@@ -138,7 +142,7 @@
 					<Button
 						variant="ghost"
 						size="sm"
-						class="text-muted-foreground"
+						class="text-foreground/90"
 						href={resolve('/how-it-works')}
 					>
 						{t('landing.nav.how')}
@@ -146,7 +150,7 @@
 					<Button
 						variant="ghost"
 						size="sm"
-						class="text-muted-foreground"
+						class="text-foreground/90"
 						href={resolve('/(marketing)/help/[[topic]]', { topic: undefined })}
 					>
 						{t('landing.nav.guides')}
@@ -154,29 +158,15 @@
 					<Button
 						variant="ghost"
 						size="sm"
-						class="text-muted-foreground"
+						class="text-foreground/90"
 						href={resolve('/(marketing)/privacy')}
 					>
 						{t('policy.title')}
 					</Button>
-					<!-- The only way to reach a person. GitHub covers anyone willing to
-					     open an issue; this covers everyone else, which is most people.
-					     The label is the address rather than the word "Contact", because
-					     mailto's documented failure is silence: a visitor on webmail with
-					     no registered mail client clicks and nothing happens. Printed, it
-					     survives that — it can be read and copied. -->
 					<Button
 						variant="ghost"
 						size="sm"
-						class="text-muted-foreground font-normal"
-						href={`mailto:${CONTACT_EMAIL}`}
-					>
-						{CONTACT_EMAIL}
-					</Button>
-					<Button
-						variant="ghost"
-						size="sm"
-						class="text-muted-foreground gap-1.5"
+						class="text-foreground/90 gap-1.5"
 						href={GITHUB}
 						target="_blank"
 						rel="noopener"

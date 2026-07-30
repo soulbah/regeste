@@ -7,12 +7,12 @@
 	// pills floating near it. A boundary diagram only says something when the
 	// things on each side are visibly *inside* something.
 	//
-	// So: containers. The browser holds every step that never leaves. Cloud and
-	// Your server get a second room below the dashed line; This device gets no
-	// second room at all, because there is nothing to put in one. Choosing a
-	// mode moves the answer step across, and the line states its payload. That
-	// single movement is the whole product claim, and it is the only thing here
-	// that animates.
+	// So: containers. The browser holds every step that never leaves. Below the
+	// dashed line sits a second room, drawn in all three modes: Cloud and Your
+	// server put the answer step in it, This device leaves it struck out and
+	// empty. Choosing a mode moves that step across, and the line states its
+	// payload. That single movement is the whole product claim, and it is the only
+	// thing here that animates.
 	//
 	// Lifted out of /how-it-works so the landing shows the same drawing rather
 	// than a second one that drifts. Two surfaces, one file.
@@ -117,12 +117,18 @@
 	</div>
 {/snippet}
 
-{#snippet answerNode()}
+{#snippet answerLane()}
 	<!-- Centred, not parked in the first column: this step is alone in its room,
 	     and a lone node hugging the left edge reads as a lane that got cut off
 	     rather than as a destination. -->
-	<div class="hiw-node flex justify-center">
-		<div class="flex w-32 flex-col items-center gap-3 text-center lg:w-36">
+	<div>
+		<p
+			class="text-muted-foreground mb-5 flex items-baseline justify-center gap-2.5 font-mono text-[10px] tracking-widest uppercase"
+		>
+			<span class="text-accent-foreground">03</span>
+			{t('hiw.lane.answer')}
+		</p>
+		<div class="hiw-node flex w-32 flex-col items-center gap-3 text-center lg:mx-auto lg:w-36">
 			<span
 				class="flex size-11 items-center justify-center rounded-xl border {crosses
 					? 'border-amber-500/40 bg-amber-500/10'
@@ -140,41 +146,41 @@
 {/snippet}
 
 <!-- Room one. Everything in here happens on the machine in front of you, in
-     every mode, which is why it is drawn as a container and not as a list. -->
+     every mode, which is why it is drawn as a container and not as a list.
+     Writing the answer is lane 03, not a node dangling off lane 02 on a vertical
+     stub. Readers told us the stub read as "the answer comes straight after Local
+     search", skipping Top passages entirely, and they were right: it is a third
+     step and it now says so. -->
 <div class="border-border bg-card/25 rounded-2xl border">
 	<div class="border-border flex items-center gap-2.5 border-b px-6 py-3.5">
 		<MonitorIcon class="text-muted-foreground size-4" />
 		<span class="font-mono text-[10px] tracking-widest uppercase">{t('hiw.frame')}</span>
 	</div>
 
-	<div class="space-y-9 px-6 pt-8 sm:px-8">
+	<div class="space-y-9 px-6 py-8 sm:px-8">
 		{@render lane(t('hiw.lane.ingest'), '01', INGEST)}
 		{@render lane(t('hiw.lane.ask'), '02', ASK)}
-	</div>
-
-	<!-- The descent. The answer comes out of the question chain, not out of
-	     indexing, so it hangs below lane 02 on a vertical connector rather than
-	     sitting in a third row of its own: a third row implied the two passes
-	     above it narrowed into one, and they do not.
-	     When the mode crosses, the connector runs out of the bottom of the room
-	     and the boundary cuts it. -->
-	<div class="flex flex-col items-center px-6 pb-8 sm:px-8">
-		<span
-			class="flow flow-y h-8 border-l {crosses
-				? 'border-amber-500/40 flow-amber'
-				: 'border-border'}"
-			style="--flow-delay: 1.1s"
-		></span>
 		{#if !crosses}
-			<div class="pt-4">{@render answerNode()}</div>
+			{@render answerLane()}
 		{/if}
 	</div>
 </div>
 
 <!-- The line, and its payload. What crosses is the single most important
      sentence here, so it is written on the boundary itself rather than in a
-     footnote under a diagram. -->
+     footnote under a diagram.
+     The vertical connector appears here and nowhere else. Every other line in
+     this drawing is horizontal, so a vertical one carries exactly one meaning:
+     something left the room. -->
 <div class="py-7 {bleed ? '-mx-[calc(50vw-50%)] px-[calc(50vw-50%)]' : 'px-2'}">
+	{#if crosses}
+		<div class="flex justify-center pb-5" aria-hidden="true">
+			<span
+				class="flow flow-y flow-amber h-8 border-l border-amber-500/40"
+				style="--flow-delay: 1.1s"
+			></span>
+		</div>
+	{/if}
 	<div class="flex items-center gap-4">
 		<span class="border-border flex-1 border-t border-dashed"></span>
 		<span
@@ -186,36 +192,58 @@
 		</span>
 		<span class="border-border flex-1 border-t border-dashed"></span>
 	</div>
-	<!-- max-w-3xl, not xl: the longest of the three payloads fits on one line at
-	     this measure, so switching modes does not reflow the sentence from one
-	     line to two and back. -->
-	<p
-		class="mx-auto mt-3.5 max-w-3xl text-center text-sm leading-relaxed {crosses
-			? 'text-amber-700 dark:text-amber-500/90'
-			: 'text-muted-foreground'}"
-	>
-		{detail.leaves}
-	</p>
+	{#if crosses}
+		<p
+			class="mx-auto mt-3.5 max-w-3xl text-center text-sm leading-relaxed text-amber-700 dark:text-amber-500/90"
+		>
+			{detail.leaves}
+		</p>
+	{/if}
 </div>
 
-<!-- Room two, only when there is one. On This device nothing sits below the
-     line, which the other two modes make legible by putting a room there: the
-     absence is the statement, and it does not need a sentence saying so on top
-     of the label and the payload line. -->
+<!-- Room two, always drawn.
+     It used to vanish on This device, on the theory that the absence was the
+     statement. Readers could not compare against something that was not there, so
+     the room stays and shows itself empty instead: the same frame, one occupied
+     and one visibly not. That contrast is the whole argument of the drawing, and
+     it only exists if both boxes exist. -->
 {#if crosses}
 	<div class="rounded-2xl border border-amber-500/30 bg-amber-500/[0.04]">
 		<div class="flex items-center gap-2.5 border-b border-amber-500/25 px-6 py-3.5">
 			<ZONE_ICON class="size-4 text-amber-700 dark:text-amber-500" />
 			<span class="font-mono text-[10px] tracking-widest uppercase">{NAMES[mode]}</span>
 		</div>
-		<!-- The connector picks up where the boundary cut it. -->
-		<div class="flex flex-col items-center px-6 pt-0 pb-8 sm:px-8">
-			<span
-				class="flow flow-y flow-amber h-8 border-l border-amber-500/40"
-				style="--flow-delay: 1.5s"
-			></span>
-			<div class="pt-4">{@render answerNode()}</div>
+		<div class="px-6 py-8 sm:px-8">
+			{@render answerLane()}
 		</div>
+	</div>
+{:else}
+	<!-- Same room, same name, same header colour, marked unused. Naming it
+	     "Nothing leaves" made it a different box from the one Cloud draws, and two
+	     different boxes cannot be compared; keeping Cloud's own header, amber
+	     included, is what makes the comparison land.
+	     The state goes in a tag, not a strikethrough. A line through the word
+	     negates the word, so on the name of a mode we actually offer it reads as
+	     "Cloud is disabled" rather than "Cloud is not being used here", and at
+	     10px mono capitals the rule crosses the letters and costs legibility.
+	     Amber stays on the header only. The frame keeps a neutral dashed border and
+	     no fill, so the colour identifies which room this is without a filled amber
+	     block claiming, in the one mode where nothing leaves, that something did. -->
+	<div class="border-border/70 rounded-2xl border border-dashed">
+		<div
+			class="border-border/70 flex items-center gap-2.5 border-b border-dashed px-6 py-3.5 sm:gap-3"
+		>
+			<CloudIcon class="size-4 text-amber-700 dark:text-amber-500" />
+			<span class="font-mono text-[10px] tracking-widest uppercase">
+				{NAMES.assisted}
+			</span>
+			<span
+				class="border-border/70 text-muted-foreground/80 rounded-full border px-2 py-0.5 font-mono text-[9px] tracking-widest uppercase"
+			>
+				{t('hiw.zone.unused')}
+			</span>
+		</div>
+		<p class="px-6 py-8 text-center text-sm leading-relaxed sm:px-8">{detail.leaves}</p>
 	</div>
 {/if}
 

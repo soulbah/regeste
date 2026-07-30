@@ -49,8 +49,12 @@
 	     writes `group-data-horizontal/tabs:h-10`, and a plain `h-auto` is a
 	     different key to tailwind-merge, so it does not override it and the cards
 	     overflow the list into the drawing below. -->
+	<!-- items-stretch, because the base list centres its items: a card whose
+	     description wraps to two lines then grew taller than its neighbours and the
+	     row looked broken. Stretch plus h-full on the trigger gives one height for
+	     the three, set by the tallest. -->
 	<Tabs.List
-		class="grid h-auto w-full gap-6 bg-transparent p-0 group-data-horizontal/tabs:h-auto {MODES.length ===
+		class="grid h-auto w-full items-stretch gap-6 bg-transparent p-0 group-data-horizontal/tabs:h-auto {MODES.length ===
 		3
 			? 'lg:grid-cols-3'
 			: 'lg:grid-cols-2'}"
@@ -58,8 +62,23 @@
 		{#each MODES as id (id)}
 			<Tabs.Trigger
 				value={id}
-				class="border-border data-[state=active]:bg-card data-[state=inactive]:bg-card/40 hover:bg-card/70 h-auto flex-none cursor-pointer flex-col items-start gap-2 rounded-2xl border p-6 text-left whitespace-normal data-[state=active]:shadow-lg data-[state=active]:shadow-black/5"
+				class="border-border data-[state=active]:bg-card data-[state=inactive]:bg-card/40 hover:bg-card/70 data-[state=active]:border-accent-foreground/40 group/mode relative h-full flex-none cursor-pointer flex-col items-start gap-2 rounded-2xl border p-6 pt-11 text-left whitespace-normal transition-[background-color,border-color,transform] hover:-translate-y-0.5 data-[state=active]:shadow-lg data-[state=active]:shadow-black/5"
 			>
+				<!-- The cards did not read as clickable, and testers had to be told.
+				     Three affordances, because one was demonstrably not enough: a radio
+				     mark that fills when chosen, a verb saying what a click does, and a
+				     lift on hover. The mark is the load-bearing one — a filled dot beside
+				     two hollow ones is the one pattern everybody has already learned. -->
+				<span class="absolute top-5 left-6 flex items-center gap-2">
+					<span
+						class="border-border group-data-[state=active]/mode:border-accent-foreground group-data-[state=active]/mode:bg-accent-foreground size-[13px] rounded-full border-2 transition-colors"
+					></span>
+					<span
+						class="text-muted-foreground group-data-[state=active]/mode:text-accent-foreground font-mono text-[10px] tracking-widest uppercase transition-colors"
+					>
+						{mode === id ? t('landing.modes.showing') : t('landing.modes.show')}
+					</span>
+				</span>
 				<span class="font-display text-2xl tracking-tight">{COPY[id].name}</span>
 				<span class="text-muted-foreground text-sm leading-relaxed">{COPY[id].desc}</span>
 				<!-- The cost, not the benefit. Naming what it asks of you first is what
@@ -72,21 +91,23 @@
 		{/each}
 	</Tabs.List>
 
-	<!-- The active card feeds the room, and the hairline descends from that card,
-	     not from the middle of the row: a centred connector under a left-hand
-	     selection says the three cards feed the room as a group, which is not what
-	     the control means. A hairline rather than a card welded to the room's top
-	     edge, because the first card's corner sits exactly on the room's radius
-	     and a flush join would break there. -->
+	<!-- The line leaves the card that is showing, not the middle of the row: it says
+	     "this card feeds that drawing", and centred under three cards it said nothing
+	     at all. It rides the same grid as the cards and moves column when the
+	     selection moves.
+	     It stays green and static, and the connector at the trust boundary stays
+	     amber and animated, so a vertical line still tells you which side of the
+	     boundary you are on: green never leaves the browser. -->
 	<div
-		class="grid {MODES.length === 3 ? 'lg:grid-cols-3' : 'lg:grid-cols-2'} gap-6"
+		class="flex justify-center py-8 lg:grid lg:gap-6 {MODES.length === 3
+			? 'lg:grid-cols-3'
+			: 'lg:grid-cols-2'}"
 		aria-hidden="true"
 	>
-		{#each MODES as id (id)}
-			<div class="flex justify-center">
-				<span class="h-8 border-l {mode === id ? 'border-border' : 'border-transparent'}"></span>
-			</div>
-		{/each}
+		<span
+			class="border-accent-foreground/40 h-8 border-l transition-[grid-column] lg:mx-auto"
+			style="grid-column-start: {MODES.findIndex((id) => id === mode) + 1}"
+		></span>
 	</div>
 
 	<div aria-hidden="true">
