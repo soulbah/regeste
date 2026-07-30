@@ -514,25 +514,29 @@
 										{/snippet}
 										{@render row(
 											t('settings.ai.model.title'),
-											privateR.blockedLine ??
-												(privateR.state === 'ready'
-													? t(
-															llmStore.tier?.id === 'lite'
-																? 'modes.private.readyLite'
-																: 'modes.private.ready'
-														)
-													: privateR.state === 'progress'
-														? llmStore.status === 'loading'
-															? t('modes.private.loading')
-															: llmStore.status === 'detecting'
-																? t('modes.private.checking')
-																: t('modes.private.preparing', { pct: privateR.pct })
-														: t(
-																llmStore.tier?.id === 'lite'
-																	? 'modes.private.downloadLite'
-																	: 'modes.private.download',
-																{ size: llmStore.downloadLabel }
-															)),
+											llmStore.steppedDownTo
+												? t('llm.steppedDown', {
+														size: llmStore.steppedDownTo.downloadLabel
+													})
+												: (privateR.blockedLine ??
+														(privateR.state === 'ready'
+															? t(
+																	llmStore.tier?.id === 'lite'
+																		? 'modes.private.readyLite'
+																		: 'modes.private.ready'
+																)
+															: privateR.state === 'progress'
+																? llmStore.status === 'loading'
+																	? t('modes.private.loading')
+																	: llmStore.status === 'detecting'
+																		? t('modes.private.checking')
+																		: t('modes.private.preparing', { pct: privateR.pct })
+																: t(
+																		llmStore.tier?.id === 'lite'
+																			? 'modes.private.downloadLite'
+																			: 'modes.private.download',
+																		{ size: llmStore.downloadLabel }
+																	))),
 											privateModelControl
 										)}
 										{#if modelsStore.cached.length > 0}

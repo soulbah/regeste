@@ -67,7 +67,7 @@ export function landingSchema(origin: string, t: Translate) {
 		applicationCategory: 'BusinessApplication',
 		operatingSystem: 'Any',
 		inLanguage: ['en', 'fr'],
-		image: `${origin}/icons/icon-512.png`,
+		image: `${origin}/og.png`,
 		license: LICENSE,
 		sameAs: [GITHUB],
 		author: AUTHOR,

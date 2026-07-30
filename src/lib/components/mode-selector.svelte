@@ -4,6 +4,7 @@
 	// Clicking a mode that needs setup opens the Settings modal on its card;
 	// the pendingActivation watcher selects it once setup completes.
 	import * as Popover from '$lib/components/ui/popover';
+	import { howItWorksHref } from '$lib/marketing-links.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
@@ -237,7 +238,7 @@
 					variant="ghost"
 					size="sm"
 					class="text-muted-foreground hover:text-foreground h-auto w-full justify-start px-2.5 py-1.5 text-xs font-normal"
-					href={resolve('/how-it-works')}
+					href={howItWorksHref()}
 					{...NEW_TAB}
 					onclick={() => (open = false)}
 				>

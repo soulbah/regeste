@@ -3,6 +3,7 @@
 	// + chevrons trigger, dropdown with quick settings (the Claude recipe),
 	// Privacy Report, How it works, Settings (modal) and sign in/out.
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+	import { guidesHref, howItWorksHref } from '$lib/marketing-links.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
 	import CheckIcon from '@lucide/svelte/icons/check';
@@ -122,16 +123,14 @@
 					<ShieldIcon class="text-muted-foreground" />
 					{t('sidebar.privacyReport')}
 				</DropdownMenu.Item>
-				<DropdownMenu.Item onclick={() => openInNewTab(resolve('/how-it-works'))}>
+				<DropdownMenu.Item onclick={() => openInNewTab(howItWorksHref())}>
 					<CircleHelpIcon class="text-muted-foreground" />
 					{t('hiw.title')}
 				</DropdownMenu.Item>
 				<!-- A permanent way in, not only the link a failure hands you: the
 				     research on consent surfaces applies here too — a page you can
 				     only reach by breaking something is one nobody reads first. -->
-				<DropdownMenu.Item
-					onclick={() => openInNewTab(resolve('/(marketing)/help/[[topic]]', { topic: undefined }))}
-				>
+				<DropdownMenu.Item onclick={() => openInNewTab(guidesHref())}>
 					<LifeBuoyIcon class="text-muted-foreground" />
 					{t('help.title')}
 				</DropdownMenu.Item>

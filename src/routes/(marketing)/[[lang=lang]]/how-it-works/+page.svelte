@@ -3,7 +3,7 @@
 	// page. The drawing it drives lives in $lib/components/data-flow.svelte, which
 	// the landing renders too.
 	import WifiOffIcon from '@lucide/svelte/icons/wifi-off';
-	import { page } from '$app/state';
+	import { CANONICAL_ORIGIN } from '$lib/links';
 	import { i18n } from '$lib/i18n/index.svelte';
 	import { howItWorksSchema } from '$lib/structured-data';
 	import PageMeta from '$lib/components/page-meta.svelte';
@@ -34,7 +34,7 @@
 <PageMeta
 	title={t('hiw.title')}
 	description={t('hiw.intro')}
-	jsonLd={howItWorksSchema(page.url.origin, t, i18n.locale)}
+	jsonLd={howItWorksSchema(CANONICAL_ORIGIN, t, i18n.locale)}
 />
 
 <!-- The bar and the footer come from (marketing)/+layout.svelte. This page used

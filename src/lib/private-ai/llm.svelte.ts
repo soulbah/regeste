@@ -9,7 +9,7 @@
 
 import { wrap, proxy, type Remote } from 'comlink';
 import { detectTier } from './capability';
-import { downgrade, TIERS, type Tier } from './tiers';
+import { downgrade, largestFitting, STORAGE_HEADROOM, TIERS, type Tier } from './tiers';
 import type { LlmApi } from './llm-worker';
 import type { WllamaApi } from './wllama-worker';
 import { guardWorker } from '$lib/state/worker-health.svelte';
@@ -39,6 +39,30 @@ function forcedTier(): Tier | null {
 	}
 }
 const METRICS_KEY = 'regeste:private-last-metrics';
+
+/**
+ * How many rungs the app will step down on its own before it stops and asks.
+ *
+ * Two, not unlimited: the first failure is information and acting on it saves
+ * the person a decision they have no way to make better than we can. A device
+ * that has failed three times is telling us the ladder is not the problem, and
+ * carrying on would spend gigabytes of someone's bandwidth proving it.
+ */
+const MAX_AUTO_STEPS = 2;
+
+/** What this origin can still write, or null when the browser will not say. */
+async function freeStorageBytes(): Promise<number | null> {
+	try {
+		const estimate = await navigator.storage?.estimate?.();
+		if (!estimate || typeof estimate.quota !== 'number') return null;
+		return estimate.quota - (estimate.usage ?? 0);
+	} catch {
+		return null;
+	}
+}
+
+/** Why a load attempt ended. Storage and memory need different recoveries. */
+type LoadFailure = 'storage' | 'memory';
 
 export type PrivateStatus =
 	| 'detecting'
@@ -73,17 +97,40 @@ class LlmStore {
 	progress = $state(0);
 	tier = $state<Tier | null>(null);
 	errorMessage = $state<string | null>(null);
-	/** Set when the browser refused to commit to keeping the weights, so the UI can
-	 * warn BEFORE spending gigabytes. Cleared by proceeding or by cancelling. */
+	/** Set when this origin measurably cannot hold the weights, so the UI can say so
+	 * BEFORE spending gigabytes. Cleared by proceeding or by cancelling. */
 	storageRisk = $state(false);
-	/** A smaller rung this device might manage, offered after a load failed. Never
-	 * taken automatically: a download is minutes and gigabytes, so it is a choice. */
+	/** Free bytes measured at the moment the risk was raised, so the warning can
+	 * state the shortfall instead of asserting one. */
+	storageFreeBytes = $state<number | null>(null);
+	/** A smaller rung offered after the app has already stepped down as far as it
+	 * will on its own. Taking it is then a choice, because two attempts have
+	 * already failed and a third is worth agreeing to. */
 	smallerTier = $state<Tier | null>(null);
+	/** Set while a download is running that the app chose after a failure, so the
+	 * screen can say why the size changed under the reader. Cleared once ready. */
+	steppedDownTo = $state<Tier | null>(null);
 	/** True when weights are cached from a previous session (fast load). */
 	prepared = $state(false);
 	lastMetrics = $state<Omit<GenerationResult, 'text'> | null>(null);
 
 	downloadLabel = $derived(this.tier?.downloadLabel ?? '');
+
+	/** Back to before init(), for the landing demo which borrows this store to
+	 * render the real app components and must not leave its fixture behind: the
+	 * chat is the same page, so a pinned 'ready' with no tier followed the reader
+	 * in and left Private mode claiming a model that was never chosen. */
+	reset(): void {
+		this.status = 'detecting';
+		this.progress = 0;
+		this.tier = null;
+		this.errorMessage = null;
+		this.storageRisk = false;
+		this.storageFreeBytes = null;
+		this.smallerTier = null;
+		this.steppedDownTo = null;
+		this.prepared = false;
+	}
 
 	async init(): Promise<void> {
 		if (this.status !== 'detecting') return;
@@ -110,14 +157,14 @@ class LlmStore {
 		if (this.prepared || forced) void this.prepare();
 	}
 
-	/** Take the smaller rung offered after a failure. Separate from prepare() so
-	 * the choice is always the person's, and forced past the storage gate because
-	 * they have already been through it once. */
+	/** Take the rung offered once the app has stopped stepping down on its own.
+	 * Forced past the space check because they have already read what it says. */
 	async acceptSmaller(): Promise<void> {
 		if (!this.smallerTier) return;
 		this.tier = this.smallerTier;
 		this.smallerTier = null;
 		this.errorMessage = null;
+		this.steppedDownTo = null;
 		this.prepared = localStorage.getItem(PREPARED_KEY) === this.tier.model;
 		this.status = 'needs-download';
 		await this.prepare({ force: true });
@@ -125,7 +172,7 @@ class LlmStore {
 
 	/** Explicit user consent → download (or fast cache load) then ready.
 	 *
-	 * `force` skips the storage warning, for someone who has read it and wants the
+	 * `force` skips the space warning, for someone who has read it and wants the
 	 * download anyway. */
 	async prepare(options: { force?: boolean } = {}): Promise<void> {
 		if (
@@ -135,33 +182,80 @@ class LlmStore {
 			this.status === 'ready'
 		)
 			return;
+
+		// Ask for persistent storage, and carry on whatever the answer is.
+		//
+		// It used to be a gate, and it was the wrong one. Chromium "automatically
+		// approve[s] or den[ies] the request based on the user's history of
+		// interaction with the site" (MDN, Storage quotas and eviction criteria) —
+		// it is a statement about how often someone has visited, never about how
+		// much room they have. So a first-time visitor in an ordinary window was
+		// told their download "would very likely fail partway", and it then
+		// succeeded. A warning that fires for everyone and is wrong for almost all
+		// of them is worse than no warning.
+		//
+		// The ask stays, because a yes is worth having: it moves the weights and the
+		// user's library out of the evictable bucket.
+		if (!this.prepared) await navigator.storage?.persist?.().catch(() => false);
+
+		// The real question is whether the bytes fit, and that one has a measurement.
+		// Not a perfect one — a private window reports an ordinary-looking quota on
+		// purpose, so this cannot catch that case — but when it does fire it is a
+		// fact with numbers, and the step-down below covers what it misses.
+		if (!this.prepared && !options.force) {
+			const free = await freeStorageBytes();
+			if (free !== null && free < this.tier.downloadBytes * STORAGE_HEADROOM) {
+				this.storageRisk = true;
+				this.storageFreeBytes = free;
+				this.status = 'needs-download';
+				return;
+			}
+		}
+		this.storageRisk = false;
+		this.steppedDownTo = null;
+
+		// Step down and retry rather than stop and ask.
+		//
+		// The person asked for a model that answers on this device; a rung that
+		// turned out not to fit is not a new decision for them to make, it is this
+		// one still in progress. So the app takes the step it would have recommended
+		// anyway and says what it did, which is the difference between recovering
+		// and interrogating. It stops after MAX_AUTO_STEPS, where a step really has
+		// become a question.
+		//
+		// A loop, not recursion: the old code called prepare() again from its own
+		// catch, and prepare() returns immediately while the status is 'downloading'.
+		// So the retry never ran, the error branch after it never ran either, and the
+		// bar froze at the percentage it died on with no message at all — on exactly
+		// the marginal devices the downgrade existed for.
+		for (let step = 0; ; step++) {
+			const failure = await this.attempt();
+			if (!failure) {
+				this.steppedDownTo = null;
+				return;
+			}
+			// Annotated, or TypeScript reads `this.tier = next` as making the field's
+			// own type depend on itself and gives up on both.
+			const current: Tier | null = this.tier;
+			const next: Tier | null = current ? await this.rungAfter(current, failure) : null;
+			if (next && step < MAX_AUTO_STEPS) {
+				this.tier = next;
+				this.steppedDownTo = next;
+				this.prepared = localStorage.getItem(PREPARED_KEY) === next.model;
+				continue;
+			}
+			await this.reportFailure(failure, next);
+			return;
+		}
+	}
+
+	/** One load, start to finish. Resolves to null on success, or to why it ended. */
+	private async attempt(): Promise<LoadFailure | null> {
+		if (!this.tier) return 'memory';
 		this.status = this.prepared ? 'loading' : 'downloading';
 		this.progress = 0;
+		this.errorMessage = null;
 		try {
-			// Ask for persistent storage BEFORE the download, and stop if it is
-			// refused.
-			//
-			// Refusal is the only trustworthy signal left. Reading the quota used to
-			// betray a private window (Chrome capped the reported figure at ~120 MB),
-			// but Chrome now ships "predictable reported storage quota" — an
-			// artificial figure in every mode, precisely so quota cannot be used as a
-			// private-browsing side channel. That is why this app's own preflight
-			// admitted a 5 GB model into a window that could hold 1.1 GB, and why the
-			// download died at 23%, downgraded, and died again at 46%.
-			//
-			// persist() is not a side channel: it is the browser answering whether it
-			// will commit to keeping the data. A private window always says no. A
-			// normal window that says no is also worth stopping for, because the same
-			// eviction is coming. Either way the person decides, having been told.
-			if (!this.prepared && !options.force) {
-				const persisted = await navigator.storage?.persist?.().catch(() => false);
-				if (!persisted) {
-					this.storageRisk = true;
-					this.status = 'needs-download';
-					return;
-				}
-			}
-			this.storageRisk = false;
 			await (
 				await getWorker(this.tier.engine)
 			).load(
@@ -175,11 +269,12 @@ class LlmStore {
 			localStorage.setItem(PREPARED_KEY, this.tier.model);
 			this.prepared = true;
 			this.status = 'ready';
+			return null;
 		} catch (err) {
 			console.error('[regeste] private engine load failed:', err);
 			const message = err instanceof Error ? err.message : String(err);
 			// Storage or memory, and the distinction decides both the message and
-			// whether retrying smaller is worth the bandwidth.
+			// which rung to try next.
 			//
 			// "Failed to execute 'add' on 'Cache': Unexpected internal error" is how
 			// Chrome reports a cache write it could not complete, and it carries
@@ -187,40 +282,49 @@ class LlmStore {
 			// words told a visitor whose browser had refused to store the weights
 			// that their device had run out of memory, and sent them closing tabs
 			// for a problem no tab was causing.
-			const storageFailure = /quota|storage|exceeded/i.test(message) || /on 'Cache'/.test(message);
-
-			// This block used to recurse into prepare() to try a smaller rung, and it
-			// could not work: prepare() had already set status to 'downloading' at the
-			// top, and its own guard returns immediately on that status. So the retry
-			// never ran, `status = 'error'` below was never reached, and the progress
-			// bar froze at the percentage it died on — permanently, with no message,
-			// while the mode picker kept reporting "preparing · 46%" and Send stayed
-			// blocked. Every device marginal enough to need the downgrade got that.
-			//
-			// It is also not a decision to take silently. A rung down is a different,
-			// weaker model and another download of gigabytes; offering it beats
-			// spending someone's bandwidth on a guess.
-			if (!storageFailure) {
-				this.smallerTier = this.tier ? downgrade(this.tier) : null;
-				if (this.smallerTier) {
-					this.status = 'error';
-					this.errorMessage = t('llm.error.tooLarge', { size: this.smallerTier.downloadLabel });
-					return;
-				}
-			}
-			this.status = 'error';
-			// A window that refuses to persist and then refuses to store is almost
-			// always a private one, which is the single most common way to meet this
-			// error. Naming it beats a generic "free up disk space" that will not
-			// help, and it is a check rather than a guess about the browser.
-			const ephemeral =
-				storageFailure && !(await navigator.storage?.persisted?.().catch(() => false));
-			this.errorMessage = storageFailure
-				? ephemeral
-					? t('llm.error.ephemeral')
-					: t('llm.error.storage')
-				: t('llm.error.memory');
+			return /quota|storage|exceeded/i.test(message) || /on 'Cache'/.test(message)
+				? 'storage'
+				: 'memory';
 		}
+	}
+
+	/** The rung to try next, or null when there is nothing worth trying. */
+	private async rungAfter(tier: Tier, failure: LoadFailure): Promise<Tier | null> {
+		if (failure === 'memory') return downgrade(tier);
+		// Space, so the ladder is not the measure — the space is. Ask again after the
+		// failure, because a partial download leaves bytes behind and the number that
+		// matters is the one now.
+		const free = await freeStorageBytes();
+		return free === null ? downgrade(tier) : largestFitting(tier, free);
+	}
+
+	/** `offer` is the rung that exists but that the app stopped short of taking,
+	 * which is precisely when handing the choice over is worth doing: null means
+	 * there was nothing left to try, and inviting a third download would be a lie. */
+	private async reportFailure(failure: LoadFailure, offer: Tier | null): Promise<void> {
+		this.status = 'error';
+		this.steppedDownTo = null;
+		this.smallerTier = offer;
+		if (offer) {
+			// Which of the two happened decides the sentence: "could not load that
+			// much" sends someone to close tabs, "no room left" sends them to their
+			// disk, and each is useless advice for the other problem.
+			this.errorMessage = t(failure === 'storage' ? 'llm.error.noRoom' : 'llm.error.tooLarge', {
+				size: offer.downloadLabel
+			});
+			return;
+		}
+		// A window that will not store the weights and has not been granted
+		// persistence is almost always a private one, which is the single most
+		// common way to meet this error and the one case the space check above
+		// cannot see. Naming it beats a generic "free up disk space" that will not
+		// help, and it is a check rather than a guess about the browser.
+		if (failure === 'storage') {
+			const persisted = await navigator.storage?.persisted?.().catch(() => false);
+			this.errorMessage = persisted ? t('llm.error.storage') : t('llm.error.ephemeral');
+			return;
+		}
+		this.errorMessage = t('llm.error.memory');
 	}
 
 	async generate(

@@ -3,6 +3,7 @@
 // Spec 015 adds the workspace export (R1) and the Assisted quota gauge (R5).
 
 import { zipSync, strToU8 } from 'fflate';
+import { resolve } from '$app/paths';
 import { getLocalDb } from '$lib/local-db/client';
 import { readOriginal } from '$lib/opfs';
 import { guardedFetch } from '$lib/net';
@@ -232,7 +233,15 @@ class SettingsStore {
 		}
 		localStorage.clear();
 		sessionStorage.clear();
-		location.href = '/';
+		// Back into the app, not out to the marketing page. Someone who has just
+		// erased their workspace is still using the thing; landing them on the sales
+		// pitch reads as being shown the door, and the first screen they want is the
+		// one that sets the app up again. A blank profile opens on exactly that.
+		//
+		// location, not goto: every store in memory still holds the state of a
+		// workspace that no longer exists, and a full document load is the only way
+		// to be sure none of it survives.
+		location.href = resolve('/chat');
 	}
 }
 

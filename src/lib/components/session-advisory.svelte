@@ -12,10 +12,10 @@
 	// project's colour rule allows it — amber for a real degradation, the accent for
 	// something merely worth knowing, and nothing decorative on either.
 	import ArrowDownToLineIcon from '@lucide/svelte/icons/arrow-down-to-line';
+	import { guidesHref } from '$lib/marketing-links.svelte';
 	import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
 	import GaugeIcon from '@lucide/svelte/icons/gauge';
 	import XIcon from '@lucide/svelte/icons/x';
-	import { resolve } from '$app/paths';
 	import { Button } from '$lib/components/ui/button';
 	import { t } from '$lib/i18n/index.svelte';
 	import { advisories } from '$lib/state/advisories.svelte';
@@ -70,7 +70,7 @@
 						variant="ghost"
 						size="sm"
 						class="text-muted-foreground h-6 px-1.5 text-xs"
-						href={resolve('/(marketing)/help/[[topic]]', { topic: current.topic })}
+						href={guidesHref(current.topic)}
 						{...NEW_TAB}
 					>
 						{t('app.whatToDo')}

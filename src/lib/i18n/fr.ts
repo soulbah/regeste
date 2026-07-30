@@ -109,17 +109,15 @@ export const fr: Record<keyof typeof en, string> = {
 	'modes.private.loading': 'Chargement du modèle local…',
 	'modes.private.ready': 'Prêt · fonctionne hors ligne',
 	'modes.error': 'Un problème est survenu',
-	'storageRisk.title': 'Cette fenêtre ne gardera pas le téléchargement',
-	'storageRisk.body':
-		'Le modèle est un fichier de {size}, et ce navigateur a refusé de s’engager à le conserver. Lancer maintenant échouerait très probablement en route.',
-	'storageRisk.reason1':
-		'Une fenêtre privée. Elle ne peut pas garder de gros fichiers, quoi qu’elle annonce, et tout disparaît à sa fermeture.',
-	'storageRisk.reason2': 'Ou le disque est presque plein, et le navigateur protège ce qui reste.',
-	'storageRisk.alternative':
-		'Ouvrir l’application dans une fenêtre normale règle le problème. Cloud et Votre serveur répondent sans aucun téléchargement.',
+	'storageRisk.title': 'Pas assez de place pour ce téléchargement',
+	'storageRisk.body': 'Le modèle demande {size}, et ce navigateur dispose de {free} pour ce site.',
+	'storageRisk.reason':
+		'Soit le disque est presque plein, soit un autre site occupe la place. En libérer fait remonter le chiffre aussitôt.',
+	'storageRisk.alternative': 'Cloud et Votre serveur répondent sans aucun téléchargement.',
 	'storageRisk.anyway': 'Télécharger quand même',
 	'llm.error.tooLarge':
 		'Cet appareil n’a pas pu charger un téléchargement de cette taille. Un plus petit, de {size}, est disponible.',
+	'llm.error.noRoom': 'Il n’y avait pas de place pour ce modèle. Un plus petit, de {size}, tient.',
 	'llm.error.tooLarge.cta': 'Télécharger le plus petit',
 	'llm.error.ephemeral':
 		'Une fenêtre privée ne peut pas stocker le modèle. Ouvrez l’application dans une fenêtre normale, ou choisissez Cloud ou Votre serveur.',
@@ -138,6 +136,8 @@ export const fr: Record<keyof typeof en, string> = {
 	'onboard.cost.signIn': 'Connexion · rien à installer',
 	'onboard.cost.endpoint': 'Votre propre serveur · rien à installer',
 	'onboard.downloading': 'Téléchargement en cours. Ajoutez un document en attendant.',
+	'llm.steppedDown':
+		'Ce modèle ne tenait pas sur cet appareil. Un plus petit se télécharge, {size}.',
 	'onboard.unfinished': 'Terminez la configuration pour obtenir des réponses.',
 	'onboard.resume': 'Terminer',
 	'onboard.needDownload': 'Téléchargez le modèle pour obtenir des réponses sur cet appareil.',
@@ -712,7 +712,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'landing.hero.title': 'Vos documents ont la réponse.',
 	'landing.hero.sub':
 		'Posez une question et obtenez une réponse rédigée, qui cite les passages exacts sur lesquels elle s’appuie. Tout se passe dans votre navigateur, et avec le modèle local vos fichiers ne quittent jamais votre appareil.',
-	'landing.hero.facts': 'Gratuit et open source. Sans compte pour commencer.',
+	'landing.hero.facts': 'Gratuit · Sans compte pour commencer · open source',
 	'landing.modes.title': 'Choisissez où la réponse s’écrit.',
 	'landing.modes.sub':
 		'Vos documents sont lus dans ce navigateur, et la recherche aussi. Les trois modes ne changent qu’une chose : qui rédige la réponse.',
@@ -788,7 +788,8 @@ export const fr: Record<keyof typeof en, string> = {
 	'policy.contact.title': 'Questions',
 	'policy.contact.body': 'Écrivez-nous, nous répondrons.',
 	'policy.source': 'Le code derrière chaque affirmation de cette page est public.',
-	'landing.footer.copyright': '© 2026 · AGPL-3.0',
+	'landing.footer.copyright': '© 2026',
+	'landing.footer.license': 'AGPL-3.0',
 
 	// How it works
 	'hiw.title': 'Comment circulent vos données',

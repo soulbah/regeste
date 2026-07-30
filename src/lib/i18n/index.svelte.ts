@@ -11,6 +11,15 @@ export type MessageKey = keyof typeof en;
 
 const dictionaries: Record<Locale, Record<MessageKey, string>> = { en, fr };
 
+/** The language this machine reads.
+ *
+ * Exported because the marketing pages have no switch to offer and no database
+ * to consult: they answer the same question the app answers on first run, and
+ * one rule beats two that agree until one is edited. Browser-only. */
+export function browserLocale(): Locale {
+	return navigator.language?.toLowerCase().startsWith('fr') ? 'fr' : 'en';
+}
+
 class I18nStore {
 	locale = $state<Locale>('en');
 	private loaded = false;
@@ -21,9 +30,9 @@ class I18nStore {
 		try {
 			const { db } = await getLocalDb();
 			const saved = await db.getSetting('locale');
-			this.locale = saved === 'fr' || saved === 'en' ? saved : this.autoLocale();
+			this.locale = saved === 'fr' || saved === 'en' ? saved : browserLocale();
 		} catch {
-			this.locale = this.autoLocale();
+			this.locale = browserLocale();
 		}
 	}
 
@@ -31,11 +40,7 @@ class I18nStore {
 	 * the local database, whose lock belongs to the app. */
 	initWithoutDb(): void {
 		if (this.loaded) return;
-		this.locale = this.autoLocale();
-	}
-
-	private autoLocale(): Locale {
-		return navigator.language?.toLowerCase().startsWith('fr') ? 'fr' : 'en';
+		this.locale = browserLocale();
 	}
 
 	async setLocale(locale: Locale): Promise<void> {

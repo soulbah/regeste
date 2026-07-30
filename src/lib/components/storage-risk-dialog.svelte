@@ -1,16 +1,19 @@
 <script lang="ts">
 	// Before the gigabytes, not after them.
 	//
-	// The download used to start regardless and fail partway: 23% of one model,
-	// then 46% of a smaller one after an automatic retry, every byte crossing the
-	// deployment's own proxy. The person was left with a console error and no idea
-	// that the window they chose was the reason.
+	// It used to open whenever navigator.storage.persist() said no, and that fired
+	// for nearly everyone: Chromium decides persistence from how often you have
+	// visited a site, not from how much room you have. So an ordinary first visit
+	// was told the download "would very likely fail partway" and it then succeeded.
+	// The gate is now the one measurement that speaks to the question — free bytes
+	// against the size of the file — so when this opens it is arithmetic rather
+	// than a prediction, and it can print both numbers.
 	//
-	// It is a dialog rather than an inline line because it has to be read before an
-	// action worth minutes and gigabytes, and dismissible because the decision is
-	// theirs: someone who understands the trade can still proceed.
+	// It stays a dialog because it has to be read before an action worth minutes
+	// and gigabytes, and it stays dismissible because the numbers can be wrong in
+	// the reader's favour and the decision is theirs.
 	import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
-	import { resolve } from '$app/paths';
+	import { guidesHref } from '$lib/marketing-links.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Button } from '$lib/components/ui/button';
 	import { t } from '$lib/i18n/index.svelte';
@@ -19,6 +22,14 @@
 
 	const open = $derived(llmStore.storageRisk);
 	const size = $derived(llmStore.tier?.downloadLabel ?? '');
+	const free = $derived.by(() => {
+		const bytes = llmStore.storageFreeBytes;
+		if (bytes === null) return '';
+		const gb = bytes / 1_000_000_000;
+		// Under a gigabyte the number in GB rounds to something that reads as zero,
+		// and "0.3 GB" is harder to place than "280 MB".
+		return gb >= 1 ? `${gb.toFixed(1)} GB` : `${Math.round(bytes / 1_000_000)} MB`;
+	});
 </script>
 
 <Dialog.Root
@@ -27,25 +38,16 @@
 		if (!next) llmStore.storageRisk = false;
 	}}
 >
-	<Dialog.Content class="sm:max-w-md">
+	<Dialog.Content>
 		<Dialog.Header>
 			<Dialog.Title class="flex items-center gap-2.5">
 				<HardDriveIcon class="text-muted-foreground size-4" />
 				{t('storageRisk.title')}
 			</Dialog.Title>
-			<Dialog.Description>{t('storageRisk.body', { size })}</Dialog.Description>
+			<Dialog.Description>{t('storageRisk.body', { size, free })}</Dialog.Description>
 		</Dialog.Header>
 
-		<ul class="space-y-2.5 text-sm leading-relaxed">
-			<li class="flex gap-2.5">
-				<span class="text-muted-foreground mt-px font-mono text-[11px]">01</span>
-				<span class="flex-1">{t('storageRisk.reason1')}</span>
-			</li>
-			<li class="flex gap-2.5">
-				<span class="text-muted-foreground mt-px font-mono text-[11px]">02</span>
-				<span class="flex-1">{t('storageRisk.reason2')}</span>
-			</li>
-		</ul>
+		<p class="text-sm leading-relaxed">{t('storageRisk.reason')}</p>
 
 		<p class="text-muted-foreground text-sm leading-relaxed">{t('storageRisk.alternative')}</p>
 
@@ -54,7 +56,7 @@
 				variant="ghost"
 				size="sm"
 				class="text-muted-foreground"
-				href={resolve('/(marketing)/help/[[topic]]', { topic: 'model-storage' })}
+				href={guidesHref('model-storage')}
 				{...NEW_TAB}
 			>
 				{t('app.whatToDo')}

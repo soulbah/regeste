@@ -32,9 +32,10 @@ describe('service worker scope', () => {
 });
 
 describe('isMarketingPage', () => {
-	it('covers every page under (marketing)', () => {
+	it('covers every page under (marketing), in both languages', () => {
 		for (const path of ['/', '/how-it-works', '/privacy', '/help', '/help/two-tabs']) {
 			expect(isMarketingPage(path)).toBe(true);
+			expect(isMarketingPage(path === '/' ? '/fr' : `/fr${path}`)).toBe(true);
 		}
 	});
 

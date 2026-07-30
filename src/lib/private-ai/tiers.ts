@@ -185,11 +185,16 @@ export function grantedBufferMB(signals: DeviceSignals): number {
 	return granted / (1024 * 1024);
 }
 
+/** A little headroom so the weights do not crowd out the user's own library. */
+export const STORAGE_HEADROOM = 1.15;
+
+export function fitsIn(tier: Tier, freeBytes: number): boolean {
+	return tier.downloadBytes * STORAGE_HEADROOM <= freeBytes;
+}
+
 function fitsStorage(tier: Tier, signals: DeviceSignals): boolean {
 	if (signals.storageQuotaBytes === null) return true; // unknown is not "no"
-	const free = signals.storageQuotaBytes - (signals.storageUsageBytes ?? 0);
-	// A little headroom so the weights do not evict the user's own library.
-	return tier.downloadBytes * 1.15 <= free;
+	return fitsIn(tier, signals.storageQuotaBytes - (signals.storageUsageBytes ?? 0));
 }
 
 /** Every tier this machine could attempt, best first. The UI offers these, and
@@ -262,4 +267,17 @@ export function downgrade(tier: Tier): Tier | null {
 	return (
 		rest.find((candidate) => candidate.vramMB <= tier.vramMB * RECOVERY_RATIO) ?? rest[0] ?? null
 	);
+}
+
+/**
+ * Where to retry after the *storage* ran out, which is a different question from
+ * a failed load: the device could run the model, it just could not keep it. So
+ * the rung is chosen by measured free space rather than by the recovery ratio,
+ * and it is the largest one that fits — stepping further down would cost quality
+ * for no reason.
+ */
+export function largestFitting(tier: Tier, freeBytes: number): Tier | null {
+	const index = TIERS.findIndex((candidate) => candidate.id === tier.id);
+	if (index < 0) return null;
+	return TIERS.slice(index + 1).find((candidate) => fitsIn(candidate, freeBytes)) ?? null;
 }

@@ -3,6 +3,7 @@ import { building } from '$app/environment';
 import { svelteKitHandler } from 'better-auth/svelte-kit';
 import { createAuth } from '$lib/server/auth';
 import { pickLocale } from '$lib/server/otp-email';
+import { CANONICAL_ORIGIN } from '$lib/links';
 
 /** One host, so there is one cookie jar.
  *
@@ -14,10 +15,19 @@ import { pickLocale } from '$lib/server/otp-email';
  *
  * 301 rather than 302: this is permanent, and it keeps search engines from
  * indexing both. */
-const CANONICAL_HOST = 'regeste.com';
+const CANONICAL_HOST = new URL(CANONICAL_ORIGIN).hostname;
 
-/** Local development is the one place cleartext is the real address. */
+/** Local development is the one place cleartext is the real address.
+ *
+ * The host list is not enough on its own. `wrangler dev` serves the built worker over
+ * http and rewrites the Location of a redirect back to http so local flows stay
+ * local, so upgrading the scheme there points at the address we are already on: every
+ * worker-served route looped, and `bun run preview` was unusable for anything but the
+ * prerendered pages. An explicit port is the honest signal, since the deployed origin
+ * never carries one. */
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
+
+const isLocal = (url: URL) => LOCAL_HOSTS.has(url.hostname) || url.port !== '';
 
 /** One canonical origin: https, no www.
  *
@@ -31,7 +41,7 @@ const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
  * Both corrections happen in one 301 so http://www never walks a redirect chain,
  * and both happen before auth so no session is ever minted on a wrong origin. */
 export function canonicalRedirect(url: URL, forwardedProto: string | null): Response | null {
-	if (LOCAL_HOSTS.has(url.hostname)) return null;
+	if (isLocal(url)) return null;
 	// Either signal saying http is enough, and neither is authoritative alone.
 	// Cloudflare keeps the visitor's scheme on the request url but sends
 	// `x-forwarded-proto: https`, describing its own leg to the Worker rather than
@@ -53,15 +63,40 @@ export function canonicalRedirect(url: URL, forwardedProto: string | null): Resp
 	return new Response(null, { status: 301, headers: { location: target.href } });
 }
 
+/** The document language, which app.html templates as English for every page.
+ *
+ * A French page announcing lang="en" is read aloud with English phonetics by a
+ * screen reader and counted as English by a crawler. Svelte 5.56 has no
+ * <svelte:html>, and this is the only place that sees the finished document.
+ *
+ * Rewriting only French leaves a missed case as English, which is where it already
+ * was, rather than shipping a literal placeholder. */
+function localizeHtmlLang(pathname: string) {
+	if (pathname !== '/fr' && !pathname.startsWith('/fr/')) return undefined;
+	return ({ html }: { html: string }) => html.replace('<html lang="en"', '<html lang="fr"');
+}
+
 export const handle: Handle = async ({ event, resolve }) => {
+	// The marketing pages are prerendered, so this branch is the only one that ever
+	// renders them: the language has to be corrected here or nowhere.
 	if (building) {
-		return resolve(event);
+		const transformPageChunk = localizeHtmlLang(event.url.pathname);
+		return resolve(event, transformPageChunk ? { transformPageChunk } : undefined);
 	}
 	const redirect = canonicalRedirect(
 		event.url,
 		event.request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim() ?? null
 	);
 	if (redirect) return redirect;
+	// A prerendered page is a file. In production the asset store answers for it and
+	// this Worker never sees the request, so nothing below has ever applied to the
+	// marketing site. `vite dev` does route those requests through here, and the
+	// binding lookup on the next line is what the adapter refuses inside a
+	// prerenderable route — rightly, since a page rendered once at build time cannot
+	// depend on anything per-request. The result was a 500 on every marketing URL
+	// locally while production served them fine. Leaving early makes dev tell the
+	// truth about what runs.
+	if (event.route.id?.startsWith('/(marketing)')) return resolve(event);
 	// The locale rides along so a sign-in code reaches someone in the language
 	// they are reading the app in.
 	const auth = createAuth(
@@ -91,7 +126,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	// A year is the usual figure. No `preload`: that is a submission to a list
 	// browsers ship in their binaries, and it is not ours to make on the owner's
 	// behalf.
-	if (!LOCAL_HOSTS.has(event.url.hostname)) {
+	if (!isLocal(event.url)) {
 		response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
 	}
 	return response;

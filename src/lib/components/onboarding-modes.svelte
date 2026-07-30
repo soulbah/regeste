@@ -59,7 +59,11 @@
 	/** What this mode asks of the user before it can answer. */
 	function cost(id: ChatMode): string {
 		if (id === 'private') {
-			if (llmStore.status === 'detecting') return t('modes.private.checking');
+			// No tier means the device has not been measured yet, whatever the status
+			// claims. Checked rather than assumed, because the assumption printed
+			// "One-time download ·" with nothing after it, on the one screen someone
+			// has to make a decision from.
+			if (llmStore.status === 'detecting' || !llmStore.tier) return t('modes.private.checking');
 			if (llmStore.status === 'unavailable') return t('modes.private.unavailable');
 			return t('onboard.cost.download', { size: llmStore.downloadLabel });
 		}

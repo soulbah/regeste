@@ -3,6 +3,7 @@ import {
 	downgrade,
 	eligibleTiers,
 	grantedBufferMB,
+	largestFitting,
 	pickTier,
 	TIERS,
 	type DeviceSignals
@@ -133,5 +134,20 @@ describe('the ladder', () => {
 		expect(walked.length).toBeLessThan(TIERS.length);
 		expect(walked[walked.length - 1]).toBe('lite');
 		expect(downgrade(TIERS[TIERS.length - 1])).toBeNull();
+	});
+});
+
+describe('largestFitting', () => {
+	it('recovers from a full disk with the biggest rung that fits, not the next one down', () => {
+		// Running out of room says nothing about what the GPU can hold, so the
+		// recovery ratio is the wrong measure here: 1.4 GB free means the 1.1 GB
+		// rung, and stepping to 0.5 GB instead would cost quality for nothing.
+		const chosen = largestFitting(TIERS[0], 1.4 * 1_000_000_000);
+		expect(chosen?.id).toBe('mid');
+	});
+
+	it('offers nothing when not even the smallest rung fits', () => {
+		// The alternative is inviting a third download that cannot succeed.
+		expect(largestFitting(TIERS[0], 50_000_000)).toBeNull();
 	});
 });

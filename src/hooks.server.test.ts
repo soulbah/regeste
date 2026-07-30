@@ -56,4 +56,13 @@ describe('canonicalRedirect', () => {
 		expect(at('http://localhost:5173/chat')).toBeNull();
 		expect(at('http://127.0.0.1:8787/')).toBeNull();
 	});
+
+	it('leaves any origin carrying an explicit port alone', () => {
+		// wrangler dev serves the built worker over http on a chosen port and rewrites
+		// the Location of a redirect back to http, so upgrading the scheme there points
+		// at the address we are already on and loops: every worker-served route 301'd to
+		// itself and local preview was unusable. The deployed origin has no port.
+		expect(at('http://regeste.com:8789/chat', 'https')).toBeNull();
+		expect(at('http://www.regeste.com:8789/', 'https')).toBeNull();
+	});
 });

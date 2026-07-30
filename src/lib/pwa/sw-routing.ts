@@ -36,10 +36,14 @@ export function isMarketingAsset(pathname: string): boolean {
  * reads the session, so it boots like an app route.
  */
 export function isMarketingPage(pathname: string): boolean {
+	// The French pages carry a /fr segment and are the same pages. Missing them here
+	// cost more than a cache decision: the root layout uses this predicate too, so a
+	// French URL took the app branch, which detects the language from the browser and
+	// the database and overwrote the one the path had just established. The server
+	// sent French, the page turned English the moment it hydrated, and the whole point
+	// of putting the language in the URL was lost for anyone but a crawler.
+	const path = pathname === '/fr' ? '/' : pathname.replace(/^\/fr(?=\/)/, '');
 	return (
-		pathname === '/' ||
-		pathname === '/how-it-works' ||
-		pathname === '/privacy' ||
-		pathname.startsWith('/help')
+		path === '/' || path === '/how-it-works' || path === '/privacy' || path.startsWith('/help')
 	);
 }

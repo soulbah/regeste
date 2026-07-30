@@ -14,7 +14,7 @@
 	// landing must never open the local database (single-owner OPFS lock), and
 	// none of these components touch it outside event handlers, which cannot
 	// fire here: the whole thing is inert.
-	import { onMount } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import MonitorIcon from '@lucide/svelte/icons/monitor';
 	import ChatHeader from '$lib/components/chat-header.svelte';
 	import PrivateTurn from '$lib/components/private-turn.svelte';
@@ -132,6 +132,29 @@
 		if (seeded === key) return;
 		seeded = key;
 		seed();
+	});
+
+	// Hand the stores back on the way out.
+	//
+	// These are module singletons and the chat is the same page: following "Open
+	// the chat" is a client-side navigation, so whatever the demo pinned walks in
+	// with the reader. `llmStore.status = 'ready'` did exactly that, and with no
+	// tier behind it — init() returns early on any status but 'detecting', so the
+	// device was never measured. The onboarding card offered "One-time download ·"
+	// with the size missing, which is what the reader reported, and it was the
+	// visible half: Private mode was pinned ready with no model to run, and only a
+	// full page reload cleared it.
+	//
+	// The chat re-reads the session, the settings and its own chat, so the demo's
+	// values for those are overwritten either way; they are undone here regardless,
+	// because "something else happens to fix it" is not a property worth relying on.
+	onDestroy(() => {
+		llmStore.reset();
+		sessionStore.user = null;
+		settingsStore.modeChosen = false;
+		chatsStore.activeChat = null;
+		chatsStore.chatDocuments = [];
+		chatsStore.chatDocumentsLoaded = false;
 	});
 
 	onMount(() => {

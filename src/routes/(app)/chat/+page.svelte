@@ -66,6 +66,10 @@
 		if (!pendingMode) return '';
 		const readiness = modeReadiness(pendingMode);
 		if (preparingLoad) return t('modes.private.loading');
+		// The size on the card and the size now arriving are different numbers, and
+		// nobody would guess why. Said once, on the line that is already there.
+		if (llmStore.steppedDownTo)
+			return t('llm.steppedDown', { size: llmStore.steppedDownTo.downloadLabel });
 		if (home.downloadPct !== null) return t('onboard.downloading');
 		return readiness.blockedLine ?? t(NEEDS[pendingMode]);
 	});

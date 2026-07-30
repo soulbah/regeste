@@ -9,7 +9,7 @@
 	//
 	// ?scene=hero|cite|review|wais|privacy  ?lang=fr|en  ?theme=light|dark
 	import { page } from '$app/state';
-	import { onMount } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import PanelShell from '$lib/components/panel-shell.svelte';
 	import PrivateTurn from '$lib/components/private-turn.svelte';
 	import PresendPanel from '$lib/components/presend-panel.svelte';
@@ -72,6 +72,16 @@
 			again.forEach(clearTimeout);
 			filmTimers.forEach(clearTimeout);
 		};
+	});
+
+	// The stage pins the same module singletons the app runs on, so leaving it for
+	// /chat carried a Private mode pinned ready with no model behind it. Same
+	// teardown as the landing demo, same reason.
+	onDestroy(() => {
+		llmStore.reset();
+		sessionStore.user = null;
+		settingsStore.modeChosen = false;
+		chatsStore.activeChat = null;
 	});
 
 	function seed(fixNow: (typeof LANDING_FIXTURE)['fr']) {

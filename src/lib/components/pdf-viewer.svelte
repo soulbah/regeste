@@ -59,7 +59,11 @@
 			// useSystemFonts: PDFs relying on the 14 standard fonts (no embed)
 			// otherwise need standardFontDataUrl assets; without it the first
 			// render can stall on a font fetch that never resolves.
-			loadingTask = pdfjs.getDocument({ data, useSystemFonts: true });
+			loadingTask = pdfjs.getDocument({
+				data,
+				useSystemFonts: true,
+				verbosity: pdfjs.VerbosityLevel.ERRORS
+			});
 			pdf = await loadingTask.promise;
 			if (cancelled) return;
 			numPages = pdf.numPages;

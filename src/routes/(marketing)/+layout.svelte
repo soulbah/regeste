@@ -14,23 +14,64 @@
 	// ending on ink and switching back to paper for six links puts a seam two
 	// centimetres from the bottom.
 	import { resolve } from '$app/paths';
+	import {
+		guidesHref,
+		howItWorksHref,
+		landingHref,
+		privacyHref
+	} from '$lib/marketing-links.svelte';
 	import { page } from '$app/state';
 	import { mode } from 'mode-watcher';
 	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
 	import { Button } from '$lib/components/ui/button';
 	import BrandMark from '$lib/components/brand-mark.svelte';
 	import GithubIcon from '$lib/components/github-icon.svelte';
-	import { t, i18n } from '$lib/i18n/index.svelte';
+	import { t, i18n, browserLocale } from '$lib/i18n/index.svelte';
 	import { reveal } from '$lib/landing-motion';
-	import { GITHUB } from '$lib/links';
+	import { GITHUB, LICENSE_DOC } from '$lib/links';
+	import { NEW_TAB } from '$lib/external-page';
 
-	let { children } = $props();
+	let { children, data } = $props();
 
-	// ?lang=fr|en overrides the detected language: a shareable localized URL, and
-	// the only language control these pages need.
+	// Synchronously, in the script body, not in an $effect: an effect never runs on
+	// the server, which is exactly how every page came to be rendered in English
+	// whatever its URL said. The body runs at the top of the render and Svelte's SSR
+	// render has no await inside it, so a request cannot be interleaved with another
+	// of a different language even though the dictionary is one module instance.
+	i18n.locale = data.locale;
 	$effect(() => {
-		const lang = page.url.searchParams.get('lang');
-		if ((lang === 'fr' || lang === 'en') && i18n.locale !== lang) i18n.locale = lang;
+		i18n.locale = data.locale;
+	});
+
+	// This page at its French address. Every branch goes through resolve(), so the
+	// router owns the URL shape: hand-building "/fr" + pathname is how a link survives
+	// a route rename and starts 404ing in silence.
+	const frHref = $derived.by(() => {
+		const id = page.route.id;
+		if (id?.endsWith('/how-it-works')) return howItWorksHref('fr');
+		if (id?.endsWith('/privacy')) return privacyHref('fr');
+		if (id?.includes('/help/')) return guidesHref(page.params.topic, 'fr');
+		return landingHref('fr');
+	});
+
+	// No language switch in the bar. The machine already knows which language its
+	// owner reads, and a page nobody has read yet is the worst moment to ask: the
+	// switch sat next to the one button that matters, and it was the only control
+	// there that made the reader do the app's arithmetic for it.
+	//
+	// So a French browser on an English address is carried across once, replacing
+	// the entry so Back does not bounce. Never the reverse: /fr is an address
+	// somebody chose and shared, and an English machine opening it is reading
+	// French on purpose. ?lang=fr was the old switch and those links are already
+	// out there, so they land here too.
+	//
+	// It happens in the browser because it can happen nowhere else: these pages are
+	// prerendered, served straight off the asset store, and no server sees the
+	// request to read its Accept-Language.
+	$effect(() => {
+		if (data.locale === 'fr') return;
+		if (page.url.searchParams.get('lang') !== 'fr' && browserLocale() !== 'fr') return;
+		location.replace(frHref);
 	});
 
 	const scheme = $derived(mode.current === 'dark' ? 'dark' : 'light');
@@ -66,7 +107,7 @@
 					variant="ghost"
 					size="sm"
 					class="text-muted-foreground max-sm:hidden"
-					href={resolve('/how-it-works')}
+					href={howItWorksHref()}
 				>
 					{t('landing.nav.how')}
 				</Button>
@@ -74,7 +115,7 @@
 					variant="ghost"
 					size="sm"
 					class="text-muted-foreground max-sm:hidden"
-					href={resolve('/(marketing)/help/[[topic]]', { topic: undefined })}
+					href={guidesHref()}
 				>
 					{t('landing.nav.guides')}
 				</Button>
@@ -147,33 +188,31 @@
 					</span>
 					<span class="mx-2">·</span>
 					{t('landing.footer.copyright')}
+					<span class="mx-2">·</span>
+					<!-- A licence name is a term of art, and printing one without a way to
+					     look it up asks the reader to already know what they are allowed to
+					     do with this code. h-auto p-0 so it sits on the line rather than
+					     becoming a third control in a row of two. -->
+					<Button
+						variant="link"
+						class="text-foreground/90 hover:text-foreground h-auto p-0 text-sm underline-offset-4"
+						href={LICENSE_DOC}
+						{...NEW_TAB}
+					>
+						{t('landing.footer.license')}
+					</Button>
 				</p>
 				<!-- flex-wrap, or the page's clip cuts these off rather than the row folding.
 				     Four French labels are 483px, wider than any phone, and the links are
 				     the whole point of a footer. -->
 				<nav class="flex flex-wrap items-center gap-1">
-					<Button
-						variant="ghost"
-						size="sm"
-						class="text-foreground/90"
-						href={resolve('/how-it-works')}
-					>
+					<Button variant="ghost" size="sm" class="text-foreground/90" href={howItWorksHref()}>
 						{t('landing.nav.how')}
 					</Button>
-					<Button
-						variant="ghost"
-						size="sm"
-						class="text-foreground/90"
-						href={resolve('/(marketing)/help/[[topic]]', { topic: undefined })}
-					>
+					<Button variant="ghost" size="sm" class="text-foreground/90" href={guidesHref()}>
 						{t('landing.nav.guides')}
 					</Button>
-					<Button
-						variant="ghost"
-						size="sm"
-						class="text-foreground/90"
-						href={resolve('/(marketing)/privacy')}
-					>
+					<Button variant="ghost" size="sm" class="text-foreground/90" href={privacyHref()}>
 						{t('policy.title')}
 					</Button>
 					<Button

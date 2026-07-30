@@ -25,7 +25,6 @@
 	// .benchmark-corpus/scripts/landing-capture.mjs. It stays a still because a
 	// live citation click needs the local database, which this page must not open.
 	import { resolve } from '$app/paths';
-	import { page } from '$app/state';
 	import { landingSchema } from '$lib/structured-data';
 	import PageMeta from '$lib/components/page-meta.svelte';
 	import { mode } from 'mode-watcher';
@@ -37,7 +36,7 @@
 	import LandingDossier from '$lib/components/landing-dossier.svelte';
 	import { t, i18n } from '$lib/i18n/index.svelte';
 	import { reveal } from '$lib/landing-motion';
-	import { GITHUB } from '$lib/links';
+	import { CANONICAL_ORIGIN, GITHUB } from '$lib/links';
 
 	const CITE_NOTES = ['landing.cite.f1', 'landing.cite.f2'] as const;
 
@@ -57,7 +56,7 @@
 <PageMeta
 	title={t('landing.meta.title')}
 	description={t('landing.hero.sub')}
-	jsonLd={landingSchema(page.url.origin, t)}
+	jsonLd={landingSchema(CANONICAL_ORIGIN, t)}
 />
 
 {#snippet kicker(index: string, id: string)}

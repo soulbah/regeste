@@ -1,5 +1,6 @@
 <script lang="ts">
 	import './layout.css';
+	import { guidesHref } from '$lib/marketing-links.svelte';
 	import { ModeWatcher } from 'mode-watcher';
 	import { toast } from 'svelte-sonner';
 	import { Toaster } from '$lib/components/ui/sonner';
@@ -72,11 +73,7 @@
 					action: {
 						label: t('app.whatToDo'),
 						onClick: () =>
-							openInNewTab(
-								resolve('/(marketing)/help/[[topic]]', {
-									topic: key === 'app.dbBlocked' ? 'storage-blocked' : 'two-tabs'
-								})
-							)
+							openInNewTab(guidesHref(key === 'app.dbBlocked' ? 'storage-blocked' : 'two-tabs'))
 					}
 				});
 				return;
@@ -97,7 +94,11 @@
 	let dbBooted = false;
 	$effect(() => {
 		if (isMarketingPage(page.url.pathname)) {
-			i18n.initWithoutDb();
+			// No language detection here: the marketing pages carry their language in the
+			// path and set it themselves before rendering. Guessing from navigator.language
+			// on top of that flipped a French URL back to English the moment it hydrated,
+			// so the server sent French and the reader got English, which undoes the point
+			// of having the language in the URL at all.
 			return;
 		}
 		if (dbBooted) return;
@@ -139,6 +140,13 @@
 		};
 		if (document.readyState === 'complete') register();
 		else window.addEventListener('load', register, { once: true });
+	});
+
+	// The document language follows the dictionary. app.html can only template one
+	// value and the app never renders on a server, so a French reader had the whole
+	// interface announced as English to a screen reader.
+	$effect(() => {
+		document.documentElement.lang = i18n.locale;
 	});
 
 	// Storage persistence (spec 030): retry on every start. Chrome caches grants

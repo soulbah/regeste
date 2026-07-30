@@ -2,6 +2,7 @@ import { defineConfig } from 'vitest/config';
 import { playwright } from '@vitest/browser-playwright';
 import tailwindcss from '@tailwindcss/vite';
 import adapter from '@sveltejs/adapter-cloudflare';
+import { CSP_DIRECTIVES } from './src/lib/csp';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
@@ -72,6 +73,28 @@ export default defineConfig({
 				runes: ({ filename }) =>
 					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
 			},
+
+			// Both languages are built. '*' covers every route without a required
+			// parameter, which is English at the root; an optional parameter has no
+			// value for a crawler to discover, so the French roots are named and the
+			// topics under /fr/help are found from that index.
+			prerender: { entries: ['*', '/fr', '/fr/how-it-works', '/fr/help', '/fr/privacy'] },
+
+			// A content policy on a product whose promise is that documents do not
+			// leave the device. The value here is not theoretical: an injected script
+			// would have the whole library, the index and every answer in reach, on a
+			// page that legitimately holds all of it.
+			//
+			// 'auto', not 'hash': hashes for the prerendered pages, whose HTML is a static
+			// file, and a per-response nonce for everything the worker renders. Hash mode
+			// alone left the app shell with no policy at all, because SvelteKit emits none
+			// for a route with ssr off — so the protection covered the marketing pages,
+			// which hold nothing, and not the workspace, which holds every document.
+			// 'auto': hashes for the prerendered pages, a nonce for what the worker
+			// renders. The directives live in src/lib/csp.ts because the worker has to
+			// send the same ones as a header — SvelteKit emits no policy for a route with
+			// ssr off, which is the whole app.
+			csp: { mode: 'auto', directives: CSP_DIRECTIVES },
 
 			adapter: adapter({
 				platformProxy: {

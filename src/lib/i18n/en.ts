@@ -116,17 +116,15 @@ export const en = {
 	'modes.error': 'Something went wrong',
 	// The three ways preparing the on-device AI fails, told apart because the
 	// remedies have nothing in common.
-	'storageRisk.title': 'This window will not keep the download',
-	'storageRisk.body':
-		'The model is a {size} file, and this browser has refused to commit to storing it. Starting now would very likely fail partway.',
-	'storageRisk.reason1':
-		'A private window. It cannot keep large files, whatever it reports, and everything is dropped when you close it.',
-	'storageRisk.reason2': 'Or the disk is nearly full, and the browser is protecting what is left.',
-	'storageRisk.alternative':
-		'Opening this in a normal window fixes it. Cloud and Your server answer without any download.',
+	'storageRisk.title': 'Not enough room for this download',
+	'storageRisk.body': 'The model needs {size}, and this browser has {free} left for this site.',
+	'storageRisk.reason':
+		'Either the disk is nearly full, or another site is holding the space. Freeing some up raises the figure straight away.',
+	'storageRisk.alternative': 'Cloud and Your server answer without any download.',
 	'storageRisk.anyway': 'Download anyway',
 	'llm.error.tooLarge':
 		'This device could not load a download that large. A smaller one of {size} is available.',
+	'llm.error.noRoom': 'There was no room for that model. A smaller one of {size} fits.',
 	'llm.error.tooLarge.cta': 'Download the smaller one',
 	'llm.error.ephemeral':
 		'A private window cannot store the model. Open this in a normal window, or pick Cloud or Your server.',
@@ -145,6 +143,7 @@ export const en = {
 	'onboard.cost.signIn': 'Sign in · nothing to install',
 	'onboard.cost.endpoint': 'Your own server · nothing to install',
 	'onboard.downloading': 'Downloading. Add a document while you wait.',
+	'llm.steppedDown': 'That model did not fit this device. A smaller one is downloading, {size}.',
 	'onboard.unfinished': 'Finish setting up to get answers.',
 	'onboard.resume': 'Finish',
 	'onboard.needDownload': 'Download the model to answer on this device.',
@@ -707,7 +706,7 @@ export const en = {
 	'landing.hero.title': 'Your documents have the answer.',
 	'landing.hero.sub':
 		'Ask a question and get a written answer that cites the exact passages it came from. Everything runs in your browser, and with the on-device model your files never leave your machine.',
-	'landing.hero.facts': 'Free and open source. No account to start.',
+	'landing.hero.facts': 'Free · No account to start · open source',
 	'landing.modes.title': 'Choose where the answer is written.',
 	'landing.modes.sub':
 		'Reading your documents and searching them happen in this browser. The three modes differ on one point: who writes the answer.',
@@ -788,7 +787,8 @@ export const en = {
 	'policy.contact.title': 'Questions',
 	'policy.contact.body': 'Write to us and we will answer.',
 	'policy.source': 'The code behind every claim on this page is public.',
-	'landing.footer.copyright': '© 2026 · AGPL-3.0',
+	'landing.footer.copyright': '© 2026',
+	'landing.footer.license': 'AGPL-3.0',
 
 	// How it works
 	'hiw.title': 'How your data flows',

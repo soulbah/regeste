@@ -28,7 +28,12 @@
 		bind:ref
 		data-slot="dialog-content"
 		class={cn(
-			'bg-popover text-popover-foreground data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 ring-foreground/10 grid max-w-[calc(100%-2rem)] gap-6 rounded-lg p-6 text-sm shadow-md ring-1 duration-100 sm:max-w-md fixed top-1/2 left-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2 outline-none',
+			// max-w-lg and p-7, not md and p-6: at 448px wide with 24px of padding, two
+			// sentences of body copy wrapped to four lines and the dialog read as a
+			// column of text in a box. 512px holds the same sentences in two or three
+			// lines, and the extra padding and gap are what turn a stack of blocks into
+			// something with air around it. Callers that want narrower still say so.
+			'bg-popover text-popover-foreground data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 ring-foreground/10 grid max-w-[calc(100%-2rem)] gap-7 rounded-lg p-7 text-sm shadow-md ring-1 duration-100 sm:max-w-lg fixed top-1/2 left-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2 outline-none',
 			className
 		)}
 		{...restProps}

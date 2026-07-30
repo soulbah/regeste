@@ -10,11 +10,13 @@
 	// a lead paragraph, a rule, then cause and steps. Recognising the symptom is
 	// what tells a reader they are on the right page, which is why it is the
 	// lead and not a labelled field halfway down.
+	import { guidesHref } from '$lib/marketing-links.svelte';
+	import { CANONICAL_ORIGIN } from '$lib/links';
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import { i18n } from '$lib/i18n/index.svelte';
 	import { helpIndexSchema, helpTopicSchema } from '$lib/structured-data';
 	import PageMeta from '$lib/components/page-meta.svelte';
-	import { page } from '$app/state';
 	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
 	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
 	import { Button } from '$lib/components/ui/button';
@@ -25,6 +27,9 @@
 	// someone can paste to a colleague, and it survives a reload.
 	const topic = $derived(HELP_TOPICS.find((entry) => entry.id === page.params.topic) ?? null);
 	const others = $derived(HELP_TOPICS.filter((entry) => entry.id !== topic?.id).slice(0, 3));
+	// The language segment this page was rendered for. Passing it on is what keeps a
+	// French reader inside the French guides.
+	const lang = $derived(page.params.lang === 'fr' ? ('fr' as const) : undefined);
 </script>
 
 <!-- A topic page describes the failure it is about; the index describes the set. -->
@@ -32,8 +37,8 @@
 	title={topic ? t(topic.title) : t('help.title')}
 	description={topic ? t(topic.symptom) : t('help.intro')}
 	jsonLd={topic
-		? helpTopicSchema(page.url.origin, topic, t, i18n.locale, t('help.title'))
-		: helpIndexSchema(page.url.origin, t, i18n.locale)}
+		? helpTopicSchema(CANONICAL_ORIGIN, topic, t, i18n.locale, t('help.title'))
+		: helpIndexSchema(CANONICAL_ORIGIN, t, i18n.locale)}
 />
 
 <!-- The bar and the footer come from (marketing)/+layout.svelte.
@@ -47,7 +52,7 @@
 			variant="ghost"
 			size="sm"
 			class="text-muted-foreground -ml-3 gap-1.5"
-			href={resolve('/(marketing)/help/[[topic]]', { topic: undefined })}
+			href={guidesHref()}
 		>
 			<ArrowLeftIcon class="size-3.5!" />
 			{t('help.allGuides')}
@@ -98,7 +103,7 @@
 		<div class="mt-3 divide-y">
 			{#each others as entry (entry.id)}
 				<a
-					href={resolve('/(marketing)/help/[[topic]]', { topic: entry.id })}
+					href={resolve('/(marketing)/[[lang=lang]]/help/[[topic]]', { lang, topic: entry.id })}
 					class="group hover:text-accent-foreground flex items-center gap-4 py-3 text-sm transition-colors"
 				>
 					<span class="min-w-0 flex-1 truncate">{t(entry.title)}</span>
@@ -120,7 +125,7 @@
 		<div class="mt-12 divide-y border-t">
 			{#each HELP_TOPICS as entry (entry.id)}
 				<a
-					href={resolve('/(marketing)/help/[[topic]]', { topic: entry.id })}
+					href={resolve('/(marketing)/[[lang=lang]]/help/[[topic]]', { lang, topic: entry.id })}
 					class="group flex items-start gap-5 py-6"
 				>
 					<div class="min-w-0 flex-1">

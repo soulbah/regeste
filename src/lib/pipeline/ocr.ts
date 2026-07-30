@@ -42,7 +42,12 @@ export async function ocrPages(
 	pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
 	// slice() so pdf.js can't detach the caller's buffer (it may reuse it).
-	const loadingTask = pdfjs.getDocument({ data: data.slice(0) });
+	// Errors only, for the same reason as the parser: font warnings by the dozen
+	// on a document that reads fine.
+	const loadingTask = pdfjs.getDocument({
+		data: data.slice(0),
+		verbosity: pdfjs.VerbosityLevel.ERRORS
+	});
 	const doc = await loadingTask.promise;
 	const out: ParsedBlock[] = [];
 	let done = 0;

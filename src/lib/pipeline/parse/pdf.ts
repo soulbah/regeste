@@ -70,7 +70,16 @@ export async function parsePdf(data: ArrayBuffer): Promise<ParsedDoc> {
 
 	// slice() so pdf.js can't detach the caller's buffer — ingest and ocrDocument
 	// both reuse the same ArrayBuffer after parsing.
-	const loadingTask = pdfjs.getDocument({ data: data.slice(0) });
+	//
+	// Errors only. pdf.js narrates every quirk of every embedded font at warning
+	// level — a single real-world PDF produced dozens of "TT: undefined function"
+	// lines while parsing perfectly — and a console that scrolls on a normal add is
+	// a console nobody reads when something is actually wrong. Errors still print,
+	// and a document that fails still fails loudly.
+	const loadingTask = pdfjs.getDocument({
+		data: data.slice(0),
+		verbosity: pdfjs.VerbosityLevel.ERRORS
+	});
 	const doc = await loadingTask.promise;
 	const blocks: ParsedBlock[] = [];
 	const needsOcr: number[] = [];

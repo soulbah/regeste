@@ -10,8 +10,8 @@
 	"packageManager": "bun@1.2.22",
 	"scripts": {
 		"dev": "PUBLIC_ASSISTED_ENABLED=true vite dev",
-		"build": "vite build && node scripts/check-asset-limits.mjs",
-		"preview": "bun run build && wrangler dev",
+		"build": "vite build && node scripts/check-asset-limits.mjs && node scripts/check-csp.mjs",
+		"preview": "bun run build && wrangler dev --config wrangler.dev.jsonc",
 		"prepare": "svelte-kit sync && bun run vendor || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
@@ -25,7 +25,7 @@
 		"db:migrate:local": "wrangler d1 migrations apply regeste-db --local",
 		"db:migrate:remote": "wrangler d1 migrations apply regeste-db --remote",
 		"cf:types": "wrangler types && sed -i '' 's#typeof import(\"./.svelte-kit/cloudflare/_worker\")#unknown#' worker-configuration.d.ts",
-		"deploy": "bun run build && bunx wrangler@4.106.0 deploy",
+		"deploy": "bun run build && wrangler deploy",
 		"knip": "knip",
 		"vendor": "mkdir -p static/vendor/sqlite && cp node_modules/sqlite-vec-wasm-demo/sqlite3.mjs node_modules/sqlite-vec-wasm-demo/sqlite3.wasm static/vendor/sqlite/ && bash scripts/vendor-ocr-models.sh"
 	},
@@ -75,7 +75,7 @@
 		"vite": "^8.0.16",
 		"vitest": "^4.1.8",
 		"vitest-browser-svelte": "^2.1.1",
-		"wrangler": "^4.107.1"
+		"wrangler": "^4.115.0"
 	},
 	"dependencies": {
 		"@huggingface/transformers": "4.2.0",
