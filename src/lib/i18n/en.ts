@@ -110,6 +110,13 @@ export const en = {
 	'modes.private.loading': 'Loading private AI…',
 	'modes.private.ready': 'Ready · works offline',
 	'modes.error': 'Something went wrong',
+	// The three ways preparing the on-device AI fails, told apart because the
+	// remedies have nothing in common.
+	'llm.error.ephemeral':
+		'A private window cannot store the AI. Open this in a normal window, or pick Cloud or Your server.',
+	'llm.error.storage':
+		'This browser ran out of storage for the AI. Free up disk space and retry, or pick Cloud or Your server.',
+	'llm.error.memory': 'This device ran out of memory preparing the AI. Close other tabs and retry.',
 	'modes.locked': 'Locked · this chat is private-only',
 	'modes.offlineOn': 'Offline mode is on',
 	'modes.choose': 'Answer mode',

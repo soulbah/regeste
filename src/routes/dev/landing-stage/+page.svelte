@@ -10,7 +10,6 @@
 	// ?scene=hero|cite|review|wais|privacy  ?lang=fr|en  ?theme=light|dark
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
-	import { setMode } from 'mode-watcher';
 	import PanelShell from '$lib/components/panel-shell.svelte';
 	import PrivateTurn from '$lib/components/private-turn.svelte';
 	import PresendPanel from '$lib/components/presend-panel.svelte';
@@ -52,7 +51,14 @@
 	// write back, and any tracked read here can chain into an effect loop. The
 	// stage is a capture surface; one deterministic pass is exactly right.
 	onMount(() => {
-		setMode(theme);
+		// No setMode here. It writes localStorage['mode-watcher-mode'] for the whole
+		// origin, so opening this dev page once at ?theme=dark left the visitor's
+		// preference pinned to dark on the real app and the landing, overriding
+		// their OS from then on. A capture surface must not be able to do that.
+		// The scheme is scoped to the stage wrapper instead — the same `.dark`
+		// class trick the landing's inverted band uses — and the capture scripts
+		// already emulate prefers-color-scheme at the browser level anyway.
+		//
 		// The root layout's async store init lands after us and restores persisted
 		// values; re-seeding is idempotent and simply wins the race.
 		seed(fix);
@@ -404,7 +410,11 @@
 {/snippet}
 
 <Tooltip.Provider delayDuration={300}>
-	<div class="bg-background min-h-svh {scene === 'film' ? 'p-0' : 'p-8'}">
+	<div
+		class="bg-background min-h-svh {theme === 'dark' ? 'dark' : ''} {scene === 'film'
+			? 'p-0'
+			: 'p-8'}"
+	>
 		{#if scene === 'film'}
 			<!-- The film frame: larger type via zoom for a supersampled recording,
 			     a cover over the ingestion, the end card over everything. The

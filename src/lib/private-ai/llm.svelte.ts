@@ -16,6 +16,7 @@ import { guardWorker } from '$lib/state/worker-health.svelte';
 import { adaptGenerationOptions, type GenerationOptions } from './generation';
 import type { GenerationResult } from './generation';
 import type { WebLlmClient } from './webllm-client';
+import { t } from '$lib/i18n/index.svelte';
 
 const PREPARED_KEY = 'regeste:private-prepared-model';
 /**
@@ -135,19 +136,42 @@ class LlmStore {
 			this.status = 'ready';
 		} catch (err) {
 			console.error('[regeste] private engine load failed:', err);
-			const lower = this.tier ? downgrade(this.tier) : null;
-			if (lower) {
-				this.tier = lower;
-				this.prepared = localStorage.getItem(PREPARED_KEY) === lower.model;
-				return this.prepare();
+			const message = err instanceof Error ? err.message : String(err);
+			// Storage or memory, and the distinction decides both the message and
+			// whether retrying smaller is worth the bandwidth.
+			//
+			// "Failed to execute 'add' on 'Cache': Unexpected internal error" is how
+			// Chrome reports a cache write it could not complete, and it carries
+			// neither "quota" nor "storage" in its text. Matching only those two
+			// words told a visitor whose browser had refused to store the weights
+			// that their device had run out of memory, and sent them closing tabs
+			// for a problem no tab was causing.
+			const storageFailure = /quota|storage|exceeded/i.test(message) || /on 'Cache'/.test(message);
+
+			// Downgrading assumes the failure was about capability. On a storage
+			// failure it is not: a window that cannot hold five gigabytes will not
+			// hold two either, and each attempt re-downloads the whole model through
+			// the deployment's own proxy. Fail once and say why.
+			if (!storageFailure) {
+				const lower = this.tier ? downgrade(this.tier) : null;
+				if (lower) {
+					this.tier = lower;
+					this.prepared = localStorage.getItem(PREPARED_KEY) === lower.model;
+					return this.prepare();
+				}
 			}
 			this.status = 'error';
-			// A storage-quota failure is not the same as running out of memory:
-			// the browser refused to cache the weights. Say which one it is.
-			const message = err instanceof Error ? err.message : String(err);
-			this.errorMessage = /quota|storage/i.test(message)
-				? 'Your browser ran out of storage for the private AI. Free up disk space and retry, or use Assisted or My AI instead.'
-				: 'Your device ran out of memory preparing the private AI. Try closing other tabs and retry.';
+			// A window that refuses to persist and then refuses to store is almost
+			// always a private one, which is the single most common way to meet this
+			// error. Naming it beats a generic "free up disk space" that will not
+			// help, and it is a check rather than a guess about the browser.
+			const ephemeral =
+				storageFailure && !(await navigator.storage?.persisted?.().catch(() => false));
+			this.errorMessage = storageFailure
+				? ephemeral
+					? t('llm.error.ephemeral')
+					: t('llm.error.storage')
+				: t('llm.error.memory');
 		}
 	}
 

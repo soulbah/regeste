@@ -105,6 +105,12 @@ export const fr: Record<keyof typeof en, string> = {
 	'modes.private.loading': "Chargement de l'IA privée…",
 	'modes.private.ready': 'Prêt · fonctionne hors ligne',
 	'modes.error': 'Un problème est survenu',
+	'llm.error.ephemeral':
+		'Une fenêtre privée ne peut pas stocker l’IA. Ouvrez ceci dans une fenêtre normale, ou choisissez Cloud ou Votre serveur.',
+	'llm.error.storage':
+		'Ce navigateur n’a plus de place pour l’IA. Libérez de l’espace disque et réessayez, ou choisissez Cloud ou Votre serveur.',
+	'llm.error.memory':
+		'Cet appareil n’a plus de mémoire pour préparer l’IA. Fermez d’autres onglets et réessayez.',
 	'modes.locked': 'Verrouillé · cette discussion est privée uniquement',
 	'modes.offlineOn': 'Le mode hors ligne est activé',
 	'modes.choose': 'Mode de réponse',
