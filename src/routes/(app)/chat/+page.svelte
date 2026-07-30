@@ -172,7 +172,7 @@
 	<!-- Only on the two guided surfaces, which are mostly empty by design. The
 	     launcher has the user's own documents on it and needs no atmosphere. -->
 	{#if choosing || firstRun}
-		<AmbientWash top="4%" />
+		<AmbientWash top="4%" size="38rem" strength="quiet" />
 	{/if}
 
 	<!-- Three surfaces, not one screen with branches. The engine gate blocks
