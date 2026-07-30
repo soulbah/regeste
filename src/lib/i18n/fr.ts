@@ -149,6 +149,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'auth.or': 'ou',
 	'auth.continueWith': 'Continuer avec {provider}',
 	'auth.providerSoon': 'Pas encore disponible.',
+	'auth.socialFailed': 'La connexion n’a pas abouti. Réessayez, ou utilisez un code.',
 	'auth.codeSent': 'Saisissez le code à six chiffres envoyé à {email}.',
 	'auth.changeEmail': 'Utiliser une autre adresse',
 	'auth.footnote': 'Vos documents et vos discussions restent sur cet appareil dans tous les cas.',
@@ -703,6 +704,43 @@ export const fr: Record<keyof typeof en, string> = {
 	'landing.deck.f1':
 		'Le consentement est demandé une fois, la première fois que quelque chose partirait.',
 	'landing.deck.f2': 'Le Rapport de confidentialité en fait le total.',
+
+	'policy.title': 'Confidentialité',
+	'policy.updated': 'Dernière mise à jour le 30 juillet 2026',
+	'policy.intro':
+		'Cette page dit ce que cette application fait de vos données, dans l’ordre qui compte. La version courte : vos documents n’atteignent jamais un serveur. La version longue est en dessous.',
+
+	'policy.device.title': 'Vos documents restent sur votre appareil',
+	'policy.device.body':
+		'Les fichiers que vous ajoutez sont lus, indexés et cherchés dans votre navigateur. Le texte, l’index construit à partir de lui, vos questions, les réponses et les noms de fichiers sont stockés dans ce navigateur uniquement. Rien n’est envoyé, aucun serveur n’en garde de copie. Coupez le réseau : l’application continue de répondre dans le mode qui répond sur votre appareil, et c’est la façon de le vérifier plutôt que de nous croire.',
+
+	'policy.server.title': 'Ce que le serveur sait',
+	'policy.server.body':
+		'Il y a un serveur, et il existe pour les comptes et les quotas. À la connexion, il enregistre votre adresse email, un nom si la méthode de connexion en a fourni un, et des sessions. Une session contient l’adresse IP et l’identification du navigateur de la requête qui l’a créée, ce qui permet de distinguer une session volée de la vôtre. Il compte aussi votre usage quotidien du mode cloud : un nombre de requêtes et une mesure de consommation. Il n’existe aucune table pour les documents, les discussions, les messages, les passages ou les noms de fichiers, et en ajouter une casserait la garantie ci-dessus.',
+
+	'policy.cloud.title': 'Quand vous demandez une réponse cloud',
+	'policy.cloud.body':
+		'Deux des trois modes de réponse ne contactent jamais ce serveur. Si vous choisissez le mode cloud, votre question et les passages que vous avez validés à l’étape de relecture traversent le serveur vers le modèle qui rédige la réponse, puis reviennent. Ils ne sont écrits dans aucune base et ne sont pas conservés. Ce qui est écrit est une ligne de compteurs : combien de passages, combien d’unités de facturation, la durée, la longueur de la réponse, et les premiers caractères de votre identifiant de compte. Aucune question et aucun passage n’y figure.',
+
+	'policy.signin.title': 'La connexion',
+	'policy.signin.body':
+		'Seul le mode cloud demande un compte. Un code arrive par email depuis mail.regeste.com, et le message ne contient aucun lien. Si vous vous connectez avec Google, Google apprend que vous utilisez cette application, et cette application reçoit votre adresse email, votre nom et votre photo de profil. Rien de plus n’est demandé.',
+
+	'policy.models.title': 'Le téléchargement du modèle',
+	'policy.models.body':
+		'Répondre sur votre appareil demande un fichier de modèle, téléchargé une fois et conservé dans ce navigateur. Il passe par ce domaine depuis un hébergeur public de modèles, parce que l’isolation dont le navigateur a besoin pour ce mode bloque la route directe. Seuls des fichiers de modèles publics empruntent ce chemin.',
+
+	'policy.tracking.title': 'Aucun analytics',
+	'policy.tracking.body':
+		'Il n’y a aucun service d’analytics, aucun script de traçage et aucun code tiers dans cette application. Les emails ne contiennent aucune image, donc rien ne signale que vous en ouvrez un. Le seul cookie est celui qui vous garde connecté.',
+
+	'policy.delete.title': 'Supprimer vos données',
+	'policy.delete.body':
+		'Tout ce qui est sur votre appareil se supprime depuis les réglages de l’application, ou en vidant le stockage de ce navigateur. Supprimer votre compte retire votre adresse email, vos sessions et vos compteurs d’usage du serveur. Comme le serveur n’a jamais détenu de document, il n’y a rien d’autre à vous retirer.',
+
+	'policy.contact.title': 'Questions',
+	'policy.contact.body': 'Écrivez-nous, nous répondrons.',
+	'policy.source': 'Le code derrière chaque affirmation de cette page est public.',
 	'landing.footer.copyright': '© 2026 · AGPL-3.0',
 
 	// How it works

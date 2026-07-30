@@ -151,6 +151,14 @@
 					>
 						{t('landing.nav.guides')}
 					</Button>
+					<Button
+						variant="ghost"
+						size="sm"
+						class="text-muted-foreground"
+						href={resolve('/(marketing)/privacy')}
+					>
+						{t('policy.title')}
+					</Button>
 					<!-- The only way to reach a person. GitHub covers anyone willing to
 					     open an issue; this covers everyone else, which is most people.
 					     The label is the address rather than the word "Contact", because

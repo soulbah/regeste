@@ -33,7 +33,7 @@ describe('service worker scope', () => {
 
 describe('isMarketingPage', () => {
 	it('covers every page under (marketing)', () => {
-		for (const path of ['/', '/how-it-works', '/help', '/help/two-tabs', '/help/storage-blocked']) {
+		for (const path of ['/', '/how-it-works', '/privacy', '/help', '/help/two-tabs']) {
 			expect(isMarketingPage(path)).toBe(true);
 		}
 	});

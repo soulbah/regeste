@@ -36,5 +36,10 @@ export function isMarketingAsset(pathname: string): boolean {
  * reads the session, so it boots like an app route.
  */
 export function isMarketingPage(pathname: string): boolean {
-	return pathname === '/' || pathname === '/how-it-works' || pathname.startsWith('/help');
+	return (
+		pathname === '/' ||
+		pathname === '/how-it-works' ||
+		pathname === '/privacy' ||
+		pathname.startsWith('/help')
+	);
 }

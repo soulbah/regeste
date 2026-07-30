@@ -23,6 +23,10 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import { sessionStore } from '$lib/state/session.svelte';
 	import type { ResolvedPathname } from '$app/types';
+	import { authClient } from '$lib/auth-client';
+	import type { PageData } from './$types';
+
+	let { data }: { data: PageData } = $props();
 
 	let email = $state('');
 	let otp = $state('');
@@ -69,10 +73,27 @@
 		if (!sessionStore.loading && sessionStore.user) goto(resolve('/chat'));
 	});
 
-	const PROVIDERS = [
-		{ id: 'google', label: 'Google' },
-		{ id: 'github', label: 'GitHub' }
-	] as const;
+	// Google is offered when this deployment holds the credential; GitHub is not
+	// wired at all yet. Each row says which of the two it is, because "not
+	// available yet" and "not available here" are different facts and a reader
+	// deciding how to sign in needs the right one.
+	const PROVIDERS = $derived([
+		{ id: 'google' as const, label: 'Google', ready: data.google },
+		{ id: 'github' as const, label: 'GitHub', ready: data.github }
+	]);
+
+	let sending = $state(false);
+	async function social(provider: 'google' | 'github') {
+		sending = true;
+		// Google hands the browser back to /api/auth/callback/google, better-auth
+		// mints the session there and forwards here; callbackURL is where it lands
+		// afterwards — the chat, same as a code sign-in.
+		const { error } = await authClient.signIn.social({ provider, callbackURL: '/chat' });
+		if (error) {
+			sending = false;
+			sessionStore.error = error.message ?? t('auth.socialFailed');
+		}
+	}
 </script>
 
 <svelte:head><title>{t('auth.title')} · Regeste</title></svelte:head>
@@ -180,14 +201,25 @@
 				<div class="space-y-2">
 					<Tooltip.Provider delayDuration={300}>
 						{#each PROVIDERS as provider (provider.id)}
-							<Tooltip.Root>
-								<Tooltip.Trigger class="block w-full">
-									<Button variant="outline" class="w-full" disabled>
-										{t('auth.continueWith', { provider: provider.label })}
-									</Button>
-								</Tooltip.Trigger>
-								<Tooltip.Content>{t('auth.providerSoon')}</Tooltip.Content>
-							</Tooltip.Root>
+							{#if provider.ready}
+								<Button
+									variant="outline"
+									class="w-full"
+									disabled={sending}
+									onclick={() => social(provider.id)}
+								>
+									{t('auth.continueWith', { provider: provider.label })}
+								</Button>
+							{:else}
+								<Tooltip.Root>
+									<Tooltip.Trigger class="block w-full">
+										<Button variant="outline" class="w-full" disabled>
+											{t('auth.continueWith', { provider: provider.label })}
+										</Button>
+									</Tooltip.Trigger>
+									<Tooltip.Content>{t('auth.providerSoon')}</Tooltip.Content>
+								</Tooltip.Root>
+							{/if}
 						{/each}
 					</Tooltip.Provider>
 				</div>

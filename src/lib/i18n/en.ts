@@ -158,6 +158,7 @@ export const en = {
 	'auth.or': 'or',
 	'auth.continueWith': 'Continue with {provider}',
 	'auth.providerSoon': 'Not available yet.',
+	'auth.socialFailed': 'That sign-in did not complete. Try again, or use a code.',
 	'auth.codeSent': 'Enter the six-digit code sent to {email}.',
 	'auth.changeEmail': 'Use another address',
 	'auth.footnote': 'Your documents and chats stay on this device either way.',
@@ -699,6 +700,47 @@ export const en = {
 	'landing.deck.bring': 'Bring {name} forward',
 	'landing.deck.f1': 'Consent is asked once, the first time anything would leave.',
 	'landing.deck.f2': 'The Privacy Report adds them all up.',
+
+	// Privacy policy (/privacy). Required by Google to publish an OAuth consent
+	// screen, and honest work regardless. Every claim here was read off the code:
+	// the D1 schema, the assisted endpoint's log line, the absence of any
+	// analytics dependency.
+	'policy.title': 'Privacy',
+	'policy.updated': 'Last updated 30 July 2026',
+	'policy.intro':
+		'This page says what this app does with your data, in the order that matters. The short version is that your documents never reach a server, and the long version is below.',
+
+	'policy.device.title': 'Your documents stay on your device',
+	'policy.device.body':
+		'Files you add are read, indexed and searched inside your browser. The text, the index built from it, your questions, the answers and the file names are stored in this browser only. None of it is uploaded, and no server holds a copy. Turning off the network leaves the app working in the mode that answers on your device, which is the way to check this rather than take it on trust.',
+
+	'policy.server.title': 'What the server knows',
+	'policy.server.body':
+		'There is one server, and it exists for accounts and quotas. When you sign in it stores your email address, a name if the sign-in method gave one, and session records. A session record includes the IP address and browser identification of the request that created it, which is how a stolen session can be told apart from yours. It also counts your daily use of the cloud answer mode: a number of requests and a usage figure. There is no table for documents, chats, messages, passages or file names, and adding one would break the guarantee above.',
+
+	'policy.cloud.title': 'When you ask for a cloud answer',
+	'policy.cloud.body':
+		'Two of the three answer modes never contact this server. If you pick the cloud mode, your question and the passages you approved in the review step pass through the server to the model that writes the answer, and come back. They are not written to any database and not kept. What is written is a line of counters: how many passages, how many billing units, how long it took, how long the answer was, and the first characters of your account identifier. No question and no passage appears in it.',
+
+	'policy.signin.title': 'Signing in',
+	'policy.signin.body':
+		'Only the cloud mode needs an account. A code arrives by email from mail.regeste.com, and the message contains no links. If you sign in with Google instead, Google learns that you use this app, and this app receives your email address, your name and your profile picture. Nothing more is requested.',
+
+	'policy.models.title': 'The model download',
+	'policy.models.body':
+		'Answering on your device needs a model file, which is downloaded once and kept in this browser. It is fetched through this domain from a public model host, because the isolation the browser needs for that mode blocks the direct route. Only public model files travel that path.',
+
+	'policy.tracking.title': 'No analytics',
+	'policy.tracking.body':
+		'There is no analytics service, no tracking script and no third-party code in this app. The emails carry no images, so nothing reports when you open one. The only cookie is the one that keeps you signed in.',
+
+	'policy.delete.title': 'Deleting your data',
+	'policy.delete.body':
+		'Everything on your device is deleted from the app’s own settings, or by clearing this browser’s storage. Deleting your account removes your email address, your sessions and your usage counters from the server. Since the server never held a document, there is nothing else of yours to remove.',
+
+	'policy.contact.title': 'Questions',
+	'policy.contact.body': 'Write to us and we will answer.',
+	'policy.source': 'The code behind every claim on this page is public.',
 	'landing.footer.copyright': '© 2026 · AGPL-3.0',
 
 	// How it works
