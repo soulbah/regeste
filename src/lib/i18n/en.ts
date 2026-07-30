@@ -118,7 +118,7 @@ export const en = {
 	// remedies have nothing in common.
 	'storageRisk.title': 'This window will not keep the download',
 	'storageRisk.body':
-		'The AI is a {size} file, and this browser has refused to commit to storing it. Starting now would very likely fail partway.',
+		'The model is a {size} file, and this browser has refused to commit to storing it. Starting now would very likely fail partway.',
 	'storageRisk.reason1':
 		'A private window. It cannot keep large files, whatever it reports, and everything is dropped when you close it.',
 	'storageRisk.reason2': 'Or the disk is nearly full, and the browser is protecting what is left.',
@@ -129,10 +129,11 @@ export const en = {
 		'This device could not load a download that large. A smaller one of {size} is available.',
 	'llm.error.tooLarge.cta': 'Download the smaller one',
 	'llm.error.ephemeral':
-		'A private window cannot store the AI. Open this in a normal window, or pick Cloud or Your server.',
+		'A private window cannot store the model. Open this in a normal window, or pick Cloud or Your server.',
 	'llm.error.storage':
-		'This browser ran out of storage for the AI. Free up disk space and retry, or pick Cloud or Your server.',
-	'llm.error.memory': 'This device ran out of memory preparing the AI. Close other tabs and retry.',
+		'This browser ran out of storage for the model. Free up disk space and retry, or pick Cloud or Your server.',
+	'llm.error.memory':
+		'This device ran out of memory preparing the model. Close other tabs and retry.',
 	'modes.locked': 'Locked · this chat is private-only',
 	'modes.offlineOn': 'Offline mode is on',
 	'modes.choose': 'Answer mode',
@@ -204,7 +205,7 @@ export const en = {
 	'myai.error.key': 'Your server refused the API key.',
 	'myai.error.status': 'Your server answered with an error ({status}).',
 	'myai.error.unreachable':
-		'Endpoint unreachable. Check the URL, that the server is running, and its CORS settings.',
+		'Your server is unreachable. Check the URL, that it is started, and its CORS settings.',
 
 	// Sources panel (in chat)
 	'sources.title': 'Sources',
@@ -382,7 +383,7 @@ export const en = {
 	'sheet.reindex': 'Re-index',
 	'sheet.improveSearch': 'Improve search',
 	'sheet.reindexRecommended':
-		'A newer local search model is available. The current index remains usable until you rebuild it.',
+		'A newer search model is available. The current index remains usable until you rebuild it.',
 	'sheet.replaceFile': 'Replace file…',
 	'sheet.replaceFailed': 'Could not replace with {name}',
 	'sheet.replaceFailedNoText': 'No usable text in the new file. The current version stays active.',
@@ -549,14 +550,14 @@ export const en = {
 		'On a company network, ask for this site and the model CDN to be allowed, or use This device, which needs the network only once.',
 
 	'report.title': 'Report a problem',
-	'report.intro': 'Write to us and we will answer, three things make it quick to fix.',
+	'report.intro': 'Write to us and we will answer. Three things make it quick to fix.',
 	'report.step1': 'What you were doing, and what happened instead.',
 	'report.step2': 'Your browser and whether you had it installed as an app.',
 	'report.step3': 'The answer mode you were on, if the problem was an answer.',
 	'report.copy': 'Copy',
 	'report.copied': 'Copied',
 	'report.write': 'Write to us',
-	'report.github': 'Or file it on GitHub',
+	'report.github': 'Or open an issue on GitHub',
 	'report.subject': 'Problem report',
 	'app.whatToDo': 'What to do',
 	'app.dbBusy': 'You already have this open in another tab. Close it there, then reload.',
@@ -641,7 +642,7 @@ export const en = {
 	'settings.workspace.export': 'Export my workspace',
 	'settings.workspace.quota': 'About {answers} answers left today',
 	'settings.workspace.quotaSignIn': "Your daily allowance appears here once you're signed in.",
-	'models.onDevice': 'On-device model',
+	'models.onDevice': 'Local model',
 	'models.index': 'Document index model',
 	'settings.models.title': 'Downloaded AI',
 	'settings.models.measuring': 'Measuring…',
@@ -677,9 +678,9 @@ export const en = {
 	'privacy.deviceSummary':
 		'{count} answer{s} generated entirely on this device. 0 bytes sent anywhere.',
 	'privacy.emptyBody':
-		'Every document, index and conversation is stored locally. This report fills up only if you choose a cloud mode.',
+		'Your documents, your indexes and your chats are all stored locally. This report fills up only if you choose a cloud mode.',
 	'privacy.onDevice': 'On this device',
-	'privacy.privateAnswers': '{count} private answer{s}',
+	'privacy.privateAnswers': '{count} answer{s} on this device',
 	'privacy.leftDevice': 'Left this device',
 	'privacy.inRequests': 'in {count} request{s}',
 	'privacy.since': 'since {date}',

@@ -131,7 +131,13 @@
 		</div>
 	</ScrollArea>
 	<div class="border-t p-3">
-		<Badge variant="outline" class="gap-1 font-mono text-[10px] uppercase">
+		<!-- whitespace-normal, because this chip holds a sentence and chips do not wrap.
+		     The French line is 305px against a 271px panel column, so it overflowed the
+		     panel and, on the landing, the page. English happened to fit. -->
+		<Badge
+			variant="outline"
+			class="gap-1 text-left font-mono text-[10px] whitespace-normal uppercase"
+		>
 			{t('wais.footer')}
 		</Badge>
 	</div>

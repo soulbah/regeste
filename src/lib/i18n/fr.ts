@@ -111,22 +111,22 @@ export const fr: Record<keyof typeof en, string> = {
 	'modes.error': 'Un problème est survenu',
 	'storageRisk.title': 'Cette fenêtre ne gardera pas le téléchargement',
 	'storageRisk.body':
-		'L’IA est un fichier de {size}, et ce navigateur a refusé de s’engager à le conserver. Lancer maintenant échouerait très probablement en route.',
+		'Le modèle est un fichier de {size}, et ce navigateur a refusé de s’engager à le conserver. Lancer maintenant échouerait très probablement en route.',
 	'storageRisk.reason1':
 		'Une fenêtre privée. Elle ne peut pas garder de gros fichiers, quoi qu’elle annonce, et tout disparaît à sa fermeture.',
 	'storageRisk.reason2': 'Ou le disque est presque plein, et le navigateur protège ce qui reste.',
 	'storageRisk.alternative':
-		'Ouvrir ceci dans une fenêtre normale règle le problème. Cloud et Votre serveur répondent sans aucun téléchargement.',
+		'Ouvrir l’application dans une fenêtre normale règle le problème. Cloud et Votre serveur répondent sans aucun téléchargement.',
 	'storageRisk.anyway': 'Télécharger quand même',
 	'llm.error.tooLarge':
 		'Cet appareil n’a pas pu charger un téléchargement de cette taille. Un plus petit, de {size}, est disponible.',
 	'llm.error.tooLarge.cta': 'Télécharger le plus petit',
 	'llm.error.ephemeral':
-		'Une fenêtre privée ne peut pas stocker l’IA. Ouvrez ceci dans une fenêtre normale, ou choisissez Cloud ou Votre serveur.',
+		'Une fenêtre privée ne peut pas stocker le modèle. Ouvrez l’application dans une fenêtre normale, ou choisissez Cloud ou Votre serveur.',
 	'llm.error.storage':
-		'Ce navigateur n’a plus de place pour l’IA. Libérez de l’espace disque et réessayez, ou choisissez Cloud ou Votre serveur.',
+		'Ce navigateur n’a plus de place pour le modèle. Libérez de l’espace disque et réessayez, ou choisissez Cloud ou Votre serveur.',
 	'llm.error.memory':
-		'Cet appareil n’a plus de mémoire pour préparer l’IA. Fermez d’autres onglets et réessayez.',
+		'Cet appareil n’a plus de mémoire pour préparer le modèle. Fermez d’autres onglets et réessayez.',
 	'modes.locked': 'Verrouillé · cette discussion reste en mode Cet appareil',
 	'modes.offlineOn': 'Le mode hors ligne est activé',
 	'modes.choose': 'Mode de réponse',
@@ -195,7 +195,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'myai.error.key': 'Votre serveur a refusé la clé API.',
 	'myai.error.status': 'Votre serveur a répondu avec une erreur ({status}).',
 	'myai.error.unreachable':
-		"Endpoint injoignable. Vérifiez l'URL, que le serveur tourne, et ses réglages CORS.",
+		'Votre serveur est injoignable. Vérifiez l’URL, qu’il est démarré, et ses réglages CORS.',
 
 	// Sources panel (in chat)
 	'sources.title': 'Sources',
@@ -371,14 +371,14 @@ export const fr: Record<keyof typeof en, string> = {
 	'sheet.privacy': 'Confidentialité',
 	'sheet.loading': 'Chargement…',
 	'sheet.detailUnavailable': 'Les détails de ce document n’ont pas pu être lus pour l’instant.',
-	'sheet.neverSent': 'Aucun passage n’a quitté votre appareil',
+	'sheet.neverSent': 'Aucun passage n’a quitté cet appareil',
 	'sheet.usedIn': 'Utilisé dans',
 	'sheet.noChats': 'Aucune discussion pour le moment.',
 	'sheet.open': 'Ouvrir',
 	'sheet.reindex': 'Réindexer',
 	'sheet.improveSearch': 'Améliorer la recherche',
 	'sheet.reindexRecommended':
-		'Un meilleur modèle de recherche local est disponible. L’index actuel reste utilisable jusqu’à sa reconstruction.',
+		'Un modèle de recherche plus récent est disponible. L’index actuel reste utilisable jusqu’à sa reconstruction.',
 	'sheet.replaceFile': 'Remplacer le fichier…',
 	'sheet.replaceFailed': 'Impossible de remplacer par {name}',
 	'sheet.replaceFailedNoText':
@@ -553,14 +553,14 @@ export const fr: Record<keyof typeof en, string> = {
 		'Sur un réseau d’entreprise, demandez que ce site et le CDN du modèle soient autorisés, ou utilisez Cet appareil, qui n’a besoin du réseau qu’une fois.',
 
 	'report.title': 'Signaler un problème',
-	'report.intro': 'Écrivez-nous et nous répondrons, trois choses rendent la correction rapide.',
+	'report.intro': 'Écrivez-nous, nous répondrons. Trois précisions accélèrent la correction.',
 	'report.step1': 'Ce que vous faisiez, et ce qui s’est passé à la place.',
 	'report.step2': 'Votre navigateur, et si vous l’aviez installé comme application.',
 	'report.step3': 'Le mode de réponse utilisé, si le problème portait sur une réponse.',
 	'report.copy': 'Copier',
 	'report.copied': 'Copié',
 	'report.write': 'Nous écrire',
-	'report.github': 'Ou l’ouvrir sur GitHub',
+	'report.github': 'Ou ouvrir un ticket sur GitHub',
 	'report.subject': 'Signalement de problème',
 	'app.whatToDo': 'Que faire',
 	'app.dbBusy':
@@ -646,7 +646,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'settings.workspace.export': 'Exporter mon espace de travail',
 	'settings.workspace.quota': "Environ {answers} réponses restantes aujourd'hui",
 	'settings.workspace.quotaSignIn': 'Votre réserve du jour apparaît ici une fois connecté.',
-	'models.onDevice': 'Modèle sur cet appareil',
+	'models.onDevice': 'Modèle local',
 	'models.index': 'Modèle d’indexation',
 	'settings.models.title': 'IA téléchargée',
 	'settings.models.measuring': 'Mesure…',
@@ -677,21 +677,21 @@ export const fr: Record<keyof typeof en, string> = {
 
 	// Privacy Report
 	'privacy.title': 'Rapport de confidentialité',
-	'privacy.subtitle': 'Tout ce qui a quitté cet appareil, ou pas',
+	'privacy.subtitle': 'Ce qui a quitté cet appareil, et ce qui n’en est pas sorti',
 	'privacy.export': 'Exporter en JSON',
 	'privacy.nothing': "Rien n'a quitté cet appareil.",
 	'privacy.deviceSummary':
 		'{count} réponse{s} générée{s} entièrement sur cet appareil. 0 octet envoyé.',
 	'privacy.emptyBody':
-		'Chaque document, index et discussion est stocké localement. Ce rapport ne se remplit que si vous choisissez un mode cloud.',
+		'Vos documents, vos index et vos discussions sont tous stockés localement. Ce rapport ne se remplit que si vous choisissez un mode cloud.',
 	'privacy.onDevice': 'Sur cet appareil',
-	'privacy.privateAnswers': '{count} réponse{s} privée{s}',
+	'privacy.privateAnswers': '{count} réponse{s} sur cet appareil',
 	'privacy.leftDevice': 'Parti de cet appareil',
 	'privacy.inRequests': 'en {count} requête{s}',
 	'privacy.since': 'depuis le {date}',
 	'privacy.stayedHere': 'Resté ici',
 	'privacy.answersHere': 'réponses écrites sur cet appareil',
-	'privacy.whereItWent': 'Où c’est parti',
+	'privacy.whereItWent': 'Destinataires',
 	'privacy.col.destination': 'Destination',
 	'privacy.col.requests': 'Requêtes',
 	'privacy.col.sent': 'Envoyé',

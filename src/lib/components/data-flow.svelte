@@ -226,10 +226,13 @@
 	     negates the word, so on the name of a mode we actually offer it reads as
 	     "Cloud is disabled" rather than "Cloud is not being used here", and at
 	     10px mono capitals the rule crosses the letters and costs legibility.
-	     Amber stays on the header only. The frame keeps a neutral dashed border and
-	     no fill, so the colour identifies which room this is without a filled amber
-	     block claiming, in the one mode where nothing leaves, that something did. -->
-	<div class="border-border/70 rounded-2xl border border-dashed">
+	     Amber stays on the header only, and the fill is neutral. In this system amber
+	     means one thing, data leaving the device, and this is the room of the one mode
+	     where nothing does: an amber wash here would paint the no-egress state in the
+	     egress colour, which is the confusion the whole drawing exists to remove. The
+	     colour says which room this is, the dashes say it is not in use, and a faint
+	     neutral fill keeps it from reading as an empty outline. -->
+	<div class="border-border/70 bg-muted/20 rounded-2xl border border-dashed">
 		<div
 			class="border-border/70 flex items-center gap-2.5 border-b border-dashed px-6 py-3.5 sm:gap-3"
 		>

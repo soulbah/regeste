@@ -46,7 +46,12 @@
 	});
 </script>
 
-<div class="bg-background min-h-svh">
+<!-- overflow-x-clip, not auto: the chapters mount the app's own 448px panels and
+     the trust boundary runs a rule to both viewport edges, so on a narrow phone
+     something is always wider than the screen. Clipping keeps the document from
+     scrolling sideways; clip rather than hidden so it creates no scroll container
+     and position:sticky on the header keeps working. -->
+<div class="bg-background min-h-svh overflow-x-clip">
 	<header
 		class="sticky top-0 z-40 transition-[background-color,border-color] duration-300 {scrolled
 			? 'bg-background/85 border-border border-b backdrop-blur-md'
@@ -73,16 +78,21 @@
 				>
 					{t('landing.nav.guides')}
 				</Button>
+				<!-- The label goes, the mark stays. Two links were already hidden below sm
+				     and this one still overflowed the viewport by 10px at 375px, which is
+				     an iPhone SE: the page scrolled sideways. An icon-only link needs its
+				     name for assistive technology, hence the aria-label. -->
 				<Button
 					variant="ghost"
 					size="sm"
-					class="text-muted-foreground gap-1.5"
+					class="text-muted-foreground gap-1.5 max-sm:px-2"
 					href={GITHUB}
 					target="_blank"
 					rel="noopener"
+					aria-label={t('landing.nav.github')}
 				>
 					<GithubIcon />
-					{t('landing.nav.github')}
+					<span class="max-sm:hidden">{t('landing.nav.github')}</span>
 				</Button>
 				<Button size="sm" class="ml-2" href={resolve('/chat')}>{t('landing.cta')}</Button>
 			</nav>
@@ -138,7 +148,10 @@
 					<span class="mx-2">·</span>
 					{t('landing.footer.copyright')}
 				</p>
-				<nav class="flex items-center gap-1">
+				<!-- flex-wrap, or the page's clip cuts these off rather than the row folding.
+				     Four French labels are 483px, wider than any phone, and the links are
+				     the whole point of a footer. -->
+				<nav class="flex flex-wrap items-center gap-1">
 					<Button
 						variant="ghost"
 						size="sm"
