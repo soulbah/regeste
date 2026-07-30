@@ -8,6 +8,7 @@ import { readOriginal } from '$lib/opfs';
 import { guardedFetch } from '$lib/net';
 import { DEFAULT_MODEL_KEY, type CloudModelKey } from '$lib/cloud-models';
 import { ASSISTED_ENABLED } from '$lib/flags';
+import { sessionStore } from './session.svelte';
 
 export interface StorageStatus {
 	usage: number;
@@ -105,8 +106,18 @@ class SettingsStore {
 		await db.setSetting('assisted_consented', '1');
 	}
 
-	/** R5 — read-only usage fetch; silent when signed out or offline. */
+	/** R5 — read-only usage fetch; silent when signed out or offline.
+	 *
+	 * Asking without a session is a guaranteed 401 (the endpoint requires one, and
+	 * rightly). It was harmless — the catch left quota null and the picker printed
+	 * the full daily allowance — but it fired on every settings open for every
+	 * signed-out visitor, spending a round trip to be refused and printing a red
+	 * line in the console that reads like a bug. */
 	async refreshQuota(): Promise<void> {
+		if (!sessionStore.user) {
+			this.quota = null;
+			return;
+		}
 		try {
 			const res = await guardedFetch('/api/quota');
 			this.quota = res.ok ? await res.json() : null;

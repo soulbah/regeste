@@ -7,7 +7,7 @@
 	// element-screenshots #stage per scene × language × scheme, and those files
 	// are what the landing shows. Dev-only (see ../+layout.ts).
 	//
-	// ?scene=hero|cite|review|wais  ?lang=fr|en  ?theme=light|dark
+	// ?scene=hero|cite|review|wais|privacy  ?lang=fr|en  ?theme=light|dark
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import { setMode } from 'mode-watcher';
@@ -21,6 +21,7 @@
 	import ChatHeader from '$lib/components/chat-header.svelte';
 	import Composer from '$lib/components/composer.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
+	import PrivacyReport from '$lib/components/privacy-report.svelte';
 	import { chatsStore } from '$lib/state/chats.svelte';
 	import { settingsStore } from '$lib/state/settings.svelte';
 	import { sessionStore } from '$lib/state/session.svelte';
@@ -224,6 +225,57 @@
 		chatsStore.chatDocumentsLoaded = true;
 		filmPhase = 'ready';
 	}
+
+	// The Privacy Report with events in it. The route reads three local tables, so
+	// the populated state was unreachable without first sending passages to a
+	// cloud model — which is why nobody had reviewed it. Plausible figures, not
+	// round ones: a real journal is ragged.
+	const PRIVACY_EVENTS = [
+		{
+			createdAt: 1785200000000,
+			mode: 'assisted',
+			destination: 'cloud',
+			excerptCount: 2,
+			bytesSent: 564
+		},
+		{
+			createdAt: 1785113600000,
+			mode: 'assisted',
+			destination: 'cloud',
+			excerptCount: 3,
+			bytesSent: 1204
+		},
+		{
+			createdAt: 1785027200000,
+			mode: 'myai',
+			destination: 'ollama.local',
+			excerptCount: 4,
+			bytesSent: 2318
+		},
+		{
+			createdAt: 1784940800000,
+			mode: 'assisted',
+			destination: 'cloud',
+			excerptCount: 1,
+			bytesSent: 287
+		},
+		{
+			createdAt: 1784854400000,
+			mode: 'private',
+			destination: 'device',
+			excerptCount: 3,
+			bytesSent: 0
+		}
+	];
+	const PRIVACY_SUMMARY = [
+		{ destination: 'cloud', requests: 3, bytes: 2055 },
+		{ destination: 'ollama.local', requests: 1, bytes: 2318 },
+		{ destination: 'device', requests: 41, bytes: 0 }
+	];
+	const PRIVACY_WEEK = [
+		{ destination: 'cloud', requests: 3, bytes: 2055 },
+		{ destination: 'ollama.local', requests: 1, bytes: 2318 }
+	];
 </script>
 
 {#snippet thread()}
@@ -377,6 +429,17 @@
 						</div>
 					{/if}
 				</div>
+			</div>
+		{:else if scene === 'privacy'}
+			<div id="stage" class="border-border bg-background mx-auto w-[900px] rounded-xl border">
+				<PrivacyReport
+					events={PRIVACY_EVENTS}
+					summary={PRIVACY_SUMMARY}
+					week={PRIVACY_WEEK}
+					loaded={true}
+					error={false}
+					onretry={() => {}}
+				/>
 			</div>
 		{:else}
 			<div id="stage" class="mx-auto w-[1240px] {panelOpen ? 'h-[600px]' : 'h-[520px]'}">

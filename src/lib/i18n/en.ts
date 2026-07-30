@@ -503,8 +503,16 @@ export const en = {
 	'help.network.fix2':
 		'On a company network, ask for this site and the model CDN to be allowed, or use This device, which needs the network only once.',
 
-	'app.reportProblem': 'Report a problem',
-	'app.reportSubject': 'Problem report',
+	'report.title': 'Report a problem',
+	'report.intro': 'Write to us and we will answer, three things make it quick to fix.',
+	'report.step1': 'What you were doing, and what happened instead.',
+	'report.step2': 'Your browser and whether you had it installed as an app.',
+	'report.step3': 'The answer mode you were on, if the problem was an answer.',
+	'report.copy': 'Copy',
+	'report.copied': 'Copied',
+	'report.write': 'Write to us',
+	'report.github': 'Or file it on GitHub',
+	'report.subject': 'Problem report',
 	'app.whatToDo': 'What to do',
 	'app.dbBusy': 'You already have this open in another tab. Close it there, then reload.',
 	'app.dbBlocked':
@@ -636,7 +644,6 @@ export const en = {
 	'landing.nav.how': 'How it works',
 	'landing.nav.guides': 'Guides',
 	'landing.nav.github': 'GitHub',
-	'landing.nav.contact': 'Contact',
 	'landing.cta': 'Open the chat',
 	'landing.cta.code': 'View the code',
 	'landing.hero.title': 'Your documents have the answer.',

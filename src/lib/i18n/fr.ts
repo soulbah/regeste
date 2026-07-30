@@ -505,8 +505,16 @@ export const fr: Record<keyof typeof en, string> = {
 	'help.network.fix2':
 		'Sur un réseau d’entreprise, demandez que ce site et le CDN du modèle soient autorisés, ou utilisez Cet appareil, qui n’a besoin du réseau qu’une fois.',
 
-	'app.reportProblem': 'Signaler un problème',
-	'app.reportSubject': 'Signalement de problème',
+	'report.title': 'Signaler un problème',
+	'report.intro': 'Écrivez-nous et nous répondrons, trois choses rendent la correction rapide.',
+	'report.step1': 'Ce que vous faisiez, et ce qui s’est passé à la place.',
+	'report.step2': 'Votre navigateur, et si vous l’aviez installé comme application.',
+	'report.step3': 'Le mode de réponse utilisé, si le problème portait sur une réponse.',
+	'report.copy': 'Copier',
+	'report.copied': 'Copié',
+	'report.write': 'Nous écrire',
+	'report.github': 'Ou l’ouvrir sur GitHub',
+	'report.subject': 'Signalement de problème',
 	'app.whatToDo': 'Que faire',
 	'app.dbBusy':
 		'Vous avez déjà ceci ouvert dans un autre onglet. Fermez-le, puis rechargez cette page.',
@@ -640,7 +648,6 @@ export const fr: Record<keyof typeof en, string> = {
 	'landing.nav.how': 'Comment ça marche',
 	'landing.nav.guides': 'Guides',
 	'landing.nav.github': 'GitHub',
-	'landing.nav.contact': 'Contact',
 	'landing.cta': 'Ouvrir le chat',
 	'landing.cta.code': 'Voir le code',
 	'landing.hero.title': 'Vos documents ont la réponse.',

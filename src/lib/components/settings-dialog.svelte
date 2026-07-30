@@ -678,14 +678,23 @@
 										{@render row(t('myai.baseUrl'), null, urlControl)}
 										<Separator />
 										{#snippet keyControl()}
-											<Input
-												id="settings-myai-key"
-												type="password"
-												bind:value={keyDraft}
-												placeholder={t('myai.keyPlaceholder')}
-												aria-label={t('myai.apiKey')}
-												class="w-64"
-											/>
+											<!-- A masked field outside a form makes Chrome warn, and the warning is
+											     worth heeding for the reason behind it rather than the noise: a
+											     password manager offering to file a server API key in a credential
+											     vault. The form gives the field the context the browser expects and
+											     autocomplete=off keeps managers out of it. Nothing submits — the
+											     value is saved by the Save button, like every other setting here. -->
+											<form onsubmit={(e) => e.preventDefault()}>
+												<Input
+													id="settings-myai-key"
+													type="password"
+													autocomplete="off"
+													bind:value={keyDraft}
+													placeholder={t('myai.keyPlaceholder')}
+													aria-label={t('myai.apiKey')}
+													class="w-64"
+												/>
+											</form>
 										{/snippet}
 										{@render row(t('myai.apiKey'), null, keyControl)}
 										<Separator />

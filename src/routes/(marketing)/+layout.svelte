@@ -152,14 +152,18 @@
 						{t('landing.nav.guides')}
 					</Button>
 					<!-- The only way to reach a person. GitHub covers anyone willing to
-					     open an issue; this covers everyone else, which is most people. -->
+					     open an issue; this covers everyone else, which is most people.
+					     The label is the address rather than the word "Contact", because
+					     mailto's documented failure is silence: a visitor on webmail with
+					     no registered mail client clicks and nothing happens. Printed, it
+					     survives that — it can be read and copied. -->
 					<Button
 						variant="ghost"
 						size="sm"
-						class="text-muted-foreground"
+						class="text-muted-foreground font-normal"
 						href={`mailto:${CONTACT_EMAIL}`}
 					>
-						{t('landing.nav.contact')}
+						{CONTACT_EMAIL}
 					</Button>
 					<Button
 						variant="ghost"
