@@ -125,6 +125,9 @@ export const en = {
 	'storageRisk.alternative':
 		'Opening this in a normal window fixes it. Cloud and Your server answer without any download.',
 	'storageRisk.anyway': 'Download anyway',
+	'llm.error.tooLarge':
+		'This device could not load a download that large. A smaller one of {size} is available.',
+	'llm.error.tooLarge.cta': 'Download the smaller one',
 	'llm.error.ephemeral':
 		'A private window cannot store the AI. Open this in a normal window, or pick Cloud or Your server.',
 	'llm.error.storage':
@@ -411,6 +414,8 @@ export const en = {
 	// Settings
 	'settings.title': 'Settings',
 	'settings.subtitle': 'Storage · privacy · offline',
+	'advisory.eviction':
+		'This browser has not committed to keeping your documents, so it may clear them to reclaim space. Installing the app, or allowing storage, settles it.',
 	'update.ready': 'A new version is ready.',
 	'update.cta': 'Reload',
 	'settings.storage.title': 'Storage',
@@ -499,6 +504,16 @@ export const en = {
 		'In Firefox, click the shield in the address bar and turn protections off for this site. In Safari, allow storage for this site in the privacy settings.',
 	'help.blocked.fix3': 'Reload the page.',
 
+	'help.privateWindow.title': 'Everything disappears when the window closes',
+	'help.privateWindow.symptom':
+		'Documents you added are gone the next time you open the app, along with the chats about them.',
+	'help.privateWindow.cause':
+		'A private window keeps nothing once you close it. Chrome and Edge still let documents be added there and read normally, so nothing looks wrong until the window closes and the whole library goes with it. Firefox and Safari refuse the storage from the start, which at least fails where you can see it.',
+	'help.privateWindow.fix1': 'Open the app in a normal window and add your documents again.',
+	'help.privateWindow.fix2':
+		'In a normal window, Settings then Data reads Persistent once the browser has committed to keeping your library.',
+	'help.privateWindow.fix3':
+		'If you cannot leave the private window, export your workspace from Settings before closing it.',
 	'help.tabs.title': 'Open in another tab',
 	'help.tabs.symptom': 'The app says it is already open somewhere else and stops loading.',
 	'help.tabs.cause':
@@ -688,6 +703,7 @@ export const en = {
 	'landing.nav.github': 'GitHub',
 	'landing.cta': 'Open the chat',
 	'landing.cta.code': 'View the code',
+	'landing.meta.title': 'Ask questions about your documents, in your browser',
 	'landing.hero.title': 'Your documents have the answer.',
 	'landing.hero.sub':
 		'Ask a question and get a written answer that cites the exact passages it came from. Everything runs in your browser, and with the on-device model your files never leave your machine.',
@@ -696,10 +712,12 @@ export const en = {
 	'landing.modes.sub':
 		'Reading your documents and searching them happen in this browser. The three modes differ on one point: who writes the answer.',
 	'landing.modes.private': 'A small model runs inside your browser tab.',
+	'landing.modes.show': 'See this one',
+	'landing.modes.showing': 'Showing',
 	'landing.modes.private.cost': 'One download to start, and a slower answer.',
 	'landing.modes.assisted': 'Sign in, and the answer is written online.',
 	'landing.modes.assisted.cost': 'An account, and a daily allowance.',
-	'landing.modes.myai': 'Plug in your own AI server.',
+	'landing.modes.myai': 'For an AI you already run yourself, like Ollama or LM Studio.',
 	'landing.modes.myai.cost': 'A server you keep running.',
 	'landing.cite.title': 'Every claim shows its source.',
 	'landing.cite.sub':
@@ -803,6 +821,8 @@ export const en = {
 	'hiw.boundaryCrossed': 'What crosses',
 	'hiw.frame': 'This browser',
 	'hiw.lane.ingest': 'Adding a document',
+	'hiw.lane.answer': 'Writing the answer',
+	'hiw.zone.unused': 'Not used',
 	'hiw.lane.ask': 'Asking a question',
 	'hiw.proofTitle': 'Check it yourself',
 	'hiw.proofBody':

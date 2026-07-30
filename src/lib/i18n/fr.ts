@@ -118,6 +118,9 @@ export const fr: Record<keyof typeof en, string> = {
 	'storageRisk.alternative':
 		'Ouvrir ceci dans une fenêtre normale règle le problème. Cloud et Votre serveur répondent sans aucun téléchargement.',
 	'storageRisk.anyway': 'Télécharger quand même',
+	'llm.error.tooLarge':
+		'Cet appareil n’a pas pu charger un téléchargement de cette taille. Un plus petit, de {size}, est disponible.',
+	'llm.error.tooLarge.cta': 'Télécharger le plus petit',
 	'llm.error.ephemeral':
 		'Une fenêtre privée ne peut pas stocker l’IA. Ouvrez ceci dans une fenêtre normale, ou choisissez Cloud ou Votre serveur.',
 	'llm.error.storage':
@@ -408,6 +411,8 @@ export const fr: Record<keyof typeof en, string> = {
 	// Settings
 	'settings.title': 'Réglages',
 	'settings.subtitle': 'Stockage · confidentialité · hors ligne',
+	'advisory.eviction':
+		'Ce navigateur ne s’est pas engagé à conserver vos documents, il peut donc les effacer pour récupérer de la place. Installer l’application, ou autoriser le stockage, règle la question.',
 	'update.ready': 'Une nouvelle version est prête.',
 	'update.cta': 'Recharger',
 	'settings.storage.title': 'Stockage',
@@ -500,6 +505,17 @@ export const fr: Record<keyof typeof en, string> = {
 		'Dans Firefox, cliquez sur le bouclier dans la barre d’adresse et désactivez les protections pour ce site. Dans Safari, autorisez le stockage pour ce site dans les réglages de confidentialité.',
 	'help.blocked.fix3': 'Rechargez la page.',
 
+	'help.privateWindow.title': 'Tout disparaît à la fermeture de la fenêtre',
+	'help.privateWindow.symptom':
+		'Les documents que vous avez ajoutés ont disparu à l’ouverture suivante, et les discussions à leur sujet avec eux.',
+	'help.privateWindow.cause':
+		'Une fenêtre privée ne garde rien une fois fermée. Chrome et Edge laissent pourtant les documents s’ajouter et se lire normalement, donc rien ne semble anormal jusqu’à la fermeture, qui emporte toute la bibliothèque. Firefox et Safari refusent le stockage dès le départ, ce qui a au moins le mérite de se voir.',
+	'help.privateWindow.fix1':
+		'Ouvrez l’application dans une fenêtre normale, puis ajoutez vos documents à nouveau.',
+	'help.privateWindow.fix2':
+		'Dans une fenêtre normale, Réglages puis Données affiche « Persistant » dès que le navigateur s’est engagé à conserver votre bibliothèque.',
+	'help.privateWindow.fix3':
+		'Si vous ne pouvez pas quitter la fenêtre privée, exportez votre espace de travail depuis les Réglages avant de la fermer.',
 	'help.tabs.title': 'Déjà ouvert dans un autre onglet',
 	'help.tabs.symptom': 'L’app annonce qu’elle est déjà ouverte ailleurs et s’arrête de charger.',
 	'help.tabs.cause':
@@ -692,6 +708,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'landing.nav.github': 'GitHub',
 	'landing.cta': 'Ouvrir le chat',
 	'landing.cta.code': 'Voir le code',
+	'landing.meta.title': 'Interrogez vos documents, dans votre navigateur',
 	'landing.hero.title': 'Vos documents ont la réponse.',
 	'landing.hero.sub':
 		'Posez une question, recevez une réponse rédigée qui cite les passages exacts dont elle vient. Tout se passe dans votre navigateur, et avec le modèle sur l’appareil vos fichiers ne quittent jamais votre machine.',
@@ -700,10 +717,12 @@ export const fr: Record<keyof typeof en, string> = {
 	'landing.modes.sub':
 		'La lecture de vos documents et leur recherche se font dans ce navigateur. Les trois modes ne diffèrent que sur un point : qui rédige la réponse.',
 	'landing.modes.private': 'Un petit modèle tourne dans l’onglet de votre navigateur.',
+	'landing.modes.show': 'Voir celui-ci',
+	'landing.modes.showing': 'Affiché',
 	'landing.modes.private.cost': 'Un téléchargement pour démarrer, et une réponse plus lente.',
 	'landing.modes.assisted': 'Connectez-vous, la réponse s’écrit en ligne.',
 	'landing.modes.assisted.cost': 'Un compte, et une réserve quotidienne.',
-	'landing.modes.myai': 'Branchez votre propre serveur d’IA.',
+	'landing.modes.myai': 'Pour une IA que vous faites déjà tourner, comme Ollama ou LM Studio.',
 	'landing.modes.myai.cost': 'Un serveur que vous gardez allumé.',
 	'landing.cite.title': 'Chaque affirmation montre sa source.',
 	'landing.cite.sub':
@@ -804,6 +823,8 @@ export const fr: Record<keyof typeof en, string> = {
 	'hiw.boundaryCrossed': 'Ce qui traverse',
 	'hiw.frame': 'Ce navigateur',
 	'hiw.lane.ingest': 'Ajouter un document',
+	'hiw.lane.answer': 'La réponse s’écrit',
+	'hiw.zone.unused': 'Non utilisé',
 	'hiw.lane.ask': 'Poser une question',
 	'hiw.proofTitle': 'Vérifiez par vous-même',
 	'hiw.proofBody':
