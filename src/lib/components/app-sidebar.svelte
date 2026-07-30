@@ -3,7 +3,7 @@
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import NavUser from '$lib/components/nav-user.svelte';
-	import UpdateNotice from '$lib/components/update-notice.svelte';
+	import SessionAdvisory from '$lib/components/session-advisory.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -248,7 +248,7 @@
 	     sidebar is already a column of hairlines and one more would read as
 	     another group header rather than as a floor. -->
 	<Sidebar.Footer class="mt-4">
-		<UpdateNotice />
+		<SessionAdvisory />
 		<NavUser />
 	</Sidebar.Footer>
 	<Sidebar.ResizeHandle aria-label={t('sidebar.resizeAria')} />

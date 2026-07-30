@@ -43,6 +43,14 @@ export const HELP_TOPICS: HelpTopic[] = [
 		fix: ['help.blocked.fix1', 'help.blocked.fix2', 'help.blocked.fix3']
 	},
 	{
+		id: 'private-window',
+		kind: 'help.kind.storage',
+		title: 'help.privateWindow.title',
+		symptom: 'help.privateWindow.symptom',
+		cause: 'help.privateWindow.cause',
+		fix: ['help.privateWindow.fix1', 'help.privateWindow.fix2', 'help.privateWindow.fix3']
+	},
+	{
 		id: 'two-tabs',
 		kind: 'help.kind.storage',
 		title: 'help.tabs.title',

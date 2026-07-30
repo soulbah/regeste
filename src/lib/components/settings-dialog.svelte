@@ -482,7 +482,20 @@
 											{@render stateBadge(privateR, 'private')}
 										</header>
 										{#snippet privateModelControl()}
-											{#if privateR.state === 'setup'}
+											{#if llmStore.smallerTier}
+												<!-- A load that failed on size. The line beside this button already
+												     carries llmStore.errorMessage through blockedLine, so the button
+												     only has to be the way out — and it must be a click, never an
+												     automatic retry: a rung down is a weaker model and another
+												     download of gigabytes. -->
+												<Button
+													size="sm"
+													variant="outline"
+													onclick={() => llmStore.acceptSmaller()}
+												>
+													{t('llm.error.tooLarge.cta')}
+												</Button>
+											{:else if privateR.state === 'setup'}
 												<Button size="sm" onclick={() => llmStore.prepare()}>
 													{llmStore.prepared
 														? t('settings.ai.load')

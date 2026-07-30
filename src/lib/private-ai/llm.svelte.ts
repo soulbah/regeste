@@ -76,6 +76,9 @@ class LlmStore {
 	/** Set when the browser refused to commit to keeping the weights, so the UI can
 	 * warn BEFORE spending gigabytes. Cleared by proceeding or by cancelling. */
 	storageRisk = $state(false);
+	/** A smaller rung this device might manage, offered after a load failed. Never
+	 * taken automatically: a download is minutes and gigabytes, so it is a choice. */
+	smallerTier = $state<Tier | null>(null);
 	/** True when weights are cached from a previous session (fast load). */
 	prepared = $state(false);
 	lastMetrics = $state<Omit<GenerationResult, 'text'> | null>(null);
@@ -105,6 +108,19 @@ class LlmStore {
 		// other way to reach this instance, and waiting for a click it will never
 		// receive is what left benchmark runs stalled on a disabled button.
 		if (this.prepared || forced) void this.prepare();
+	}
+
+	/** Take the smaller rung offered after a failure. Separate from prepare() so
+	 * the choice is always the person's, and forced past the storage gate because
+	 * they have already been through it once. */
+	async acceptSmaller(): Promise<void> {
+		if (!this.smallerTier) return;
+		this.tier = this.smallerTier;
+		this.smallerTier = null;
+		this.errorMessage = null;
+		this.prepared = localStorage.getItem(PREPARED_KEY) === this.tier.model;
+		this.status = 'needs-download';
+		await this.prepare({ force: true });
 	}
 
 	/** Explicit user consent → download (or fast cache load) then ready.
@@ -173,16 +189,23 @@ class LlmStore {
 			// for a problem no tab was causing.
 			const storageFailure = /quota|storage|exceeded/i.test(message) || /on 'Cache'/.test(message);
 
-			// Downgrading assumes the failure was about capability. On a storage
-			// failure it is not: a window that cannot hold five gigabytes will not
-			// hold two either, and each attempt re-downloads the whole model through
-			// the deployment's own proxy. Fail once and say why.
+			// This block used to recurse into prepare() to try a smaller rung, and it
+			// could not work: prepare() had already set status to 'downloading' at the
+			// top, and its own guard returns immediately on that status. So the retry
+			// never ran, `status = 'error'` below was never reached, and the progress
+			// bar froze at the percentage it died on — permanently, with no message,
+			// while the mode picker kept reporting "preparing · 46%" and Send stayed
+			// blocked. Every device marginal enough to need the downgrade got that.
+			//
+			// It is also not a decision to take silently. A rung down is a different,
+			// weaker model and another download of gigabytes; offering it beats
+			// spending someone's bandwidth on a guess.
 			if (!storageFailure) {
-				const lower = this.tier ? downgrade(this.tier) : null;
-				if (lower) {
-					this.tier = lower;
-					this.prepared = localStorage.getItem(PREPARED_KEY) === lower.model;
-					return this.prepare({ force: true });
+				this.smallerTier = this.tier ? downgrade(this.tier) : null;
+				if (this.smallerTier) {
+					this.status = 'error';
+					this.errorMessage = t('llm.error.tooLarge', { size: this.smallerTier.downloadLabel });
+					return;
 				}
 			}
 			this.status = 'error';

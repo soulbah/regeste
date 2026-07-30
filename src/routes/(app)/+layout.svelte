@@ -17,8 +17,11 @@
 	import { viewerStore } from '$lib/state/viewer.svelte';
 	import { panelStore } from '$lib/state/panel.svelte';
 	import StorageRiskDialog from '$lib/components/storage-risk-dialog.svelte';
+	import { registerAdvisories } from '$lib/state/register-advisories.svelte';
 
 	let { children } = $props();
+
+	registerAdvisories();
 </script>
 
 <CommandPalette />
