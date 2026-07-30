@@ -87,7 +87,11 @@
 	});
 	const metaLine = $derived(
 		mode === 'private'
-			? t('turn.privateMeta', { count: excerpts.length, s: excerpts.length === 1 ? '' : 's' })
+			? t('turn.privateMeta', {
+					mode: modeLabel.private,
+					count: excerpts.length,
+					s: excerpts.length === 1 ? '' : 's'
+				})
 			: meta
 				? `${modeLabel[mode]} · ${meta}`
 				: modeLabel[mode]

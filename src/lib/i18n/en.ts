@@ -5,7 +5,7 @@ export const en = {
 	// Common
 	'common.cancel': 'Cancel',
 	'common.close': 'Close',
-	'disabled.chooseMode': 'Choose an AI mode first.',
+	'disabled.chooseMode': 'Choose an answer mode first.',
 	'disabled.modeNotReady': 'Finish setting up this mode first.',
 	'disabled.needUrl': 'Enter the base URL first.',
 	'disabled.emptyMessage': 'Write a message first.',
@@ -137,7 +137,7 @@ export const en = {
 	'modes.offlineOn': 'Offline mode is on',
 	'modes.choose': 'Answer mode',
 	'onboard.chooseMode': 'Choose answer mode',
-	'onboard.headline': 'Pick what answers you.',
+	'onboard.headline': 'Choose where the answer is written.',
 	'onboard.headlineSub': 'You can change this at any time.',
 	'onboard.pick': 'Use this',
 	'onboard.cost.download': 'One-time download · {size}',
@@ -212,7 +212,7 @@ export const en = {
 	// Documents (library page + shared rows)
 	'docs.title': 'Documents',
 	'docs.reviewSend': 'Always check what leaves this chat',
-	'docs.privateOnly': 'Private only: no cloud mode in this chat',
+	'docs.privateOnly': 'This device only: no cloud mode in this chat',
 	'docs.useAria': 'Use {name} for questions',
 	'docs.openAria': 'Open {name} in the viewer',
 	'docs.removeAria': 'Remove {name} from this chat',
@@ -262,11 +262,11 @@ export const en = {
 	// Retrieval preview turn — plain language; the reason adapts to why no answer
 	// was written, and points at the documents (source chips) the user sees.
 	'retrieval.found': 'Found in your documents',
-	'retrieval.reason.download': 'Download the on-device AI for a written answer.',
+	'retrieval.reason.download': 'Download the local model for a written answer.',
 	'retrieval.reason.setup': 'Set up this mode for a written answer.',
-	'retrieval.reason.loading': 'The on-device AI is getting ready, try again in a moment.',
+	'retrieval.reason.loading': 'The local model is getting ready, try again in a moment.',
 	'retrieval.reason.ready': 'Ask again for a written answer.',
-	'retrieval.reason.generic': 'Turn on an AI mode for a written answer.',
+	'retrieval.reason.generic': 'Pick an answer mode to get a written answer.',
 	'retrieval.noDocs': 'No documents in this chat. Add one to ask questions about it.',
 	'retrieval.noHits': 'Nothing in your documents matches this question.',
 	'retrieval.weak': 'These sources barely match the question. An answer may be unreliable.',
@@ -309,7 +309,7 @@ export const en = {
 	'home.pickAll': 'All {count} documents',
 	'home.addNew': 'Add a file',
 	'home.sampleLead': 'New here?',
-	'home.sampleLink': 'Try a sample contract',
+	'home.sampleLink': 'Try with a sample contract',
 	'home.sub': 'Add documents, ask questions, and see exactly what gets shared.',
 	'home.demoPreparing': 'Preparing the demo…',
 	'home.demoCta': 'Try with a sample contract',
@@ -436,7 +436,7 @@ export const en = {
 	'addDocs.menuAria': 'Add documents and actions',
 	'composer.enterHint': '⏎ send · ⇧⏎ new line',
 	'composer.sendAria': 'Send',
-	'turn.privateMeta': 'Private · {count} passage{s}',
+	'turn.privateMeta': '{mode} · {count} passage{s}',
 	'work.search.active': 'Searching {count} documents',
 	'work.search.done': 'Searched {count} documents',
 	'work.inspect.active': 'Checking relevant passages',
@@ -460,7 +460,7 @@ export const en = {
 	'turn.copyAria': 'Copy the answer',
 	'turn.prevVersion': 'Previous version',
 	'turn.nextVersion': 'Next version',
-	'turn.quote': 'Reply',
+	'turn.quote': 'Quote',
 	'related.title': 'Related',
 	'clarification.scope': 'Should I calculate this for one record or across all selected documents?',
 	'clarification.financialRole':
@@ -859,10 +859,9 @@ export const en = {
 	'aggregate.ambiguous':
 		'Several amount types match. Specify whether you need sent amounts, received amounts, fees, or debited totals.',
 	'aggregate.ambiguousCalculation': 'Amount type required',
-	'aggregate.none':
-		'I found no sufficiently reliable amount to calculate in the selected documents.',
+	'aggregate.none': 'No amount reliable enough to calculate was found in the selected documents.',
 	'aggregate.noneCalculation': 'No amount retained',
-	'aggregate.count': 'The number of matching records is {count}. {citations}',
+	'aggregate.count': 'There are {count} matching record(s). {citations}',
 	'aggregate.countCalculation': '{count} matching record(s)',
 	'aggregate.list': 'The amounts are {values}.',
 	'aggregate.sum': 'The sum is',
@@ -874,5 +873,5 @@ export const en = {
 	'aggregate.average': 'The average is',
 	'aggregate.minimum': 'The minimum is',
 	'aggregate.maximum': 'The maximum is',
-	'aggregate.excluded': '{count} ambiguous document(s) were excluded.'
+	'aggregate.excluded': '{count} ambiguous document(s) set aside.'
 } as const;

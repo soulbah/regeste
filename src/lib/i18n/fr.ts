@@ -8,7 +8,7 @@ export const fr: Record<keyof typeof en, string> = {
 	// Common
 	'common.cancel': 'Annuler',
 	'common.close': 'Fermer',
-	'disabled.chooseMode': "Choisissez d'abord un mode IA.",
+	'disabled.chooseMode': 'Choisissez d’abord un mode de réponse.',
 	'disabled.modeNotReady': "Terminez d'abord la configuration de ce mode.",
 	'disabled.needUrl': "Renseignez d'abord l'URL de base.",
 	'disabled.emptyMessage': "Écrivez d'abord un message.",
@@ -61,15 +61,15 @@ export const fr: Record<keyof typeof en, string> = {
 
 	// Composer
 	'composer.placeholder': 'Posez une question sur vos documents…',
-	'composer.followUp': 'Poser une question de suivi…',
+	'composer.followUp': 'Poser une autre question…',
 	'composer.attachFrom': 'Joindre depuis vos documents',
 	'composer.footer': 'Les réponses citent vos documents',
 	'composer.preparingOne': 'Préparation de {name}',
 	'composer.preparingMany': 'Préparation de {count} documents',
 	'composer.preparingStep': '{phase}, étape {step} sur 4',
-	'composer.preparingAvailable': '{count} prêt, vous pouvez déjà poser une question',
+	'composer.preparingAvailable': '{count} prêt{s}, vous pouvez déjà poser une question',
 	'composer.documentsReady': 'Vos documents sont prêts pour la recherche',
-	'composer.waitPlaceholder': 'Écrivez votre question, elle partira dès que le document est prêt…',
+	'composer.waitPlaceholder': 'Écrivez votre question, elle partira dès que le document sera prêt…',
 
 	// Preset actions (R3)
 	'actions.menu': 'Actions',
@@ -90,7 +90,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'app.unexpected': 'Un problème est survenu.',
 	'viewer.renderFailed': 'Cette page n’a pas pu être affichée. Réessayez.',
 	'toast.originalNotKept':
-		'Le fichier original n’a pas pu être conservé. Les réponses fonctionnent ; la vue page de ce document montrera ses passages à la place.',
+		'Le fichier original n’a pas pu être conservé. Les réponses fonctionnent ; l’aperçu de ce document affichera ses passages à la place.',
 	'modes.private.name': 'Cet appareil',
 	'modes.assisted.name': 'Cloud',
 	'modes.myai.name': 'Votre serveur',
@@ -131,7 +131,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'modes.offlineOn': 'Le mode hors ligne est activé',
 	'modes.choose': 'Mode de réponse',
 	'onboard.chooseMode': 'Choisir le mode de réponse',
-	'onboard.headline': 'Choisissez qui vous répond.',
+	'onboard.headline': 'Choisissez où la réponse s’écrit.',
 	'onboard.headlineSub': 'Vous pourrez en changer à tout moment.',
 	'onboard.pick': 'Utiliser',
 	'onboard.cost.download': 'Téléchargement unique · {size}',
@@ -140,7 +140,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'onboard.downloading': 'Téléchargement en cours. Ajoutez un document en attendant.',
 	'onboard.unfinished': 'Terminez la configuration pour obtenir des réponses.',
 	'onboard.resume': 'Terminer',
-	'onboard.needDownload': 'Téléchargez le modèle pour répondre sur cet appareil.',
+	'onboard.needDownload': 'Téléchargez le modèle pour obtenir des réponses sur cet appareil.',
 	'onboard.needEndpoint': 'Configurez votre serveur pour obtenir des réponses.',
 	'modes.state.ready': 'Prêt',
 	'modes.state.setup': 'Configurer',
@@ -203,12 +203,12 @@ export const fr: Record<keyof typeof en, string> = {
 	// Documents (library page + shared rows)
 	'docs.title': 'Documents',
 	'docs.reviewSend': 'Toujours vérifier ce qui part de cette discussion',
-	'docs.privateOnly': 'Privé uniquement : aucun mode cloud dans cette discussion',
+	'docs.privateOnly': 'Cet appareil uniquement : aucun mode cloud dans cette discussion',
 	'docs.useAria': 'Utiliser {name} pour les questions',
 	'docs.openAria': 'Ouvrir {name} dans la visionneuse',
 	'docs.removeAria': 'Retirer {name} de cette discussion',
 	'docs.empty': 'Aucun document dans cette discussion pour le moment.',
-	'docs.emptyHint': 'Ajoutez-en un pour poser des questions dessus.',
+	'docs.emptyHint': 'Ajoutez-en un pour pouvoir l’interroger.',
 	'docs.add': 'Ajouter des documents',
 	'docs.optionsAria': 'Options de {name}',
 	'docs.remove': 'Retirer de la discussion',
@@ -225,7 +225,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'status.failed': 'Échec',
 
 	// Pre-send review panel
-	'presend.title': 'Avant que ça parte',
+	'presend.title': 'Avant l’envoi',
 	'presend.subtitle': 'Vérifiez ce qui quitte votre appareil',
 	'presend.question': 'Votre question',
 	'presend.context': 'Contexte de la discussion',
@@ -236,7 +236,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'presend.match': 'pertinence {pct}%',
 	'presend.firstTime': 'Première fois que quelque chose quitte cet appareil',
 	'presend.firstTimeBody':
-		"Jusqu'ici, tout s'est passé sur votre appareil. Cet envoi transmet votre question et les passages cochés au service Cloud, jamais vos fichiers. Vous recevez votre réponse, et rien n'est stocké ni journalisé.",
+		"Jusqu'ici, tout s'est passé sur votre appareil. Cet envoi transmet votre question et les passages cochés au service Cloud, jamais vos fichiers. Vous recevez votre réponse, et rien n’est enregistré.",
 	'presend.consent': "J'ai compris, continuer",
 	'presend.count': '{selected}/{total} passages · {kb} Ko',
 	'presend.footer':
@@ -255,13 +255,13 @@ export const fr: Record<keyof typeof en, string> = {
 	// Retrieval preview turn — langage clair ; la raison s'adapte à pourquoi aucune
 	// réponse n'a été rédigée, et pointe vers les documents (chips-sources) affichés.
 	'retrieval.found': 'Trouvés dans vos documents',
-	'retrieval.reason.download': "Téléchargez l'IA sur votre appareil pour une réponse rédigée.",
+	'retrieval.reason.download': 'Téléchargez le modèle local pour une réponse rédigée.',
 	'retrieval.reason.setup': 'Configurez ce mode pour une réponse rédigée.',
-	'retrieval.reason.loading': "L'IA sur votre appareil se prépare, réessayez dans un instant.",
+	'retrieval.reason.loading': 'Le modèle local se prépare, réessayez dans un instant.',
 	'retrieval.reason.ready': 'Reposez votre question pour une réponse rédigée.',
-	'retrieval.reason.generic': 'Activez un mode IA pour une réponse rédigée.',
+	'retrieval.reason.generic': 'Choisissez un mode de réponse pour obtenir un texte rédigé.',
 	'retrieval.noDocs':
-		'Aucun document dans cette discussion. Ajoutez-en un pour poser des questions dessus.',
+		'Aucun document dans cette discussion. Ajoutez-en un pour pouvoir l’interroger.',
 	'retrieval.noHits': 'Rien dans vos documents ne correspond à cette question.',
 	'retrieval.weak':
 		'Ces sources ont peu de rapport avec la question. Une réponse peut être peu fiable.',
@@ -274,7 +274,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'wais.device': "cet appareil, rien n'a été envoyé",
 	'wais.zeroBytes': '0 octet envoyé',
 	'wais.kbSent': '{kb} Ko envoyés',
-	'wais.excluded': 'Exclu par vous',
+	'wais.excluded': 'Écarté',
 	'wais.sent': 'Envoyé',
 	'wais.stayed': 'Resté',
 	'wais.noPassages': 'Aucun passage de document. Seule votre question était concernée.',
@@ -305,11 +305,11 @@ export const fr: Record<keyof typeof en, string> = {
 	'home.pickAll': 'Les {count} documents',
 	'home.addNew': 'Ajouter un fichier',
 	'home.sampleLead': 'Première fois ?',
-	'home.sampleLink': 'Essayez avec un contrat d’exemple',
+	'home.sampleLink': 'Essayer avec un contrat d’exemple',
 	'home.sub': 'Ajoutez des documents, posez des questions et voyez exactement ce qui est partagé.',
 	'home.demoPreparing': 'Préparation de la démo…',
-	'home.demoCta': 'Essayer avec un contrat fictif',
-	'home.demoTitle': 'Démo · contrat fictif',
+	'home.demoCta': 'Essayer avec un contrat d’exemple',
+	'home.demoTitle': 'Démo · contrat d’exemple',
 	'home.drop': 'Déposez pour démarrer une discussion',
 
 	// Chat page
@@ -324,7 +324,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'chat.drop': 'Déposez pour ajouter à cette discussion',
 	'chat.fromSections': 'Depuis les sections de votre document',
 	'chat.editAria': 'Modifier cette question',
-	'chat.reviewing': 'En attente de votre vérification dans le panneau latéral',
+	'chat.reviewing': 'En attente de votre relecture dans le panneau latéral',
 	'chat.writing': 'Préparation de votre réponse…',
 	'chat.reading': 'Recherche dans vos documents…',
 	'chat.stop': 'Arrêter',
@@ -433,23 +433,22 @@ export const fr: Record<keyof typeof en, string> = {
 	'addDocs.menuAria': 'Ajouter des documents et des actions',
 	'composer.enterHint': '⏎ envoyer · ⇧⏎ à la ligne',
 	'composer.sendAria': 'Envoyer',
-	'turn.privateMeta': 'Privé · {count} passage{s}',
+	'turn.privateMeta': '{mode} · {count} passage{s}',
 	'work.search.active': 'Recherche dans {count} documents',
-	'work.search.done': 'Recherche faite dans {count} documents',
+	'work.search.done': '{count} documents fouillés',
 	'work.inspect.active': 'Vérification des passages pertinents',
 	'work.inspect.done': '{count} passages vérifiés',
 	'work.calculate.active': 'Calcul exact des valeurs',
 	'work.calculate.done': '{count} valeurs calculées',
 	'work.write.active': 'Rédaction de la réponse',
-	'work.write.waiting': 'En attente de votre validation de ce qui part',
+	'work.write.waiting': 'En attente de votre accord sur ce qui part',
 	'work.write.done': 'Réponse rédigée',
 	'work.method': 'Comment ce résultat a été construit',
 	'work.method.targeted': '{count} passages pertinents retrouvés et vérifiés.',
 	'work.method.synthesis': '{count} passages pertinents comparés avant la réponse.',
 	'work.method.aggregate':
-		'Documents sélectionnés lus intégralement, puis calcul effectué sur {count} valeurs retenues.',
-	'work.method.clarification':
-		'Une précision a été demandée avant la recherche dans les documents.',
+		'Documents sélectionnés lus intégralement, puis calcul sur {count} valeurs retenues.',
+	'work.method.clarification': 'Précision demandée avant la recherche dans les documents.',
 	'work.method.notes': 'Notes de travail',
 	'work.method.notesAll': 'Tout afficher',
 	'work.method.notesLess': 'Réduire',
@@ -565,7 +564,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'report.subject': 'Signalement de problème',
 	'app.whatToDo': 'Que faire',
 	'app.dbBusy':
-		'Vous avez déjà ceci ouvert dans un autre onglet. Fermez-le, puis rechargez cette page.',
+		'Cette application est déjà ouverte dans un autre onglet. Fermez-le, puis rechargez cette page.',
 	'app.dbBlocked':
 		'Ce navigateur bloque le stockage pour ce site, donc rien ne peut être enregistré ici. Quittez la navigation privée, ou autorisez le stockage pour ce site, puis rechargez.',
 	'app.workerFailed.title': "Cette page n'a pas fini de se charger",
@@ -854,8 +853,8 @@ export const fr: Record<keyof typeof en, string> = {
 	'notice.retry': 'Réessayer',
 	'notice.stopped': "La génération s'est arrêtée avant la réponse.",
 	'notice.myaiUnreachable':
-		"Votre serveur d'IA est injoignable. Vérifiez qu'il tourne, l'URL et ses réglages CORS.",
-	'notice.quota': 'Votre réserve du jour est épuisée. Elle revient demain.',
+		'Votre serveur d’IA est injoignable. Vérifiez qu’il est démarré, puis l’URL et ses réglages CORS.',
+	'notice.quota': 'Votre quota du jour est épuisé. Il revient demain.',
 	'notice.signIn': 'Connectez-vous pour utiliser le mode Cloud.',
 	'notice.assistedDown': 'Le service Cloud est indisponible pour le moment.',
 	'notice.assistedUnreachable': 'Le service Cloud est injoignable. Vérifiez votre connexion.',
@@ -864,10 +863,9 @@ export const fr: Record<keyof typeof en, string> = {
 	'aggregate.ambiguous':
 		'Plusieurs types de montants correspondent. Précisez si vous cherchez les montants envoyés, reçus, les frais ou les totaux débités.',
 	'aggregate.ambiguousCalculation': 'Type de montant à préciser',
-	'aggregate.none':
-		'Je n’ai trouvé aucun montant suffisamment fiable à calculer dans les documents sélectionnés.',
+	'aggregate.none': 'Aucun montant suffisamment fiable à calculer dans les documents sélectionnés.',
 	'aggregate.noneCalculation': 'Aucun montant retenu',
-	'aggregate.count': 'Le nombre d’opérations correspondantes est {count}. {citations}',
+	'aggregate.count': 'Il y a {count} opération(s) correspondante(s). {citations}',
 	'aggregate.countCalculation': '{count} opération(s) correspondante(s)',
 	'aggregate.list': 'Les montants sont {values}.',
 	'column.first': '{label} : {value}, à la première ligne du tableau ({date}).',
@@ -879,5 +877,5 @@ export const fr: Record<keyof typeof en, string> = {
 	'aggregate.average': 'La moyenne est',
 	'aggregate.minimum': 'Le minimum est',
 	'aggregate.maximum': 'Le maximum est',
-	'aggregate.excluded': '{count} document(s) ambigu(s) ont été exclus.'
+	'aggregate.excluded': '{count} document(s) ambigu(s) écarté(s).'
 };

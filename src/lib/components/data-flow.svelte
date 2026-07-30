@@ -100,7 +100,7 @@
 			{#each steps as step, i (step.key)}
 				{#if i > 0}
 					<span
-						class="border-border flow flow-x mt-[22px] hidden w-10 border-t md:block lg:w-16"
+						class="border-border/50 flow flow-x mt-[22px] hidden w-10 border-t md:block lg:w-16"
 						style="--flow-delay: {i * 0.34}s"
 					></span>
 				{/if}
@@ -268,28 +268,54 @@
 		position: relative;
 	}
 
+	/* The animation name is written literally in each direction's rule, never handed
+	   in through a custom property. Svelte prefixes a component's @keyframes with its
+	   scope hash and rewrites the declarations that name them, and it cannot see
+	   through var(): the name resolved to an unscoped `flow-x`, which no longer
+	   existed, so this never ran once. It looked like a visibility problem for weeks
+	   and it was a dead reference. */
 	.flow::after {
 		content: '';
 		position: absolute;
 		background-repeat: no-repeat;
-		animation: var(--flow-anim) 2.9s linear infinite;
+		animation-duration: 2.9s;
+		animation-timing-function: linear;
+		animation-iteration-count: infinite;
 		animation-delay: var(--flow-delay, 0s);
 	}
 
+	/* A spark of fixed length, not a proportion of the connector.
+	   At 45% of its own segment the highlight measured 18px on a 40px connector,
+	   and the gradient spends its ends on transparency, so two or three pixels were
+	   actually lit: the animation ran and nobody could see it. 26px carries the same
+	   weight on every segment and at every breakpoint, and the colour stops keep a
+	   tight bright core instead of a long fade. */
 	.flow-x::after {
 		inset: -1px 0 auto 0;
 		height: 1px;
-		background-image: linear-gradient(90deg, transparent, var(--accent-foreground), transparent);
-		background-size: 45% 100%;
-		--flow-anim: flow-x;
+		background-image: linear-gradient(
+			90deg,
+			transparent 0%,
+			var(--accent-foreground) 45%,
+			var(--accent-foreground) 55%,
+			transparent 100%
+		);
+		background-size: 26px 100%;
+		animation-name: flow-x;
 	}
 
 	.flow-y::after {
 		inset: 0 auto 0 -1px;
 		width: 1px;
-		background-image: linear-gradient(180deg, transparent, var(--accent-foreground), transparent);
-		background-size: 100% 45%;
-		--flow-anim: flow-y;
+		background-image: linear-gradient(
+			180deg,
+			transparent 0%,
+			var(--accent-foreground) 45%,
+			var(--accent-foreground) 55%,
+			transparent 100%
+		);
+		background-size: 100% 26px;
+		animation-name: flow-y;
 	}
 
 	.flow-amber.flow-y::after {
@@ -298,19 +324,19 @@
 
 	@keyframes flow-x {
 		from {
-			background-position: -45% 0;
+			background-position: -26px 0;
 		}
 		to {
-			background-position: 145% 0;
+			background-position: calc(100% + 26px) 0;
 		}
 	}
 
 	@keyframes flow-y {
 		from {
-			background-position: 0 -45%;
+			background-position: 0 -26px;
 		}
 		to {
-			background-position: 0 145%;
+			background-position: 0 calc(100% + 26px);
 		}
 	}
 
