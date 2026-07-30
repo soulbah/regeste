@@ -87,6 +87,10 @@ export const fr: Record<keyof typeof en, string> = {
 	'addDocs.upload': 'Importer un fichier',
 
 	// Mode selector — les noms disent OÙ la réponse est calculée (voir en.ts).
+	'app.unexpected': 'Un problème est survenu.',
+	'viewer.renderFailed': 'Cette page n’a pas pu être affichée. Réessayez.',
+	'toast.originalNotKept':
+		'Le fichier original n’a pas pu être conservé. Les réponses fonctionnent ; la vue page de ce document montrera ses passages à la place.',
 	'modes.private.name': 'Cet appareil',
 	'modes.assisted.name': 'Cloud',
 	'modes.myai.name': 'Votre serveur',
@@ -455,6 +459,16 @@ export const fr: Record<keyof typeof en, string> = {
 	'clarification.multiPart': 'À quelle partie faut-il répondre en premier ?',
 	// Page d'aide — le symptôme d'abord, c'est ce qu'on reconnaît.
 	'help.title': 'Si le navigateur bloque',
+	'help.modelStorage.title': 'Quand le téléchargement de l’IA s’arrête en route',
+	'help.modelStorage.symptom':
+		'Le téléchargement de l’IA sur cet appareil échoue à un certain pourcentage, avec un message qui parle de stockage.',
+	'help.modelStorage.cause':
+		'L’IA est un fichier volumineux que ce navigateur conserve localement, et le navigateur a refusé la place. Les deux causes habituelles : une fenêtre privée, qui ne peut pas garder de gros fichiers quoi qu’elle annonce, ou un disque presque plein.',
+	'help.modelStorage.fix1': 'Ouvrez l’application dans une fenêtre normale plutôt que privée.',
+	'help.modelStorage.fix2':
+		'Libérez quelques gigaoctets d’espace disque, puis relancez le téléchargement.',
+	'help.modelStorage.fix3':
+		'Ou passez-vous du téléchargement : les modes Cloud et Votre serveur répondent sans lui.',
 	'help.kind.storage': 'Stockage',
 	'help.kind.browser': 'Navigateur',
 	'help.kind.network': 'Réseau',

@@ -28,6 +28,7 @@
 	// Set to the cited page once the document loads (component is keyed on the chunk).
 	let pageNum = $state(1);
 	let rendering = $state(false);
+	let renderFailed = $state(false);
 	let rects = $state<HighlightRect[]>([]);
 	let pageSize = $state<{ width: number; height: number } | null>(null);
 	let canvas = $state<HTMLCanvasElement | null>(null);
@@ -84,6 +85,7 @@
 	});
 
 	async function renderPage(n: number): Promise<void> {
+		renderFailed = false;
 		if (!pdf || !canvas) return;
 		const seq = ++renderSeq;
 		rendering = true;
@@ -144,6 +146,10 @@
 		} catch (err: unknown) {
 			if ((err as { name?: string })?.name !== 'RenderingCancelledException') {
 				console.error('[regeste] pdf render failed:', err);
+				// A failed frame used to leave the previous page on the canvas and
+				// nothing anywhere else: the one failure in this app that painted no
+				// surface at all. The banner names it and offers the retry.
+				if (seq === renderSeq) renderFailed = true;
 			}
 		} finally {
 			if (seq === renderSeq) rendering = false;
@@ -174,6 +180,16 @@
 				<div class="space-y-2">
 					<Skeleton class="h-4 w-2/3" />
 					<Skeleton class="h-64 w-full" />
+				</div>
+			{/if}
+			{#if renderFailed}
+				<div
+					class="border-border bg-muted/40 flex items-center justify-between gap-3 rounded-md border p-3"
+				>
+					<p class="text-muted-foreground text-sm">{t('viewer.renderFailed')}</p>
+					<Button variant="outline" size="sm" onclick={() => renderPage(pageNum)}>
+						{t('notice.retry')}
+					</Button>
 				</div>
 			{/if}
 			<div class="relative" style:display={status === 'ready' ? 'block' : 'none'}>

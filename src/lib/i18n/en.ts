@@ -92,6 +92,10 @@ export const en = {
 	// "Assisted" said nothing at all about the one mode that leaves the device.
 	// Research is consistent that users assume an AI feature runs locally and
 	// are usually wrong, so the label has to carry the location.
+	'app.unexpected': 'Something went wrong.',
+	'viewer.renderFailed': 'This page could not be drawn. Try again.',
+	'toast.originalNotKept':
+		'The original file could not be kept. Answers still work; the page view for this document will show its passages instead.',
 	'modes.private.name': 'This device',
 	'modes.assisted.name': 'Cloud',
 	'modes.myai.name': 'Your server',
@@ -455,6 +459,15 @@ export const en = {
 	'clarification.multiPart': 'Which part should I answer first?',
 	// Help page. Symptom first, because that is what someone recognises.
 	'help.title': 'When the browser blocks',
+	'help.modelStorage.title': 'When the AI download stops partway',
+	'help.modelStorage.symptom':
+		'The download for the on-device AI fails at some percentage, with a message about storage.',
+	'help.modelStorage.cause':
+		'The AI is a large file this browser stores locally, and the browser refused the space. The two usual reasons: a private window, which cannot keep large files no matter what it reports, or a disk that is nearly full.',
+	'help.modelStorage.fix1': 'Open the app in a normal window rather than a private one.',
+	'help.modelStorage.fix2': 'Free a few gigabytes of disk space, then retry the download.',
+	'help.modelStorage.fix3':
+		'Or skip the download: the Cloud and Your server modes answer without it.',
 	'help.kind.storage': 'Storage',
 	'help.kind.browser': 'Browser',
 	'help.kind.network': 'Network',

@@ -27,6 +27,14 @@ export interface HelpTopic {
 
 export const HELP_TOPICS: HelpTopic[] = [
 	{
+		id: 'model-storage',
+		kind: 'help.kind.storage',
+		title: 'help.modelStorage.title',
+		symptom: 'help.modelStorage.symptom',
+		cause: 'help.modelStorage.cause',
+		fix: ['help.modelStorage.fix1', 'help.modelStorage.fix2', 'help.modelStorage.fix3']
+	},
+	{
 		id: 'storage-blocked',
 		kind: 'help.kind.storage',
 		title: 'help.blocked.title',

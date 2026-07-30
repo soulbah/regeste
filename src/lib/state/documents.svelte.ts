@@ -54,6 +54,8 @@ import {
 	FACT_EXTRACTOR_VERSION,
 	type AggregateResult
 } from '$lib/analysis/aggregate';
+import { toast } from 'svelte-sonner';
+import { t } from '$lib/i18n/index.svelte';
 import type {
 	IngestErrorCode,
 	LibraryDocument,
@@ -117,8 +119,18 @@ async function storeOriginal(hash: string, data: ArrayBuffer): Promise<void> {
 		await w.close();
 	} catch (err) {
 		console.warn('[regeste] could not persist original file to OPFS:', err);
+		// Say it now, once. The consequence otherwise surfaces days later, when the
+		// viewer shows "no longer available" for a document whose answers still
+		// work, with nothing connecting that to this moment. Once per session:
+		// every file in a batch fails the same way for the same reason.
+		if (!originalNotKeptToldOnce) {
+			originalNotKeptToldOnce = true;
+			toast.warning(t('toast.originalNotKept'));
+		}
 	}
 }
+
+let originalNotKeptToldOnce = false;
 
 export interface IngestState {
 	status: LocalDocument['status'];

@@ -9,6 +9,9 @@ export type SettingsTab = 'general' | 'usage' | 'data' | 'ai' | 'account';
 
 class UiStore {
 	settingsOpen = $state(false);
+	/** The report-a-problem dialog, mounted once in the root layout so both the
+	 * sidebar menu and the error funnel's toast can summon it. */
+	reportOpen = $state(false);
 	settingsTab = $state<SettingsTab>('general');
 	/** Mode card to scroll to / focus when the AI tab opens. */
 	settingsFocus = $state<ChatMode | null>(null);

@@ -12,6 +12,9 @@
 	import { isShellCache } from '$lib/pwa/cache-names';
 	import { pwaStore } from '$lib/state/pwa.svelte';
 	import WorkerFailureNotice from '$lib/components/worker-failure-notice.svelte';
+	import ReportProblemDialog from '$lib/components/report-problem-dialog.svelte';
+	import { installErrorFunnel } from '$lib/error-funnel';
+	import { uiStore } from '$lib/state/ui.svelte';
 	import { page } from '$app/state';
 	import { dev } from '$app/environment';
 	import { SvelteMap } from 'svelte/reactivity';
@@ -36,6 +39,13 @@
 	// the shell unmounts (afterNavigate would fire too late to prevent it).
 	beforeNavigate((navigation) => {
 		if (navigation.from?.url?.pathname !== navigation.to?.url?.pathname) viewerStore.close();
+	});
+
+	// The last net: an uncaught exception or unhandled rejection must reach the
+	// person, not only the console. Known failures have their own surfaces; this
+	// catches the ones nothing anticipated.
+	$effect(() => {
+		if (browser) installErrorFunnel();
 	});
 
 	// Two ways the local database can refuse to open, and they need different
@@ -200,6 +210,7 @@
      belong to the (app) group: a sign-in screen must not carry the chrome of
      the application it is the door to. -->
 <ModeWatcher defaultMode="system" />
+<ReportProblemDialog bind:open={uiStore.reportOpen} />
 <Toaster position="bottom-right" />
 <UpdateBanner />
 <WorkerFailureNotice />

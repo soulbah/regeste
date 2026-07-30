@@ -18,7 +18,6 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { openInNewTab } from '$lib/external-page';
-	import ReportProblemDialog from '$lib/components/report-problem-dialog.svelte';
 	import { setMode, userPrefersMode } from 'mode-watcher';
 	import { i18n, t } from '$lib/i18n/index.svelte';
 	import { sessionStore } from '$lib/state/session.svelte';
@@ -41,8 +40,6 @@
 				}
 			: { name: t('sidebar.guest'), line: t('sidebar.localWorkspace') }
 	);
-
-	let reportOpen = $state(false);
 
 	async function signOut() {
 		await sessionStore.signOut();
@@ -144,7 +141,7 @@
 				     address has to be visible (mailto fails silently with no mail client
 				     registered), and a two-line menu item to show it broke the rhythm of
 				     every other row. -->
-				<DropdownMenu.Item onclick={() => (reportOpen = true)}>
+				<DropdownMenu.Item onclick={() => (uiStore.reportOpen = true)}>
 					<MessageSquareWarningIcon class="text-muted-foreground" />
 					{t('report.title')}
 				</DropdownMenu.Item>
@@ -168,5 +165,3 @@
 		</DropdownMenu.Root>
 	</Sidebar.MenuItem>
 </Sidebar.Menu>
-
-<ReportProblemDialog bind:open={reportOpen} />
