@@ -1,3 +1,8 @@
-# allow crawling everything by default
+# Cloudflare serves a managed robots.txt for this zone that supersedes this file
+# (it adds the Content-Signal directives declaring ai-train=no). Kept so a
+# self-hosted build without that feature still gets sane defaults, and so the
+# sitemap is declared somewhere in the repo.
 User-agent: *
 Disallow:
+
+Sitemap: https://regeste.com/sitemap.xml

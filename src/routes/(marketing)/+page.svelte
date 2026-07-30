@@ -25,6 +25,9 @@
 	// .benchmark-corpus/scripts/landing-capture.mjs. It stays a still because a
 	// live citation click needs the local database, which this page must not open.
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
+	import { landingSchema } from '$lib/structured-data';
+	import PageMeta from '$lib/components/page-meta.svelte';
 	import { mode } from 'mode-watcher';
 	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
 	import { Button } from '$lib/components/ui/button';
@@ -51,10 +54,11 @@
 	const scheme = $derived(mode.current === 'dark' ? 'dark' : 'light');
 </script>
 
-<svelte:head>
-	<title>Regeste</title>
-	<meta name="description" content={t('landing.hero.sub')} />
-</svelte:head>
+<PageMeta
+	title={t('landing.meta.title')}
+	description={t('landing.hero.sub')}
+	jsonLd={landingSchema(page.url.origin, t)}
+/>
 
 {#snippet kicker(index: string, id: string)}
 	<p class="text-muted-foreground font-mono text-[11px] tracking-widest uppercase" {id}>
@@ -204,7 +208,9 @@
 				<img
 					src={`/landing/cite-${i18n.locale}-${scheme}.webp`}
 					alt={t('landing.cite.title')}
-					class="block w-full lg:w-[52rem] lg:max-w-none xl:w-[68rem]"
+					width="3720"
+					height="1800"
+					class="block h-auto w-full lg:w-[52rem] lg:max-w-none xl:w-[68rem]"
 					loading="lazy"
 					decoding="async"
 				/>
@@ -231,6 +237,22 @@
 	@keyframes land-rise {
 		from {
 			opacity: 0;
+			transform: translateY(14px);
+		}
+	}
+
+	/* The headline rises but never fades.
+	   `both` holds the from-frame from first paint, so fading the largest text on
+	   the page kept it invisible until the animation ran — which took it out of the
+	   running as the largest contentful paint and handed that role to a paragraph
+	   inside the demo, 3.7 s in. Movement costs nothing; invisibility costs the
+	   metric that decides whether the page feels fast. */
+	h1.land-rise {
+		animation-name: land-rise-nofade;
+	}
+
+	@keyframes land-rise-nofade {
+		from {
 			transform: translateY(14px);
 		}
 	}

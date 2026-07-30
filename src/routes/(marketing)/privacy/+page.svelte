@@ -14,6 +14,10 @@
 	// cleaner is simply false, and the one thing this page cannot afford is to be
 	// caught out by someone reading the schema it points at.
 	import { Button } from '$lib/components/ui/button';
+	import { page } from '$app/state';
+	import { i18n } from '$lib/i18n/index.svelte';
+	import { privacySchema } from '$lib/structured-data';
+	import PageMeta from '$lib/components/page-meta.svelte';
 	import GithubIcon from '$lib/components/github-icon.svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import { CONTACT_EMAIL, GITHUB } from '$lib/links';
@@ -21,10 +25,11 @@
 	const SECTIONS = ['device', 'server', 'cloud', 'signin', 'models', 'tracking', 'delete'] as const;
 </script>
 
-<svelte:head>
-	<title>{t('policy.title')} · Regeste</title>
-	<meta name="description" content={t('policy.intro')} />
-</svelte:head>
+<PageMeta
+	title={t('policy.title')}
+	description={t('policy.intro')}
+	jsonLd={privacySchema(page.url.origin, t, i18n.locale)}
+/>
 
 <article class="mx-auto max-w-2xl px-6 pt-14 pb-8">
 	<p class="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">

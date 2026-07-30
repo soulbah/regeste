@@ -1,0 +1,65 @@
+<script lang="ts">
+	// One head block for every marketing page, because four hand-written ones drift:
+	// three of them had no description at all, none declared a canonical, and the
+	// product name was retyped in each title.
+	//
+	// The canonical matters more here than it normally would. This domain had a
+	// previous occupant, and Google's own report still names a Brazilian site as the
+	// canonical it picked for our homepage — a duplicate verdict formed while the
+	// domain was parked. An explicit self-canonical on every page is what withdraws
+	// that guess, and it drops the query string, so ?lang=fr does not read as a
+	// second page competing with the first.
+	//
+	// The positive robots value is not normally worth writing, since absence means
+	// index. It is written here because the last crawl of this domain found a
+	// noindex on the parked page, and one line removes any doubt on the next one.
+	import { page } from '$app/state';
+	import { i18n } from '$lib/i18n/index.svelte';
+
+	let {
+		title,
+		description,
+		/** Schema.org payload for this page, emitted as JSON-LD. */
+		jsonLd
+	}: { title?: string; description: string; jsonLd?: unknown } = $props();
+
+	// The name lives in the tab, which is one of the two places it is allowed to
+	// appear at all. Never inside a sentence.
+	const heading = $derived(title ? `${title} · Regeste` : 'Regeste');
+	const canonical = $derived(`${page.url.origin}${page.url.pathname}`);
+
+	// The whole tag is assembled here rather than in the markup: a literal <script>
+	// inside a template string in the template is what the svelte eslint parser
+	// chokes on, and the closing tag has to be written broken so the HTML parser
+	// does not end the component's own script block on it.
+	//
+	// Escaping `<` in the payload is what keeps a dictionary string from closing the
+	// tag it is being written into. \u003c is valid JSON and parses back to `<`.
+	const ld = $derived(
+		jsonLd
+			? '<' +
+					'script type="application/ld+json">' +
+					JSON.stringify(jsonLd).replaceAll('<', '\\u003c') +
+					'<' +
+					'/script>'
+			: null
+	);
+</script>
+
+<svelte:head>
+	<title>{heading}</title>
+	<meta name="description" content={description} />
+	<link rel="canonical" href={canonical} />
+	<meta name="robots" content="index, follow" />
+	<meta property="og:type" content="website" />
+	<meta property="og:site_name" content="Regeste" />
+	<meta property="og:title" content={heading} />
+	<meta property="og:description" content={description} />
+	<meta property="og:url" content={canonical} />
+	<meta property="og:locale" content={i18n.locale === 'fr' ? 'fr_FR' : 'en_GB'} />
+	<meta name="twitter:card" content="summary" />
+	<meta name="twitter:title" content={heading} />
+	<meta name="twitter:description" content={description} />
+	<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+	{@html ld ?? ''}
+</svelte:head>

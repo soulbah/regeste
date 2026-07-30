@@ -3,6 +3,10 @@
 	// page. The drawing it drives lives in $lib/components/data-flow.svelte, which
 	// the landing renders too.
 	import WifiOffIcon from '@lucide/svelte/icons/wifi-off';
+	import { page } from '$app/state';
+	import { i18n } from '$lib/i18n/index.svelte';
+	import { howItWorksSchema } from '$lib/structured-data';
+	import PageMeta from '$lib/components/page-meta.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import DataFlow from '$lib/components/data-flow.svelte';
 	import { t } from '$lib/i18n/index.svelte';
@@ -27,7 +31,11 @@
 	});
 </script>
 
-<svelte:head><title>{t('hiw.title')} · Regeste</title></svelte:head>
+<PageMeta
+	title={t('hiw.title')}
+	description={t('hiw.intro')}
+	jsonLd={howItWorksSchema(page.url.origin, t, i18n.locale)}
+/>
 
 <!-- The bar and the footer come from (marketing)/+layout.svelte. This page used
      to open on "Back to chat", which was a lie about where the reader is: most

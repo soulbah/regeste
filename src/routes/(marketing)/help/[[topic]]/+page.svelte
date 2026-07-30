@@ -11,6 +11,9 @@
 	// what tells a reader they are on the right page, which is why it is the
 	// lead and not a labelled field halfway down.
 	import { resolve } from '$app/paths';
+	import { i18n } from '$lib/i18n/index.svelte';
+	import { helpIndexSchema, helpTopicSchema } from '$lib/structured-data';
+	import PageMeta from '$lib/components/page-meta.svelte';
 	import { page } from '$app/state';
 	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
 	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
@@ -24,9 +27,14 @@
 	const others = $derived(HELP_TOPICS.filter((entry) => entry.id !== topic?.id).slice(0, 3));
 </script>
 
-<svelte:head>
-	<title>{topic ? t(topic.title) : t('help.title')} · Regeste</title>
-</svelte:head>
+<!-- A topic page describes the failure it is about; the index describes the set. -->
+<PageMeta
+	title={topic ? t(topic.title) : t('help.title')}
+	description={topic ? t(topic.symptom) : t('help.intro')}
+	jsonLd={topic
+		? helpTopicSchema(page.url.origin, topic, t, i18n.locale, t('help.title'))
+		: helpIndexSchema(page.url.origin, t, i18n.locale)}
+/>
 
 <!-- The bar and the footer come from (marketing)/+layout.svelte.
      One back link, and only from inside an article, where it means "up to the
