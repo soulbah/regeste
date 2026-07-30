@@ -44,12 +44,15 @@
 	const HOME = resolve('/chat');
 	let returnTo = $state<ResolvedPathname>(HOME);
 	afterNavigate((nav) => {
-		const from = nav.from?.url.pathname;
+		// Optional at both levels. A navigation target can carry a null url, and
+		// reading .pathname straight off it threw on every /auth load in production:
+		// "Cannot read properties of null (reading 'pathname')".
+		const from = nav.from?.url?.pathname;
 		// A fresh load or a reload has no previous page, and coming from this page
 		// means the form re-rendered rather than that anyone arrived from it.
 		// A narrowing, not a trust decision: the router only ever reports a path it
 		// just served.
-		if (from && from !== nav.to?.url.pathname) returnTo = from as ResolvedPathname;
+		if (from && from !== nav.to?.url?.pathname) returnTo = from as ResolvedPathname;
 	});
 
 	async function requestCode(e: SubmitEvent) {
