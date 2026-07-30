@@ -183,17 +183,17 @@ export const fr: Record<keyof typeof en, string> = {
 	'myai.keyPlaceholder': 'aucune pour les serveurs locaux',
 	'myai.testing': 'Test…',
 	'myai.test': 'Tester la connexion',
-	'myai.noModels': "Connecté, mais l'endpoint ne liste aucun modèle.",
+	'myai.noModels': 'Connecté, mais votre serveur ne liste aucun modèle.',
 	'myai.pickModel': 'Choisissez un modèle',
 	'myai.direct':
-		'Les requêtes vont directement de ce navigateur à votre endpoint. Aucun serveur intermédiaire.',
+		'Les requêtes vont directement de ce navigateur à votre serveur. Rien entre les deux.',
 	'myai.corsHint.ollama':
 		"Lancez Ollama avec OLLAMA_ORIGINS réglé sur ce site (ou *) pour autoriser l'accès depuis le navigateur.",
 	'myai.corsHint.lmstudio':
 		'Dans LM Studio, activez CORS dans les réglages du serveur local avant de vous connecter.',
 	'myai.corsHint.vllm': 'Lancez vLLM avec --allowed-origins incluant ce site (ou *).',
-	'myai.error.key': "L'endpoint a refusé la clé API.",
-	'myai.error.status': "L'endpoint a répondu avec une erreur ({status}).",
+	'myai.error.key': 'Votre serveur a refusé la clé API.',
+	'myai.error.status': 'Votre serveur a répondu avec une erreur ({status}).',
 	'myai.error.unreachable':
 		"Endpoint injoignable. Vérifiez l'URL, que le serveur tourne, et ses réglages CORS.",
 
@@ -473,11 +473,11 @@ export const fr: Record<keyof typeof en, string> = {
 	'clarification.multiPart': 'À quelle partie faut-il répondre en premier ?',
 	// Page d'aide — le symptôme d'abord, c'est ce qu'on reconnaît.
 	'help.title': 'Si le navigateur bloque',
-	'help.modelStorage.title': 'Quand le téléchargement de l’IA s’arrête en route',
+	'help.modelStorage.title': 'Quand le téléchargement du modèle s’arrête en route',
 	'help.modelStorage.symptom':
-		'Le téléchargement de l’IA sur cet appareil échoue à un certain pourcentage, avec un message qui parle de stockage.',
+		'Le téléchargement du modèle local échoue à un certain pourcentage, avec un message qui parle de stockage.',
 	'help.modelStorage.cause':
-		'L’IA est un fichier volumineux que ce navigateur conserve localement, et le navigateur a refusé la place. Les deux causes habituelles : une fenêtre privée, qui ne peut pas garder de gros fichiers quoi qu’elle annonce, ou un disque presque plein.',
+		'Le modèle est un fichier volumineux que ce navigateur conserve localement, et le navigateur a refusé la place. Les deux causes habituelles : une fenêtre privée, qui ne peut pas garder de gros fichiers quoi qu’elle annonce, ou un disque presque plein.',
 	'help.modelStorage.fix1': 'Ouvrez l’application dans une fenêtre normale plutôt que privée.',
 	'help.modelStorage.fix2':
 		'Libérez quelques gigaoctets d’espace disque, puis relancez le téléchargement.',
@@ -489,18 +489,19 @@ export const fr: Record<keyof typeof en, string> = {
 	'help.allGuides': 'Tous les guides',
 	'help.more': 'Autres guides',
 	'help.intro':
-		'Tout se passe dans votre navigateur, donc ses réglages font partie du fonctionnement. Voici les cas qui l’empêchent de tourner, et ce qui les débloque.',
+		'Tout se passe dans votre navigateur, donc ses réglages font partie du fonctionnement. Voici les cas qui l’empêchent de fonctionner, et comment en sortir.',
 	'help.cause': 'Pourquoi',
 	'help.fix': 'Que faire',
 	'help.footnote':
-		'Aucun de ces réglages n’envoie vos documents où que ce soit. Ce sont des paramètres de votre machine, et ils sont tous réversibles.',
+		'Aucun de ces réglages n’envoie vos documents où que ce soit. Ce sont des réglages de votre appareil, et vous pouvez tous les annuler.',
 
 	'help.blocked.title': 'Rien ne peut être enregistré',
 	'help.blocked.symptom':
-		'Les documents refusent d’être ajoutés, ou l’app signale que le stockage est bloqué pour ce site.',
+		'L’ajout de documents échoue, ou l’application signale que le stockage est bloqué pour ce site.',
 	'help.blocked.cause':
-		'Vos documents vivent dans le navigateur, dans un espace appelé OPFS. Une fenêtre privée et un blocage de contenu strict le refusent tous les deux, et il n’y a pas de repli : sans espace de stockage, un document n’a nulle part où aller.',
-	'help.blocked.fix1': 'Ouvrez l’app dans une fenêtre normale plutôt qu’une fenêtre privée.',
+		'Vos documents sont stockés dans le navigateur, dans un espace appelé OPFS. Une fenêtre privée et un blocage de contenu strict le refusent tous les deux, et il n’y a pas de repli : sans espace de stockage, un document n’a nulle part où aller.',
+	'help.blocked.fix1':
+		'Ouvrez l’application dans une fenêtre normale plutôt qu’une fenêtre privée.',
 	'help.blocked.fix2':
 		'Dans Firefox, cliquez sur le bouclier dans la barre d’adresse et désactivez les protections pour ce site. Dans Safari, autorisez le stockage pour ce site dans les réglages de confidentialité.',
 	'help.blocked.fix3': 'Rechargez la page.',
@@ -517,9 +518,10 @@ export const fr: Record<keyof typeof en, string> = {
 	'help.privateWindow.fix3':
 		'Si vous ne pouvez pas quitter la fenêtre privée, exportez votre espace de travail depuis les Réglages avant de la fermer.',
 	'help.tabs.title': 'Déjà ouvert dans un autre onglet',
-	'help.tabs.symptom': 'L’app annonce qu’elle est déjà ouverte ailleurs et s’arrête de charger.',
+	'help.tabs.symptom':
+		'L’application indique qu’elle est déjà ouverte ailleurs, et le chargement s’arrête.',
 	'help.tabs.cause':
-		'Un seul onglet possède la base à la fois. Deux onglets qui écrivent dans le même espace, c’est ainsi qu’il se corrompt, donc le second refuse plutôt que de risquer vos données.',
+		'Un seul onglet possède la base à la fois. Deux onglets qui écrivent dans le même espace finissent par le corrompre, donc le second refuse plutôt que de risquer vos données.',
 	'help.tabs.fix1': 'Fermez l’autre onglet, puis rechargez celui-ci.',
 
 	'help.eviction.title': 'Des documents ont disparu',
@@ -528,15 +530,15 @@ export const fr: Record<keyof typeof en, string> = {
 	'help.eviction.cause':
 		'Un navigateur reprend l’espace des sites qu’il juge inactifs, sauf si le site a demandé à être conservé. L’app le demande à chaque démarrage, et le navigateur l’accorde en silence une fois que vous l’avez utilisée quelques fois.',
 	'help.eviction.fix1':
-		'Réglages, puis Données, indique si le stockage est conservé. Sinon, le bouton présent redemande.',
+		'Réglages, puis Données, indique si le stockage est conservé. Sinon, le bouton qui s’y trouve permet de le redemander.',
 	'help.eviction.fix2':
 		'Exportez votre espace de travail depuis le même onglet pour garder une copie hors du navigateur.',
 
 	'help.gpu.title': 'Le modèle local ne s’installe pas',
 	'help.gpu.symptom':
-		'Choisir Cet appareil affiche indisponible, ou le téléchargement se termine et le modèle refuse de démarrer.',
+		'Le mode Cet appareil s’affiche comme indisponible, ou le téléchargement se termine et le modèle refuse de démarrer.',
 	'help.gpu.cause':
-		'Faire tourner un modèle dans un onglet demande WebGPU, et les navigateurs diffèrent. Firefox autorise moins de buffers par shader que le modèle n’en demande. Safari ne prend pas en charge l’isolation dont le repli processeur a besoin.',
+		'Faire tourner un modèle dans un onglet demande WebGPU, et les navigateurs diffèrent. Firefox impose des limites graphiques plus basses que celles dont le modèle a besoin. Safari ne permet pas la solution de secours qui fait tourner le modèle sur le processeur.',
 	'help.gpu.fix1':
 		'Utilisez un navigateur Chromium pour Cet appareil : Chrome, Edge, Brave, Arc et Opera fonctionnent.',
 	'help.gpu.fix2':
@@ -546,7 +548,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'help.network.symptom':
 		'Le téléchargement du modèle se fige, ou une réponse Cloud annonce le service injoignable.',
 	'help.network.cause':
-		'Un VPN, un proxy d’entreprise ou une extension peuvent bloquer les requêtes. Les poids du modèle viennent d’un CDN public, et les réponses Cloud vont vers l’endpoint de cette app ; les deux peuvent être filtrés.',
+		'Un VPN, un proxy d’entreprise ou une extension peuvent bloquer les requêtes. Les poids du modèle viennent d’un CDN public, et les réponses Cloud passent par le serveur de cette application ; les deux peuvent être filtrés.',
 	'help.network.fix1': 'Désactivez le VPN ou l’extension de blocage pour ce site, puis réessayez.',
 	'help.network.fix2':
 		'Sur un réseau d’entreprise, demandez que ce site et le CDN du modèle soient autorisés, ou utilisez Cet appareil, qui n’a besoin du réseau qu’une fois.',
@@ -754,15 +756,15 @@ export const fr: Record<keyof typeof en, string> = {
 	'policy.title': 'Confidentialité',
 	'policy.updated': 'Dernière mise à jour le 30 juillet 2026',
 	'policy.intro':
-		'Cette page dit ce que cette application fait de vos données, dans l’ordre qui compte. La version courte : vos documents n’atteignent jamais un serveur. La version longue est en dessous.',
+		'Cette page dit ce qui est fait de vos données, dans l’ordre qui compte. La version courte : vos documents n’atteignent jamais un serveur. La version longue est en dessous.',
 
 	'policy.device.title': 'Vos documents restent sur votre appareil',
 	'policy.device.body':
-		'Les fichiers que vous ajoutez sont lus, indexés et cherchés dans votre navigateur. Le texte, l’index construit à partir de lui, vos questions, les réponses et les noms de fichiers sont stockés dans ce navigateur uniquement. Rien n’est envoyé, aucun serveur n’en garde de copie. Coupez le réseau : l’application continue de répondre dans le mode qui répond sur votre appareil, et c’est la façon de le vérifier plutôt que de nous croire.',
+		'Les fichiers que vous ajoutez sont lus, indexés et fouillés dans votre navigateur. Le texte, l’index qui en est tiré, vos questions, les réponses et les noms de fichiers sont stockés dans ce navigateur uniquement. Rien n’est envoyé, aucun serveur n’en garde de copie. Coupez le réseau : le mode Cet appareil continue de répondre, et c’est la façon de le vérifier plutôt que de nous croire.',
 
 	'policy.server.title': 'Ce que le serveur sait',
 	'policy.server.body':
-		'Il y a un serveur, et il existe pour les comptes et les quotas. À la connexion, il enregistre votre adresse email, un nom si la méthode de connexion en a fourni un, et des sessions. Une session contient l’adresse IP et l’identification du navigateur de la requête qui l’a créée, ce qui permet de distinguer une session volée de la vôtre. Il compte aussi votre usage quotidien du mode cloud : un nombre de requêtes et une mesure de consommation. Il n’existe aucune table pour les documents, les discussions, les messages, les passages ou les noms de fichiers, et en ajouter une casserait la garantie ci-dessus.',
+		'Il y a un serveur, et il existe pour les comptes et les quotas. À la connexion, il enregistre votre adresse email, un nom si la méthode de connexion en a fourni un, et des sessions. Une session contient l’adresse IP et le navigateur de la requête qui l’a créée, ce qui permet de distinguer une session volée de la vôtre. Il compte aussi votre usage quotidien du mode cloud : un nombre de requêtes et une mesure de consommation. Il n’existe aucune table pour les documents, les discussions, les messages, les passages ou les noms de fichiers, et en ajouter une casserait la garantie ci-dessus.',
 
 	'policy.cloud.title': 'Quand vous demandez une réponse cloud',
 	'policy.cloud.body':
@@ -776,13 +778,13 @@ export const fr: Record<keyof typeof en, string> = {
 	'policy.models.body':
 		'Répondre sur votre appareil demande un fichier de modèle, téléchargé une fois et conservé dans ce navigateur. Il passe par ce domaine depuis un hébergeur public de modèles, parce que l’isolation dont le navigateur a besoin pour ce mode bloque la route directe. Seuls des fichiers de modèles publics empruntent ce chemin.',
 
-	'policy.tracking.title': 'Aucun analytics',
+	'policy.tracking.title': 'Aucune mesure d’audience',
 	'policy.tracking.body':
-		'Il n’y a aucun service d’analytics, aucun script de traçage et aucun code tiers dans cette application. Les emails ne contiennent aucune image, donc rien ne signale que vous en ouvrez un. Le seul cookie est celui qui vous garde connecté.',
+		'Il n’y a aucun outil de mesure d’audience, aucun script de traçage et aucun code tiers ici. Les emails ne contiennent aucune image, donc rien ne signale que vous en ouvrez un. Le seul cookie est celui qui vous garde connecté.',
 
 	'policy.delete.title': 'Supprimer vos données',
 	'policy.delete.body':
-		'Tout ce qui est sur votre appareil se supprime depuis les réglages de l’application, ou en vidant le stockage de ce navigateur. Supprimer votre compte retire votre adresse email, vos sessions et vos compteurs d’usage du serveur. Comme le serveur n’a jamais détenu de document, il n’y a rien d’autre à vous retirer.',
+		'Tout ce qui est sur votre appareil se supprime depuis les réglages de l’application, ou en vidant le stockage de ce navigateur. Supprimer votre compte retire votre adresse email, vos sessions et vos compteurs d’usage du serveur. Comme le serveur n’a jamais détenu de document, il n’y a rien d’autre à supprimer.',
 
 	'policy.contact.title': 'Questions',
 	'policy.contact.body': 'Écrivez-nous, nous répondrons.',

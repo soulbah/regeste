@@ -193,16 +193,16 @@ export const en = {
 	'myai.keyPlaceholder': 'none for local servers',
 	'myai.testing': 'Testing…',
 	'myai.test': 'Test connection',
-	'myai.noModels': 'Connected, but the endpoint lists no models.',
+	'myai.noModels': 'Connected, but your server lists no models.',
 	'myai.pickModel': 'Pick a model',
-	'myai.direct': 'Requests go straight from this browser to your endpoint. No server in between.',
+	'myai.direct': 'Requests go straight from this browser to your server. Nothing in between.',
 	'myai.corsHint.ollama':
 		'Start Ollama with OLLAMA_ORIGINS set to this site (or *) to allow browser access.',
 	'myai.corsHint.lmstudio':
 		'In LM Studio, enable CORS in the local server settings before connecting.',
 	'myai.corsHint.vllm': 'Start vLLM with --allowed-origins including this site (or *).',
-	'myai.error.key': 'The endpoint refused the API key.',
-	'myai.error.status': 'The endpoint answered with an error ({status}).',
+	'myai.error.key': 'Your server refused the API key.',
+	'myai.error.status': 'Your server answered with an error ({status}).',
 	'myai.error.unreachable':
 		'Endpoint unreachable. Check the URL, that the server is running, and its CORS settings.',
 
@@ -543,7 +543,7 @@ export const en = {
 	'help.network.symptom':
 		'The model download stalls, or a Cloud answer reports the service as unreachable.',
 	'help.network.cause':
-		'A VPN, a company proxy or an extension can block the requests. The model weights come from a public CDN, and Cloud answers go to this app’s own endpoint; either can be filtered.',
+		'A VPN, a company proxy or an extension can block the requests. The model weights come from a public CDN, and Cloud answers go through this app’s own server; either can be filtered.',
 	'help.network.fix1': 'Turn the VPN or the blocking extension off for this site and retry.',
 	'help.network.fix2':
 		'On a company network, ask for this site and the model CDN to be allowed, or use This device, which needs the network only once.',
