@@ -16,6 +16,7 @@
 	import ViewerPanel from '$lib/components/viewer-panel.svelte';
 	import { viewerStore } from '$lib/state/viewer.svelte';
 	import { panelStore } from '$lib/state/panel.svelte';
+	import StorageRiskDialog from '$lib/components/storage-risk-dialog.svelte';
 
 	let { children } = $props();
 </script>
@@ -49,3 +50,5 @@
 		{@render children()}
 	</Sidebar.Inset>
 </Sidebar.Provider>
+
+<StorageRiskDialog />

@@ -109,6 +109,15 @@ export const fr: Record<keyof typeof en, string> = {
 	'modes.private.loading': "Chargement de l'IA privée…",
 	'modes.private.ready': 'Prêt · fonctionne hors ligne',
 	'modes.error': 'Un problème est survenu',
+	'storageRisk.title': 'Cette fenêtre ne gardera pas le téléchargement',
+	'storageRisk.body':
+		'L’IA est un fichier de {size}, et ce navigateur a refusé de s’engager à le conserver. Lancer maintenant échouerait très probablement en route.',
+	'storageRisk.reason1':
+		'Une fenêtre privée. Elle ne peut pas garder de gros fichiers, quoi qu’elle annonce, et tout disparaît à sa fermeture.',
+	'storageRisk.reason2': 'Ou le disque est presque plein, et le navigateur protège ce qui reste.',
+	'storageRisk.alternative':
+		'Ouvrir ceci dans une fenêtre normale règle le problème. Cloud et Votre serveur répondent sans aucun téléchargement.',
+	'storageRisk.anyway': 'Télécharger quand même',
 	'llm.error.ephemeral':
 		'Une fenêtre privée ne peut pas stocker l’IA. Ouvrez ceci dans une fenêtre normale, ou choisissez Cloud ou Votre serveur.',
 	'llm.error.storage':

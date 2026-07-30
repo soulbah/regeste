@@ -116,6 +116,15 @@ export const en = {
 	'modes.error': 'Something went wrong',
 	// The three ways preparing the on-device AI fails, told apart because the
 	// remedies have nothing in common.
+	'storageRisk.title': 'This window will not keep the download',
+	'storageRisk.body':
+		'The AI is a {size} file, and this browser has refused to commit to storing it. Starting now would very likely fail partway.',
+	'storageRisk.reason1':
+		'A private window. It cannot keep large files, whatever it reports, and everything is dropped when you close it.',
+	'storageRisk.reason2': 'Or the disk is nearly full, and the browser is protecting what is left.',
+	'storageRisk.alternative':
+		'Opening this in a normal window fixes it. Cloud and Your server answer without any download.',
+	'storageRisk.anyway': 'Download anyway',
 	'llm.error.ephemeral':
 		'A private window cannot store the AI. Open this in a normal window, or pick Cloud or Your server.',
 	'llm.error.storage':

@@ -73,6 +73,9 @@ class LlmStore {
 	progress = $state(0);
 	tier = $state<Tier | null>(null);
 	errorMessage = $state<string | null>(null);
+	/** Set when the browser refused to commit to keeping the weights, so the UI can
+	 * warn BEFORE spending gigabytes. Cleared by proceeding or by cancelling. */
+	storageRisk = $state(false);
 	/** True when weights are cached from a previous session (fast load). */
 	prepared = $state(false);
 	lastMetrics = $state<Omit<GenerationResult, 'text'> | null>(null);
@@ -104,8 +107,11 @@ class LlmStore {
 		if (this.prepared || forced) void this.prepare();
 	}
 
-	/** Explicit user consent → download (or fast cache load) then ready. */
-	async prepare(): Promise<void> {
+	/** Explicit user consent → download (or fast cache load) then ready.
+	 *
+	 * `force` skips the storage warning, for someone who has read it and wants the
+	 * download anyway. */
+	async prepare(options: { force?: boolean } = {}): Promise<void> {
 		if (
 			!this.tier ||
 			this.status === 'downloading' ||
@@ -116,11 +122,30 @@ class LlmStore {
 		this.status = this.prepared ? 'loading' : 'downloading';
 		this.progress = 0;
 		try {
-			// Ask for persistent storage BEFORE the ~2.4 GB download: without it,
-			// Safari (and Chrome on a low-disk machine) cap a single origin's
-			// quota well below the model size and the cache write fails with
-			// "Quota exceeded". Persisted origins get a much larger allowance.
-			if (!this.prepared) await navigator.storage?.persist?.().catch(() => false);
+			// Ask for persistent storage BEFORE the download, and stop if it is
+			// refused.
+			//
+			// Refusal is the only trustworthy signal left. Reading the quota used to
+			// betray a private window (Chrome capped the reported figure at ~120 MB),
+			// but Chrome now ships "predictable reported storage quota" — an
+			// artificial figure in every mode, precisely so quota cannot be used as a
+			// private-browsing side channel. That is why this app's own preflight
+			// admitted a 5 GB model into a window that could hold 1.1 GB, and why the
+			// download died at 23%, downgraded, and died again at 46%.
+			//
+			// persist() is not a side channel: it is the browser answering whether it
+			// will commit to keeping the data. A private window always says no. A
+			// normal window that says no is also worth stopping for, because the same
+			// eviction is coming. Either way the person decides, having been told.
+			if (!this.prepared && !options.force) {
+				const persisted = await navigator.storage?.persist?.().catch(() => false);
+				if (!persisted) {
+					this.storageRisk = true;
+					this.status = 'needs-download';
+					return;
+				}
+			}
+			this.storageRisk = false;
 			await (
 				await getWorker(this.tier.engine)
 			).load(
@@ -157,7 +182,7 @@ class LlmStore {
 				if (lower) {
 					this.tier = lower;
 					this.prepared = localStorage.getItem(PREPARED_KEY) === lower.model;
-					return this.prepare();
+					return this.prepare({ force: true });
 				}
 			}
 			this.status = 'error';
