@@ -3,6 +3,7 @@
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import NavUser from '$lib/components/nav-user.svelte';
+	import UpdateNotice from '$lib/components/update-notice.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -243,7 +244,11 @@
 			</Sidebar.Group>
 		{/each}
 	</Sidebar.Content>
-	<Sidebar.Footer>
+	<!-- Space, not a rule, to separate the account row from the chat list: the
+	     sidebar is already a column of hairlines and one more would read as
+	     another group header rather than as a floor. -->
+	<Sidebar.Footer class="mt-4">
+		<UpdateNotice />
 		<NavUser />
 	</Sidebar.Footer>
 	<Sidebar.ResizeHandle aria-label={t('sidebar.resizeAria')} />

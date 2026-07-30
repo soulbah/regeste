@@ -8,7 +8,6 @@
 	import { resolve } from '$app/paths';
 	import { openInNewTab } from '$lib/external-page';
 	import { isMarketingPage } from '$lib/pwa/sw-routing';
-	import UpdateBanner from '$lib/components/update-banner.svelte';
 	import { isShellCache } from '$lib/pwa/cache-names';
 	import { pwaStore } from '$lib/state/pwa.svelte';
 	import WorkerFailureNotice from '$lib/components/worker-failure-notice.svelte';
@@ -212,7 +211,6 @@
 <ModeWatcher defaultMode="system" />
 <ReportProblemDialog bind:open={uiStore.reportOpen} />
 <Toaster position="bottom-right" />
-<UpdateBanner />
 <WorkerFailureNotice />
 
 {@render children()}

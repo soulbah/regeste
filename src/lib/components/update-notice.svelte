@@ -20,9 +20,8 @@
 			llmStore.status === 'loading' ||
 			documentsStore.ingesting > 0
 	);
-	// A dead worker owns the bottom slot: both cards sit at bottom-4 left-1/2 and
-	// both say Reload, so side by side they read as one confused message, and
-	// "a new version is ready" is a poor answer to "search just stopped working".
+	// A dead worker still owns the louder slot: both say Reload, and "a new
+	// version is ready" is a poor answer to "search just stopped working".
 	const show = $derived(pwaStore.updateReady && !busy && !workerHealth.failed);
 
 	$effect(() => {
@@ -37,47 +36,48 @@
 </script>
 
 {#if show}
-	<!-- Top centre, not bottom: at the bottom it sat over the composer and read
-	     as a toast, which is what you show for something that can be missed.
-	     A stale shell asks for chunks the next deploy stops serving, and only a
-	     hard refresh recovers it, so this one has to be seen. It still blocks
-	     nothing: the app keeps working behind it and it is dismissible by acting
-	     on it. -->
+	<!-- In the sidebar's own footer, above the account row.
+	     It used to be fixed at the top centre of the viewport, where it sat across
+	     the header and covered the chat's title — and it rendered from the root
+	     layout, so it also appeared on the landing, which can never go stale: the
+	     shell cache only claims /chat (see $lib/pwa/sw-routing.ts), so only the app
+	     has a shell to become stale. Here it is persistent chrome out of the
+	     reading path, which is what the guidance asks for when a message must stay
+	     until it is acted on rather than fade like a toast. -->
 	<div
-		class="update-banner bg-card ring-accent-foreground/25 fixed top-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-xl border px-4 py-2.5 shadow-lg ring-1"
+		class="update-notice border-accent-foreground/25 bg-accent-foreground/[0.06] mb-2 flex items-center gap-2.5 rounded-lg border px-2.5 py-2"
 		role="status"
 	>
-		<span
-			class="bg-accent-foreground/10 flex size-7 shrink-0 items-center justify-center rounded-full"
+		<ArrowDownToLineIcon class="text-accent-foreground size-3.5 shrink-0" />
+		<p class="min-w-0 flex-1 text-xs leading-snug">{t('update.ready')}</p>
+		<Button
+			size="sm"
+			variant="ghost"
+			class="text-accent-foreground hover:text-accent-foreground h-7 shrink-0 px-2 text-xs"
+			onclick={() => pwaStore.applyUpdate()}
 		>
-			<ArrowDownToLineIcon class="text-accent-foreground size-3.5" />
-		</span>
-		<p class="text-sm">{t('update.ready')}</p>
-		<Button size="sm" onclick={() => pwaStore.applyUpdate()}>{t('update.cta')}</Button>
+			{t('update.cta')}
+		</Button>
 	</div>
 {/if}
 
 <style>
-	/* It appears without warning while someone is reading, so it drops in rather
-	   than blinking into place: the movement is what gets noticed, and one short
-	   entrance is enough to earn a glance without nagging. */
-	.update-banner {
-		animation: update-drop 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+	/* It appears without warning while someone is reading, so it rises in rather
+	   than blinking into place. One short entrance earns a glance; in the sidebar
+	   it no longer needs to travel far to be noticed. */
+	.update-notice {
+		animation: update-rise 380ms cubic-bezier(0.16, 1, 0.3, 1) both;
 	}
 
-	@keyframes update-drop {
+	@keyframes update-rise {
 		from {
 			opacity: 0;
-			transform: translate(-50%, -0.75rem);
-		}
-		to {
-			opacity: 1;
-			transform: translate(-50%, 0);
+			transform: translateY(0.5rem);
 		}
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		.update-banner {
+		.update-notice {
 			animation: none;
 		}
 	}
