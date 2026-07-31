@@ -141,86 +141,6 @@ export function expandChannelCandidatesWithNeighbors(
 	return expanded;
 }
 
-const CONCEPT_EXPANSIONS: Array<[RegExp, string]> = [
-	// "Combien coûtera toute la procédure ?" is the most natural way to ask, and
-	// it matched nothing: the pattern knew prix/price/cost only, and the
-	// approximate path needs an edit distance of 1 where "coutera" is 3 from
-	// "cout". Measured on a fee agreement, the passage carrying the 1100 € RAPO
-	// provision ranked 116th of 124 for that question — the model never saw it
-	// and refused, correctly, on evidence that did not contain the answer.
-	// A professional's fee schedule prices itself with honoraires, provision and
-	// forfaitaire, never with "coût", so the reader's word and the document's
-	// word never meet without this.
-	[
-		/\b(?:prix|price|cost|co[uû]te\w*|co[uû]t|tarif\w*|factur\w*|honoraires?)\b|\bcombien(?!\s+de\s+temps)\b|\bhow much\b/iu,
-		'prix vente montant euros tarif forfaitaire honoraires provision facturation HT TTC'
-	],
-	[/\b(?:pr[eê]t|emprunt|loan|mortgage|financement)\b/iu, 'prêt emprunt financement montant'],
-	[/\b(?:superficie|surface|area|square)\b/iu, 'superficie surface contenance mètres carrés m² ca'],
-	[
-		/\b(?:acheteur|acqu[eé]reur|buyer|purchaser)\b/iu,
-		'acheteur acquéreur acquisition partie monsieur madame soussigné'
-	],
-	[
-		/\b(?:vendeur|c[eé]dants?|seller|vendor)\b/iu,
-		'vendeur cédant propriétaire partie monsieur madame soussigné'
-	],
-	[
-		/\b(?:absent|pr[eé]sent|repr[eé]sent[eé]|procuration|represented)\b/iu,
-		'présence représentation absent présent procuration soussigné'
-	],
-	[
-		/(?:^|\W)(?:sign[eé]|signature|signed)(?=\W|$)/iu,
-		'signature signé date lieu fait à paraphes signatures'
-	],
-	[
-		/(?:^|\W)(?:assur[eé]e?|coassur[eé]e?|insured)(?=\W|$)/iu,
-		'assuré couverte couvert couvre coassuré partenaire souscripteur insured covered policyholder partner'
-	],
-	[
-		/\b(?:date d['’]?effet|prise d['’]?effet|entr[eé]e en vigueur|effective date|entry into force)\b/iu,
-		"date d'effet prise d'effet entrée en vigueur début commence survenant après effective date entry into force starts at"
-	],
-	[
-		/\b(?:que (?:dois|faut)[- ]?(?:je|il)|what (?:should|must) i do)\b[\s\S]*\b(?:vol|sinistre|theft|claim)\b/iu,
-		'obligations sinistre réclamation avertissez immédiatement autorités police vol signalés'
-	],
-	[
-		/\b(?:que (?:dois|faut)[- ]?(?:je|il)|what (?:should|must) i do)\b[\s\S]*\b(?:vol|sinistre|theft|claim)\b/iu,
-		'preuves justificatifs propriété informations documents sinistre claim evidence ownership'
-	],
-	[
-		/\b(?:major\w*|augment\w*|supplement\w*|pourcent\w*|percent)\b[\s\S]*\b(?:frais|costs?|stockage|storage|protection)\b/iu,
-		'frais raisonnables nécessaires protéger affaires stockage sécurité temporaire'
-	],
-	[
-		/\b(?:major\w*|augment\w*|supplement\w*|pourcent\w*|percent)\b[\s\S]*\b(?:frais|costs?|stockage|storage|protection)\b/iu,
-		'plafond majoré frais supplémentaires limit increased additional costs'
-	],
-	[
-		/\b(?:objet pr[eé]cis|specific item|marque|brand|nom exact|exact name)\b[\s\S]*\b(?:poss[eè]de|owns?|souscripteur|policyholder)\b/iu,
-		'possédez-vous déclaré questionnaire objet valeur supérieure souscripteur declared questionnaire item value policyholder'
-	]
-];
-
-const APPROXIMATE_CONCEPT_EXPANSIONS: Array<{
-	required: string[][];
-	expansion: string;
-}> = [
-	{
-		required: [['price', 'prix', 'cost', 'cout']],
-		expansion: 'prix price vente sale montant amount euros'
-	},
-	{
-		required: [
-			['date', 'quand', 'when'],
-			['effective', 'vigueur', 'commence', 'debut', 'couverture', 'coverage', 'start', 'starts']
-		],
-		expansion:
-			"date d'effet prise d'effet entrée en vigueur début commence survenant après effective date entry into force starts at"
-	}
-];
-
 const STOPWORDS = new Set([
 	'que',
 	'qui',
@@ -267,34 +187,27 @@ function terms(text: string): string[] {
 	return [...new Set(significantQueryTokens(text, 3))];
 }
 
-function retrievalConceptAdditions(query: string): string[] {
-	const additions = CONCEPT_EXPANSIONS.filter(([pattern]) => pattern.test(query)).map(
-		([, expansion]) => expansion
-	);
-	const queryTerms = normalizeForFuzzy(query).split(' ');
-	for (const concept of APPROXIMATE_CONCEPT_EXPANSIONS) {
-		// "prise d'effet" is valid French date vocabulary, not a misspelling of
-		// "price". Approximate expansion must not overwrite an exact structural
-		// phrase with a different intent.
-		if (concept.expansion.startsWith('prix ') && /\bprise d['’]?effet\b/iu.test(query)) continue;
-		const matches = concept.required.every((alternatives) =>
-			alternatives.some((alternative) =>
-				queryTerms.some(
-					(term) =>
-						damerauLevenshtein(term, alternative, 2) <=
-						Math.min(2, Math.floor(alternative.length / 4))
-				)
-			)
-		);
-		if (matches) additions.push(concept.expansion);
-	}
-	return [...new Set(additions)];
-}
-
-/** Add document vocabulary commonly used for the user's plain-language concept. */
+/**
+ * The query, unchanged.
+ *
+ * This appended document vocabulary drawn from a hand-kept table of concepts:
+ * "prix" also searched "vente montant euros", and so on. A word list is not a
+ * retrieval strategy — it settles one gap and breaks at the next, and every
+ * entry is a new way to be wrong. Adding "combien" to it once pulled cost
+ * vocabulary into "combien de temps", a question about duration.
+ *
+ * Measured on 113 grounded cases before removing it. Without a reranker it
+ * improved the gold passage's rank 4 times and worsened it 10, for a mean rank
+ * of 5.6 against 5.3 with no expansion at all. With the cross-encoder ranking
+ * the pool, the two arms are indistinguishable where it counts: the gold page
+ * came first 103 times of 113 either way, and reached the top five 108 times
+ * either way.
+ *
+ * Kept as a function so the call sites still read as "this is the retrieval
+ * query"; deciding what the words mean is the reranker's job now.
+ */
 export function expandRetrievalQuery(query: string): string {
-	const additions = retrievalConceptAdditions(query);
-	return additions.length ? `${query}\n${additions.join(' ')}` : query;
+	return query;
 }
 
 /** Independent query views prevent long natural questions from consuming the
@@ -320,7 +233,6 @@ function retrievalClauses(query: string): string[] {
 }
 
 export function retrievalQueryVariants(query: string): string[] {
-	const additions = retrievalConceptAdditions(query);
 	const clauses = retrievalClauses(query);
 	const normalized = normalizeForFuzzy(query);
 	const scenarioWindows =
@@ -335,9 +247,7 @@ export function retrievalQueryVariants(query: string): string[] {
 					.map((tokens) => tokens.join(' '))
 					.slice(0, 4)
 			: [];
-	return [
-		...new Set([query, ...(clauses.length > 1 ? clauses : []), ...scenarioWindows, ...additions])
-	];
+	return [...new Set([query, ...(clauses.length > 1 ? clauses : []), ...scenarioWindows])];
 }
 
 /** Dense retrieval receives natural-language questions, never sparse keyword
