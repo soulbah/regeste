@@ -584,20 +584,16 @@ export const en = {
 	'menu.language': 'Language',
 	'menu.signIn': 'Sign in',
 	'work.model.downloading.title': 'Downloading the model',
-	'work.model.downloading.body':
-		'One download of {size}. It then stays on this device and works offline.',
+	'work.model.downloading.body': 'One download of {size}.',
 	'work.model.loading.title': 'Starting the model',
-	'work.model.loading.body':
-		'The file is here. It is being placed in memory, which is the slow part and happens once per session.',
+	'work.model.loading.body': 'The file is downloaded, it is being placed in memory.',
 	'reindex.title': 'Rereading your documents',
-	'reindex.body':
-		'This version changed how documents are indexed, so each one is read again from the copy on this device. Answers keep working meanwhile, and improve as each document finishes.',
+	'reindex.body': 'Answers sharpen as each one lands, you can keep asking questions.',
 	'settings.rerank.title': 'Deeper search',
-	'settings.rerank.body':
-		"Finds the passage that answers you even when your words are not the document's. A fee schedule says « montant forfaitaire » where you would say « combien ça coûte », and searching on words alone walks past it.",
+	'settings.rerank.body': 'The right passage, even when your words are not the document’s.',
 	'settings.rerank.cost': 'ONE-TIME DOWNLOAD · 544 MB',
 	'settings.rerank.on': 'On',
-	'settings.rerank.turnOn': 'Turn on deeper search',
+	'settings.rerank.turnOn': 'Turn on',
 	'settings.rerank.turnOff': 'Turn off',
 	'settings.tabs.general': 'General',
 	'settings.tabs.data': 'Data',

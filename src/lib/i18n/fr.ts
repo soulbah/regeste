@@ -588,20 +588,17 @@ export const fr: Record<keyof typeof en, string> = {
 	'menu.language': 'Langue',
 	'menu.signIn': 'Se connecter',
 	'work.model.downloading.title': 'Téléchargement du modèle',
-	'work.model.downloading.body':
-		'Un seul téléchargement de {size}. Il reste ensuite sur votre appareil et fonctionne hors ligne.',
+	'work.model.downloading.body': 'Un seul téléchargement de {size}.',
 	'work.model.loading.title': 'Démarrage du modèle',
-	'work.model.loading.body':
-		'Le fichier est là. Il se met en mémoire, c’est l’étape lente et elle n’arrive qu’une fois par session.',
+	'work.model.loading.body': 'Le fichier est téléchargé, il se met en mémoire.',
 	'reindex.title': 'Relecture de vos documents',
 	'reindex.body':
-		"Cette version a changé la façon d'indexer les documents, donc chacun est relu depuis la copie présente sur votre appareil. Les réponses continuent de fonctionner et s'améliorent à mesure que chaque document se termine.",
+		'Les réponses s’affinent au fur et à mesure, vous pouvez continuer à poser des questions.',
 	'settings.rerank.title': 'Recherche approfondie',
-	'settings.rerank.body':
-		"Retrouve le passage qui vous répond même quand vos mots ne sont pas ceux du document. Une convention d'honoraires écrit « montant forfaitaire » là où vous demandez combien ça coûte, et une recherche sur les mots seuls passe à côté.",
+	'settings.rerank.body': 'Le bon passage, même quand vos mots ne sont pas ceux du document.',
 	'settings.rerank.cost': 'TÉLÉCHARGEMENT UNIQUE · 544 MO',
 	'settings.rerank.on': 'Activée',
-	'settings.rerank.turnOn': 'Activer la recherche approfondie',
+	'settings.rerank.turnOn': 'Activer',
 	'settings.rerank.turnOff': 'Désactiver',
 	'settings.tabs.general': 'Général',
 	'settings.tabs.data': 'Données',
