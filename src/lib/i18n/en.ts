@@ -583,6 +583,13 @@ export const en = {
 	'sidebar.chatOptionsAria': 'Chat options',
 	'menu.language': 'Language',
 	'menu.signIn': 'Sign in',
+	'settings.rerank.title': 'Deeper search',
+	'settings.rerank.body':
+		"Finds the passage that answers you even when your words are not the document's. A fee schedule says « montant forfaitaire » where you would say « combien ça coûte », and searching on words alone walks past it.",
+	'settings.rerank.cost': 'ONE-TIME DOWNLOAD · 544 MB',
+	'settings.rerank.on': 'On',
+	'settings.rerank.turnOn': 'Turn on deeper search',
+	'settings.rerank.turnOff': 'Turn off',
 	'settings.tabs.general': 'General',
 	'settings.tabs.data': 'Data',
 	'settings.tabs.ai': 'AI',

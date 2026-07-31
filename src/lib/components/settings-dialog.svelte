@@ -37,6 +37,7 @@
 	import { myaiStore, MYAI_PRESETS, normalizeBaseUrl } from '$lib/state/myai.svelte';
 	import { sessionStore } from '$lib/state/session.svelte';
 	import { settingsStore } from '$lib/state/settings.svelte';
+	import { documentsStore } from '$lib/state/documents.svelte';
 	import { uiStore } from '$lib/state/ui.svelte';
 	import { ASSISTED_ENABLED } from '$lib/flags';
 	import { CLOUD_MODELS, answersLeft, modelFor } from '$lib/cloud-models';
@@ -765,6 +766,54 @@
 											{/snippet}
 											{@render row(t('settings.myai.model'), null, modelControl)}
 										{/if}
+									</section>
+
+									<!-- Deeper search. Its own card rather than a settings row: it
+									     costs a download, and a switch that silently started 544 MB
+									     would be the one control here doing something its label does
+									     not say. -->
+									<section class="border-border bg-card/40 rounded-2xl border p-6">
+										<div class="flex items-baseline justify-between gap-3">
+											<h3 class="font-serif text-lg leading-none font-medium tracking-tight">
+												{t('settings.rerank.title')}
+											</h3>
+											{#if documentsStore.rerankAccepted}
+												<Badge variant="outline" class="shrink-0 font-mono text-[10px] uppercase">
+													{t('settings.rerank.on')}
+												</Badge>
+											{/if}
+										</div>
+										<p class="text-muted-foreground mt-4 text-sm leading-relaxed">
+											{t('settings.rerank.body')}
+										</p>
+										<p
+											class="text-muted-foreground border-border/60 mt-5 border-t pt-4 font-mono text-[11px] tracking-wider uppercase"
+										>
+											{t('settings.rerank.cost')}
+										</p>
+										{#if documentsStore.rerankDownload}
+											<Progress
+												value={Math.round(documentsStore.rerankDownload.progress * 100)}
+												class="mt-4 h-1"
+											/>
+										{:else if documentsStore.rerankError}
+											<p class="text-destructive mt-4 text-xs leading-relaxed">
+												{documentsStore.rerankError}
+											</p>
+										{/if}
+										<Button
+											variant={documentsStore.rerankAccepted ? 'outline' : 'default'}
+											class="mt-5 w-full"
+											disabled={documentsStore.rerankDownload !== null}
+											onclick={() =>
+												documentsStore.rerankAccepted
+													? documentsStore.disableReranking()
+													: void documentsStore.enableReranking()}
+										>
+											{documentsStore.rerankAccepted
+												? t('settings.rerank.turnOff')
+												: t('settings.rerank.turnOn')}
+										</Button>
 									</section>
 								</div>
 							{:else if sessionStore.user}

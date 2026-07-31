@@ -587,6 +587,13 @@ export const fr: Record<keyof typeof en, string> = {
 	'sidebar.chatOptionsAria': 'Options de la discussion',
 	'menu.language': 'Langue',
 	'menu.signIn': 'Se connecter',
+	'settings.rerank.title': 'Recherche approfondie',
+	'settings.rerank.body':
+		"Retrouve le passage qui vous répond même quand vos mots ne sont pas ceux du document. Une convention d'honoraires écrit « montant forfaitaire » là où vous demandez combien ça coûte, et une recherche sur les mots seuls passe à côté.",
+	'settings.rerank.cost': 'TÉLÉCHARGEMENT UNIQUE · 544 MO',
+	'settings.rerank.on': 'Activée',
+	'settings.rerank.turnOn': 'Activer la recherche approfondie',
+	'settings.rerank.turnOff': 'Désactiver',
 	'settings.tabs.general': 'Général',
 	'settings.tabs.data': 'Données',
 	'settings.tabs.ai': 'IA',

@@ -34,6 +34,11 @@ export interface FinalRankingInput {
 	route: QuestionRoute;
 	ranked: SearchHit[];
 	neighbors: SearchHit[];
+	/** How many passages to pack. Defaults to what goes straight to the model.
+	 * A reranking turn asks for more, because a cross-encoder can only reorder
+	 * what it is handed: measured on a fee agreement, a pool of ten carried no
+	 * passage stating a fee at all, where twenty carried three. */
+	limit?: number;
 }
 
 /** Pure CPU stages used both directly in tests and from the ranking workers. */
@@ -75,5 +80,11 @@ export function packAndFuseChannels(input: FusionRankingInput): FusionRankingOut
 }
 
 export function packFinalEvidence(input: FinalRankingInput): SearchHit[] {
-	return selectWithNeighbors(input.ranked, input.neighbors, input.query, 16, input.route);
+	return selectWithNeighbors(
+		input.ranked,
+		input.neighbors,
+		input.query,
+		input.limit ?? 16,
+		input.route
+	);
 }
