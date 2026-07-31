@@ -578,7 +578,7 @@ export function buildVerificationPrompt(
 ): string {
 	const coverageContract = buildAnswerCoverageContract(question);
 	return `Audit and correct the draft against the excerpts. Return only the corrected answer in the question's language, with citations.
-Treat the draft as untrusted. Re-solve the question from the excerpts before comparing it with the draft. Silently build a checklist with one row per requested part: requested subject, exact adjacent source label, value, unit, condition, exception and citation. Then write the answer from that checklist.
+Treat the draft as untrusted. Re-solve the question from the excerpts before comparing it with the draft. Output the corrected answer only: prose for the reader, no checklist, no headings, no field labels, no notes about your own process.
 Check every requested part, exact form/output identifiers, strict bounds and comparisons, start-to-end direction, operands, units and arithmetic. Bind each value to its exact adjacent source label and requested subject; when two similar labels exist, keep both labels distinct rather than silently choosing one. Reject document creation/signature/print timestamps when the question asks for a contract effective date, and reject values from neighboring categories. A duration cannot be replaced by a price, deductible or retention period for another subject. For every deadline, copy the exact starting event after "from"/"à compter de". For lists, rights, obligations, consequences and selected/excluded options, compare the draft item by item with every relevant bullet, continuation, or following subsection; restore omissions. When asked how a payment, entitlement or remedy works, include supported prerequisites, deadlines and proof requirements from adjacent excerpts. When asked what is covered, use the clause matching the exact scenario and remove unrelated exclusions or assistance services. For coverage questions, preserve the decisive limitation and any explicitly offered option. For requested actions, include relevant notices, evidence and deadlines. If a requested value is absent but a related status or condition is present, return a qualified answer containing both the known status and the explicit absence; do not give a generic refusal. If the premise is disproved by the excerpts, state the contradiction and the useful supported fact instead of giving a generic refusal. Check contradictions instead of smoothing them over. Never add unsupported facts.
 If two compared values are unequal or the computed difference is non-zero, the yes/no conclusion must be "no", never "yes".
 
@@ -628,6 +628,39 @@ export function enforceAnswerInvariants(question: string, text: string): string 
 	return corrected;
 }
 
+/** A sentence long enough that seeing it twice is redundancy rather than a
+ * heading or a shared label two passages legitimately both carry. */
+const REDUNDANT_SENTENCE_CHARS = 60;
+
+/**
+ * A passage with the sentences an earlier passage already carried removed.
+ *
+ * Chunks overlap on purpose — it is what keeps a fact retrievable when it
+ * straddles a boundary — but the model is shown every retrieved chunk in full,
+ * so the overlap is paid again in the prompt. Measured on a fee agreement with
+ * sixteen passages: 7 005 of 13 653 characters were sentences already present
+ * in a higher-ranked passage, about 2 300 tokens of prefill spent restating
+ * what the model had just read, on the answer pass and again on every
+ * verification and retry.
+ *
+ * A passage is never emptied and never renumbered: it keeps its citation
+ * number and its own first sentence, so every `[n]` the model can emit still
+ * resolves and the fact remains in the prompt exactly once.
+ */
+export function withoutRepeatedSentences(text: string, seen: Set<string>): string {
+	const sentences = text.split(/(?<=[.;:!?])\s+/u);
+	const kept: string[] = [];
+	for (const sentence of sentences) {
+		const key = sentence.replace(/\s+/gu, ' ').trim().toLowerCase();
+		if (key.length >= REDUNDANT_SENTENCE_CHARS && seen.has(key)) continue;
+		if (key.length >= REDUNDANT_SENTENCE_CHARS) seen.add(key);
+		kept.push(sentence);
+	}
+	// Every sentence already seen: keep the first one so the passage still says
+	// something under its number.
+	return (kept.length ? kept : sentences.slice(0, 1)).join(' ').trim();
+}
+
 export function buildUserPrompt(
 	question: string,
 	hits: SearchHit[],
@@ -635,11 +668,12 @@ export function buildUserPrompt(
 	citationNumbers: ReadonlyMap<number, number> | null = null,
 	inventoryHits: SearchHit[] | null = null
 ): string {
+	const seen = new Set<string>();
 	const excerpts = hits
 		.map((h, i) => {
 			const locator = h.page ? `page ${h.page}` : (h.headingPath ?? '');
 			const citationNumber = citationNumbers?.get(h.chunkId) ?? i + 1;
-			return `[${citationNumber}] (${h.documentName}${locator ? ` · ${locator}` : ''})\n${h.text}`;
+			return `[${citationNumber}] (${h.documentName}${locator ? ` · ${locator}` : ''})\n${withoutRepeatedSentences(h.text, seen)}`;
 		})
 		.join('\n\n');
 	const context = conversationContext

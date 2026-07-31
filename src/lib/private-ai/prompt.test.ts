@@ -12,6 +12,7 @@ import {
 	extractThink,
 	fitEvidenceToContext,
 	isDegenerateAnswer,
+	withoutRepeatedSentences,
 	isRefusalLike,
 	needsGroundedVerification,
 	resolveCitations,
@@ -645,5 +646,31 @@ describe('isRefusalLike — a refusal that blames the reader', () => {
 
 	it('leaves a real answer alone', () => {
 		expect(isRefusalLike('Le montant total est de 2800 € HT [1].')).toBe(false);
+	});
+});
+
+describe('withoutRepeatedSentences', () => {
+	it('drops a sentence an earlier passage already carried', () => {
+		const seen = new Set<string>();
+		const first =
+			'La SELARL JURIS ne s’engage à aucune intervention avant paiement de cette provision. Le RAPO est facturé 1100 euros.';
+		const second =
+			'La SELARL JURIS ne s’engage à aucune intervention avant paiement de cette provision. Le référé est facturé 800 € HT.';
+		expect(withoutRepeatedSentences(first, seen)).toBe(first);
+		expect(withoutRepeatedSentences(second, seen)).toBe('Le référé est facturé 800 € HT.');
+	});
+
+	it('keeps a short repeated line: a shared label is not redundancy', () => {
+		const seen = new Set<string>();
+		withoutRepeatedSentences('Montant : 800 €.', seen);
+		expect(withoutRepeatedSentences('Montant : 900 €.', seen)).toBe('Montant : 900 €.');
+	});
+
+	it('never empties a passage, so its citation number still says something', () => {
+		const seen = new Set<string>();
+		const passage =
+			'Cette clause décrit précisément les modalités de règlement des provisions dues au cabinet.';
+		withoutRepeatedSentences(passage, seen);
+		expect(withoutRepeatedSentences(passage, seen)).toBe(passage);
 	});
 });
