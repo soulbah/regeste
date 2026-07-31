@@ -185,6 +185,16 @@ class ChatsStore {
 		);
 	}
 
+	/** The verification pass is a second full generation, and up to three
+	 * targeted retries can follow it. They stream nothing, so the ledger used to
+	 * sit on "Writing the answer" through all of it and a finished answer looked
+	 * frozen. The step is added only when that work actually starts. */
+	private ensureVerifyStep(): void {
+		if (!this.workSteps.some((step) => step.id === 'verify'))
+			this.workSteps = [...this.workSteps, { id: 'verify' as const, status: 'pending' as const }];
+		this.advanceWork('verify');
+	}
+
 	private retrievalContext(question: string) {
 		const clarificationIds = new Set(
 			Object.entries(this.methodByMessage)
@@ -1038,6 +1048,7 @@ class ChatsStore {
 				// The verification is a fresh generation; a small/CPU model can spend
 				// its whole budget inside <think> and return nothing. Only adopt the
 				// verified answer when it is non-empty, otherwise keep the good draft.
+				this.ensureVerifyStep();
 				const verificationStartedAt = performance.now();
 				const verifiedRaw = await llmStore.generate(
 					[

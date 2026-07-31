@@ -443,6 +443,8 @@ export const fr: Record<keyof typeof en, string> = {
 	'work.write.active': 'Rédaction de la réponse',
 	'work.write.waiting': 'En attente de votre accord sur ce qui part',
 	'work.write.done': 'Réponse rédigée',
+	'work.verify.active': 'Vérification de la réponse',
+	'work.verify.done': 'Réponse vérifiée',
 	'work.method': 'Comment ce résultat a été construit',
 	'work.method.targeted': '{count} passages pertinents retrouvés et vérifiés.',
 	'work.method.synthesis': '{count} passages pertinents comparés avant la réponse.',

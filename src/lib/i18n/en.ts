@@ -447,6 +447,8 @@ export const en = {
 	'work.write.active': 'Writing the answer',
 	'work.write.waiting': 'Waiting for you to approve what leaves',
 	'work.write.done': 'Answer written',
+	'work.verify.active': 'Checking the answer against the sources',
+	'work.verify.done': 'Answer checked',
 	'work.method': 'How this result was built',
 	'work.method.targeted': 'Retrieved and checked {count} relevant passages.',
 	'work.method.synthesis': 'Compared {count} relevant passages before answering.',

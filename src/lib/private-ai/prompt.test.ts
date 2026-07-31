@@ -12,6 +12,7 @@ import {
 	extractThink,
 	fitEvidenceToContext,
 	isDegenerateAnswer,
+	isRefusalLike,
 	needsGroundedVerification,
 	resolveCitations,
 	resolveTargetedCitations
@@ -593,5 +594,56 @@ describe('fitEvidenceToContext', () => {
 	it('leaves a fitting list untouched', () => {
 		const small = [hit(1), hit(2)];
 		expect(fitEvidenceToContext('Question ?', small)).toEqual(small);
+	});
+});
+
+describe('isDegenerateAnswer — output that must never replace a draft', () => {
+	it('rejects the verification checklist emitted instead of prose', () => {
+		// Measured live: the verification prompt asks for this checklist to be
+		// built *silently*, and a small local model printed it twelve times with
+		// every field blank, under a real citation, replacing a correct draft.
+		const scaffold = Array.from(
+			{ length: 12 },
+			() =>
+				'- Requested subject: montant total [1]\n- Exact adjacent source label:\n- Value:\n- Unit:\n- Condition:\n- Exception:\n- Citation:'
+		).join('\n');
+		expect(isDegenerateAnswer(scaffold)).toBe(true);
+	});
+
+	it('rejects a collapsed repetition loop', () => {
+		expect(
+			isDegenerateAnswer(Array.from({ length: 10 }, () => 'Le montant est de 800 €.').join('\n'))
+		).toBe(true);
+	});
+
+	it('keeps a real multi-line answer', () => {
+		const answer = [
+			'Le RAPO est facturé 1100 € HT [1].',
+			'La saisine du tribunal administratif est facturée 900 € HT [2].',
+			'Le référé-suspension est facturé 800 € HT pour un visa concerné [3].',
+			'Le total des trois phases est donc de 2800 € HT.'
+		].join('\n');
+		expect(isDegenerateAnswer(answer)).toBe(false);
+	});
+
+	it('keeps a short answer that carries a citation', () => {
+		expect(isDegenerateAnswer('800 € HT [1].')).toBe(false);
+	});
+});
+
+describe('isRefusalLike — a refusal that blames the reader', () => {
+	it('catches the model claiming the documents were not provided', () => {
+		// Sixteen passages were in the prompt when this was produced, so the
+		// sentence is false as well as rude; it must be replaced by the app's own
+		// refusal rather than shown.
+		expect(
+			isRefusalLike(
+				"Je ne peux pas fournir une réponse qui ne soit pas étayée par les documents fournis. Puisque vous n'avez pas fourni les documents, je ne peux pas répondre à votre question."
+			)
+		).toBe(true);
+	});
+
+	it('leaves a real answer alone', () => {
+		expect(isRefusalLike('Le montant total est de 2800 € HT [1].')).toBe(false);
 	});
 });

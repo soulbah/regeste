@@ -391,9 +391,47 @@ export function fitEvidenceToContext(
  * degenerate, while a bare "1" is the first decoded token of an answer whose
  * generation failed (worker death, stop, or the known early-EOS failure of
  * this model family). Callers retry once or refuse to adopt, never both. */
+/**
+ * The scaffold the verification prompt asks the model to build *silently*:
+ * one row per requested part, labelled subject/label/value/unit/condition/
+ * exception/citation. A small local model does not keep it silent — it emits
+ * the empty checklist instead of the answer, and the verification pass then
+ * replaces a correct draft with it. Measured live: twelve identical rows,
+ * every field blank but the subject, shown to the user under a real citation.
+ *
+ * Matched on the labels rather than on any one phrasing, because the model
+ * translates them and reorders them.
+ */
+const CHECKLIST_SCAFFOLD =
+	/^[-*\s]*(?:requested subject|sujet demand|exact adjacent source label|libell[ée] (?:source )?adjacent|value|valeur|unit[ée]?|condition|exception|citation)\s*:/imu;
+
+/** Lines an answer repeats verbatim. A model that loops emits the same row over
+ * and over; genuine prose repeats a whole line essentially never. */
+function repeatedLineRatio(text: string): number {
+	const lines = text
+		.split('\n')
+		.map((line) => line.trim().toLowerCase())
+		.filter((line) => line.length > 2);
+	if (lines.length < 6) return 0;
+	const seen = new Map<string, number>();
+	for (const line of lines) seen.set(line, (seen.get(line) ?? 0) + 1);
+	const repeated = [...seen.values()].reduce((sum, count) => sum + (count > 1 ? count : 0), 0);
+	return repeated / lines.length;
+}
+
+/**
+ * An output that is not an answer: too short to say anything, a collapsed
+ * repetition loop, or the internal checklist emitted instead of prose.
+ *
+ * Used to decide whether a generation may REPLACE a draft, so it has to catch
+ * long garbage as well as short: the original length test passed a 3 000-char
+ * loop because it carried a citation marker.
+ */
 export function isDegenerateAnswer(text: string): boolean {
 	const visible = text.trim();
-	return visible.length < 40 && !/\[\d{1,2}\]/.test(visible);
+	if (visible.length < 40 && !/\[\d{1,2}\]/.test(visible)) return true;
+	if (CHECKLIST_SCAFFOLD.test(visible)) return true;
+	return repeatedLineRatio(visible) >= 0.5;
 }
 
 export function groundedRefusal(question: string): string {
@@ -402,8 +440,23 @@ export function groundedRefusal(question: string): string {
 		: "I couldn't find enough information in the attached documents to answer this.";
 }
 
+/**
+ * The model refusing by blaming the reader for something they did.
+ *
+ * Measured live on a fee agreement, with sixteen passages in the prompt: "Je ne
+ * peux pas fournir une réponse qui ne soit pas étayée par les documents
+ * fournis. Puisque vous n'avez pas fourni les documents, je ne peux pas
+ * répondre." The documents were attached and searched, so the sentence is
+ * false, and it tells the user the fault is theirs. It escaped `isRefusalLike`
+ * — which looks for claims that a FACT is absent — so it was shown verbatim
+ * instead of being replaced by the app's own honest refusal.
+ */
+const BLAMES_THE_READER =
+	/\b(?:vous n avez pas (?:fourni|donne|joint)|you (?:did not|have not|haven t) provided|sans (?:les )?documents fournis|je ne peux pas (?:fournir une reponse|repondre)|i cannot (?:provide an answer|answer))\b/u;
+
 export function isRefusalLike(text: string): boolean {
 	const normalized = normalizeQuestion(text);
+	if (BLAMES_THE_READER.test(normalized)) return true;
 	// "n'est pas indiqué" is the model's most common absence phrasing and was
 	// missing here — the answer then kept a citation on an absence claim, which
 	// the honest-refusal rule forbids (a citation cannot prove an absence).

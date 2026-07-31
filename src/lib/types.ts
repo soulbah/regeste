@@ -128,7 +128,7 @@ export interface MethodSummary {
 }
 
 export interface WorkStep {
-	id: 'search' | 'inspect' | 'calculate' | 'write';
+	id: 'search' | 'inspect' | 'calculate' | 'write' | 'verify';
 	/** 'waiting' is the one status the app does not own: the work is ready and
 	 * held for the user to approve what leaves the device. It exists so a Cloud
 	 * turn runs through the same ledger as an on-device one, with one step in a
