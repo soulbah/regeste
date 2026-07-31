@@ -1,0 +1,269 @@
+{
+	"version": 1,
+	"method": "Every pair below was read off a page image rendered with pdf.js at 4x and checked by eye. No pair was taken from any parser's output, so the labels do not favour either side. When a source document is reissued its digest changes and scripts/parser-ab/fetch.ts refuses to proceed, which is the signal to re-verify the pages listed here.",
+	"documents": [
+		{
+			"file": "bank-bp-2026.pdf",
+			"page": 3,
+			"layout": "bordered table, right-aligned prices, single-line rows",
+			"pairs": [
+				["abonnement a des services de banque a distance", "2,00"],
+				["notification hors application mobile", "gratuit"],
+				["tenue de compte", "18,45"],
+				["a debit immediat : carte visa classic", "50,00"],
+				["a autorisation quasi-systematique", "46,00"],
+				["retrait d'especes", "1,00"],
+				["securiplus", "29,50"],
+				["en agence", "5,15"],
+				["frais de mise en place d'un mandat de prelevement sepa", "12,00"],
+				["commission d'intervention", "8,00"]
+			]
+		},
+		{
+			"file": "bank-ce-2026-rgaa.pdf",
+			"page": 3,
+			"layout": "ruled table, price cells vertically offset from their labels",
+			"pairs": [
+				["direct ecureuil", "gratuit"],
+				["alertecureuil", "2,60"],
+				["tenue de compte", "4,85"],
+				["a debit immediat", "44,70"],
+				["a debit differe", "43,65"],
+				["retrait d'especes", "1,00"],
+				["assurance sur compte", "36,00"],
+				["en agence", "5,00"],
+				["commission d'intervention", "8,00"]
+			]
+		},
+		{
+			"file": "bank-ce-2026-rgaa.pdf",
+			"page": 7,
+			"layout": "dot-leader lists, no rules",
+			"pairs": [
+				["mise en place d'une convention sequestre", "nous consulter"],
+				["delivrance d'un releve d'identite bancaire", "gratuit"],
+				["demande d'ajout d'un releve d'identite bancaire", "5,00"],
+				["petit volume", "250,00"],
+				["volume moyen", "300,00"],
+				["grand volume", "350,00"],
+				["frais d'ouverture forcee d'un coffre-fort", "frais reels"],
+				["services bancaires de base", "gratuit"],
+				["des services bancaires de base", "4,00"]
+			]
+		},
+		{
+			"file": "bank-ca-2026.pdf",
+			"page": 2,
+			"layout": "bordered table, prices inline mid-row, sub-bullets",
+			"pairs": [
+				["cranque populaire en ligne vision", "gratuit"],
+				["alerte solde disponible", "0,32"],
+				["tenue de compte", "1,50"],
+				["avec releve papier", "2,50"],
+				["a debit immediat", "51,00"],
+				["autorisation systematique", "39,50"],
+				["avec l'autre carte", "1,00"],
+				["securicompte plus", "2,00"],
+				["en agence, vers un compte d'une autre banque", "4,65"],
+				["plafond mensuel", "80,00"]
+			]
+		},
+		{
+			"file": "bank-ca-2026.pdf",
+			"page": 6,
+			"layout": "shaded (unruled) rows, alternating prices",
+			"pairs": [
+				["cranque populaire en ligne vision+", "gratuit"],
+				["moins de 12 ordres par an", "99,30"],
+				["service d'agregation de comptes", "gratuit"],
+				["alerte ecopage", "0,32"],
+				["alerte temps reel de gestion", "0,79"],
+				["alerte achat a distance", "0,79"],
+				["alerte solde disponible", "0,32"],
+				["alerte essentielle", "0,79"],
+				["alerte souplesse du decouvert", "0,32"],
+				["alerte solde debiteur et rejet d'operations", "gratuit"]
+			]
+		},
+		{
+			"file": "bank-lbp-2026.pdf",
+			"page": 4,
+			"layout": "dot-leader, three sections",
+			"pairs": [
+				["frais de depot des avoirs inactifs ou prescrits", "30,00"],
+				["frais d'actualisation de dossier client", "15,00"],
+				["releves mensuels thematiques", "1,00"],
+				["releves frequents", "2,00"],
+				["frais par releve", "1,70"],
+				["tenue de compte sans mouvement", "30,00"],
+				["association de comptes", "14,00"],
+				["service d'accueil plus", "gratuit"],
+				["cloture de compte", "gratuit"]
+			]
+		},
+		{
+			"file": "paie-cesu-specimen.pdf",
+			"page": 1,
+			"layout": "payslip grid: each row carries a salarié AND an employeur base×rate=amount triplet, under a diagonal SPECIMEN watermark",
+			"pairs": [
+				["csg + crds", "4,01"],
+				["csg deductible", "9,42"],
+				["maladie", "18,32"],
+				["vieillesse", "10,29"],
+				["alloc. familiales", "7,40"],
+				["accident du travail", "3,51"],
+				["fnal", "0,14"],
+				["cfp", "0,78"],
+				["csa", "0,42"],
+				["cds", "0,02"],
+				["retraite complementaire", "5,65"],
+				["ircem prevoyance", "1,58"],
+				["pole emploi", "5,71"],
+				["total des cotisations", "30,95"],
+				["salaire net imposable", "114,01"],
+				["net a payer avant impot sur le revenu", "110,00"],
+				["date de paiement de la remuneration", "01/04/2022"],
+				["code naf", "97.00z"],
+				["numero de securite sociale", "2640677742439"]
+			]
+		},
+		{
+			"file": "bank-cadif-2026.pdf",
+			"page": 2,
+			"layout": "A4 ruled grid, integer euro prices, multi-line label cells",
+			"pairs": [
+				["abonnement a un service de banque a distance sur internet", "gratuit"],
+				["alerte temps reel de gestion", "1€"],
+				["frais de tenue de compte de depot", "1,50"],
+				["internationale a debit immediat", "47€"],
+				["internationale a debit differe", "45€"],
+				["a autorisation systematique", "16€"],
+				["retrait d'especes", "1€"],
+				["securicompte plus", "2€"],
+				["en agence", "3,60"],
+				["par internet", "gratuit"],
+				["commission d'intervention", "8€"]
+			]
+		}
+	],
+	"sectionsNote": "An IPID puts 'what is covered' and 'what is NOT covered' in two boxes side by side. If the columns interleave, a covered peril lands under the exclusions heading and the product answers the exact opposite of the truth, with a real citation. These entries check that each statement keeps the heading that governs it.",
+	"sections": [
+		{
+			"file": "ipid-axa-habitation.pdf",
+			"page": 1,
+			"headings": [
+				"Qu'est ce qui est assuré ?",
+				"Qu'est-ce qui n'est pas assuré ?",
+				"Y-a-t-il des exclusions à la couverture ?"
+			],
+			"items": [
+				["Défense Pénale et Recours Suite à Accident", "Qu'est ce qui est assuré ?"],
+				["Incendie et évènements assimilés", "Qu'est ce qui est assuré ?"],
+				["Dégâts des eaux", "Qu'est ce qui est assuré ?"],
+				["Evénements climatiques", "Qu'est ce qui est assuré ?"],
+				["Catastrophes naturelles et technologiques", "Qu'est ce qui est assuré ?"],
+				["Relogement d'urgence dans un hôtel 2 étoiles", "Qu'est ce qui est assuré ?"],
+				["Conseils aux personnes handicapées", "Qu'est ce qui est assuré ?"],
+				["Bris de vitre accidentel", "Qu'est ce qui est assuré ?"],
+				["Les bâtiments simplement posés au sol", "Qu'est-ce qui n'est pas assuré ?"],
+				["Les véhicules terrestres à moteur", "Qu'est-ce qui n'est pas assuré ?"],
+				["Les bâtiments à usage professionnel", "Qu'est-ce qui n'est pas assuré ?"],
+				["Les activités professionnelles", "Qu'est-ce qui n'est pas assuré ?"],
+				[
+					"L'exclusion légale du fait intentionnel ou dolosif",
+					"Y-a-t-il des exclusions à la couverture ?"
+				],
+				[
+					"Les conséquences de la guerre civile ou étrangère",
+					"Y-a-t-il des exclusions à la couverture ?"
+				],
+				["Le paiement des amendes et des pénalités", "Y-a-t-il des exclusions à la couverture ?"],
+				[
+					"Les piscines, spas et jacuzzis non encastrés",
+					"Y-a-t-il des exclusions à la couverture ?"
+				]
+			]
+		},
+		{
+			"file": "ipid-probtp-habitation.pdf",
+			"page": 1,
+			"headings": [
+				"Qu'est-ce qui est assuré ?",
+				"Qu'est-ce qui n'est pas assuré ?",
+				"Y a-t-il des exclusions à la couverture ?"
+			],
+			"items": [
+				["Incendie et événements assimilés", "Qu'est-ce qui est assuré ?"],
+				["Dommages électriques aux bâtiments", "Qu'est-ce qui est assuré ?"],
+				["Dégâts des eaux", "Qu'est-ce qui est assuré ?"],
+				["Catastrophes naturelles", "Qu'est-ce qui est assuré ?"],
+				["Actes de terrorismes et attentats", "Qu'est-ce qui est assuré ?"],
+				["Perte d'usage de l'habitation suite à un sinistre garanti", "Qu'est-ce qui est assuré ?"],
+				["Dommages causés par les secours", "Qu'est-ce qui est assuré ?"],
+				["Assistance à domicile et aux personnes", "Qu'est-ce qui est assuré ?"],
+				["Responsabilité civile vie privée", "Qu'est-ce qui est assuré ?"],
+				["Défense pénale et recours suite à accident", "Qu'est-ce qui est assuré ?"],
+				["Dommages aux aménagements extérieurs", "Qu'est-ce qui est assuré ?"],
+				["Les véhicules à moteur, leurs remorques", "Qu'est-ce qui n'est pas assuré ?"],
+				["L'exercice d'une activité professionnelle", "Qu'est-ce qui n'est pas assuré ?"],
+				["La pratique de la chasse", "Qu'est-ce qui n'est pas assuré ?"],
+				["La faute intentionnelle ou dolosive", "Y a-t-il des exclusions à la couverture ?"],
+				[
+					"La déflagration d'explosifs dont la détention n'est pas autorisée",
+					"Y a-t-il des exclusions à la couverture ?"
+				],
+				[
+					"Le vol, la tentative de vol ou le vandalisme commis par un assuré",
+					"Y a-t-il des exclusions à la couverture ?"
+				]
+			]
+		},
+		{
+			"file": "ipid-sg-habitation.pdf",
+			"page": 1,
+			"headings": [
+				"Qu'est-ce qui est assuré ?",
+				"Qu'est-ce qui n'est pas assuré ?",
+				"Y a-t-il des exclusions à la couverture ?"
+			],
+			"items": [
+				["Choc d'un véhicule terrestre à moteur", "Qu'est-ce qui est assuré ?"],
+				["Dégâts des eaux et gel", "Qu'est-ce qui est assuré ?"],
+				["Attentats ou actes de terrorisme", "Qu'est-ce qui est assuré ?"],
+				["Catastrophes naturelles et technologiques", "Qu'est-ce qui est assuré ?"],
+				["Détériorations immobilières résultant d'un vol", "Qu'est-ce qui est assuré ?"],
+				["Responsabilité civile de locataire ou de propriétaire", "Qu'est-ce qui est assuré ?"],
+				[
+					"Les mobil homes, manoirs, châteaux, monuments historiques",
+					"Qu'est-ce qui n'est pas assuré ?"
+				],
+				[
+					"Les bâtiments à usage agricole, industriel ou professionnel",
+					"Qu'est-ce qui n'est pas assuré ?"
+				],
+				["Les fonds, valeurs, timbres, monnaies et médailles", "Qu'est-ce qui n'est pas assuré ?"],
+				["Le contenu des bâtiments non clos ou non couverts", "Qu'est-ce qui n'est pas assuré ?"],
+				[
+					"Les véhicules terrestres à moteur, caravanes, bateaux",
+					"Qu'est-ce qui n'est pas assuré ?"
+				],
+				[
+					"Les frais de dépollution et de désamiantage",
+					"Y a-t-il des exclusions à la couverture ?"
+				],
+				[
+					"Le vol commis par les membres de la famille de l'assuré",
+					"Y a-t-il des exclusions à la couverture ?"
+				],
+				[
+					"Les pollutions ou atteintes à l'environnement",
+					"Y a-t-il des exclusions à la couverture ?"
+				],
+				[
+					"Les dommages résultant de la pratique de la chasse",
+					"Y a-t-il des exclusions à la couverture ?"
+				]
+			]
+		}
+	]
+}
