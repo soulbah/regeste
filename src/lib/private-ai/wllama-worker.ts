@@ -63,6 +63,9 @@ async function generate(
 			stream: true,
 			abortSignal: aborter.signal,
 			temperature: options.temperature ?? 0.2,
+			// See llm-worker: temperature 0 is greedy decoding and loops on its
+			// own output. llama.cpp spells the same control differently.
+			penalty_repeat: 1.15,
 			max_tokens: options.maxTokens,
 			// Qwen3 thinks by default; grounded QA doesn't need it and CPU
 			// tokens are expensive. stripThink upstream catches any leak.
