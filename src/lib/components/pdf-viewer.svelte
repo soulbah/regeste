@@ -10,7 +10,7 @@
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import { t } from '$lib/i18n/index.svelte';
 	import { readOriginal } from '$lib/opfs';
-	import { findMatchRange } from '$lib/viewer/match';
+	import { findMatchRanges } from '$lib/viewer/match';
 	import type { ViewerChunk } from '$lib/state/viewer.svelte';
 	import type { LocalDocument } from '$lib/types';
 
@@ -115,24 +115,25 @@
 				const content = await page.getTextContent();
 				if (seq !== renderSeq) return;
 				const items = content.items.filter((it: any) => 'str' in it);
-				const range = findMatchRange(
+				const ranges = findMatchRanges(
 					items.map((it: any) => it.str),
 					chunk.text
 				);
-				if (range) {
+				if (ranges.length) {
 					const out: HighlightRect[] = [];
-					for (let i = range.start; i <= range.end; i++) {
-						const item = items[i];
-						if (!item.str.trim()) continue;
-						const tx = pdfjs.Util.transform(viewport.transform, item.transform);
-						const fontHeight = Math.hypot(tx[2], tx[3]);
-						out.push({
-							left: tx[4],
-							top: tx[5] - fontHeight,
-							width: item.width * viewport.scale,
-							height: fontHeight * 1.15
-						});
-					}
+					for (const range of ranges)
+						for (let i = range.start; i <= range.end; i++) {
+							const item = items[i];
+							if (!item.str.trim()) continue;
+							const tx = pdfjs.Util.transform(viewport.transform, item.transform);
+							const fontHeight = Math.hypot(tx[2], tx[3]);
+							out.push({
+								left: tx[4],
+								top: tx[5] - fontHeight,
+								width: item.width * viewport.scale,
+								height: fontHeight * 1.15
+							});
+						}
 					rects = out;
 					// Bring the passage into view within the page scroller.
 					const top = Math.min(...out.map((r) => r.top), Infinity);
