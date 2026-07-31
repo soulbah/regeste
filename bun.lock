@@ -5,6 +5,7 @@
       "name": "regeste",
       "dependencies": {
         "@huggingface/transformers": "4.2.0",
+        "@llamaindex/liteparse-wasm": "2.10.1",
         "@mlc-ai/web-llm": "^0.2.84",
         "@orama/stemmers": "^3.1.18",
         "@wllama/wllama": "^3.5.1",
@@ -300,6 +301,8 @@
     "@jridgewell/sourcemap-codec": ["@jridgewell/sourcemap-codec@1.5.5", "", {}, "sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og=="],
 
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
+
+    "@llamaindex/liteparse-wasm": ["@llamaindex/liteparse-wasm@2.10.1", "", {}, "sha512-P+UbalhpZFVVC+XZfFNzz9Rr9T0MtMMGDBoEmT1Zzvg4TYotC1YjUo3vi/wLgtNgJqd7KhaoJEinS/tm6KHexw=="],
 
     "@lucide/svelte": ["@lucide/svelte@1.23.0", "", { "peerDependencies": { "svelte": "^5" } }, "sha512-3LQbKXx9vId6Nx4E2Nu2qwgJfdmr5+CVeVJbxe5cy+HcnCRd9QVVtZXqvgBYAV1OJrPmQAf9/3gJWLCpASC/Ng=="],
 

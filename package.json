@@ -21,6 +21,8 @@
 		"test": "vitest run",
 		"verify": "bun run check && bun run lint && bun run test && bun run build",
 		"benchmark:fetch": "bun scripts/fetch-fuzzy-benchmark.ts",
+		"parser-ab:fetch": "bun scripts/parser-ab/fetch.ts",
+		"parser-ab": "bun scripts/parser-ab/run.ts",
 		"db:generate": "drizzle-kit generate",
 		"db:migrate:local": "wrangler d1 migrations apply regeste-db --local",
 		"db:migrate:remote": "wrangler d1 migrations apply regeste-db --remote",
@@ -79,6 +81,7 @@
 	},
 	"dependencies": {
 		"@huggingface/transformers": "4.2.0",
+		"@llamaindex/liteparse-wasm": "2.10.1",
 		"@mlc-ai/web-llm": "^0.2.84",
 		"@orama/stemmers": "^3.1.18",
 		"@wllama/wllama": "^3.5.1",
