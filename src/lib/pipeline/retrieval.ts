@@ -142,7 +142,19 @@ export function expandChannelCandidatesWithNeighbors(
 }
 
 const CONCEPT_EXPANSIONS: Array<[RegExp, string]> = [
-	[/\b(?:prix|price|cost)\b/iu, 'prix vente montant euros'],
+	// "Combien coûtera toute la procédure ?" is the most natural way to ask, and
+	// it matched nothing: the pattern knew prix/price/cost only, and the
+	// approximate path needs an edit distance of 1 where "coutera" is 3 from
+	// "cout". Measured on a fee agreement, the passage carrying the 1100 € RAPO
+	// provision ranked 116th of 124 for that question — the model never saw it
+	// and refused, correctly, on evidence that did not contain the answer.
+	// A professional's fee schedule prices itself with honoraires, provision and
+	// forfaitaire, never with "coût", so the reader's word and the document's
+	// word never meet without this.
+	[
+		/\b(?:prix|price|cost|co[uû]te\w*|co[uû]t|tarif\w*|factur\w*|honoraires?)\b|\bcombien(?!\s+de\s+temps)\b|\bhow much\b/iu,
+		'prix vente montant euros tarif forfaitaire honoraires provision facturation HT TTC'
+	],
 	[/\b(?:pr[eê]t|emprunt|loan|mortgage|financement)\b/iu, 'prêt emprunt financement montant'],
 	[/\b(?:superficie|surface|area|square)\b/iu, 'superficie surface contenance mètres carrés m² ca'],
 	[
