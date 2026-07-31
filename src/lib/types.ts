@@ -98,6 +98,11 @@ export interface SearchHit {
 	semanticScore?: number | null;
 	lexicalScore?: number | null;
 	fuzzyScore?: number | null;
+	/** Cross-encoder relevance, present only on a reranked turn. Unlike the
+	 * fused score it is comparable across the hits of one question, which is
+	 * what lets the margin between the first two say whether the top passage
+	 * actually won or merely came first. */
+	rerankScore?: number | null;
 	ocrConfidence?: number | null;
 }
 

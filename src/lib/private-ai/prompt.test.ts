@@ -11,6 +11,7 @@ import {
 	enforceAnswerInvariants,
 	extractThink,
 	fitEvidenceToContext,
+	hasCollapsedIntoRepetition,
 	isDegenerateAnswer,
 	withoutRepeatedSentences,
 	isRefusalLike,
@@ -672,5 +673,29 @@ describe('withoutRepeatedSentences', () => {
 			'Cette clause décrit précisément les modalités de règlement des provisions dues au cabinet.';
 		withoutRepeatedSentences(passage, seen);
 		expect(withoutRepeatedSentences(passage, seen)).toBe(passage);
+	});
+});
+
+describe('hasCollapsedIntoRepetition', () => {
+	it('catches the loop while it is still streaming', () => {
+		// The shape measured live: the same two sentences, over and over, under a
+		// real citation, for 86 seconds.
+		const loop =
+			"Le directeur d'agence est la Caisse Régionale de Banque Populaire Mutuel Grand Ouest. Le cabinet d'avocat s'appelle SELARL JURIS. ";
+		expect(hasCollapsedIntoRepetition(loop.repeat(4))).toBe(true);
+	});
+
+	it('leaves a long answer that never repeats itself alone', () => {
+		const answer = [
+			'Le montant forfaitaire de base pour la phase administrative du recours est de 1100 € HT.',
+			'La saisine du tribunal administratif de Nantes est facturée 900 € HT.',
+			'Le référé-suspension coûte 800 € HT pour un visa concerné.',
+			'Des provisions complémentaires sont adressées au fur et à mesure des interventions.'
+		].join(' ');
+		expect(hasCollapsedIntoRepetition(answer)).toBe(false);
+	});
+
+	it('says nothing about a stream too short to judge', () => {
+		expect(hasCollapsedIntoRepetition('Le RAPO est de 1100 € HT.')).toBe(false);
 	});
 });

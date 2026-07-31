@@ -3,6 +3,7 @@
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import { Progress } from '$lib/components/ui/progress';
+	import BackgroundWork from '$lib/components/background-work.svelte';
 	import ArrowUpIcon from '@lucide/svelte/icons/arrow-up';
 	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
 	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
@@ -138,6 +139,10 @@
 </script>
 
 <div class="bg-card relative mx-auto w-full max-w-3xl rounded-[18px] border p-3 shadow-sm">
+	<!-- Work the reader did not ask for: the model coming up, documents being
+	     reread after an index change. Above the ingest row because it explains
+	     the app, not this message. -->
+	<BackgroundWork />
 	{#if readiness.preparingCount > 0}
 		<div class="border-border -mx-3 -mt-3 mb-3 border-b px-3 py-2.5" aria-live="polite">
 			<div class="flex items-start gap-2.5">

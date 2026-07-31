@@ -89,3 +89,26 @@ describe('contextual clarification dimensions', () => {
 		).toBeNull();
 	});
 });
+
+describe('scope clarification only when the question names nothing', () => {
+	const frame = (question: string) => analyzeQuestion(question);
+	const ask = (question: string) =>
+		contextualClarification(question, frame(question), {
+			hasConversationContext: false,
+			documentCount: 2
+		});
+
+	it('asks when the question says what to compute but not over what', () => {
+		expect(ask('Quel est le montant total ?')).toBe('scope');
+	});
+
+	it('stays quiet when the question already named its operands', () => {
+		// Measured live: the app spent a turn asking "one record or all selected
+		// documents?" about a question that had just listed three named fees.
+		expect(ask('Quel est le montant total si on faisait le RAPO, le TA et référé ?')).toBeNull();
+	});
+
+	it('treats any named thing as an answer, not only an acronym', () => {
+		expect(ask('Quelle est la somme des primes pour Sécuriplus ?')).toBeNull();
+	});
+});

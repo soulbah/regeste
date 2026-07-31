@@ -587,6 +587,15 @@ export const fr: Record<keyof typeof en, string> = {
 	'sidebar.chatOptionsAria': 'Options de la discussion',
 	'menu.language': 'Langue',
 	'menu.signIn': 'Se connecter',
+	'work.model.downloading.title': 'Téléchargement du modèle',
+	'work.model.downloading.body':
+		'Un seul téléchargement de {size}. Il reste ensuite sur votre appareil et fonctionne hors ligne.',
+	'work.model.loading.title': 'Démarrage du modèle',
+	'work.model.loading.body':
+		'Le fichier est là. Il se met en mémoire, c’est l’étape lente et elle n’arrive qu’une fois par session.',
+	'reindex.title': 'Relecture de vos documents',
+	'reindex.body':
+		"Cette version a changé la façon d'indexer les documents, donc chacun est relu depuis la copie présente sur votre appareil. Les réponses continuent de fonctionner et s'améliorent à mesure que chaque document se termine.",
 	'settings.rerank.title': 'Recherche approfondie',
 	'settings.rerank.body':
 		"Retrouve le passage qui vous répond même quand vos mots ne sont pas ceux du document. Une convention d'honoraires écrit « montant forfaitaire » là où vous demandez combien ça coûte, et une recherche sur les mots seuls passe à côté.",

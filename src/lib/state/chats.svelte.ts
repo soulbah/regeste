@@ -54,6 +54,7 @@ import {
 	extractThink,
 	fitEvidenceToContext,
 	groundedRefusal,
+	hasCollapsedIntoRepetition,
 	isDegenerateAnswer,
 	isThinking,
 	needsGroundedVerification,
@@ -951,10 +952,25 @@ class ChatsStore {
 				question,
 				route === 'synthesis' ? 'synthesis' : 'targeted'
 			);
+			// Checked on a cadence rather than per token: the probe scans the text
+			// so far, and a stream that has collapsed stays collapsed for the next
+			// few hundred characters anyway.
+			let collapseCheckedAt = 0;
+			let collapsed = false;
 			const onDelta = (delta: string) => {
 				streamRaw += delta;
 				this.streamingText = isThinking(streamRaw) ? '' : stripThink(streamRaw);
 				this.streamingThinking = extractThink(streamRaw) || null;
+				// Greedy decoding cannot leave a loop it has entered, so the only way
+				// out is to stop it. Left alone it ran 86 seconds and ended because
+				// the reader pressed the button.
+				if (!collapsed && streamRaw.length - collapseCheckedAt >= 240) {
+					collapseCheckedAt = streamRaw.length;
+					if (hasCollapsedIntoRepetition(stripThink(streamRaw))) {
+						collapsed = true;
+						void llmStore.stop();
+					}
+				}
 			};
 			const writeStartedAt = performance.now();
 			try {
@@ -995,7 +1011,15 @@ class ChatsStore {
 			// chars); a legitimate single-fact answer already runs ~60-110 chars
 			// and must not trigger the retry (it would discard its notes).
 			const visibleAnswer = stripThink(raw || streamRaw).trim();
-			if (options.reasoning === 'on' && visibleAnswer.length < 40 && !this.stopRequested) {
+			// A collapsed stream is not a short answer, so the length gate below
+			// could never see it: the loop is long, cited, and useless. It is the
+			// same verdict either way — this pass produced nothing usable — so it
+			// takes the same route, a single direct retry.
+			const streamCollapsed = collapsed;
+			if (
+				(options.reasoning === 'on' && visibleAnswer.length < 40 && !this.stopRequested) ||
+				(streamCollapsed && !this.stopRequested)
+			) {
 				this.streamingThinking = null;
 				streamRaw = '';
 				try {

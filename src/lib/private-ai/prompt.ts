@@ -115,6 +115,10 @@ interface EvidenceInventoryItem {
 	utility: number;
 	order: number;
 	extraCitations?: SearchHit[];
+	/** A short label/value pair recovered from adjacent lines. Exempt from the
+	 * containment rule below: it is the answer isolated, and the long run that
+	 * happens to contain it is not the same fact stated twice. */
+	precise?: boolean;
 }
 
 function logicalEvidenceLines(text: string): string[] {
@@ -188,16 +192,53 @@ export function buildEvidenceInventory(
 				continue;
 			pairedRows.push(`${label} : ${value}`);
 		}
-		for (const text of [...lines, ...sentences, ...pairedRows]) {
+		// A bare label carries no value of its own, and the inventory selects lines
+		// by how much they overlap the question — so "Votre Directeur d'Agence"
+		// was kept and "AMELIE ROUSSEAU", printed on the line above it, was
+		// dropped for sharing no word with "qui est le directeur d'agence ?". The
+		// model then bound the label to the company boilerplate that followed and
+		// answered a person question with a bank's name.
+		//
+		// A French signature block writes the name above the role, a form writes
+		// the value below the label, and neither is reachable by looking one way
+		// only. Joining a value-less line with each short neighbour covers both
+		// without a list of titles: the pair is scored like any other row, so it
+		// only survives when the label itself was relevant.
+		const carriesNoValue = (line: string) =>
+			!/\d/u.test(line) &&
+			!/[:?]\s*\S/u.test(line) &&
+			line.split(/\s+/u).filter(Boolean).length <= 6;
+		// Raw lines, not the logical ones: logicalEvidenceLines merges consecutive
+		// lines into one run, which is exactly the adjacency this needs.
+		const neighbourJoined: string[] = [];
+		for (const [index, line] of rawLines.entries()) {
+			if (!carriesNoValue(line)) continue;
+			for (const neighbour of [rawLines[index - 1], rawLines[index + 1]]) {
+				if (
+					!neighbour ||
+					neighbour.split(/\s+/u).filter(Boolean).length > 8 ||
+					/[.!?»]\s*$/u.test(neighbour.trim())
+				)
+					continue;
+				neighbourJoined.push(
+					neighbour === rawLines[index - 1] ? `${neighbour} ${line}` : `${line} ${neighbour}`
+				);
+			}
+		}
+
+		const preciseRows = new Set(neighbourJoined);
+		for (const text of [...lines, ...sentences, ...pairedRows, ...neighbourJoined]) {
 			const normalized = normalizeQuestion(text);
 			const labelValue = /[:?]\s*\S/u.test(text) || /^[-•●✓✗!]\s+/u.test(text);
 			const continuation =
 				/^(?:ce|cet|cette|ces|seulement|si|lorsque|apres|avant|toutefois|mais|oui|non)\b/u.test(
 					normalized
 				);
-			const utility = score(text) + (labelValue ? 0.3 : 0) + (continuation ? 0.22 : 0);
+			const precise = preciseRows.has(text);
+			const utility =
+				score(text) + (labelValue ? 0.3 : 0) + (continuation ? 0.22 : 0) + (precise ? 0.35 : 0);
 			if (utility < 0.2) continue;
-			items.push({ hit, text, utility, order: hitIndex });
+			items.push({ hit, text, utility, order: hitIndex, ...(precise ? { precise: true } : {}) });
 		}
 	}
 
@@ -264,15 +305,17 @@ export function buildEvidenceInventory(
 		(left, right) => right.utility - left.utility || left.order - right.order
 	)) {
 		const normalized = normalizeQuestion(item.text);
-		if (
-			selected.some(
-				(candidate) =>
-					normalizeQuestion(candidate.text) === normalized ||
-					normalizeQuestion(candidate.text).includes(normalized) ||
-					normalized.includes(normalizeQuestion(candidate.text))
-			)
-		)
-			continue;
+		// Containment means "already said" for two runs of prose. It does not for
+		// a recovered pair: "AMELIE ROUSSEAU Votre Directeur d'Agence" sits
+		// inside a 420-character run of the whole letter foot, and dropping it
+		// left the model the label without the name.
+		const duplicate = selected.some((candidate) => {
+			const other = normalizeQuestion(candidate.text);
+			if (other === normalized) return true;
+			if (item.precise) return false;
+			return other.includes(normalized) || normalized.includes(other);
+		});
+		if (duplicate) continue;
 		const excerpt = item.text.slice(0, 420);
 		if (selected.length > 0 && chars + excerpt.length > MAX_EVIDENCE_INVENTORY_CHARS) continue;
 		selected.push({ ...item, text: excerpt });
@@ -417,6 +460,40 @@ function repeatedLineRatio(text: string): number {
 	for (const line of lines) seen.set(line, (seen.get(line) ?? 0) + 1);
 	const repeated = [...seen.values()].reduce((sum, count) => sum + (count > 1 ? count : 0), 0);
 	return repeated / lines.length;
+}
+
+/** How much of the tail to look for again. Long enough that prose never
+ *  repeats it by chance, short enough to catch a loop within a line or two. */
+const REPETITION_PROBE_CHARS = 90;
+/** Seen this many times, it is a decoder stuck on its own output, not emphasis. */
+const REPETITION_OCCURRENCES = 3;
+
+/**
+ * Is the stream looping on itself, right now?
+ *
+ * `isDegenerateAnswer` judges a finished candidate that would replace a draft.
+ * It never sees the draft as it streams, which is why a model repeating the
+ * same two sentences twelve times reached a reader in full, ran 86 seconds, and
+ * only stopped because they pressed the button.
+ *
+ * Greedy decoding at temperature 0 has no way out of that on its own: once a
+ * run of tokens is the likeliest continuation it stays the likeliest. The
+ * literature calls the fix real-time stream detection, and it is the layer that
+ * catches what a repetition penalty and a cleaner prompt still let through.
+ *
+ * Looks for the tail appearing earlier in the text rather than for known bad
+ * shapes, so it holds for any loop period and any language.
+ */
+export function hasCollapsedIntoRepetition(text: string): boolean {
+	if (text.length < REPETITION_PROBE_CHARS * REPETITION_OCCURRENCES) return false;
+	const probe = text.slice(-REPETITION_PROBE_CHARS);
+	let seen = 0;
+	let at = text.indexOf(probe);
+	while (at >= 0) {
+		if (++seen >= REPETITION_OCCURRENCES) return true;
+		at = text.indexOf(probe, at + 1);
+	}
+	return false;
 }
 
 /**

@@ -236,6 +236,14 @@ class DocumentsStore {
 	rerankDownload = $state<RerankProgress | null>(null);
 	rerankReady = $state(false);
 	rerankError = $state<string | null>(null);
+	/** A rebuild the reader did not ask for: the app changed how documents are
+	 * indexed, so everything already stored has to be read again. Silent, it
+	 * looks like nothing is happening while answers quietly improve; worse, a
+	 * question asked mid-rebuild is answered from half-old passages with no hint
+	 * why. Surfaced above the composer so the chat stays usable throughout. */
+	reindexTotal = $state(0);
+	reindexDone = $state(0);
+	reindexNames = $state<string[]>([]);
 	staleDocumentIds = $state<Set<string>>(new Set());
 
 	/** Shared local query encoder for semantic routing and retrieval. */
@@ -283,15 +291,41 @@ class DocumentsStore {
 		this.retrievalRepairStarted = true;
 		try {
 			const { db } = await getLocalDb();
+			const stale: LocalDocument[] = [];
 			for (const doc of this.documents.filter((item) => item.status === 'ready')) {
 				if (this.processingIds.has(doc.id) || this.ocrAborts[doc.id]) continue;
 				const chunkCount = await db.countChunks(doc.id);
 				if ((doc.retrievalVersion ?? 1) >= RETRIEVAL_VERSION && chunkCount > 0) continue;
-				await waitForBackgroundIdle();
-				await this.reindex(doc.id);
+				stale.push(doc);
 			}
+			if (!stale.length) return;
+			this.reindexTotal = stale.length;
+			this.reindexDone = 0;
+			this.reindexNames = [];
+			// Two at a time. One document at a time left a five-document library
+			// rebuilding for minutes with a bar that barely moved; the whole
+			// library at once starves the query path, and a question asked during
+			// the rebuild is the moment this matters most. The embed worker
+			// already serves queries before passage batches, so two rebuilds keep
+			// it busy without owning it.
+			const queue = [...stale];
+			const worker = async () => {
+				for (;;) {
+					const doc = queue.shift();
+					if (!doc) return;
+					this.reindexNames = [...this.reindexNames, doc.name];
+					await waitForBackgroundIdle();
+					await this.reindex(doc.id);
+					this.reindexDone += 1;
+					this.reindexNames = this.reindexNames.filter((name) => name !== doc.name);
+				}
+			};
+			await Promise.all([worker(), worker()]);
 		} finally {
 			this.retrievalRepairStarted = false;
+			this.reindexTotal = 0;
+			this.reindexDone = 0;
+			this.reindexNames = [];
 			await this.refreshLibrary();
 		}
 	}
@@ -815,7 +849,7 @@ class DocumentsStore {
 						.map((hit, position) => ({ hit, score: scores[position] }))
 						.sort((left, right) => right.score - left.score)
 						.slice(0, RERANK_KEEP)
-						.map((entry) => entry.hit);
+						.map((entry) => ({ ...entry.hit, rerankScore: entry.score }));
 				})
 			);
 		} catch (error) {

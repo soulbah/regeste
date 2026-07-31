@@ -583,6 +583,15 @@ export const en = {
 	'sidebar.chatOptionsAria': 'Chat options',
 	'menu.language': 'Language',
 	'menu.signIn': 'Sign in',
+	'work.model.downloading.title': 'Downloading the model',
+	'work.model.downloading.body':
+		'One download of {size}. It then stays on this device and works offline.',
+	'work.model.loading.title': 'Starting the model',
+	'work.model.loading.body':
+		'The file is here. It is being placed in memory, which is the slow part and happens once per session.',
+	'reindex.title': 'Rereading your documents',
+	'reindex.body':
+		'This version changed how documents are indexed, so each one is read again from the copy on this device. Answers keep working meanwhile, and improve as each document finishes.',
 	'settings.rerank.title': 'Deeper search',
 	'settings.rerank.body':
 		"Finds the passage that answers you even when your words are not the document's. A fee schedule says « montant forfaitaire » where you would say « combien ça coûte », and searching on words alone walks past it.",
