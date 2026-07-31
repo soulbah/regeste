@@ -12,7 +12,7 @@
 // the same on a quote, a loan offer and a payment schedule.
 
 import { numberTokens } from './prompt';
-import { numericValues } from '$lib/numbers';
+import { NUMBER_RUN, canonicalNumber, numericValues } from '$lib/numbers';
 
 /** Numbers that carry no claim about the document: list markers, citation
  * markers, and the small ordinals answers use to enumerate ("1.", "2)"). */
@@ -49,6 +49,84 @@ function derivable(value: number, pool: readonly number[]): boolean {
 				if (Number.isFinite(result) && Math.abs(result - value) <= TOLERANCE) return true;
 			}
 	return false;
+}
+
+/** An operator as an answer writes it, including the ASCII stand-ins. */
+const OPERATOR_CHARACTER = /^[+\-×*÷/]$/u;
+
+const FOLD: Record<string, (left: number, right: number) => number> = {
+	'+': (left, right) => left + right,
+	'-': (left, right) => left - right,
+	'×': (left, right) => left * right,
+	'*': (left, right) => left * right,
+	'÷': (left, right) => (right === 0 ? Number.NaN : left / right),
+	'/': (left, right) => (right === 0 ? Number.NaN : left / right)
+};
+
+/**
+ * The sum an answer writes out, checked term by term.
+ *
+ * `derivable` searches for any pair of shown figures that reaches the value,
+ * which cannot reach a three-term total: asked for the cost of a RAPO, a TA and
+ * a référé, an answer that correctly states "1100 + 900 + 800 = 2800" was
+ * refused whole, because no pair of those makes 2800. Widening the search to
+ * subsets would have been the wrong repair — the more combinations admitted,
+ * the more a fabricated figure lands on one by chance.
+ *
+ * Reading the expression instead is both narrower and stricter. Every operand
+ * must be a figure the evidence carries, and the result must be the one the
+ * arithmetic actually produces, so a total that is merely plausible no longer
+ * passes: "1100 + 900 + 800 = 3000" is refused where the pair search had no
+ * opinion at all.
+ *
+ * Only chains of one repeated operator are read. Mixed operators would need
+ * precedence rules, and an answer that writes one is not doing the plain
+ * addition this exists for.
+ */
+function statedArithmetic(text: string, supported: ReadonlySet<string>): Set<string> {
+	const admitted = new Set<string>();
+	const token = new RegExp(`${NUMBER_RUN.source}|[+\\-×*÷/]|=`, 'gu');
+	const tokens = text.match(token) ?? [];
+
+	let index = 0;
+	while (index < tokens.length) {
+		// An expression is number (op number)+ = number, in the written order.
+		const operands: string[] = [];
+		const operators: string[] = [];
+		let cursor = index;
+		while (
+			cursor + 2 < tokens.length &&
+			!OPERATOR_CHARACTER.test(tokens[cursor]) &&
+			tokens[cursor] !== '=' &&
+			OPERATOR_CHARACTER.test(tokens[cursor + 1]) &&
+			tokens[cursor + 2] !== '=' &&
+			!OPERATOR_CHARACTER.test(tokens[cursor + 2])
+		) {
+			if (!operands.length) operands.push(tokens[cursor]);
+			operators.push(tokens[cursor + 1]);
+			operands.push(tokens[cursor + 2]);
+			cursor += 2;
+		}
+		if (operands.length >= 2 && tokens[cursor + 1] === '=' && tokens[cursor + 2] !== undefined) {
+			const result = tokens[cursor + 2];
+			const uniform = operators.every((operator) => operator === operators[0]);
+			const grounded = operands.every((operand) => supported.has(canonicalNumber(operand)));
+			if (uniform && grounded && !OPERATOR_CHARACTER.test(result) && result !== '=') {
+				const fold = FOLD[operators[0]];
+				const values = operands.map((operand) => Number(canonicalNumber(operand)));
+				const computed = values.reduce((left, right) => fold(left, right));
+				if (
+					Number.isFinite(computed) &&
+					Math.abs(computed - Number(canonicalNumber(result))) <= TOLERANCE
+				)
+					admitted.add(canonicalNumber(result));
+			}
+			index = cursor + 3;
+			continue;
+		}
+		index++;
+	}
+	return admitted;
 }
 
 /**
@@ -103,10 +181,20 @@ export function checkNumericGrounding(answer: string, evidence: string[]): Groun
 	const supported = new Set(evidence.flatMap((passage) => numberTokens(passage)));
 	const computing = DERIVATION_MARK.test(text);
 	const pool = computing ? evidence.flatMap((passage) => numericValues(passage)) : [];
+	// An expression the answer writes out is checked as written, before the pair
+	// search is consulted at all: it is the only route that reaches a total of
+	// three or more terms, and the only one that can tell a right total from a
+	// plausible one.
+	const computed = computing ? statedArithmetic(text, supported) : new Set<string>();
 
 	const unsupported: string[] = [];
 	for (const value of stated) {
 		if (STRUCTURAL_NUMBER.test(value) || supported.has(value)) continue;
+		if (computed.has(value)) {
+			supported.add(value);
+			pool.push(Number(value));
+			continue;
+		}
 		if (computing && derivable(Number(value), pool)) {
 			supported.add(value);
 			pool.push(Number(value));

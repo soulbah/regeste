@@ -105,3 +105,40 @@ describe('checkNumericGrounding', () => {
 		expect(checkNumericGrounding('Le TAEG est de 1,9900 % [1].', evidence).grounded).toBe(true);
 	});
 });
+
+describe('checkNumericGrounding — a total the answer writes out', () => {
+	// Measured on a real fee agreement: RAPO 1100, TA 900, référé 800, all three
+	// printed on pages 12-13. The answer added them correctly and was refused
+	// whole, because no PAIR of those figures makes 2800.
+	const fees = [
+		'• 1100 euros, à titre de provision pour la formulation du RAPO (point 2.1.1) ;',
+		'• 900 euros, à titre de provision pour la saisine du tribunal administratif (point 2.1.2.) ;',
+		'• 800 € HT, pour la préparation d’une procédure de référé suspension (1 visa concerné)'
+	];
+
+	it('admits a three-term sum whose operands the evidence carries', () => {
+		const answer = '1100 € HT (RAPO) + 900 € HT (TA) + 800 € HT (référé) = 2800 € HT';
+		expect(checkNumericGrounding(answer, fees)).toEqual({ unsupported: [], grounded: true });
+	});
+
+	it('refuses a total the same operands do not produce', () => {
+		// The pair search had no opinion on this; reading the expression does.
+		const answer = '1100 € HT + 900 € HT + 800 € HT = 3000 € HT';
+		expect(checkNumericGrounding(answer, fees).unsupported).toContain('3000');
+	});
+
+	it('refuses a sum resting on an operand the evidence never printed', () => {
+		const answer = '1100 € HT + 900 € HT + 1500 € HT = 3500 € HT';
+		const verdict = checkNumericGrounding(answer, fees);
+		expect(verdict.grounded).toBe(false);
+		expect(verdict.unsupported).toContain('1500');
+	});
+
+	it('still admits the two-step derivation the pair search was built for', () => {
+		// The pair search reaches this one because both operands are printed: the
+		// product leans on 12 and 14,91, then the gap leans on the product.
+		const answer = '12 × 14,91 € = 178,92 €, soit un écart de 6,58 € avec 185,50 €';
+		const evidence = ['12 mensualités de 14,91 €', 'prime annuelle 185,50 €'];
+		expect(checkNumericGrounding(answer, evidence)).toEqual({ unsupported: [], grounded: true });
+	});
+});
