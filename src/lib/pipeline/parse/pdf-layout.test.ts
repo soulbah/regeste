@@ -140,3 +140,62 @@ it('keeps a devis/invoice section-subtotal row intact (label + amount, not shear
 	// No bare amount column detached from labels.
 	expect(text).not.toMatch(/^17 056,11 €$/m);
 });
+
+describe('two columns of prose against a price list', () => {
+	/** A page of services on the left and their prices on the right, each label
+	 *  wrapping over two lines like a real tariff brochure. */
+	const tariffPage = () =>
+		Array.from({ length: 14 }, (_, row) => {
+			const y = 700 - row * 40;
+			return [
+				item(`Service numéro ${row + 1} proposé aux particuliers`, 40, y, 200),
+				item('avec les conditions habituelles', 40, y - 14, 180),
+				item(`${row + 2},50 € /mois`, 380, y, 80)
+			];
+		}).flat();
+
+	/** The same geometry with prose on both sides: a two-column article. */
+	const articlePage = () =>
+		Array.from({ length: 14 }, (_, row) => {
+			const y = 700 - row * 40;
+			return [
+				item(`Colonne de gauche ligne ${row + 1} du texte`, 40, y, 200),
+				item('suite de la phrase à gauche', 40, y - 14, 180),
+				item(`Colonne de droite ligne ${row + 1}`, 380, y, 160)
+			];
+		}).flat();
+
+	it('keeps a service beside its price instead of reading the columns down', () => {
+		// The two-column split is right for prose and catastrophic here: it emits
+		// every price after every service, so no chunk holds a service beside
+		// what it costs. Measured on the evaluation corpus, that one mistake was
+		// nine of the twelve label/value pairs the OCR path could not find.
+		const text = orderPdfText(tariffPage(), 595)
+			.map((line) => line.text)
+			.join('\n');
+		expect(text).toMatch(/Service numéro 1 proposé aux particuliers 2,50 € \/mois/);
+		expect(text).not.toMatch(/^2,50 € \/mois$/m);
+	});
+
+	it('still reads a two-column article one column at a time', () => {
+		const lines = orderPdfText(articlePage(), 595).map((line) => line.text);
+		const lastLeft = lines.map((line) => line.startsWith('Colonne de gauche')).lastIndexOf(true);
+		const firstRight = lines.findIndex((line) => line.startsWith('Colonne de droite'));
+		expect(firstRight).toBeGreaterThan(lastLeft);
+	});
+
+	it('splits when both columns carry figures, which is an article about money', () => {
+		const items = Array.from({ length: 14 }, (_, row) => {
+			const y = 700 - row * 40;
+			return [
+				item(`Le montant de ${row + 2},50 € est indiqué à gauche`, 40, y, 200),
+				item('et la phrase se poursuit ici', 40, y - 14, 180),
+				item(`Contre ${row + 9},00 € cité à droite`, 380, y, 160)
+			];
+		}).flat();
+		const lines = orderPdfText(items, 595).map((line) => line.text);
+		const lastLeft = lines.map((line) => line.startsWith('Le montant')).lastIndexOf(true);
+		const firstRight = lines.findIndex((line) => line.startsWith('Contre'));
+		expect(firstRight).toBeGreaterThan(lastLeft);
+	});
+});

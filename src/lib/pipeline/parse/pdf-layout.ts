@@ -311,10 +311,24 @@ function emitColumnRegions(
 /** Reconstruct reading order while avoiding the classic two-column
  * interleaving bug. A gutter is accepted only when it recurs at nearly the
  * same horizontal position on many lines; sparse tables remain line-ordered. */
+/**
+ * How far apart two baselines may be and still be one line.
+ *
+ * A table's value cell is set against the whole label block rather than against
+ * the label's first line, so it lands a couple of points off it — measured on
+ * the evaluation corpus, "Alerte solde disponible" sits at 454.0 and its
+ * "0,32 € / alerte" at 456.5. At a tolerance of 2 they became separate lines and
+ * the label bound to the next row's price instead.
+ *
+ * The ceiling is the leading: these documents set body text 9pt apart, so
+ * anything below half of that cannot merge two real lines.
+ */
+const LINE_TOLERANCE = 3;
+
 export function orderPdfText(items: PositionedPdfText[], pageWidth: number): ReconstructedLine[] {
 	const lines: PdfLine[] = [];
 	for (const item of items) {
-		let line = lines.find((candidate) => Math.abs(candidate.y - item.y) <= 2);
+		let line = lines.find((candidate) => Math.abs(candidate.y - item.y) <= LINE_TOLERANCE);
 		if (!line) {
 			line = { y: item.y, items: [] };
 			lines.push(line);
@@ -369,6 +383,43 @@ export function orderPdfText(items: PositionedPdfText[], pageWidth: number): Rec
 	}
 
 	return orderLinesWithSingleGutter(lines, pageWidth);
+}
+
+/** A cell holding a sum of money or a rate, anywhere in it. Wider than
+ *  `isAmountCell`, which asks where the amount sits; here only its presence
+ *  matters. */
+function holdsAnAmount(cell: string): boolean {
+	return /\d[\d\s.,]*\s*(?:€|%)|\b(?:gratuit|offert|n[ée]ant)\b/iu.test(cell);
+}
+
+/** At most this share of a page's amounts may sit on the poorer side before the
+ *  two columns stop looking like a price list. Zero would be brittle: one
+ *  footnote carrying a rate should not re-enable a split that severs a table. */
+const PRICE_COLUMN_LEAK = 0.15;
+/** And there must be enough amounts for "all on one side" to mean anything. */
+const PRICE_COLUMN_MINIMUM = 3;
+
+/**
+ * Are these two columns a service list and its prices rather than an article?
+ *
+ * The two-column split exists for prose set in columns, where reading down one
+ * column and then the other is the only correct order. Applied to a tariff
+ * table it is the worst thing the parser can do: every price is emitted after
+ * every service, so no chunk holds a service beside what it costs. Measured on
+ * the evaluation corpus, that single mistake accounts for nine of the twelve
+ * label/value pairs the OCR path cannot find.
+ *
+ * The two cases separate cleanly on where the money is. An article about
+ * pricing carries figures in both columns or in neither; a price list keeps
+ * them all in one. On `bank-ce-2026-rgaa` p3 the right column holds 13 amounts
+ * across 23 cells and the left column holds none across 55.
+ */
+function isPricedColumn(left: string[], right: string[]): boolean {
+	const leftAmounts = left.filter(holdsAnAmount).length;
+	const rightAmounts = right.filter(holdsAnAmount).length;
+	const richer = Math.max(leftAmounts, rightAmounts);
+	const poorer = Math.min(leftAmounts, rightAmounts);
+	return richer >= PRICE_COLUMN_MINIMUM && poorer <= richer * PRICE_COLUMN_LEAK;
 }
 
 /** Original single-gutter path: split left/right only when a central gutter
@@ -431,5 +482,6 @@ function orderLinesWithSingleGutter(lines: PdfLine[], pageWidth: number): Recons
 	const right = lines
 		.map((line) => joinItems(line.items.filter((item) => item.x >= gutter)))
 		.filter(Boolean);
+	if (isPricedColumn(left, right)) return bindTableHeaders(lines, pageWidth);
 	return asLines([...left, ...right]);
 }

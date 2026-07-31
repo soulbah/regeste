@@ -452,6 +452,110 @@ export function routedTextBaseAdapter(): Adapter {
 	};
 }
 
+// --- the OCR path ---------------------------------------------------------
+//
+// A scanned page cannot be measured against this corpus directly: the ground
+// truth is read off born-digital documents, and running recognition on a
+// rasterised version of them would mix recognition errors into a question that
+// is purely about layout.
+//
+// So the recognizer's *granularity* is simulated on the same pages instead.
+// PP-OCRv5 returns one box per detected text region grouped into lines, which
+// is coarser than pdf.js text runs and finer than a paragraph, and it is the
+// only input the OCR path ever gets. Both adapters below are fed exactly that,
+// and differ only in what they do with it:
+//
+//   ocr:naive   the lines joined top-to-bottom, boxes discarded — what
+//               src/lib/pipeline/ocr.ts emitted before the boxes were kept.
+//   ocr:boxes   the same lines through orderPdfText, which is what it emits now.
+//
+// The delta between the two rows is the change, measured on hand-verified
+// pairs. What this cannot show is recognition quality, which is unchanged.
+
+/**
+ * Gap at which the detector stops merging neighbouring words into one box.
+ *
+ * Measured on the real recogniser rather than assumed, because the assumed
+ * value (half a line height) was half the truth and made the first run of this
+ * comparison meaningless. Pairs of words drawn at a widening gap in 13pt text
+ * came back as one box up to 12pt and as two from 16pt — about 1.08 times the
+ * font size. The corpus sets body text at 9-13pt, so 14 points is the middle of
+ * the measured band. `src/routes/dev/ocr-eval` reproduces it.
+ */
+const OCR_SEGMENT_GAP = 14;
+
+/** pdf.js runs regrouped the way the recognizer would return them: clustered
+ *  into lines, then merged along each line wherever the gap is small. */
+function asRecognizedLines(items: Positioned[]): Positioned[][] {
+	const lines: Positioned[][] = [];
+	for (const item of items) {
+		const line = lines.find((candidate) => Math.abs(candidate[0].y - item.y) <= 2);
+		if (line) line.push(item);
+		else lines.push([item]);
+	}
+	lines.sort((left, right) => right[0].y - left[0].y);
+	return lines.map((line) => {
+		const sorted = [...line].sort((left, right) => left.x - right.x);
+		const merged: Positioned[] = [];
+		for (const item of sorted) {
+			const previous = merged[merged.length - 1];
+			if (previous && item.x - (previous.x + previous.width) < OCR_SEGMENT_GAP) {
+				previous.text = `${previous.text} ${item.text}`;
+				previous.width = item.x + item.width - previous.x;
+			} else {
+				merged.push({ ...item });
+			}
+		}
+		return merged;
+	});
+}
+
+function ocrAdapter(id: 'ocr:naive' | 'ocr:boxes'): Adapter {
+	return {
+		id,
+		note:
+			id === 'ocr:naive'
+				? 'recognized lines joined top-to-bottom, boxes discarded (the OCR path before)'
+				: 'the same recognized lines through orderPdfText (the OCR path now)',
+		async parse(bytes) {
+			const started = performance.now();
+			const { items, widths } = await pdfjsPages(bytes);
+			const pages: AdapterPage[] = items.map((pageItems, index) => {
+				const lines = asRecognizedLines(pageItems);
+				let citationText: string;
+				let retrievalText: string;
+				if (id === 'ocr:naive') {
+					citationText = lines.map((line) => line.map((item) => item.text).join(' ')).join('\n');
+					retrievalText = citationText;
+				} else {
+					const ordered = orderPdfText(lines.flat(), widths[index]);
+					citationText = ordered.map((line) => line.text).join('\n');
+					retrievalText = ordered
+						.map((line) =>
+							line.retrievalContext ? `${line.text}\t${line.retrievalContext}` : line.text
+						)
+						.join('\n');
+				}
+				return {
+					page: index + 1,
+					citationText,
+					retrievalText,
+					needsOcr: assessPdfTextLayer(citationText).reason !== null
+				};
+			});
+			return { pages, ms: performance.now() - started };
+		}
+	};
+}
+
+export function ocrNaiveAdapter(): Adapter {
+	return ocrAdapter('ocr:naive');
+}
+
+export function ocrBoxesAdapter(): Adapter {
+	return ocrAdapter('ocr:boxes');
+}
+
 export function defaultAdapters(): Adapter[] {
 	return [
 		oursAdapter,
@@ -461,6 +565,8 @@ export function defaultAdapters(): Adapter[] {
 		liteparseAdapter('markdown', { keepHeadersFooters: true }, '+chrome'),
 		routedAdapter(),
 		shippedAdapter(),
-		routedTextBaseAdapter()
+		routedTextBaseAdapter(),
+		ocrNaiveAdapter(),
+		ocrBoxesAdapter()
 	];
 }

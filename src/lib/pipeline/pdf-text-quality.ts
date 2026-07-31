@@ -71,12 +71,12 @@ export function assessPdfTextLayer(text: string): PdfTextQuality {
 	};
 }
 
-function preferOcr(nativeText: string, ocr: ParsedBlock): boolean {
-	if (!ocr.text.trim()) return false;
-	const quality = assessPdfTextLayer(ocr.text);
-	if (quality.reason === null && (ocr.ocrConfidence ?? 0) >= 0.5) return true;
+function preferOcr(nativeText: string, ocrText: string, confidence: number): boolean {
+	if (!ocrText.trim()) return false;
+	const quality = assessPdfTextLayer(ocrText);
+	if (quality.reason === null && confidence >= 0.5) return true;
 	return (
-		(ocr.ocrConfidence ?? 0) >= 0.78 &&
+		confidence >= 0.78 &&
 		quality.reason !== 'sparse' &&
 		quality.characters >= Math.min(50, Array.from(nativeText).length * 0.35)
 	);
@@ -93,22 +93,30 @@ export function mergeParsedWithOcr(parsed: ParsedDoc, ocrBlocks: ParsedBlock[]):
 		pageBlocks.push(block);
 		fallbackByPage.set(block.page, pageBlocks);
 	}
-	const ocrByPage = new Map(
-		ocrBlocks
-			.filter((block): block is ParsedBlock & { page: number } => block.page != null)
-			.map((block) => [block.page, block])
-	);
+	// Grouped, not keyed by page: recognition emits one block per reconstructed
+	// line now that the boxes survive the worker, so a page arrives as several.
+	const ocrByPage = new Map<number, ParsedBlock[]>();
+	for (const block of ocrBlocks) {
+		if (block.page == null) continue;
+		const pageBlocks = ocrByPage.get(block.page) ?? [];
+		pageBlocks.push(block);
+		ocrByPage.set(block.page, pageBlocks);
+	}
 	const selected: ParsedBlock[] = [...parsed.blocks];
 	for (const page of parsed.needsOcr ?? []) {
 		const fallback = fallbackByPage.get(page) ?? [];
-		const ocr = ocrByPage.get(page);
+		const ocr = ocrByPage.get(page) ?? [];
 		if (!fallback.length) {
-			if (ocr) selected.push(ocr);
+			selected.push(...ocr);
 			continue;
 		}
 		const nativeText = fallback.map((block) => block.text).join('\n');
-		if (ocr && preferOcr(nativeText, ocr)) {
-			selected.push(ocr);
+		// The page is judged whole: its lines are one recognition pass and share
+		// its confidence, so keeping some and dropping others would mix two
+		// readings of the same page.
+		const ocrText = ocr.map((block) => block.text).join('\n');
+		if (ocr.length && preferOcr(nativeText, ocrText, ocr[0].ocrConfidence ?? 0)) {
+			selected.push(...ocr);
 		} else {
 			selected.push(...fallback.map((block) => ({ ...block, ocrConfidence: 0 })));
 		}

@@ -6,6 +6,21 @@
 			"runtimeExecutable": "bun",
 			"runtimeArgs": ["run", "dev", "--port", "5173", "--strictPort"],
 			"port": 5173
+		},
+		{
+			"name": "preview",
+			"runtimeExecutable": "bunx",
+			"runtimeArgs": [
+				"wrangler",
+				"dev",
+				"--config",
+				"wrangler.dev.jsonc",
+				"--port",
+				"8788",
+				"--ip",
+				"127.0.0.1"
+			],
+			"port": 8788
 		}
 	]
 }

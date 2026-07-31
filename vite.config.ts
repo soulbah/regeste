@@ -12,14 +12,18 @@ import type { Plugin } from 'vite';
 
 const FUZZY_FIXTURE_PREFIX = '/dev/fuzzy-public/';
 const PRIVATE_FIXTURE_PREFIX = '/dev/private-fixtures/';
+const PARSER_AB_PREFIX = '/dev/parser-ab/';
 const fuzzyFixtureDirectory = resolve(import.meta.dirname, fuzzyManifest.outputDirectory);
 const privateFixtureDirectory = resolve(import.meta.dirname, '.benchmark-corpus/private');
+const parserAbDirectory = resolve(import.meta.dirname, '.benchmark-corpus/parser-ab');
 const fuzzyFixtureNames = new Set(fuzzyManifest.files.map((file) => file.name));
 
 /** Public research fixtures are dev inputs, not deployable application assets.
  * Serve them from the ignored benchmark cache only while Vite is running.
  * Private local fixtures (never committed, never deployed) are exposed the
- * same way so the dev benchmark page can ingest them without manual upload. */
+ * same way so the dev benchmark page can ingest them without manual upload.
+ * The parser evaluation corpus joins them so the OCR A/B can rasterise a real
+ * document in the browser, which is the only place the recogniser runs. */
 function localBenchmarkFixtures(): Plugin {
 	return {
 		name: 'regeste-local-benchmark-fixtures',
@@ -28,14 +32,19 @@ function localBenchmarkFixtures(): Plugin {
 			server.middlewares.use(async (req, res, next) => {
 				try {
 					const pathname = new URL(req.url ?? '/', 'http://localhost').pathname;
-					const isPrivate = pathname.startsWith(PRIVATE_FIXTURE_PREFIX);
-					if (!pathname.startsWith(FUZZY_FIXTURE_PREFIX) && !isPrivate) return next();
-					const name = decodeURIComponent(
-						pathname.slice((isPrivate ? PRIVATE_FIXTURE_PREFIX : FUZZY_FIXTURE_PREFIX).length)
+					const prefix = [FUZZY_FIXTURE_PREFIX, PRIVATE_FIXTURE_PREFIX, PARSER_AB_PREFIX].find(
+						(candidate) => pathname.startsWith(candidate)
 					);
+					if (!prefix) return next();
+					const directory = {
+						[FUZZY_FIXTURE_PREFIX]: fuzzyFixtureDirectory,
+						[PRIVATE_FIXTURE_PREFIX]: privateFixtureDirectory,
+						[PARSER_AB_PREFIX]: parserAbDirectory
+					}[prefix]!;
+					const name = decodeURIComponent(pathname.slice(prefix.length));
 					if (name.includes('/') || name.includes('..')) return next();
-					if (!isPrivate && !fuzzyFixtureNames.has(name)) return next();
-					const path = resolve(isPrivate ? privateFixtureDirectory : fuzzyFixtureDirectory, name);
+					if (prefix === FUZZY_FIXTURE_PREFIX && !fuzzyFixtureNames.has(name)) return next();
+					const path = resolve(directory, name);
 					const metadata = await stat(path);
 					res.statusCode = 200;
 					res.setHeader('Content-Length', metadata.size);
