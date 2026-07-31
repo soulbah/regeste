@@ -398,6 +398,17 @@ function holdsAnAmount(cell: string): boolean {
 const PRICE_COLUMN_LEAK = 0.15;
 /** And there must be enough amounts for "all on one side" to mean anything. */
 const PRICE_COLUMN_MINIMUM = 3;
+/**
+ * A price column is mostly prices.
+ *
+ * Concentration alone is not enough and the corpus says so: an insurance IPID
+ * keeps six figures in its "what is covered" box and none in the box beside
+ * it, which is perfectly concentrated and is not a price list at all. Read as
+ * one it fused a covered peril with an exclusion on fourteen of forty-eight
+ * statements. Density separates them with room to spare — a tariff's value
+ * column runs 0.81 to 0.83, those IPID boxes 0.14 and 0.00.
+ */
+const PRICE_COLUMN_DENSITY = 0.4;
 
 /**
  * Are these two columns a service list and its prices rather than an article?
@@ -419,7 +430,74 @@ function isPricedColumn(left: string[], right: string[]): boolean {
 	const rightAmounts = right.filter(holdsAnAmount).length;
 	const richer = Math.max(leftAmounts, rightAmounts);
 	const poorer = Math.min(leftAmounts, rightAmounts);
-	return richer >= PRICE_COLUMN_MINIMUM && poorer <= richer * PRICE_COLUMN_LEAK;
+	if (richer < PRICE_COLUMN_MINIMUM || poorer > richer * PRICE_COLUMN_LEAK) return false;
+	const valueColumn = leftAmounts >= rightAmounts ? left : right;
+	return richer / Math.max(1, valueColumn.length) >= PRICE_COLUMN_DENSITY;
+}
+
+/** A gap this much larger than the page's own leading is a new record rather
+ *  than the next line of the current one. Rows are set apart by more air than
+ *  the lines inside them; the multiplier only has to clear the noise. */
+const ROW_GAP_FACTOR = 1.5;
+
+/**
+ * Split a price list into its records, using the page's own leading.
+ *
+ * A tariff row is not one visual line. The service wraps over two or three,
+ * its price wraps over two more, and the two wraps are independent — so the
+ * label's last line sits beside the price's last line, and reading line by
+ * line answers "AlertEcureuil" with the annual figure instead of the monthly
+ * one it is priced at. Three of the corpus's remaining wrong bindings are
+ * exactly that, and all of them name the second amount of a two-amount cell.
+ *
+ * What separates one record from the next is vertical space: lines within a
+ * record are set at the leading, records are set further apart. Taking the
+ * most common gap on the page as the leading needs no threshold fitted to a
+ * document, and a page whose gaps are all equal simply yields one record per
+ * line, which is what it already did.
+ */
+function groupIntoRows(lines: PdfLine[]): PdfLine[][] {
+	if (lines.length < 3) return lines.map((line) => [line]);
+	const gaps = lines.slice(1).map((line, index) => Math.round(lines[index].y - line.y));
+	const tally = new Map<number, number>();
+	for (const gap of gaps) if (gap > 0) tally.set(gap, (tally.get(gap) ?? 0) + 1);
+	const leading = [...tally.entries()].reduce(
+		(best, entry) => (entry[1] > best[1] ? entry : best),
+		[0, 0]
+	)[0];
+	if (!leading) return lines.map((line) => [line]);
+
+	const rows: PdfLine[][] = [[lines[0]]];
+	for (let index = 1; index < lines.length; index++) {
+		if (gaps[index - 1] > leading * ROW_GAP_FACTOR) rows.push([lines[index]]);
+		else rows[rows.length - 1].push(lines[index]);
+	}
+	return rows;
+}
+
+/**
+ * A price list emitted one record per line, each record whole.
+ *
+ * Within a record the service is read before its price, so the first amount a
+ * reader meets after the service name is the one that prices it. Across
+ * records nothing moves: the page keeps its order, and only lines the leading
+ * says belong together are joined.
+ */
+function emitPricedRows(lines: PdfLine[], gutter: number): ReconstructedLine[] {
+	const out: ReconstructedLine[] = [];
+	for (const row of groupIntoRows(lines)) {
+		const label = row
+			.map((line) => joinItems(line.items.filter((item) => item.x < gutter)))
+			.filter(Boolean)
+			.join(' ');
+		const value = row
+			.map((line) => joinItems(line.items.filter((item) => item.x >= gutter)))
+			.filter(Boolean)
+			.join(' ');
+		const text = [label, value].filter(Boolean).join(' ');
+		if (text) out.push({ text });
+	}
+	return out;
 }
 
 /** Original single-gutter path: split left/right only when a central gutter
@@ -482,6 +560,6 @@ function orderLinesWithSingleGutter(lines: PdfLine[], pageWidth: number): Recons
 	const right = lines
 		.map((line) => joinItems(line.items.filter((item) => item.x >= gutter)))
 		.filter(Boolean);
-	if (isPricedColumn(left, right)) return bindTableHeaders(lines, pageWidth);
+	if (isPricedColumn(left, right)) return emitPricedRows(lines, gutter);
 	return asLines([...left, ...right]);
 }

@@ -173,7 +173,10 @@ describe('two columns of prose against a price list', () => {
 		const text = orderPdfText(tariffPage(), 595)
 			.map((line) => line.text)
 			.join('\n');
-		expect(text).toMatch(/Service numéro 1 proposé aux particuliers 2,50 € \/mois/);
+		// The whole service, wrapped line included, then its price.
+		expect(text).toMatch(
+			/Service numéro 1 proposé aux particuliers avec les conditions habituelles 2,50 € \/mois/
+		);
 		expect(text).not.toMatch(/^2,50 € \/mois$/m);
 	});
 
@@ -197,5 +200,58 @@ describe('two columns of prose against a price list', () => {
 		const lastLeft = lines.map((line) => line.startsWith('Le montant')).lastIndexOf(true);
 		const firstRight = lines.findIndex((line) => line.startsWith('Contre'));
 		expect(firstRight).toBeGreaterThan(lastLeft);
+	});
+});
+
+describe('a coverage grid is not a price list', () => {
+	it('does not fuse two boxes of prose because one of them holds the figures', () => {
+		// An insurance IPID sets "what is covered" beside "what is NOT covered".
+		// The covered box carries every figure and the excluded box carries none,
+		// which is perfect concentration and not a price list: reading the two as
+		// one record pairs a covered peril with an exclusion, and fourteen of the
+		// corpus's forty-eight statements inverted that way. Density is what
+		// separates them — a price column is mostly prices.
+		const items = Array.from({ length: 12 }, (_, row) => {
+			const y = 700 - row * 40;
+			return [
+				item(
+					row % 4 === 0
+						? `Degats des eaux jusqu a ${row + 2} 000 € par sinistre`
+						: `Garantie couverte numero ${row + 1} du contrat`,
+					40,
+					y,
+					220
+				),
+				item('dans les conditions prevues au contrat', 40, y - 14, 190),
+				item(`La deflagration d explosifs non autorises cas ${row + 1}`, 330, y, 200)
+			];
+		}).flat();
+		const lines = orderPdfText(items, 595).map((line) => line.text);
+		// No line may carry a covered peril and its exclusion at once.
+		expect(lines.some((line) => /Degats des eaux/.test(line) && /deflagration/.test(line))).toBe(
+			false
+		);
+	});
+
+	it('reads a wrapped service and its wrapped price as one record', () => {
+		// The remaining OCR failure shape: the label wraps over two lines and so
+		// does the price, so line-by-line reading answers the service with the
+		// annual figure instead of the monthly one it is priced at.
+		const items = Array.from({ length: 8 }, (_, row) => {
+			const y = 700 - row * 60;
+			return [
+				item(`Abonnement au service numero ${row + 1}`, 40, y, 200),
+				item(`option SMS ${row + 1}`, 40, y - 12, 90),
+				item(`${row + 2},60 € /mois soit pour`, 380, y, 120),
+				item(`information, ${row + 30},20 € /an`, 380, y - 12, 120)
+			];
+		}).flat();
+		const text = orderPdfText(items, 595)
+			.map((line) => line.text)
+			.join('\n');
+		// The service meets its monthly price before the annual one.
+		const record = text.split('\n').find((line) => /option SMS 1/.test(line)) ?? '';
+		expect(record).toMatch(/option SMS 1.*2,60 €/);
+		expect(record.indexOf('2,60')).toBeLessThan(record.indexOf('30,20'));
 	});
 });
