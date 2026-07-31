@@ -13,6 +13,8 @@ import { parseByName } from '$lib/pipeline/parse';
 import { mergeParsedWithOcr } from '$lib/pipeline/pdf-text-quality';
 import { readOriginal } from '$lib/opfs';
 import type { EmbedApi } from '$lib/pipeline/embed-worker';
+import type { RerankApi } from '$lib/pipeline/rerank-worker';
+import { RERANK_CANDIDATES, RERANK_KEEP, type RerankProgress } from '$lib/pipeline/rerank-model';
 import type { RetrievalRankingApi } from '$lib/pipeline/retrieval-ranking-worker';
 import type {
 	FinalRankingInput,
@@ -71,6 +73,7 @@ const rankingWorkers: Array<{
 }> = [];
 const OCR_INDEX_VERSION = 2;
 const OCR_INDEX_VERSION_KEY = 'regeste:ocr-index-version';
+const RERANK_CONSENT_KEY = 'regeste:rerank-consent';
 function getEmbedWorker(): Remote<EmbedApi> {
 	if (!embedApi) {
 		const worker = new Worker(new URL('../pipeline/embed-worker.ts', import.meta.url), {
@@ -80,6 +83,18 @@ function getEmbedWorker(): Remote<EmbedApi> {
 		embedApi = wrap<EmbedApi>(worker);
 	}
 	return embedApi;
+}
+
+let rerankApi: Remote<RerankApi> | null = null;
+function getRerankWorker(): Remote<RerankApi> {
+	if (!rerankApi) {
+		const worker = new Worker(new URL('../pipeline/rerank-worker.ts', import.meta.url), {
+			type: 'module'
+		});
+		guardWorker(worker, 'search');
+		rerankApi = wrap<RerankApi>(worker);
+	}
+	return rerankApi;
 }
 
 function rankingConcurrency(): number {
@@ -213,6 +228,22 @@ class DocumentsStore {
 	results = $state<SearchHit[]>([]);
 	lastSearchMs = $state<number | null>(null);
 	embeddingProfile = $state<EmbeddingProfile | null>(null);
+	/** Reranking is opt-in: it costs a 544 MB download, so nothing happens until
+	 * the reader accepts it. `null` means never asked. */
+	rerankAccepted = $state<boolean>(
+		typeof localStorage !== 'undefined' && localStorage.getItem(RERANK_CONSENT_KEY) === 'yes'
+	);
+	rerankDownload = $state<RerankProgress | null>(null);
+	rerankReady = $state(false);
+	rerankError = $state<string | null>(null);
+	/** A rebuild the reader did not ask for: the app changed how documents are
+	 * indexed, so everything already stored has to be read again. Silent, it
+	 * looks like nothing is happening while answers quietly improve; worse, a
+	 * question asked mid-rebuild is answered from half-old passages with no hint
+	 * why. Surfaced above the composer so the chat stays usable throughout. */
+	reindexTotal = $state(0);
+	reindexDone = $state(0);
+	reindexNames = $state<string[]>([]);
 	staleDocumentIds = $state<Set<string>>(new Set());
 
 	/** Shared local query encoder for semantic routing and retrieval. */
@@ -260,15 +291,41 @@ class DocumentsStore {
 		this.retrievalRepairStarted = true;
 		try {
 			const { db } = await getLocalDb();
+			const stale: LocalDocument[] = [];
 			for (const doc of this.documents.filter((item) => item.status === 'ready')) {
 				if (this.processingIds.has(doc.id) || this.ocrAborts[doc.id]) continue;
 				const chunkCount = await db.countChunks(doc.id);
 				if ((doc.retrievalVersion ?? 1) >= RETRIEVAL_VERSION && chunkCount > 0) continue;
-				await waitForBackgroundIdle();
-				await this.reindex(doc.id);
+				stale.push(doc);
 			}
+			if (!stale.length) return;
+			this.reindexTotal = stale.length;
+			this.reindexDone = 0;
+			this.reindexNames = [];
+			// Two at a time. One document at a time left a five-document library
+			// rebuilding for minutes with a bar that barely moved; the whole
+			// library at once starves the query path, and a question asked during
+			// the rebuild is the moment this matters most. The embed worker
+			// already serves queries before passage batches, so two rebuilds keep
+			// it busy without owning it.
+			const queue = [...stale];
+			const worker = async () => {
+				for (;;) {
+					const doc = queue.shift();
+					if (!doc) return;
+					this.reindexNames = [...this.reindexNames, doc.name];
+					await waitForBackgroundIdle();
+					await this.reindex(doc.id);
+					this.reindexDone += 1;
+					this.reindexNames = this.reindexNames.filter((name) => name !== doc.name);
+				}
+			};
+			await Promise.all([worker(), worker()]);
 		} finally {
 			this.retrievalRepairStarted = false;
+			this.reindexTotal = 0;
+			this.reindexDone = 0;
+			this.reindexNames = [];
 			await this.refreshLibrary();
 		}
 	}
@@ -718,7 +775,10 @@ class DocumentsStore {
 				query: channelRankedSets[index].request.evidenceQuery,
 				route: channelRankedSets[index].request.route,
 				ranked,
-				neighbors
+				neighbors,
+				// A cross-encoder can only reorder what it is handed, so a reranking
+				// turn packs a wider pool and lets the reranker cut it back down.
+				...(this.rerankAccepted ? { limit: RERANK_CANDIDATES } : {})
 			})),
 			(api, input) => api.packFinalEvidence(input) as unknown as Promise<SearchHit[]>
 		);
@@ -737,6 +797,10 @@ class DocumentsStore {
 				final: results[index].map(diagnosticHit)
 			});
 		}
+		const reranked = await this.rerankResults(
+			results,
+			channelRankedSets.map((set) => set.request.evidenceQuery)
+		);
 		onBatchTiming?.({
 			requests: requests.length,
 			sparseVariants: flattenedSparse.length,
@@ -752,7 +816,75 @@ class DocumentsStore {
 			rankingMs: performance.now() - rankingStartedAt,
 			totalMs: performance.now() - totalStartedAt
 		});
-		return results;
+		return reranked;
+	}
+
+	/**
+	 * Reorder each result set with the cross-encoder, keeping the best few.
+	 *
+	 * The retrieval channels score the question and the passage separately and
+	 * hope the two representations meet; a cross-encoder reads them together.
+	 * Measured on a fee agreement asked "Combien coûtera toute la procédure ?",
+	 * where the reader's word and the document's word share no token: the
+	 * passage carrying the 1 100 EUR provision ranked 116th of 124 on the
+	 * lexical channel, and first after reranking.
+	 *
+	 * Failure is never fatal. A model that will not load, or a scoring error,
+	 * leaves the fused order untouched — the order that shipped before.
+	 */
+	private async rerankResults(sets: SearchHit[][], queries: string[]): Promise<SearchHit[][]> {
+		if (!this.rerankAccepted || !sets.some((set) => set.length > 1)) return sets;
+		try {
+			const api = getRerankWorker();
+			return await Promise.all(
+				sets.map(async (hits, index) => {
+					if (hits.length < 2) return hits;
+					const scores = await api.score(
+						queries[index],
+						hits.map((hit) => hit.text)
+					);
+					if (scores.length !== hits.length) return hits;
+					this.rerankReady = true;
+					return hits
+						.map((hit, position) => ({ hit, score: scores[position] }))
+						.sort((left, right) => right.score - left.score)
+						.slice(0, RERANK_KEEP)
+						.map((entry) => ({ ...entry.hit, rerankScore: entry.score }));
+				})
+			);
+		} catch (error) {
+			this.rerankError = error instanceof Error ? error.message : String(error);
+			console.error('[regeste] reranking failed, keeping the fused order:', error);
+			return sets;
+		}
+	}
+
+	/** Accept the download and warm the model, so the first search is not the
+	 * one that waits for 544 MB. */
+	async enableReranking(): Promise<void> {
+		localStorage.setItem(RERANK_CONSENT_KEY, 'yes');
+		this.rerankAccepted = true;
+		this.rerankError = null;
+		try {
+			await getRerankWorker().prepare(
+				proxy((progress: RerankProgress) => {
+					this.rerankDownload = progress;
+				})
+			);
+			this.rerankReady = true;
+		} catch (error) {
+			this.rerankError = error instanceof Error ? error.message : String(error);
+			this.rerankAccepted = false;
+			localStorage.removeItem(RERANK_CONSENT_KEY);
+		} finally {
+			this.rerankDownload = null;
+		}
+	}
+
+	disableReranking(): void {
+		localStorage.removeItem(RERANK_CONSENT_KEY);
+		this.rerankAccepted = false;
+		this.rerankReady = false;
 	}
 
 	/** Dev benchmark ablation: same candidates, isolated by retrieval channel. */

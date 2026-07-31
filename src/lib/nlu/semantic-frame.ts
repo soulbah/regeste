@@ -226,6 +226,16 @@ function phraseMatches(q: string, phrase: string, fuzzyLimit = 2): boolean {
 		// likely a different, shorter word reached by deletion — reject it. A
 		// *longer* token (`frais` -> `farais`) is a typo of the concept; keep it.
 		if (phrase.length <= 5 && token.length < phrase.length) return false;
+		// On a short concept the whole fuzzy budget is one edit, so a common word
+		// one substitution away is indistinguishable from a typo. "comme" is one
+		// edit from "somme", and "qui est le directeur et comme s'appelle le
+		// cabinet ?" parsed as a request to add money up — the app answered a
+		// question about names with "one record or all selected documents?".
+		// Requiring the first letter to survive separates the two without a list
+		// of forbidden words: typists transpose and drop letters inside a word far
+		// more often than they miss its first one, so "sonme" and "sommme" still
+		// reach "somme" while "comme" no longer does.
+		if (phrase.length <= 5 && token[0] !== phrase[0]) return false;
 		return max > 0 && token.length >= 4 && damerauLevenshtein(token, phrase, max) <= max;
 	});
 }

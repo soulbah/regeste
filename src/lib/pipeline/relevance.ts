@@ -14,6 +14,35 @@ import {
 export const WEAK_SCORE_THRESHOLD = 0.018;
 const MAX_REFINED_SCORE = 2 / 61 + 0.008;
 
+/**
+ * The cross-encoder's margin between the best passage and the runner-up.
+ *
+ * Measured, and deliberately NOT used as a gate. The idea was sound — a
+ * comparable per-candidate score means the gap between the first two should say
+ * how much the evidence settles the question — and the gap does not separate
+ * the two populations. On 113 grounded cases, reranking a pool of 32, the
+ * margin when the top passage was on a gold page had a median of 0.50; when it
+ * was not, 0.29. Sweeping every threshold:
+ *
+ *   t=0.30  flags 38 of 113, of which 16% are actually wrong, catching 60%
+ *   t=0.75  flags 74 of 113, of which 14% are actually wrong, catching 100%
+ *
+ * Refusing at 0.30 would suppress 32 correct answers to catch 6 wrong ones, and
+ * no threshold in the sweep reaches 27% precision. The 0.3 borrowed from a
+ * product-catalogue search does not transfer: a catalogue has one right row per
+ * query, a policy document has a dozen passages that all legitimately touch the
+ * question, so near-ties are normal there and mean nothing.
+ *
+ * Kept because the number is honest and worth showing in "how this result was
+ * built". It must not decide whether the reader gets an answer.
+ */
+export function rerankMargin(hits: SearchHit[]): number | null {
+	const scored = hits
+		.map((hit) => hit.rerankScore)
+		.filter((score): score is number => typeof score === 'number');
+	return scored.length >= 2 ? scored[0] - scored[1] : null;
+}
+
 export function isWeakMatch(hits: SearchHit[]): boolean {
 	return hits.length > 0 && Math.max(...hits.map((h) => h.score)) < WEAK_SCORE_THRESHOLD;
 }

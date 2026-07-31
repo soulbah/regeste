@@ -89,6 +89,14 @@
 		if (nearBottom) stickToBottom = true;
 		else if (goingUp) stickToBottom = false;
 	}
+	/** The checks that run after the stream can replace the answer wholesale, so
+	 * the text is held back until they finish. Derived from the ledger rather
+	 * than a second flag: the step that names the work is the step that decides
+	 * whether the text is final. */
+	const answerProvisional = $derived(
+		chatsStore.workSteps.some((step) => step.id === 'verify' && step.status === 'active')
+	);
+
 	$effect(() => {
 		void chatsStore.messages;
 		void chatsStore.workSteps;
@@ -431,8 +439,17 @@
 							{#if chatsStore.streamingText}
 								<!-- Same renderer as the finalized turn: streaming raw then snapping
 								     to formatted markdown on completion would flip every list answer.
-								     No citations mid-stream, so [n] stays literal exactly as before. -->
-								<div class="text-sm">
+								     No citations mid-stream, so [n] stays literal exactly as before.
+								     Held back while the checks run, because they can still replace
+								     this text wholesale: a reader who has finished a paragraph at
+								     full contrast has been told it was the answer, and watching it
+								     vanish reads as a bug. Dimmed, it reads as what it is. -->
+								<div
+									class="text-sm transition-opacity duration-300 {answerProvisional
+										? 'opacity-55'
+										: 'opacity-100'}"
+									aria-busy={answerProvisional}
+								>
 									<Markdown source={chatsStore.streamingText} variant="answer" />
 								</div>
 							{:else if !chatsStore.streamingThinking}

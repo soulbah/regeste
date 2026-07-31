@@ -115,6 +115,10 @@ interface EvidenceInventoryItem {
 	utility: number;
 	order: number;
 	extraCitations?: SearchHit[];
+	/** A short label/value pair recovered from adjacent lines. Exempt from the
+	 * containment rule below: it is the answer isolated, and the long run that
+	 * happens to contain it is not the same fact stated twice. */
+	precise?: boolean;
 }
 
 function logicalEvidenceLines(text: string): string[] {
@@ -188,16 +192,53 @@ export function buildEvidenceInventory(
 				continue;
 			pairedRows.push(`${label} : ${value}`);
 		}
-		for (const text of [...lines, ...sentences, ...pairedRows]) {
+		// A bare label carries no value of its own, and the inventory selects lines
+		// by how much they overlap the question — so "Votre Directeur d'Agence"
+		// was kept and "AMELIE ROUSSEAU", printed on the line above it, was
+		// dropped for sharing no word with "qui est le directeur d'agence ?". The
+		// model then bound the label to the company boilerplate that followed and
+		// answered a person question with a bank's name.
+		//
+		// A French signature block writes the name above the role, a form writes
+		// the value below the label, and neither is reachable by looking one way
+		// only. Joining a value-less line with each short neighbour covers both
+		// without a list of titles: the pair is scored like any other row, so it
+		// only survives when the label itself was relevant.
+		const carriesNoValue = (line: string) =>
+			!/\d/u.test(line) &&
+			!/[:?]\s*\S/u.test(line) &&
+			line.split(/\s+/u).filter(Boolean).length <= 6;
+		// Raw lines, not the logical ones: logicalEvidenceLines merges consecutive
+		// lines into one run, which is exactly the adjacency this needs.
+		const neighbourJoined: string[] = [];
+		for (const [index, line] of rawLines.entries()) {
+			if (!carriesNoValue(line)) continue;
+			for (const neighbour of [rawLines[index - 1], rawLines[index + 1]]) {
+				if (
+					!neighbour ||
+					neighbour.split(/\s+/u).filter(Boolean).length > 8 ||
+					/[.!?»]\s*$/u.test(neighbour.trim())
+				)
+					continue;
+				neighbourJoined.push(
+					neighbour === rawLines[index - 1] ? `${neighbour} ${line}` : `${line} ${neighbour}`
+				);
+			}
+		}
+
+		const preciseRows = new Set(neighbourJoined);
+		for (const text of [...lines, ...sentences, ...pairedRows, ...neighbourJoined]) {
 			const normalized = normalizeQuestion(text);
 			const labelValue = /[:?]\s*\S/u.test(text) || /^[-•●✓✗!]\s+/u.test(text);
 			const continuation =
 				/^(?:ce|cet|cette|ces|seulement|si|lorsque|apres|avant|toutefois|mais|oui|non)\b/u.test(
 					normalized
 				);
-			const utility = score(text) + (labelValue ? 0.3 : 0) + (continuation ? 0.22 : 0);
+			const precise = preciseRows.has(text);
+			const utility =
+				score(text) + (labelValue ? 0.3 : 0) + (continuation ? 0.22 : 0) + (precise ? 0.35 : 0);
 			if (utility < 0.2) continue;
-			items.push({ hit, text, utility, order: hitIndex });
+			items.push({ hit, text, utility, order: hitIndex, ...(precise ? { precise: true } : {}) });
 		}
 	}
 
@@ -264,15 +305,17 @@ export function buildEvidenceInventory(
 		(left, right) => right.utility - left.utility || left.order - right.order
 	)) {
 		const normalized = normalizeQuestion(item.text);
-		if (
-			selected.some(
-				(candidate) =>
-					normalizeQuestion(candidate.text) === normalized ||
-					normalizeQuestion(candidate.text).includes(normalized) ||
-					normalized.includes(normalizeQuestion(candidate.text))
-			)
-		)
-			continue;
+		// Containment means "already said" for two runs of prose. It does not for
+		// a recovered pair: "AMELIE ROUSSEAU Votre Directeur d'Agence" sits
+		// inside a 420-character run of the whole letter foot, and dropping it
+		// left the model the label without the name.
+		const duplicate = selected.some((candidate) => {
+			const other = normalizeQuestion(candidate.text);
+			if (other === normalized) return true;
+			if (item.precise) return false;
+			return other.includes(normalized) || normalized.includes(other);
+		});
+		if (duplicate) continue;
 		const excerpt = item.text.slice(0, 420);
 		if (selected.length > 0 && chars + excerpt.length > MAX_EVIDENCE_INVENTORY_CHARS) continue;
 		selected.push({ ...item, text: excerpt });
@@ -391,9 +434,81 @@ export function fitEvidenceToContext(
  * degenerate, while a bare "1" is the first decoded token of an answer whose
  * generation failed (worker death, stop, or the known early-EOS failure of
  * this model family). Callers retry once or refuse to adopt, never both. */
+/**
+ * The scaffold the verification prompt asks the model to build *silently*:
+ * one row per requested part, labelled subject/label/value/unit/condition/
+ * exception/citation. A small local model does not keep it silent — it emits
+ * the empty checklist instead of the answer, and the verification pass then
+ * replaces a correct draft with it. Measured live: twelve identical rows,
+ * every field blank but the subject, shown to the user under a real citation.
+ *
+ * Matched on the labels rather than on any one phrasing, because the model
+ * translates them and reorders them.
+ */
+const CHECKLIST_SCAFFOLD =
+	/^[-*\s]*(?:requested subject|sujet demand|exact adjacent source label|libell[ée] (?:source )?adjacent|value|valeur|unit[ée]?|condition|exception|citation)\s*:/imu;
+
+/** Lines an answer repeats verbatim. A model that loops emits the same row over
+ * and over; genuine prose repeats a whole line essentially never. */
+function repeatedLineRatio(text: string): number {
+	const lines = text
+		.split('\n')
+		.map((line) => line.trim().toLowerCase())
+		.filter((line) => line.length > 2);
+	if (lines.length < 6) return 0;
+	const seen = new Map<string, number>();
+	for (const line of lines) seen.set(line, (seen.get(line) ?? 0) + 1);
+	const repeated = [...seen.values()].reduce((sum, count) => sum + (count > 1 ? count : 0), 0);
+	return repeated / lines.length;
+}
+
+/** How much of the tail to look for again. Long enough that prose never
+ *  repeats it by chance, short enough to catch a loop within a line or two. */
+const REPETITION_PROBE_CHARS = 90;
+/** Seen this many times, it is a decoder stuck on its own output, not emphasis. */
+const REPETITION_OCCURRENCES = 3;
+
+/**
+ * Is the stream looping on itself, right now?
+ *
+ * `isDegenerateAnswer` judges a finished candidate that would replace a draft.
+ * It never sees the draft as it streams, which is why a model repeating the
+ * same two sentences twelve times reached a reader in full, ran 86 seconds, and
+ * only stopped because they pressed the button.
+ *
+ * Greedy decoding at temperature 0 has no way out of that on its own: once a
+ * run of tokens is the likeliest continuation it stays the likeliest. The
+ * literature calls the fix real-time stream detection, and it is the layer that
+ * catches what a repetition penalty and a cleaner prompt still let through.
+ *
+ * Looks for the tail appearing earlier in the text rather than for known bad
+ * shapes, so it holds for any loop period and any language.
+ */
+export function hasCollapsedIntoRepetition(text: string): boolean {
+	if (text.length < REPETITION_PROBE_CHARS * REPETITION_OCCURRENCES) return false;
+	const probe = text.slice(-REPETITION_PROBE_CHARS);
+	let seen = 0;
+	let at = text.indexOf(probe);
+	while (at >= 0) {
+		if (++seen >= REPETITION_OCCURRENCES) return true;
+		at = text.indexOf(probe, at + 1);
+	}
+	return false;
+}
+
+/**
+ * An output that is not an answer: too short to say anything, a collapsed
+ * repetition loop, or the internal checklist emitted instead of prose.
+ *
+ * Used to decide whether a generation may REPLACE a draft, so it has to catch
+ * long garbage as well as short: the original length test passed a 3 000-char
+ * loop because it carried a citation marker.
+ */
 export function isDegenerateAnswer(text: string): boolean {
 	const visible = text.trim();
-	return visible.length < 40 && !/\[\d{1,2}\]/.test(visible);
+	if (visible.length < 40 && !/\[\d{1,2}\]/.test(visible)) return true;
+	if (CHECKLIST_SCAFFOLD.test(visible)) return true;
+	return repeatedLineRatio(visible) >= 0.5;
 }
 
 export function groundedRefusal(question: string): string {
@@ -402,8 +517,23 @@ export function groundedRefusal(question: string): string {
 		: "I couldn't find enough information in the attached documents to answer this.";
 }
 
+/**
+ * The model refusing by blaming the reader for something they did.
+ *
+ * Measured live on a fee agreement, with sixteen passages in the prompt: "Je ne
+ * peux pas fournir une réponse qui ne soit pas étayée par les documents
+ * fournis. Puisque vous n'avez pas fourni les documents, je ne peux pas
+ * répondre." The documents were attached and searched, so the sentence is
+ * false, and it tells the user the fault is theirs. It escaped `isRefusalLike`
+ * — which looks for claims that a FACT is absent — so it was shown verbatim
+ * instead of being replaced by the app's own honest refusal.
+ */
+const BLAMES_THE_READER =
+	/\b(?:vous n avez pas (?:fourni|donne|joint)|you (?:did not|have not|haven t) provided|sans (?:les )?documents fournis|je ne peux pas (?:fournir une reponse|repondre)|i cannot (?:provide an answer|answer))\b/u;
+
 export function isRefusalLike(text: string): boolean {
 	const normalized = normalizeQuestion(text);
+	if (BLAMES_THE_READER.test(normalized)) return true;
 	// "n'est pas indiqué" is the model's most common absence phrasing and was
 	// missing here — the answer then kept a citation on an absence claim, which
 	// the honest-refusal rule forbids (a citation cannot prove an absence).
@@ -525,7 +655,7 @@ export function buildVerificationPrompt(
 ): string {
 	const coverageContract = buildAnswerCoverageContract(question);
 	return `Audit and correct the draft against the excerpts. Return only the corrected answer in the question's language, with citations.
-Treat the draft as untrusted. Re-solve the question from the excerpts before comparing it with the draft. Silently build a checklist with one row per requested part: requested subject, exact adjacent source label, value, unit, condition, exception and citation. Then write the answer from that checklist.
+Treat the draft as untrusted. Re-solve the question from the excerpts before comparing it with the draft. Output the corrected answer only: prose for the reader, no checklist, no headings, no field labels, no notes about your own process.
 Check every requested part, exact form/output identifiers, strict bounds and comparisons, start-to-end direction, operands, units and arithmetic. Bind each value to its exact adjacent source label and requested subject; when two similar labels exist, keep both labels distinct rather than silently choosing one. Reject document creation/signature/print timestamps when the question asks for a contract effective date, and reject values from neighboring categories. A duration cannot be replaced by a price, deductible or retention period for another subject. For every deadline, copy the exact starting event after "from"/"à compter de". For lists, rights, obligations, consequences and selected/excluded options, compare the draft item by item with every relevant bullet, continuation, or following subsection; restore omissions. When asked how a payment, entitlement or remedy works, include supported prerequisites, deadlines and proof requirements from adjacent excerpts. When asked what is covered, use the clause matching the exact scenario and remove unrelated exclusions or assistance services. For coverage questions, preserve the decisive limitation and any explicitly offered option. For requested actions, include relevant notices, evidence and deadlines. If a requested value is absent but a related status or condition is present, return a qualified answer containing both the known status and the explicit absence; do not give a generic refusal. If the premise is disproved by the excerpts, state the contradiction and the useful supported fact instead of giving a generic refusal. Check contradictions instead of smoothing them over. Never add unsupported facts.
 If two compared values are unequal or the computed difference is non-zero, the yes/no conclusion must be "no", never "yes".
 
@@ -575,6 +705,39 @@ export function enforceAnswerInvariants(question: string, text: string): string 
 	return corrected;
 }
 
+/** A sentence long enough that seeing it twice is redundancy rather than a
+ * heading or a shared label two passages legitimately both carry. */
+const REDUNDANT_SENTENCE_CHARS = 60;
+
+/**
+ * A passage with the sentences an earlier passage already carried removed.
+ *
+ * Chunks overlap on purpose — it is what keeps a fact retrievable when it
+ * straddles a boundary — but the model is shown every retrieved chunk in full,
+ * so the overlap is paid again in the prompt. Measured on a fee agreement with
+ * sixteen passages: 7 005 of 13 653 characters were sentences already present
+ * in a higher-ranked passage, about 2 300 tokens of prefill spent restating
+ * what the model had just read, on the answer pass and again on every
+ * verification and retry.
+ *
+ * A passage is never emptied and never renumbered: it keeps its citation
+ * number and its own first sentence, so every `[n]` the model can emit still
+ * resolves and the fact remains in the prompt exactly once.
+ */
+export function withoutRepeatedSentences(text: string, seen: Set<string>): string {
+	const sentences = text.split(/(?<=[.;:!?])\s+/u);
+	const kept: string[] = [];
+	for (const sentence of sentences) {
+		const key = sentence.replace(/\s+/gu, ' ').trim().toLowerCase();
+		if (key.length >= REDUNDANT_SENTENCE_CHARS && seen.has(key)) continue;
+		if (key.length >= REDUNDANT_SENTENCE_CHARS) seen.add(key);
+		kept.push(sentence);
+	}
+	// Every sentence already seen: keep the first one so the passage still says
+	// something under its number.
+	return (kept.length ? kept : sentences.slice(0, 1)).join(' ').trim();
+}
+
 export function buildUserPrompt(
 	question: string,
 	hits: SearchHit[],
@@ -582,11 +745,12 @@ export function buildUserPrompt(
 	citationNumbers: ReadonlyMap<number, number> | null = null,
 	inventoryHits: SearchHit[] | null = null
 ): string {
+	const seen = new Set<string>();
 	const excerpts = hits
 		.map((h, i) => {
 			const locator = h.page ? `page ${h.page}` : (h.headingPath ?? '');
 			const citationNumber = citationNumbers?.get(h.chunkId) ?? i + 1;
-			return `[${citationNumber}] (${h.documentName}${locator ? ` · ${locator}` : ''})\n${h.text}`;
+			return `[${citationNumber}] (${h.documentName}${locator ? ` · ${locator}` : ''})\n${withoutRepeatedSentences(h.text, seen)}`;
 		})
 		.join('\n\n');
 	const context = conversationContext
@@ -636,7 +800,16 @@ export function buildUserPrompt(
 	const coverageConstraint = coverageContract ? `${coverageContract}\n\n` : '';
 	const inventory = buildEvidenceInventory(question, inventoryHits ?? hits, citationNumbers);
 	const inventoryConstraint = inventory ? `${inventory}\n\n` : '';
-	return `${context}${contestedConstraint}${roleConstraint}${structuralConstraint}${directionalConstraint}${referenceHint}${multiPartConstraint}${coverageConstraint}${inventoryConstraint}Excerpts:\n\n${excerpts}\n\nQuestion: ${question}`;
+	// Order follows the U-shaped attention curve measured for long contexts
+	// (Liu et al., "Lost in the Middle"): a model uses the head and the tail of
+	// its context well and loses the middle, and instructions work best close to
+	// the point of generation. The task constraints used to sit above the
+	// passages, so on this document they were ~3 500 tokens away from the
+	// question — the worst position available. They now sit between the passages
+	// and the question, which is the tail. Conversation context stays at the
+	// head: it is reference material for resolving pronouns, not an instruction.
+	const constraints = `${contestedConstraint}${roleConstraint}${structuralConstraint}${directionalConstraint}${referenceHint}${multiPartConstraint}${coverageConstraint}${inventoryConstraint}`;
+	return `${context}Excerpts:\n\n${excerpts}\n\n${constraints}Question: ${question}`;
 }
 
 export function buildVerificationUserPrompt(

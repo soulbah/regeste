@@ -12,6 +12,8 @@ import type { ParsedDoc, ParsedBlock } from '$lib/types';
 import { orderPdfText, type ReconstructedLine } from './pdf-layout';
 import { normalizeFormMarks, type PositionedTextItem } from './pdf-form-marks';
 import { assessPdfTextLayer } from '../pdf-text-quality';
+import { isUntrustedScan, largestRasterCoverage, textCoverage, textLayerTooThin } from './pdf-scan';
+import { tableLinesByPage } from './pdf-markdown';
 
 export function isLikelyPdfSectionHeading(line: string, nextLine = ''): boolean {
 	const text = line.trim();
@@ -90,10 +92,29 @@ export async function parsePdf(data: ArrayBuffer): Promise<ParsedDoc> {
 	// qualifies its lone instances everywhere).
 	const pageWidths: number[] = [];
 	const pagesPositioned: PositionedTextItem[][] = [];
+	/** Pages painted from a full-page raster whose text layer inks almost
+	 *  nothing: a scan carrying a worthless OCR layer (see pdf-scan.ts). */
+	const untrustedScans = new Set<number>();
 	for (let pageNum = 1; pageNum <= doc.numPages; pageNum++) {
 		const page = await doc.getPage(pageNum);
-		pageWidths.push(page.getViewport({ scale: 1 }).width);
+		const viewport = page.getViewport({ scale: 1 });
+		pageWidths.push(viewport.width);
 		const content = await page.getTextContent();
+		const pageArea = viewport.width * viewport.height;
+		// Coverage is free from the text items; the raster measurement walks every
+		// drawing operator, so it only runs where the cheap signal already agrees.
+		const coverage = textCoverage(
+			content.items.flatMap((item) =>
+				'width' in item && 'height' in item
+					? [{ width: item.width as number, height: item.height as number }]
+					: []
+			),
+			pageArea
+		);
+		if (textLayerTooThin(coverage)) {
+			const raster = largestRasterCoverage(await page.getOperatorList(), pdfjs.OPS, pageArea);
+			if (isUntrustedScan(raster, coverage)) untrustedScans.add(pageNum);
+		}
 		pagesPositioned.push(
 			content.items
 				.filter(
@@ -120,17 +141,29 @@ export async function parsePdf(data: ArrayBuffer): Promise<ParsedDoc> {
 	await loadingTask.destroy();
 
 	// Pass 2 — order text and build blocks from the normalized items.
+	// Pages whose ruling binds values to labels take their reading order from
+	// the table reconstruction instead (see pdf-markdown.ts); every other page,
+	// and every page if that parser is unavailable, keeps the position-derived
+	// order unchanged.
+	const routedPages = await tableLinesByPage(data);
 	const normalizedPages = normalizeFormMarks(pagesPositioned);
 	for (let pageNum = 1; pageNum <= normalizedPages.length; pageNum++) {
-		const lines = orderPdfText(normalizedPages[pageNum - 1], pageWidths[pageNum - 1]);
+		const positioned = orderPdfText(normalizedPages[pageNum - 1], pageWidths[pageNum - 1]);
+		const routed = routedPages.get(pageNum);
+		const lines: ReconstructedLine[] = routed ? routed.map((text) => ({ text })) : positioned;
 		const text = lines
 			.map((line) => line.text)
 			.join('\n')
 			.trim();
 		const quality = assessPdfTextLayer(text);
-		if (quality.reason) {
+		// A scan whose embedded OCR layer inks almost nothing reads as valid text
+		// but says nothing, so the structural check has to override the textual one.
+		const reason = quality.reason ?? (untrustedScans.has(pageNum) ? 'raster' : null);
+		if (reason) {
 			needsOcr.push(pageNum);
-			if (quality.reason !== 'sparse') ocrFallbackBlocks.push(...pageBlocks(lines, pageNum));
+			// Anything but an empty page is worth keeping as a fallback: if
+			// recognition returns nothing better, degraded text still beats none.
+			if (reason !== 'sparse') ocrFallbackBlocks.push(...pageBlocks(lines, pageNum));
 		} else {
 			blocks.push(...pageBlocks(lines, pageNum));
 		}

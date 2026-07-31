@@ -98,6 +98,11 @@ export interface SearchHit {
 	semanticScore?: number | null;
 	lexicalScore?: number | null;
 	fuzzyScore?: number | null;
+	/** Cross-encoder relevance, present only on a reranked turn. Unlike the
+	 * fused score it is comparable across the hits of one question, which is
+	 * what lets the margin between the first two say whether the top passage
+	 * actually won or merely came first. */
+	rerankScore?: number | null;
 	ocrConfidence?: number | null;
 }
 
@@ -128,7 +133,7 @@ export interface MethodSummary {
 }
 
 export interface WorkStep {
-	id: 'search' | 'inspect' | 'calculate' | 'write';
+	id: 'search' | 'inspect' | 'calculate' | 'write' | 'verify';
 	/** 'waiting' is the one status the app does not own: the work is ready and
 	 * held for the user to approve what leaves the device. It exists so a Cloud
 	 * turn runs through the same ledger as an on-device one, with one step in a

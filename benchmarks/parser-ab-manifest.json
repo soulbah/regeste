@@ -1,0 +1,205 @@
+{
+	"version": 1,
+	"purpose": "Parser A/B evaluation corpus. Fetched fresh from public sources and never used to tune any parser heuristic. Kept strictly separate from benchmarks/fuzzy-corpus-manifest.json, which is the retrieval NON-REGRESSION corpus that src/lib/pipeline/parse/* was developed against and therefore cannot arbitrate a parser choice.",
+	"outputDirectory": ".benchmark-corpus/parser-ab",
+	"files": [
+		{
+			"name": "bank-bp-2026.pdf",
+			"url": "https://www.img.banquepopulaire.fr/app/uploads/sites/29/2026/01/05093844/bdp-tarifs-part-2026.pdf",
+			"class": "tarifs-bancaires",
+			"stresses": "bordered table, right-aligned prices, single-line rows",
+			"license": "public commercial brochure, evaluation use",
+			"format": "pdf",
+			"bytes": 775172,
+			"sha256": "91ec397b2f9bf7c9213448d9b6c71b8275173c14ccca286200a3463c182d80b3"
+		},
+		{
+			"name": "bank-ce-2026-rgaa.pdf",
+			"url": "https://www.img.caisse-epargne.fr/app/uploads/sites/11/2025/10/31090640/brochure-tari-part-2026-accessible-rgaa.pdf",
+			"class": "tarifs-bancaires",
+			"stresses": "tagged/RGAA PDF, ruled table with cells vertically offset from labels",
+			"license": "public commercial brochure, evaluation use",
+			"format": "pdf",
+			"bytes": 830616,
+			"sha256": "a730c7db658232379b661ac9f0c125757a88d22c67a489c31d8680cbbcdb8753"
+		},
+		{
+			"name": "bank-ca-2026.pdf",
+			"url": "https://cp.credit-agricole.fr/externe/npc/documents/tarifs-particulier-2026.pdf",
+			"class": "tarifs-bancaires",
+			"stresses": "shaded (unruled) rows, prices inline mid-row, sub-bullets",
+			"license": "public commercial brochure, evaluation use",
+			"format": "pdf",
+			"bytes": 2501144,
+			"sha256": "2aa2870408da25ffb4af8b4801a9b4f5801e39bbb443e6038037f1092f200ce3"
+		},
+		{
+			"name": "bank-cadif-2026.pdf",
+			"url": "https://ca-paris.credit-agricole.fr/tarif/2026/CADIF_tarif2026_PART/conditions_tarifaires_particuliers_caidf_04_2026.pdf",
+			"class": "tarifs-bancaires",
+			"stresses": "A4 ruled grid, integer euro prices, multi-line label cells",
+			"license": "public commercial brochure, evaluation use",
+			"format": "pdf",
+			"bytes": 1774492,
+			"sha256": "8c03b70cd66a31e6c968865ab67bcee584b53b237bc35e7666787c370c537020"
+		},
+		{
+			"name": "bank-lbp-2026.pdf",
+			"url": "https://www.labanquepostale.fr/content/dam/lbp/documents/tarifs/2026/tarifs-particuliers-2026.pdf",
+			"class": "tarifs-bancaires",
+			"stresses": "dot-leader lists, sectioned",
+			"license": "public commercial brochure, evaluation use",
+			"format": "pdf",
+			"bytes": 4944257,
+			"sha256": "c81456a8c50698e5ecdc65aebe05e94e6b3da0e92ea3893c83c22b5df093c7c3"
+		},
+		{
+			"name": "ipid-sg-habitation.pdf",
+			"url": "https://www.assurance-habitation.societegenerale.com/tipi/static/assets/files/SGA_MRH1/SGA_IPID_MRH.pdf",
+			"class": "assurance-ipid",
+			"stresses": "standardised IPID, icon columns, checkmark/cross coverage grid",
+			"license": "public regulatory document (IDD art. 20), evaluation use",
+			"format": "pdf",
+			"bytes": 221435,
+			"sha256": "ed5b958af808c20c82c456dd51dc19488d5fe42d4326271f934fec0c11322290"
+		},
+		{
+			"name": "ipid-probtp-habitation.pdf",
+			"url": "https://www.probtp.com/files/live/sites/probtp/files/media/pdf/PART/protec/ipid-assurance-habitation.pdf",
+			"class": "assurance-ipid",
+			"stresses": "standardised IPID, dense two-column coverage/exclusion lists",
+			"license": "public regulatory document (IDD art. 20), evaluation use",
+			"format": "pdf",
+			"bytes": 74712,
+			"sha256": "9968214ce823a76f1f86c8887c047ca5e4474220667d8fae18e1a74e14e8cfa5"
+		},
+		{
+			"name": "ipid-axa-habitation.pdf",
+			"url": "https://directassurance.cdn.axa-contento-118412.eu/directassurance/4624dc50-e6a3-4747-b185-e87b08862bbc_IPID_HABITATION.pdf",
+			"class": "assurance-ipid",
+			"stresses": "standardised IPID, sublimits and deductibles in prose",
+			"license": "public regulatory document (IDD art. 20), evaluation use",
+			"format": "pdf",
+			"bytes": 267811,
+			"sha256": "e5711b17fbdd1050149b376bd6af7242d5ec1b3fcd48cf24c2cf58b0f823c82b"
+		},
+		{
+			"name": "ipid-sudcourtage-habitation.pdf",
+			"url": "https://legals.sud-courtage.fr/mrh/mrh-etud-ipid.pdf",
+			"class": "assurance-ipid",
+			"stresses": "standardised IPID, compact layout",
+			"license": "public regulatory document (IDD art. 20), evaluation use",
+			"format": "pdf",
+			"bytes": 78048,
+			"sha256": "ea737341aa1c06df963e51173348a0d39a60b59f64af5a35144932a307b88a1c"
+		},
+		{
+			"name": "ipid-sg-habitation2.pdf",
+			"url": "https://static.societegenerale.fr/pri/PRI/Repertoire_par_type_de_contenus/Fichier_a_telecharger/Assurer/IPID/Ipid_assurance_habitation.pdf",
+			"class": "assurance-ipid",
+			"stresses": "standardised IPID, second issuer variant",
+			"license": "public regulatory document (IDD art. 20), evaluation use",
+			"format": "pdf",
+			"bytes": 237154,
+			"sha256": "1b8f582a7a3a9a9ddfc434d10a650b03767e40735973d3984cbe83b2595f5d75"
+		},
+		{
+			"name": "paie-cesu-specimen.pdf",
+			"url": "https://www.cesu.urssaf.fr/info/files/pdf/Modele_Bulletin_salaire.pdf",
+			"class": "bulletin-de-paie",
+			"stresses": "payslip grid: many narrow numeric columns, base/rate/amount triplets",
+			"license": "URSSAF public specimen, evaluation use",
+			"format": "pdf",
+			"bytes": 616230,
+			"sha256": "764fd02a96a92e3d8b130b3dbbc3ac0840ea8b3728d7f6827cac5c9cf9fccfb2"
+		},
+		{
+			"name": "facture-edf-vierge.pdf",
+			"url": "https://raw.githubusercontent.com/adrienverge/justifake/master/facture-edf-2013-vierge-pdf.pdf",
+			"class": "facture-energie",
+			"stresses": "utility invoice: consumption table, taxes, totals, fine print",
+			"license": "MIT (justifake), blank template",
+			"format": "pdf",
+			"bytes": 566573,
+			"sha256": "1b15c2b6b195aad627d9fa9bccf15c38f181688a6200eb99f12833556cce2f26"
+		},
+		{
+			"name": "dpe-logement.pdf",
+			"url": "https://www.a2sdiagnostics.fr/dpe.pdf",
+			"class": "diagnostic-immobilier",
+			"stresses": "DPE report: gauge graphics, mixed vector/text, rating tables",
+			"license": "public sample report, evaluation use",
+			"format": "pdf",
+			"bytes": 434371,
+			"sha256": "812ad6c70c40c89b36e06e056d20808b35c90ff82e8c993e4534fe32a0305df4"
+		},
+		{
+			"name": "guide-dpe-diagnostiqueurs.pdf",
+			"url": "https://rt-re-batiment.developpement-durable.gouv.fr/IMG/pdf/v3_guidedpe.pdf",
+			"class": "reglementaire-long",
+			"stresses": "long government guide: nested tables, figures, cross-references",
+			"license": "French government publication (Licence Ouverte)",
+			"format": "pdf",
+			"bytes": 7186952,
+			"sha256": "d578b558cb270adf10f46da5fa464841f67f6dd763cadd30b31e4261bcdc1b6e"
+		},
+		{
+			"name": "cerfa-15646-carte-grise.pdf",
+			"url": "https://www.formulaires.service-public.fr/gf/cerfa_13750.do",
+			"class": "formulaire-cerfa",
+			"stresses": "AcroForm fields, checkboxes, boxed label/value pairs",
+			"license": "French government form (Licence Ouverte)",
+			"format": "pdf",
+			"bytes": 539413,
+			"sha256": "0295c8361c7fa446fe99e42f4f1d15f43c45fda342f6ebe3ba83122f02641495"
+		},
+		{
+			"name": "32016R0679.pdf",
+			"url": "https://eur-lex.europa.eu/legal-content/FR/TXT/PDF/?uri=CELEX:32016R0679",
+			"class": "juridique-2-colonnes",
+			"stresses": "two-column OJ layout, recitals + articles; HTML twin = reading-order truth",
+			"license": "EUR-Lex reuse policy (Decision 2011/833/EU)",
+			"format": "pdf",
+			"bytes": 1050270,
+			"sha256": "5b67a45c2529b7bc127645a8db21cb383a414a0ba5945e22f7a8b908d62c7d8f",
+			"htmlTwin": {
+				"name": "32016R0679.html",
+				"url": "https://eur-lex.europa.eu/legal-content/FR/TXT/HTML/?uri=CELEX:32016R0679",
+				"bytes": 878511,
+				"sha256": "c6d9baf431c7a31437b010570b336a355c2fdd0d7a08990df75ec33b2acaab28"
+			}
+		},
+		{
+			"name": "32022R2065.pdf",
+			"url": "https://eur-lex.europa.eu/legal-content/FR/TXT/PDF/?uri=CELEX:32022R2065",
+			"class": "juridique-2-colonnes",
+			"stresses": "two-column OJ layout; HTML twin = reading-order truth",
+			"license": "EUR-Lex reuse policy (Decision 2011/833/EU)",
+			"format": "pdf",
+			"bytes": 1748788,
+			"sha256": "f1fb3a2329f9cc44d3364d5050b4ff8f619c9dfa77080852df0c0420fe3fc84f",
+			"htmlTwin": {
+				"name": "32022R2065.html",
+				"url": "https://eur-lex.europa.eu/legal-content/FR/TXT/HTML/?uri=CELEX:32022R2065",
+				"bytes": 914840,
+				"sha256": "5fa1927b05ffb521ee3d35fab4ed25136d7024f3c9a70ae707ce98d82ae09f67"
+			}
+		},
+		{
+			"name": "32024R1689.pdf",
+			"url": "https://eur-lex.europa.eu/legal-content/FR/TXT/PDF/?uri=CELEX:32024R1689",
+			"class": "juridique-2-colonnes",
+			"stresses": "long act with annex tables; HTML twin = reading-order truth",
+			"license": "EUR-Lex reuse policy (Decision 2011/833/EU)",
+			"format": "pdf",
+			"bytes": 2669245,
+			"sha256": "c51f87b9ca120c1a9fbd706991f00eb8ef891d2960c3bc2bd46c046c312350eb",
+			"htmlTwin": {
+				"name": "32024R1689.html",
+				"url": "https://eur-lex.europa.eu/legal-content/FR/TXT/HTML/?uri=CELEX:32024R1689",
+				"bytes": 1384871,
+				"sha256": "068426cd146ae85b52b6de9e3428e2ac8ab0d4c992eacdaedfe6f2435a497f4a"
+			}
+		}
+	]
+}

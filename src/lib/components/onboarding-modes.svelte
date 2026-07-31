@@ -96,10 +96,10 @@
 
 <!-- Two columns self-hosted, three when this build offers Assisted. Written
      out because Tailwind only emits classes it can see in the source. -->
-<div class="grid gap-3 {MODE_IDS.length === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}">
+<div class="grid gap-4 sm:gap-5 {MODE_IDS.length === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}">
 	{#each cards as card, index (card.id)}
 		<div
-			class="onboard-card border-border bg-card/40 hover:border-foreground/20 relative flex flex-col gap-3 overflow-hidden rounded-xl border p-4 text-left transition-[transform,border-color] duration-300 hover:-translate-y-0.5 {card.blocked
+			class="onboard-card border-border bg-card/40 hover:border-foreground/20 relative flex flex-col gap-5 overflow-hidden rounded-2xl border p-6 text-left transition-[transform,border-color] duration-300 hover:-translate-y-0.5 sm:p-7 {card.blocked
 				? 'opacity-60'
 				: ''}"
 			style="--enter-delay: {120 + index * 70}ms"
@@ -110,14 +110,18 @@
 				     screen whose job is to be left. -->
 				<span aria-hidden="true" class="onboard-sheen"></span>
 			{/if}
-			<div class="flex items-baseline justify-between gap-2">
-				<span class="text-sm font-medium">{card.label}</span>
+			<div class="flex items-baseline justify-between gap-3">
+				<span class="font-serif text-lg leading-none font-medium tracking-tight">{card.label}</span>
 				{#if card.best}
 					<Badge variant="secondary" class="shrink-0 text-[10px]">{t('modes.best')}</Badge>
 				{/if}
 			</div>
-			<p class="text-muted-foreground flex-1 text-xs leading-relaxed">{card.line}</p>
-			<p class="text-muted-foreground font-mono text-[10px] tracking-wide uppercase">
+			<p class="text-muted-foreground flex-1 text-sm leading-relaxed">{card.line}</p>
+			<!-- The cost sits under a hairline: it is the fact the choice turns on,
+			     and a rule separates it from the description without adding a box. -->
+			<p
+				class="text-muted-foreground border-border/60 border-t pt-4 font-mono text-[11px] tracking-wider uppercase"
+			>
 				{card.cost}
 			</p>
 			{#if card.blocked}
@@ -127,7 +131,7 @@
 			{:else}
 				<Button
 					variant={card.best ? 'default' : 'outline'}
-					size="sm"
+					class="w-full"
 					onclick={() => choose(card.id)}
 				>
 					{t('onboard.pick')}

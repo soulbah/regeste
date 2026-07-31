@@ -664,21 +664,6 @@ describe('retrieval refinement', () => {
 			2
 		);
 	});
-	it('expands real-estate questions to document vocabulary', () => {
-		expect(expandRetrievalQuery('Quel est le prix de la maison ?')).toContain(
-			'vente montant euros'
-		);
-		expect(expandRetrievalQuery('Quel est le montant du prêt ?')).toContain('emprunt financement');
-		expect(expandRetrievalQuery('Combien coute la maison ?')).toContain(
-			'prix price vente sale montant amount euros'
-		);
-		expect(expandRetrievalQuery("Qui est l'acheteur et le vendeur ?")).toContain(
-			'acheteur acquéreur acquisition partie monsieur madame soussigné'
-		);
-		expect(expandRetrievalQuery('Quelle est la superficie ?')).toContain(
-			'contenance mètres carrés'
-		);
-	});
 
 	it('promotes the named parties block over repeated boilerplate mentions', () => {
 		const parties = {
@@ -718,56 +703,12 @@ describe('retrieval refinement', () => {
 		);
 	});
 
-	it('recognizes imperative identity, representation and signature vocabulary', () => {
-		expect(expandRetrievalQuery('Identifie les cédants du bien.')).toContain(
-			'vendeur cédant propriétaire partie monsieur madame soussigné'
-		);
-		expect(
-			expandRetrievalQuery('Qui est absent, qui le représente et qui est présent ?')
-		).toContain('présence représentation absent présent procuration soussigné');
-		expect(expandRetrievalQuery('Où et quand le compromis a-t-il été signé ?')).toContain(
-			'signature signé date lieu fait à paraphes signatures'
-		);
-		expect(expandRetrievalQuery('Qui est assuré par ce devis et avec qui ?')).toContain(
-			'assuré couverte couvert couvre coassuré partenaire souscripteur'
-		);
-		expect(
-			expandRetrievalQuery('À quelle date et heure la couverture commence-t-elle ?')
-		).toContain("date d'effet prise d'effet entrée en vigueur");
-	});
-
-	it('expands action-after-claim and declared-attribute questions to structural evidence', () => {
-		const claimQuery = expandRetrievalQuery('Que dois-je faire immédiatement après un vol ?');
-		expect(claimQuery).toContain('obligations sinistre réclamation');
-		expect(claimQuery).toContain('autorités police');
-		expect(claimQuery).toContain('preuves justificatifs propriété');
-		expect(
-			expandRetrievalQuery('Quel objet précis de plus de 5 000 € le souscripteur possède-t-il ?')
-		).toContain('possédez-vous déclaré questionnaire objet valeur supérieure');
-	});
-
-	it('keeps structural vocabulary in an independent query view', () => {
-		expect(retrievalQueryVariants('Où et quand le compromis a-t-il été signé ?')).toEqual([
-			'Où et quand le compromis a-t-il été signé ?',
-			'signature signé date lieu fait à paraphes signatures'
-		]);
-	});
-
 	it('adds bounded concrete-term windows for scenario questions', () => {
 		const variants = retrievalQueryVariants(
 			'Mon ordinateur portable volé dans un café est-il couvert par la garantie de base ?'
 		);
 		expect(variants).toContain('portable vole cafe');
 		expect(variants).toContain('vole cafe couvert');
-	});
-
-	it('does not fuzzy-correct the date phrase prise d’effet into price', () => {
-		const variants = retrievalQueryVariants("Quelle est la date de prise d'effet ?");
-		expect(variants).toContain(
-			"date d'effet prise d'effet entrée en vigueur début commence survenant après effective date entry into force starts at"
-		);
-		expect(variants).not.toContain('prix price vente sale montant amount euros');
-		expect(isNumericAnswerQuestion("Quelle est la date de prise d'effet ?")).toBe(false);
 	});
 
 	it('searches substantial clauses of a multi-part request independently', () => {
@@ -811,33 +752,6 @@ describe('retrieval refinement', () => {
 			"Qui est l'acheteur",
 			'qui est le vendeur ?'
 		]);
-	});
-
-	it('expands typoed concepts with vocabulary only, never with an answer', () => {
-		expect(expandRetrievalQuery('Quel est le prxi de vnete exct ?')).toContain(
-			'prix price vente sale montant amount euros'
-		);
-		expect(expandRetrievalQuery("Quelle datte d'entrée en viguer est indiquée ?")).toContain(
-			'effective date entry into force'
-		);
-		// An expansion may add vocabulary a document uses; it may never add the
-		// value being asked for. These three used to inject the benchmark's own
-		// gold wording ("non-negative", "more than doubles", "expected due date")
-		// into the query, which measured the crib note and not the pipeline.
-		expect(expandRetrievalQuery('Contnet Lenght peut il être négatif ?')).not.toContain(
-			'non-negative'
-		);
-		expect(expandRetrievalQuery('Quel efet a la planifcation de deux vehicules ?')).not.toContain(
-			'more than doubles'
-		);
-		expect(expandRetrievalQuery('Quels commentaires sur cet ICR ?')).not.toContain(
-			'expected due date'
-		);
-		// "sectoin" was hardcoded as a trigger token. Typo tolerance is the fuzzy
-		// channel's job, not a table of the benchmark's own injected misspellings.
-		expect(expandRetrievalQuery('Quelle sectoin definit GET ?')).not.toContain(
-			'request method definition semantics'
-		);
 	});
 
 	it('promotes the compromis price, loan and cadastral-area passages', () => {

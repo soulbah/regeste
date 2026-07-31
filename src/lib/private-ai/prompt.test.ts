@@ -11,7 +11,10 @@ import {
 	enforceAnswerInvariants,
 	extractThink,
 	fitEvidenceToContext,
+	hasCollapsedIntoRepetition,
 	isDegenerateAnswer,
+	withoutRepeatedSentences,
+	isRefusalLike,
 	needsGroundedVerification,
 	resolveCitations,
 	resolveTargetedCitations
@@ -593,5 +596,106 @@ describe('fitEvidenceToContext', () => {
 	it('leaves a fitting list untouched', () => {
 		const small = [hit(1), hit(2)];
 		expect(fitEvidenceToContext('Question ?', small)).toEqual(small);
+	});
+});
+
+describe('isDegenerateAnswer — output that must never replace a draft', () => {
+	it('rejects the verification checklist emitted instead of prose', () => {
+		// Measured live: the verification prompt asks for this checklist to be
+		// built *silently*, and a small local model printed it twelve times with
+		// every field blank, under a real citation, replacing a correct draft.
+		const scaffold = Array.from(
+			{ length: 12 },
+			() =>
+				'- Requested subject: montant total [1]\n- Exact adjacent source label:\n- Value:\n- Unit:\n- Condition:\n- Exception:\n- Citation:'
+		).join('\n');
+		expect(isDegenerateAnswer(scaffold)).toBe(true);
+	});
+
+	it('rejects a collapsed repetition loop', () => {
+		expect(
+			isDegenerateAnswer(Array.from({ length: 10 }, () => 'Le montant est de 800 €.').join('\n'))
+		).toBe(true);
+	});
+
+	it('keeps a real multi-line answer', () => {
+		const answer = [
+			'Le RAPO est facturé 1100 € HT [1].',
+			'La saisine du tribunal administratif est facturée 900 € HT [2].',
+			'Le référé-suspension est facturé 800 € HT pour un visa concerné [3].',
+			'Le total des trois phases est donc de 2800 € HT.'
+		].join('\n');
+		expect(isDegenerateAnswer(answer)).toBe(false);
+	});
+
+	it('keeps a short answer that carries a citation', () => {
+		expect(isDegenerateAnswer('800 € HT [1].')).toBe(false);
+	});
+});
+
+describe('isRefusalLike — a refusal that blames the reader', () => {
+	it('catches the model claiming the documents were not provided', () => {
+		// Sixteen passages were in the prompt when this was produced, so the
+		// sentence is false as well as rude; it must be replaced by the app's own
+		// refusal rather than shown.
+		expect(
+			isRefusalLike(
+				"Je ne peux pas fournir une réponse qui ne soit pas étayée par les documents fournis. Puisque vous n'avez pas fourni les documents, je ne peux pas répondre à votre question."
+			)
+		).toBe(true);
+	});
+
+	it('leaves a real answer alone', () => {
+		expect(isRefusalLike('Le montant total est de 2800 € HT [1].')).toBe(false);
+	});
+});
+
+describe('withoutRepeatedSentences', () => {
+	it('drops a sentence an earlier passage already carried', () => {
+		const seen = new Set<string>();
+		const first =
+			'La SELARL JURIS ne s’engage à aucune intervention avant paiement de cette provision. Le RAPO est facturé 1100 euros.';
+		const second =
+			'La SELARL JURIS ne s’engage à aucune intervention avant paiement de cette provision. Le référé est facturé 800 € HT.';
+		expect(withoutRepeatedSentences(first, seen)).toBe(first);
+		expect(withoutRepeatedSentences(second, seen)).toBe('Le référé est facturé 800 € HT.');
+	});
+
+	it('keeps a short repeated line: a shared label is not redundancy', () => {
+		const seen = new Set<string>();
+		withoutRepeatedSentences('Montant : 800 €.', seen);
+		expect(withoutRepeatedSentences('Montant : 900 €.', seen)).toBe('Montant : 900 €.');
+	});
+
+	it('never empties a passage, so its citation number still says something', () => {
+		const seen = new Set<string>();
+		const passage =
+			'Cette clause décrit précisément les modalités de règlement des provisions dues au cabinet.';
+		withoutRepeatedSentences(passage, seen);
+		expect(withoutRepeatedSentences(passage, seen)).toBe(passage);
+	});
+});
+
+describe('hasCollapsedIntoRepetition', () => {
+	it('catches the loop while it is still streaming', () => {
+		// The shape measured live: the same two sentences, over and over, under a
+		// real citation, for 86 seconds.
+		const loop =
+			"Le directeur d'agence est la Caisse Régionale de Banque Populaire Mutuel Grand Ouest. Le cabinet d'avocat s'appelle SELARL JURIS. ";
+		expect(hasCollapsedIntoRepetition(loop.repeat(4))).toBe(true);
+	});
+
+	it('leaves a long answer that never repeats itself alone', () => {
+		const answer = [
+			'Le montant forfaitaire de base pour la phase administrative du recours est de 1100 € HT.',
+			'La saisine du tribunal administratif de Nantes est facturée 900 € HT.',
+			'Le référé-suspension coûte 800 € HT pour un visa concerné.',
+			'Des provisions complémentaires sont adressées au fur et à mesure des interventions.'
+		].join(' ');
+		expect(hasCollapsedIntoRepetition(answer)).toBe(false);
+	});
+
+	it('says nothing about a stream too short to judge', () => {
+		expect(hasCollapsedIntoRepetition('Le RAPO est de 1100 € HT.')).toBe(false);
 	});
 });

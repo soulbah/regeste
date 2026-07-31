@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	hasAnswerBearingEvidence,
 	isWeakMatch,
+	rerankMargin,
 	relevancePercent,
 	temporalEvidenceCoverage
 } from './relevance';
@@ -454,5 +455,39 @@ describe('retrieval relevance', () => {
 				evidenceHit('Le mot de passe recommandé est Silex-2026.')
 			])
 		).toBe(true);
+	});
+});
+
+describe('rerankMargin', () => {
+	const hit = (rerankScore: number | undefined): SearchHit =>
+		({
+			chunkId: 1,
+			documentId: 'd',
+			documentName: 'doc.pdf',
+			text: 'x',
+			page: 1,
+			headingPath: null,
+			score: 0.9,
+			...(rerankScore === undefined ? {} : { rerankScore })
+		}) as SearchHit;
+
+	it('is the gap between the best passage and the runner-up', () => {
+		expect(rerankMargin([hit(-1.2), hit(-3.4), hit(-5)])).toBeCloseTo(2.2, 5);
+	});
+
+	it('is null on a turn that was not reranked, so the caller falls back', () => {
+		expect(rerankMargin([hit(undefined), hit(undefined)])).toBeNull();
+	});
+
+	it('is null when a single passage survived', () => {
+		expect(rerankMargin([hit(-1.2)])).toBeNull();
+	});
+
+	it('does not gate the answer, because the margin does not separate right from wrong', () => {
+		// Calibrated on 113 grounded cases: median margin 0.50 when the top
+		// passage was on a gold page, 0.29 when it was not. Refusing on the gap
+		// would suppress 32 correct answers to catch 6 wrong ones, so isWeakMatch
+		// stays on the fused score and the margin is reported, not enforced.
+		expect(isWeakMatch([hit(-2.0), hit(-2.1)])).toBe(false);
 	});
 });
