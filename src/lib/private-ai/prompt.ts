@@ -723,7 +723,16 @@ export function buildUserPrompt(
 	const coverageConstraint = coverageContract ? `${coverageContract}\n\n` : '';
 	const inventory = buildEvidenceInventory(question, inventoryHits ?? hits, citationNumbers);
 	const inventoryConstraint = inventory ? `${inventory}\n\n` : '';
-	return `${context}${contestedConstraint}${roleConstraint}${structuralConstraint}${directionalConstraint}${referenceHint}${multiPartConstraint}${coverageConstraint}${inventoryConstraint}Excerpts:\n\n${excerpts}\n\nQuestion: ${question}`;
+	// Order follows the U-shaped attention curve measured for long contexts
+	// (Liu et al., "Lost in the Middle"): a model uses the head and the tail of
+	// its context well and loses the middle, and instructions work best close to
+	// the point of generation. The task constraints used to sit above the
+	// passages, so on this document they were ~3 500 tokens away from the
+	// question — the worst position available. They now sit between the passages
+	// and the question, which is the tail. Conversation context stays at the
+	// head: it is reference material for resolving pronouns, not an instruction.
+	const constraints = `${contestedConstraint}${roleConstraint}${structuralConstraint}${directionalConstraint}${referenceHint}${multiPartConstraint}${coverageConstraint}${inventoryConstraint}`;
+	return `${context}Excerpts:\n\n${excerpts}\n\n${constraints}Question: ${question}`;
 }
 
 export function buildVerificationUserPrompt(
