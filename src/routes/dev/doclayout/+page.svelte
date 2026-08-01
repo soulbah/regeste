@@ -44,14 +44,30 @@
 	 *  DPI here buys nothing but memory. */
 	const RENDER_SCALE = 200 / 72;
 
-	// Only combinations whose files exist upstream. `q4` everywhere is the cheap
-	// default the model card implies and the one that loops in node; it stays on
-	// the list precisely so the browser can confirm or refute that.
+	// Measured on the owner's French attestation, WebGPU, Apple metal-3. The
+	// labels record the verdict so nobody repeats the sweep:
+	//
+	//   q8/int8   correct, 20 s/page after a 43 s first load     <- the one to use
+	//   fp32      correct, 19-36 s/page, largest download
+	//   fp16      wall of "!!!!"
+	//   q4f16     wall of "!!!!"
+	//   q4        decode loop, one tag repeated to the token budget
+	//
+	// The two exclamation-mark failures are NOT a hardware limit — this adapter
+	// reports `shader-f16` — and they are not specific to this model either. They
+	// are a known overflow bug in ONNX Runtime's WebGPU fp16 path, filed against
+	// unrelated models with the same signature: Gemma 3 emits repeated unused
+	// tokens (onnxruntime#26732) and nanochat produces NaNs while CPU is fine
+	// (onnxruntime#26367). So it is an upstream runtime bug that can be fixed
+	// upstream, not a property of granite-docling, and fp16 on the wasm backend is
+	// expected to work where WebGPU does not. int8 avoids the fp16 path entirely,
+	// which is why it is the setting that works today.
 	const PRECISIONS = [
-		{ value: 'fp32', label: 'fp32 (reference, slow)' },
-		{ value: 'fp16', label: 'fp16 (WebGPU)' },
-		{ value: 'q4f16', label: 'q4f16 (WebGPU, cheapest)' },
-		{ value: 'q4', label: 'q4 (loops in node — does it here?)' }
+		{ value: 'q8', label: 'int8 (correct, fastest correct)' },
+		{ value: 'fp32', label: 'fp32 (correct, biggest)' },
+		{ value: 'fp16', label: 'fp16 (bf16 range loss → "!!!!")' },
+		{ value: 'q4f16', label: 'q4f16 (bf16 range loss → "!!!!")' },
+		{ value: 'q4', label: 'q4 (decode loop)' }
 	] as const;
 
 	// Query parameters so a sweep can be driven from outside without clicking
@@ -61,7 +77,7 @@
 	let source = $state(params.get('src') ?? '/dev/owner/attestation-p1.png');
 	let pageNumber = $state(Number(params.get('page') ?? 1));
 	let precision = $state<(typeof PRECISIONS)[number]['value']>(
-		(params.get('precision') as (typeof PRECISIONS)[number]['value']) ?? 'q4f16'
+		(params.get('precision') as (typeof PRECISIONS)[number]['value']) ?? 'q8'
 	);
 	let device = $state<'webgpu' | 'wasm'>((params.get('device') as 'webgpu' | 'wasm') ?? 'webgpu');
 	let status = $state('');
@@ -102,9 +118,16 @@
 		// suggests without affecting the outcome under test.
 		const model = await AutoModelForImageTextToText.from_pretrained(MODEL, {
 			device,
+			// The companion graphs stay fp32 unless the decoder is itself an fp16
+			// export. granite-docling is trained in bfloat16, whose exponent range
+			// fp16 does not have, so an fp16 graph overflows and the decoder emits
+			// token 0 — a wall of exclamation marks. This GPU reports shader-f16, so
+			// that failure is the export, not the hardware, and no GPU will fix it.
+			// int8 keeps its scales in fp32 and is the one cheap export that can
+			// sidestep the range loss.
 			dtype: {
-				embed_tokens: precision === 'fp32' ? 'fp32' : 'fp16',
-				vision_encoder: precision === 'fp32' ? 'fp32' : 'fp16',
+				embed_tokens: precision === 'fp16' || precision === 'q4f16' ? 'fp16' : 'fp32',
+				vision_encoder: precision === 'fp16' || precision === 'q4f16' ? 'fp16' : 'fp32',
 				decoder_model_merged: precision
 			}
 		});
