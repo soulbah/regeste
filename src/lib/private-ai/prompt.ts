@@ -740,10 +740,12 @@ export function enforceAnswerInvariants(question: string, text: string): string 
 	return withoutRepeatedAnswerSentences(corrected);
 }
 
-/** A sentence in the answer long enough that its second occurrence is the model
- * restating itself, not a short formula two parts legitimately share ("Oui",
- * "Non couvert"). Shorter than the passage threshold on purpose: one answer
- * repeating its own full sentence is redundancy at any realistic length. */
+/** The floor below which a repeated sentence is presumed legitimate rather
+ * than redundant. This is not a tuning knob: it exists to protect the short
+ * formulas a multi-part answer repeats on purpose — "Oui [1]" then "Oui [2]"
+ * are two answers to two parts, and stripping citations for comparison makes
+ * them identical. Above it, a verbatim self-repeat inside one answer states
+ * nothing twice except itself; the boundary tests pin both sides. */
 const REPEATED_ANSWER_SENTENCE_CHARS = 24;
 
 /**

@@ -749,11 +749,16 @@ export function roleHeadOf(line: string): string | null {
 	return head;
 }
 
-/** Does this line read as a person's name? Two to four capitalised words, no
- * digits or punctuation, none of them a company-form word. Particles stay
- * lowercase in French names, so they are allowed through unchanged. */
+/** Honorifics a letter puts before a name; part of the name's shape, not of
+ * the name itself. */
+const HONORIFIC = /^(?:m\.|mr\.?|mme|mlle|dr\.?|me|ma[iî]tre|monsieur|madame|mademoiselle)\s+/iu;
+
+/** Does this line read as a person's name? An optional honorific, then two to
+ * four capitalised words, no digits or punctuation, none of them a
+ * company-form word. Particles stay lowercase in French names, so they are
+ * allowed through unchanged. */
 function isPersonNameLine(line: string): boolean {
-	const text = line.trim();
+	const text = line.trim().replace(HONORIFIC, '');
 	if (/\d|[:;,!?()«»]/u.test(text)) return false;
 	const words = text.split(/\s+/u).filter(Boolean);
 	if (words.length < 2 || words.length > 4) return false;
@@ -777,13 +782,31 @@ function requestedRoleTokens(query: string): string[] {
 	return tail.split(/\s+/u).filter((word) => word.length >= 4);
 }
 
+/** Capitalised runs of a line that read as person names — an honorific, then
+ * two to four capitalised words. */
+function personRunsIn(line: string): string[] {
+	const runs =
+		line.match(
+			/(?:\p{Lu}[\p{L}'’-]+|\p{Lu}{2,})(?:\s+(?:(?:de|du|des|le|la)\s+)?(?:\p{Lu}[\p{L}'’-]+|\p{Lu}{2,})){1,3}/gu
+		) ?? [];
+	return runs.filter((run) => isPersonNameLine(run));
+}
+
 /**
  * The person a passage names directly beside the requested role, or null.
  *
- * Both signature orders are read (name above the role, role above the name),
- * and a role line the parser glued onto the legal footer is recovered through
- * its head. Used as the trigger for a targeted correction: it must only ever
- * fire on a demonstrated carrier.
+ * One recogniser for the whole signature-block family rather than the one
+ * letter that surfaced it: name above the role, role above the name, both on
+ * one line joined by a comma, a colon or a copula ("AMELIE ROUSSEAU, Votre
+ * Directeur d'Agence", "Directeur d'agence : Paul Vasseur", "Le directeur est
+ * Paul Vasseur"), a role line the parser glued onto the legal footer, and an
+ * honorific before the name. The same shapes identity-evidence.ts binds for
+ * deed parties, generalised to any role the question names.
+ *
+ * A run overlapping the role's own words ("Votre Directeur") is never a
+ * person: the role names the seat, the carrier must name who sits in it. Used
+ * as the trigger for a targeted correction, so it must only ever fire on a
+ * demonstrated carrier.
  */
 export function personRoleCarrier(query: string, text: string): string | null {
 	const roleTokens = requestedRoleTokens(query);
@@ -794,15 +817,26 @@ export function personRoleCarrier(query: string, text: string): string | null {
 		.filter(Boolean);
 	const isRoleLine = (line: string): boolean => {
 		const candidate =
-			line.split(/\s+/u).filter(Boolean).length > 8 ? (roleHeadOf(line) ?? '') : line;
-		if (!candidate) return false;
+			line.split(/\s+/u).filter(Boolean).length > 8 ? (roleHeadOf(line) ?? line) : line;
 		const normalized = normalizeForFuzzy(candidate);
 		return roleTokens.every((token) => normalized.includes(token));
 	};
+	const outsideRole = (run: string): boolean => {
+		const words = normalizeForFuzzy(run).split(/\s+/u);
+		return !words.some((word) => roleTokens.includes(word));
+	};
 	for (const [index, line] of lines.entries()) {
 		if (!isRoleLine(line)) continue;
+		// The name on the role's own line, whatever joins them.
+		const inline = personRunsIn(line).find(outsideRole);
+		if (inline) return inline.trim();
 		for (const neighbour of [lines[index - 1], lines[index + 1]]) {
-			if (neighbour && isPersonNameLine(neighbour)) return neighbour.trim();
+			if (!neighbour) continue;
+			if (isPersonNameLine(neighbour)) return neighbour.trim();
+			// A neighbour carrying an honorific plus trailing matter ("M. Paul
+			// Vasseur, par délégation") still names its person.
+			const run = personRunsIn(neighbour).find(outsideRole);
+			if (run) return run.trim();
 		}
 	}
 	return null;

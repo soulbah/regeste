@@ -1451,6 +1451,54 @@ describe('ordinalScheduleValue', () => {
 	});
 });
 
+describe('who holds a role — the signature-block family', () => {
+	// One recogniser, every shape a French or English letter uses to bind a
+	// person to a seat. Each case is a distinct layout, not a rephrasing.
+	const shapes: Array<[string, string, string]> = [
+		[
+			'name above the role',
+			"MARTINE DUVAL\nVotre Directrice d'Agence",
+			"Qui est la directrice d'agence ?"
+		],
+		['role above the name', "Directeur d'agence\nPaul Vasseur", "Qui est le directeur d'agence ?"],
+		[
+			'comma on one line',
+			"AMELIE ROUSSEAU, Votre Directrice d'Agence",
+			"Qui est la directrice d'agence ?"
+		],
+		['colon on one line', "Directeur d'agence : Paul Vasseur", "Qui est le directeur d'agence ?"],
+		[
+			'copula in prose',
+			"Le directeur d'agence est Paul Vasseur pour cette convention.",
+			"Qui est le directeur d'agence ?"
+		],
+		[
+			'honorific and trailing matter',
+			"Directeur d'agence\nM. Paul Vasseur, par délégation",
+			"Qui est le directeur d'agence ?"
+		],
+		[
+			'role glued onto the legal footer',
+			"MARTINE DUVAL\nVotre Directrice d'Agence Caisse Régionale de Crédit Maritime Mutuel Société coopérative à capital variable, dont le siège social est 4 rue des Docks, 62100 CALAIS – 512 034",
+			"Qui est la directrice d'agence ?"
+		],
+		['accented role in English', 'Claims Manager\nJohn Smith', 'Who is the claims manager?']
+	];
+	it.each(shapes)('%s', (_shape, text, question) => {
+		const name = personRoleCarrier(question, text);
+		expect(name).toMatch(/MARTINE DUVAL|Paul Vasseur|AMELIE ROUSSEAU|John Smith/);
+	});
+
+	it('never promotes the role phrase itself to a person', () => {
+		expect(
+			personRoleCarrier(
+				"Qui est le directeur d'agence ?",
+				"Votre Directeur d'Agence\nHoraires : 9h-17h"
+			)
+		).toBeNull();
+	});
+});
+
 describe('who holds a role', () => {
 	const letter =
 		'BANQUE DU LITTORAL Nord – Agence : AGENCE DE CALAIS\n' +

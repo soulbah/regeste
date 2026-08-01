@@ -753,4 +753,17 @@ describe('withoutRepeatedAnswerSentences', () => {
 			'Oui [1].\n\nOui [2].\n\nLa garantie couvre le vol et le vandalisme dans la limite de 2 000 € [1].';
 		expect(withoutRepeatedAnswerSentences(answer)).toBe(answer);
 	});
+
+	it('protects two identical short answers to two parts, and both boundary sides', () => {
+		// Citations aside, "Oui" twice is two answers to two parts — kept.
+		const twoParts = '1. Oui [1].\n2. Oui [2].';
+		expect(withoutRepeatedAnswerSentences(twoParts)).toBe(twoParts);
+		// A mid-answer verbatim self-repeat above the floor is dropped even
+		// without a closing paragraph.
+		expect(
+			withoutRepeatedAnswerSentences(
+				'Le délai de rétractation est de quatorze jours [1]. Le délai de rétractation est de quatorze jours [1]. Il court dès la signature [2].'
+			)
+		).toBe('Le délai de rétractation est de quatorze jours [1]. Il court dès la signature [2].');
+	});
 });
