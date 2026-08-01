@@ -8,14 +8,15 @@ Foundation. The UI shell, browser pipeline and specs are being built incremental
 
 ## Read before working
 
-| You are about to…        | Read first                                                                                                      |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------- |
-| Any task                 | `PROGRESS.md` (project state), the active `specs/NNN-*/tasks.md`                                                |
-| Touch product behavior   | `docs/internal/PRD.md`, `docs/internal/FEATURES.md` (frozen feature set + decisions; local-only, not versioned) |
-| Touch stack/architecture | `docs/internal/RESEARCH-2026-07-stack.md`, `docs/constitution.md`                                               |
-| Touch UI                 | `.claude/rules/ui.md` (shadcn-only rule)                                                                        |
-| Touch server/API/DB      | `.claude/rules/server.md`                                                                                       |
-| Write user-facing text   | `.claude/rules/copy.md` (human-sounding copy, no AI markers; strings live in `src/lib/i18n/`)                   |
+| You are about to…           | Read first                                                                                                      |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Any task                    | `PROGRESS.md` (project state), the active `specs/NNN-*/tasks.md`                                                |
+| Touch product behavior      | `docs/internal/PRD.md`, `docs/internal/FEATURES.md` (frozen feature set + decisions; local-only, not versioned) |
+| Touch stack/architecture    | `docs/internal/RESEARCH-2026-07-stack.md`, `docs/constitution.md`                                               |
+| Touch UI                    | `.claude/rules/ui.md` (shadcn-only rule)                                                                        |
+| Touch retrieval/NLU/answers | `.claude/rules/nlp.md` (no hand-maintained vocabularies)                                                        |
+| Touch server/API/DB         | `.claude/rules/server.md`                                                                                       |
+| Write user-facing text      | `.claude/rules/copy.md` (human-sounding copy, no AI markers; strings live in `src/lib/i18n/`)                   |
 
 ## Commands
 
@@ -57,6 +58,7 @@ Never batch-check tasks you did not verify. Never claim done with a failing or s
 
 - **UI: shadcn-svelte components only.** Before using any native HTML interactive element, check the registry — if a shadcn-svelte component exists, install and use it. Raw `<button>`, `<a>`-as-button, `<input>` etc. in app code is a task failure. Details in `.claude/rules/ui.md`.
 - **Privacy is the product.** No document content, chat content, chunk, embedding or filename may ever reach the server, the database, logs or analytics. The Assisted endpoint receives excerpts transiently and must never persist or log them.
+- **NLP: no hand-maintained vocabularies.** A regex that enumerates words is a classifier with a hand-written weight vector, and it is a task failure. Patterns over token _types_ (an amount, a date, an honorific) stay; word lists become prototype embeddings, and answer shape becomes a decoding grammar. Details in `.claude/rules/nlp.md`.
 - **Validated edges**: every API endpoint validates input with valibot before use. No `any` at boundaries.
 - **Secrets**: never write `.env*` / `.dev.vars` (hook-enforced); use `wrangler secret put`.
 - **Migrations**: never edit an applied migration — create a new one (use the `db-migration` skill).

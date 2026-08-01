@@ -1,0 +1,131 @@
+# Plan 033 — Remove the hand-maintained vocabularies
+
+## The audit
+
+337 sites, 14 files. They are not one thing, and the cleanup fails if they are
+treated as one. Three kinds, with very different fates.
+
+### Type A — token-type lexers (keep, ~60 sites)
+
+Describe a token's shape. Stable across languages and across time.
+
+`AMOUNT_CELL`, `AMOUNT_IN_TEXT`, `CURRENCY_PATTERN`, `EXPLICIT_TIME`
+(`\d{1,2}[h:]\d{2}`), `TEXT_DATE_PATTERN`, `PERSON_NAME` (a capitalised run),
+`HONORIFIC`, `SCHEDULE_ROW_PATTERN`, `VALUE_CELL`, `CITATION_MARKER`,
+`TRANSLATION_PREFIX` and `RETRIEVAL_PREFIX` (they parse our own prompt output,
+which is structure we control).
+
+These stay, and the rule in `.claude/rules/nlp.md` says why.
+
+### Type B — question-intent vocabularies (replace, ~180 sites)
+
+Decide what kind of question this is. Every one is a text classifier written by
+hand.
+
+| Site                                                                            | File                             | Class it really computes    |
+| ------------------------------------------------------------------------------- | -------------------------------- | --------------------------- |
+| `ASKS_A_COST`, `MONEY_CONTEXT`, `EXACT_VALUE_QUESTION`                          | retrieval, frame, relevance      | asks an amount              |
+| `requestedNumericKinds` (money/date/duration/count)                             | retrieval                        | asks a figure, which kind   |
+| `asksForDate` / `asksForTime` / `asksWhen` (×2)                                 | relevance                        | asks a moment               |
+| `PERSON_ROLE_ASKED`, `wantsNamedPerson`, `wantsCompanion`                       | retrieval, relevance             | asks who                    |
+| `conflictRequested` / `absenceRequested` / `compareRequested`                   | execution-plan                   | operation over documents    |
+| `interrogatives`, `synthesis`, `financiallyAggregate`, `exhaustiveDocumentList` | frame                            | route                       |
+| `DEMONSTRATIVE_WITH_NOUN`, `CONTESTATION_LEAD`                                  | clarification, retrieval-context | needs clarification         |
+| `METRIC_SLOT_TERM`, `actionPattern`, `temporalPair`                             | extractive-answer                | which slot the answer fills |
+
+All of it is "classify a short sentence into one of N intents", which is what
+the embedder already loaded in all three modes does natively.
+
+### Type C — answer-shape vocabularies (delete, ~70 sites)
+
+Detect that the model misbehaved, then repair the text.
+
+`isRefusalLike`, `BLAMES_THE_READER`, `OFFERS_TO_ANSWER`, `isPureRefusalLike`,
+`NON_QUERY_CANDIDATE`, the second-person flip in `enforceAnswerInvariants`, the
+citation repair in `resolveCitations` / `resolveTargetedCitations`.
+
+These exist because the decoder was free to emit anything. It does not have to
+be.
+
+### Type D — document vocabularies (case by case, ~27 sites)
+
+`ORGANISATION_TOKEN`, `CORPORATE_BOILERPLATE`, `COMPANION_ROLE`, `LABEL_NOISE`,
+`NEGATION`, `structuralPattern`. They read the document rather than the
+question, so prototypes are the wrong shape (they would run per line). Each is
+either replaced by structure (a legal footer is last, set small, and repeats the
+letterhead) or deleted with the correction it serves.
+
+## The three replacement mechanisms
+
+### 1. Prototype embeddings, for Type B
+
+The question is already encoded for retrieval and cached in
+`QueryEmbeddingCache`. Classifying it is a dot product per class, not a forward
+pass. New module `src/lib/nlu/intent-prototypes.ts`:
+
+```ts
+export const INTENT_EXAMPLES = {
+  amount: ['Combien coûte un recours ?', 'Quel est le montant des honoraires ?',
+           'How much is the deductible?', 'Quels sont les frais de dossier ?', …],
+  moment: ['Quand expire le contrat ?', 'Quelle est la date de fin ?', …],
+  person: ["Qui est le directeur d'agence ?", 'Who signed this?', …],
+  …
+} satisfies Record<IntentName, string[]>;
+```
+
+Encoded once per session (one batch, ~40 short strings), cached beside the query
+cache, compared by cosine. A class fires above a margin over the runner-up, so
+an unclassifiable question falls through to no intent rather than to the nearest
+one. Thresholds are calibrated on the stress benchmark's questions, never fitted
+to a single document.
+
+Four to eight examples per class. More is a smell: if a class needs twenty, it
+is two classes.
+
+### 2. Constrained decoding, for Type C
+
+Both runtimes we already ship support it, no new dependency:
+
+- `@mlc-ai/web-llm` — `response_format: { type: 'grammar', grammar }` (XGrammar,
+  and `grammar_init_s` / `grammar_per_token_s` are already in its stats type, so
+  the cost is measurable).
+- `@wllama/wllama` — `grammar?: string` in the sampling config (llama.cpp GBNF).
+
+The grammar admits an answer made of sentences each ending in one or more
+citation markers drawn from the excerpts actually in the prompt, or the app's
+own refusal token, and nothing else. A model that cannot emit "je peux vous
+répondre" needs no detector for it.
+
+Hook point is `generationOptionsFor` in `src/lib/private-ai/generation.ts`,
+which already routes targeted vs synthesis.
+
+Risk to measure, not to assume: [format restrictions can cost reasoning
+quality](https://arxiv.org/pdf/2408.02442). The grammar must stay loose enough
+to be a shape and not a script, and the stress benchmark decides.
+
+### 3. Structure, for Type D
+
+A legal footer is the last block, set smaller, repeating the letterhead. That is
+readable from the parser's own geometry, which we already carry, and it does not
+need a list of company-law nouns.
+
+## Phases, each with its own gate
+
+| #   | What                                                                  | Gate                                                                |
+| --- | --------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| 0   | Baseline: run the stress benchmark, record every answer group         | the numbers exist                                                   |
+| 1   | `intent-prototypes.ts` + calibration harness                          | classifies the benchmark's questions at or above the regex baseline |
+| 2   | Type B migration, file by file, deleting each list as its class lands | no regression per file                                              |
+| 3   | Decoding grammar behind a flag, both runtimes                         | quality at or above baseline, latency measured                      |
+| 4   | Type C deletion, once the grammar carries it                          | no regression                                                       |
+| 5   | Type D case by case                                                   | no regression                                                       |
+| 6   | A lint rule that fails the build on a new word-list regex             | it catches a planted one                                            |
+
+Phases 1 and 3 are independent and can land in either order. Phase 4 depends on
+3, phase 5 on 2.
+
+## What is explicitly not changing
+
+Retrieval scoring: embeddings + BM25 fused by RRF, then the cross-encoder. No
+lexical term has ever touched a score and none may. The correction-retry
+architecture stays too; it is published work. Only its triggers change.
