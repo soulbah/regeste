@@ -47,3 +47,8 @@ static/ort/
 # context. Wrangler's own OAuth login is the normal path; this file is the
 # fallback and is read by the shell, never opened.
 /.cf_global_api_token
+
+# State-of-the-art evaluation, August 2026: heavy local artefacts.
+.marker-out/
+.venv-marker/
+.scratch/

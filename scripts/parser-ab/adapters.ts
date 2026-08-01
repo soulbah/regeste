@@ -567,6 +567,90 @@ export function defaultAdapters(): Adapter[] {
 		shippedAdapter(),
 		routedTextBaseAdapter(),
 		ocrNaiveAdapter(),
-		ocrBoxesAdapter()
+		ocrBoxesAdapter(),
+		// Scores nothing unless a Marker run has been precomputed, so it costs
+		// nothing to leave registered and it is reachable with --only marker.
+		markerAdapter()
 	];
+}
+
+// --- Marker, as a reference rather than a candidate ----------------------
+
+/**
+ * Marker's output, scored on the same pairs as everything else.
+ *
+ * Marker cannot ship here: it is Python, it wants a GPU, and it took about 23
+ * seconds on a single page of the owner's attestation. It is in this harness as
+ * an ORACLE — the number that says how much of the gap between our parser and
+ * the field is real, and therefore how much a browser-capable layout model
+ * could be worth. Chasing a ceiling is only sensible once you have measured it.
+ *
+ * Runs are precomputed because a Python subprocess per document would make the
+ * harness unusable:
+ *
+ *   marker_single <pdf> --output_dir .marker-out --output_format markdown --paginate_output
+ *
+ * The adapter keys on a hash of the bytes rather than on a file name, since the
+ * `Adapter` contract passes bytes alone and inventing a second channel for the
+ * name would leak this one experiment into every other adapter.
+ */
+export function markerAdapter(outputDir = '.marker-out', corpusDir = '.benchmark-corpus/parser-ab'): Adapter {
+	let index: Map<string, string> | null = null;
+
+	const buildIndex = async (): Promise<Map<string, string>> => {
+		const { createHash } = await import('node:crypto');
+		const { readdir, readFile } = await import('node:fs/promises');
+		const { join } = await import('node:path');
+		const map = new Map<string, string>();
+		let files: string[] = [];
+		try {
+			files = await readdir(corpusDir);
+		} catch {
+			return map;
+		}
+		for (const name of files) {
+			if (!name.endsWith('.pdf')) continue;
+			const stem = name.slice(0, -4);
+			try {
+				const bytes = await readFile(join(corpusDir, name));
+				const markdown = await readFile(join(outputDir, stem, `${stem}.md`), 'utf8');
+				map.set(createHash('sha256').update(bytes).digest('hex'), markdown);
+			} catch {
+				// No Marker run for this document. Absent, not empty: the runner
+				// reports it as skipped rather than scoring it as a failure.
+			}
+		}
+		return map;
+	};
+
+	return {
+		id: 'marker',
+		note: 'ORACLE, not shippable: python + GPU, ~23 s/page. Precompute with marker_single --paginate_output',
+		async parse(bytes) {
+			const started = performance.now();
+			const { createHash } = await import('node:crypto');
+			index ??= await buildIndex();
+			const markdown = index.get(createHash('sha256').update(bytes).digest('hex'));
+			if (markdown === undefined) return { pages: [], ms: performance.now() - started };
+			// `--paginate_output` writes "{PAGE_NUMBER}------" separators. The
+			// number is the page it OPENS, so the split's first element is the
+			// preamble before page 0 and is dropped.
+			const parts = markdown.split(/\n*\{(\d+)\}-{6,}\n*/u);
+			const pages: AdapterPage[] = [];
+			for (let i = 1; i < parts.length; i += 2) {
+				const text = (parts[i + 1] ?? '').trim();
+				pages.push({
+					page: Number(parts[i]) + 1,
+					// Marker emits one markdown view. Citations would need the
+					// document's own words, which is exactly what this oracle does
+					// not preserve — another reason it is a reference and not a
+					// candidate.
+					citationText: text.replace(/[*_`#|]/gu, ' ').replace(/[ \t]+/gu, ' '),
+					retrievalText: text,
+					needsOcr: false
+				});
+			}
+			return { pages, ms: performance.now() - started };
+		}
+	};
 }

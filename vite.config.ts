@@ -13,9 +13,13 @@ import type { Plugin } from 'vite';
 const FUZZY_FIXTURE_PREFIX = '/dev/fuzzy-public/';
 const PRIVATE_FIXTURE_PREFIX = '/dev/private-fixtures/';
 const PARSER_AB_PREFIX = '/dev/parser-ab/';
+// The owner's own documents. Not versioned, and the only French corpus that has
+// ever caught a real defect, so the harness pages must be able to load it.
+const OWNER_PREFIX = '/dev/owner/';
 const fuzzyFixtureDirectory = resolve(import.meta.dirname, fuzzyManifest.outputDirectory);
 const privateFixtureDirectory = resolve(import.meta.dirname, '.benchmark-corpus/private');
 const parserAbDirectory = resolve(import.meta.dirname, '.benchmark-corpus/parser-ab');
+const ownerDirectory = resolve(import.meta.dirname, '.benchmark-corpus/owner');
 const fuzzyFixtureNames = new Set(fuzzyManifest.files.map((file) => file.name));
 
 /** Public research fixtures are dev inputs, not deployable application assets.
@@ -32,14 +36,15 @@ function localBenchmarkFixtures(): Plugin {
 			server.middlewares.use(async (req, res, next) => {
 				try {
 					const pathname = new URL(req.url ?? '/', 'http://localhost').pathname;
-					const prefix = [FUZZY_FIXTURE_PREFIX, PRIVATE_FIXTURE_PREFIX, PARSER_AB_PREFIX].find(
+					const prefix = [FUZZY_FIXTURE_PREFIX, PRIVATE_FIXTURE_PREFIX, PARSER_AB_PREFIX, OWNER_PREFIX].find(
 						(candidate) => pathname.startsWith(candidate)
 					);
 					if (!prefix) return next();
 					const directory = {
 						[FUZZY_FIXTURE_PREFIX]: fuzzyFixtureDirectory,
 						[PRIVATE_FIXTURE_PREFIX]: privateFixtureDirectory,
-						[PARSER_AB_PREFIX]: parserAbDirectory
+						[PARSER_AB_PREFIX]: parserAbDirectory,
+						[OWNER_PREFIX]: ownerDirectory
 					}[prefix]!;
 					const name = decodeURIComponent(pathname.slice(prefix.length));
 					if (name.includes('/') || name.includes('..')) return next();

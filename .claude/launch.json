@@ -4,8 +4,14 @@
 		{
 			"name": "dev",
 			"runtimeExecutable": "bun",
-			"runtimeArgs": ["run", "dev", "--port", "5173", "--strictPort"],
-			"port": 5173
+			"runtimeArgs": [
+				"run",
+				"dev",
+				"--port",
+				"5174",
+				"--strictPort"
+			],
+			"port": 5174
 		},
 		{
 			"name": "preview",
