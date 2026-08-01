@@ -712,6 +712,112 @@ export function ordinalScheduleValue(query: string, text: string): { literal: st
 	return { literal: extremeRow.amounts[installmentColumn] };
 }
 
+// --- who holds a role -----------------------------------------------------
+//
+// "Qui est le directeur d'agence ?" is answered by a person, and the letter
+// that answers it is built to defeat overlap scoring: the letterhead and the
+// legal footer both carry the role's own words ("Agence", "Directeur"), while
+// the signature block writes a bare name above a bare role line and shares
+// nothing with the question. Vocabulary below is French/English company forms
+// and interrogatives — never a document's own strings.
+
+const PERSON_ROLE_ASKED =
+	/\b(?:qui\s+(?:est|sont|sera|serait|occupe|dirige|signe)|who\s+(?:is|are|heads|leads|signs))\b/iu;
+
+/** Words that mark an organisation rather than a person. */
+const ORGANISATION_TOKEN =
+	/\b(?:societe|caisse|banque|credit|mutuel(?:le)?|assurances?|groupe|agence|cabinet|etablissement|sarl|selarl|sasu?|eurl|sci|scp|rcs|siren|siret|france)\b/iu;
+
+/** Corporate boilerplate openers: where a letter's legal footer begins when the
+ * parser glued it onto the line above ("Votre Directeur d'Agence Caisse
+ * Régionale de …"). */
+const CORPORATE_BOILERPLATE =
+	/\b(?:soci[eé]t[eé]|caisse|banque|s\.?\s?a\.?\s?r\.?\s?l|selarl|s\.?\s?a\.?\s?s|e\.?\s?u\.?\s?r\.?\s?l|s\.?\s?c\.?\s?i|rcs|siren|siret|capital|immatricul\w*|si[eè]ge\s+social)\b/iu;
+
+/** The short head of a line whose tail is corporate boilerplate, or null when
+ * the line does not divide that way. */
+export function roleHeadOf(line: string): string | null {
+	const match = CORPORATE_BOILERPLATE.exec(line);
+	if (!match || match.index < 4) return null;
+	const head = line
+		.slice(0, match.index)
+		.replace(/[\s,;·–—-]+$/u, '')
+		.trim();
+	const words = head.split(/\s+/u).filter(Boolean);
+	if (words.length < 2 || words.length > 8) return null;
+	if (/\d/u.test(head) || /[.!?»:]\s*$/u.test(head)) return null;
+	return head;
+}
+
+/** Does this line read as a person's name? Two to four capitalised words, no
+ * digits or punctuation, none of them a company-form word. Particles stay
+ * lowercase in French names, so they are allowed through unchanged. */
+function isPersonNameLine(line: string): boolean {
+	const text = line.trim();
+	if (/\d|[:;,!?()«»]/u.test(text)) return false;
+	const words = text.split(/\s+/u).filter(Boolean);
+	if (words.length < 2 || words.length > 4) return false;
+	if (ORGANISATION_TOKEN.test(normalizeForFuzzy(text))) return false;
+	return words.every(
+		(word) =>
+			/^(?:d'|l'|d’|l’)?\p{Lu}[\p{L}'’-]*$/u.test(word) || /^(?:de|du|des|le|la)$/iu.test(word)
+	);
+}
+
+/** Content words of the role the question asks about ("directeur", "agence"),
+ * or [] when the question does not ask who holds a role. */
+function requestedRoleTokens(query: string): string[] {
+	const normalized = normalizeForFuzzy(query);
+	const asked = PERSON_ROLE_ASKED.exec(normalized);
+	if (!asked) return [];
+	const tail = normalized
+		.slice(asked.index + asked[0].length)
+		.split(/\bet\b|[?.]/u, 1)[0]
+		.trim();
+	return tail.split(/\s+/u).filter((word) => word.length >= 4);
+}
+
+/**
+ * The person a passage names directly beside the requested role, or null.
+ *
+ * Both signature orders are read (name above the role, role above the name),
+ * and a role line the parser glued onto the legal footer is recovered through
+ * its head. Used as the trigger for a targeted correction: it must only ever
+ * fire on a demonstrated carrier.
+ */
+export function personRoleCarrier(query: string, text: string): string | null {
+	const roleTokens = requestedRoleTokens(query);
+	if (!roleTokens.length) return null;
+	const lines = text
+		.split(/\n+/u)
+		.map((line) => line.trim())
+		.filter(Boolean);
+	const isRoleLine = (line: string): boolean => {
+		const candidate =
+			line.split(/\s+/u).filter(Boolean).length > 8 ? (roleHeadOf(line) ?? '') : line;
+		if (!candidate) return false;
+		const normalized = normalizeForFuzzy(candidate);
+		return roleTokens.every((token) => normalized.includes(token));
+	};
+	for (const [index, line] of lines.entries()) {
+		if (!isRoleLine(line)) continue;
+		for (const neighbour of [lines[index - 1], lines[index + 1]]) {
+			if (neighbour && isPersonNameLine(neighbour)) return neighbour.trim();
+		}
+	}
+	return null;
+}
+
+/** Person-shaped names an answer states. Empty when the draft answered a
+ * who-question with an organisation, a branch or a letterhead. */
+export function personAnswerNames(text: string): string[] {
+	const runs =
+		text.match(
+			/(?:\p{Lu}[\p{L}'’-]+|\p{Lu}{2,})(?:\s+(?:(?:de|du|des|le|la)\s+)?(?:\p{Lu}[\p{L}'’-]+|\p{Lu}{2,})){1,3}/gu
+		) ?? [];
+	return runs.filter((run) => isPersonNameLine(run));
+}
+
 /** Deterministic answer-shape signal, deliberately limited to explicit numeric
  * structure. It is a reranking feature, not a domain or intent classifier. */
 export function numericAnswerEvidenceCoverage(query: string, text: string): number {

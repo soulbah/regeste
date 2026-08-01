@@ -13,6 +13,7 @@ import {
 	fitEvidenceToContext,
 	hasCollapsedIntoRepetition,
 	isDegenerateAnswer,
+	withoutRepeatedAnswerSentences,
 	withoutRepeatedSentences,
 	isRefusalLike,
 	needsGroundedVerification,
@@ -311,6 +312,26 @@ describe('buildUserPrompt', () => {
 				"<think>calcul</think>1. Oui, 14,91 € × 12 = 178,92 € ; l'écart est de 6,58 €."
 			)
 		).toMatch(/^1\. Non,/);
+	});
+
+	it('answers the asker in the second person instead of echoing their possessive', () => {
+		expect(
+			enforceAnswerInvariants('Quel est mon solde ?', 'Mon solde est de 1 245,30 € [1].')
+		).toBe('Votre solde est de 1 245,30 € [1].');
+		expect(
+			enforceAnswerInvariants('Quelles sont mes garanties ?', 'Mes garanties incluent le vol [1].')
+		).toBe('Vos garanties incluent le vol [1].');
+		expect(enforceAnswerInvariants('What is my balance?', 'My balance is 1,245.30 € [1].')).toBe(
+			'Your balance is 1,245.30 € [1].'
+		);
+		// A product name keeps its own spelling, and third-person questions are
+		// left alone entirely.
+		expect(
+			enforceAnswerInvariants('Que propose mon contrat ?', 'Mon Compte Épargne propose 2 % [1].')
+		).toBe('Mon Compte Épargne propose 2 % [1].');
+		expect(enforceAnswerInvariants('Quel est le solde ?', 'Mon solde est de 10 € [1].')).toBe(
+			'Mon solde est de 10 € [1].'
+		);
 	});
 });
 
@@ -697,5 +718,39 @@ describe('hasCollapsedIntoRepetition', () => {
 
 	it('says nothing about a stream too short to judge', () => {
 		expect(hasCollapsedIntoRepetition('Le RAPO est de 1100 € HT.')).toBe(false);
+	});
+});
+
+describe('signature block recovery when the parser glued the role to the footer', () => {
+	it('pairs the name above a role line that carries the legal boilerplate', () => {
+		const letter = {
+			...hit(1),
+			text:
+				'BANQUE DU LITTORAL Nord – Agence : AGENCE DE CALAIS\n' +
+				'Nous restons à votre disposition pour toute précision complémentaire.\n' +
+				'MARTINE DUVAL\n' +
+				"Votre Directrice d'Agence Caisse Régionale de Crédit Maritime Mutuel Société coopérative à capital variable, dont le siège social est 4 rue des Docks, 62100 CALAIS – 512 034"
+		};
+		const inventory = buildEvidenceInventory("Qui est la directrice d'agence ?", [letter]);
+		expect(inventory).toContain("MARTINE DUVAL Votre Directrice d'Agence");
+	});
+});
+
+describe('withoutRepeatedAnswerSentences', () => {
+	it('drops the closing paragraph that restates every part already answered', () => {
+		const answer =
+			"Le directeur d'agence est MARTINE DUVAL [1].\n\n" +
+			"Le cabinet d'avocat s'appelle SELARL DUPONT [2].\n\n" +
+			"Le directeur d'agence est MARTINE DUVAL [1]. Le cabinet d'avocat s'appelle SELARL DUPONT [2].";
+		expect(withoutRepeatedAnswerSentences(answer)).toBe(
+			"Le directeur d'agence est MARTINE DUVAL [1].\n\n" +
+				"Le cabinet d'avocat s'appelle SELARL DUPONT [2]."
+		);
+	});
+
+	it('keeps short formulas and distinct sentences untouched', () => {
+		const answer =
+			'Oui [1].\n\nOui [2].\n\nLa garantie couvre le vol et le vandalisme dans la limite de 2 000 € [1].';
+		expect(withoutRepeatedAnswerSentences(answer)).toBe(answer);
 	});
 });

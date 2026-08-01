@@ -15,7 +15,6 @@
 	import RetrievalTurn from '$lib/components/retrieval-turn.svelte';
 	import PrivateTurn from '$lib/components/private-turn.svelte';
 	import WorkLedger from '$lib/components/work-ledger.svelte';
-	import Markdown from '$lib/components/markdown/markdown.svelte';
 	import ChatHeader from '$lib/components/chat-header.svelte';
 	import PresendPanel from '$lib/components/presend-panel.svelte';
 	import DocumentsPanel from '$lib/components/documents-panel.svelte';
@@ -89,13 +88,14 @@
 		if (nearBottom) stickToBottom = true;
 		else if (goingUp) stickToBottom = false;
 	}
-	/** The checks that run after the stream can replace the answer wholesale, so
-	 * the text is held back until they finish. Derived from the ledger rather
-	 * than a second flag: the step that names the work is the step that decides
-	 * whether the text is final. */
-	const answerProvisional = $derived(
-		chatsStore.workSteps.some((step) => step.id === 'verify' && step.status === 'active')
-	);
+	/** What feeds the ledger's muted live tail: the model's own notes when it
+	 * thinks aloud, otherwise the draft being written — with the one scaffolding
+	 * heading a draft can echo stripped, so internals never surface even there. */
+	const liveFeed = $derived.by(() => {
+		if (chatsStore.streamingThinking) return chatsStore.streamingThinking;
+		if (!chatsStore.streamingText) return null;
+		return chatsStore.streamingText.replace(/Structured evidence inventory[^\n]*/giu, ' ');
+	});
 
 	$effect(() => {
 		void chatsStore.messages;
@@ -430,29 +430,16 @@
 					     turn shape for every mode was the whole point. -->
 					{#if chatsStore.streamingText !== null}
 						<div class="space-y-2">
-							<!-- Live draft notes only until readable answer text streams:
-							     the answer then takes over as the progress signal. -->
-							<WorkLedger
-								steps={chatsStore.workSteps}
-								thinking={chatsStore.streamingText ? null : chatsStore.streamingThinking}
-							/>
-							{#if chatsStore.streamingText}
-								<!-- Same renderer as the finalized turn: streaming raw then snapping
-								     to formatted markdown on completion would flip every list answer.
-								     No citations mid-stream, so [n] stays literal exactly as before.
-								     Held back while the checks run, because they can still replace
-								     this text wholesale: a reader who has finished a paragraph at
-								     full contrast has been told it was the answer, and watching it
-								     vanish reads as a bug. Dimmed, it reads as what it is. -->
-								<div
-									class="text-sm transition-opacity duration-300 {answerProvisional
-										? 'opacity-55'
-										: 'opacity-100'}"
-									aria-busy={answerProvisional}
-								>
-									<Markdown source={chatsStore.streamingText} variant="answer" />
-								</div>
-							{:else if !chatsStore.streamingThinking}
+							<!-- The draft is never laid out as the answer (owner, 2026-07-31):
+							     it is raw model output, it carries scaffolding the reader must
+							     not meet, and the checks that follow may replace it wholesale —
+							     a paragraph someone has read at full contrast is a promise. What
+							     the reader gets instead is the reasoning-UI grammar: the step
+							     line with live seconds, and under it a muted two-line tail of
+							     whatever is being written, unmistakably machinery. The body
+							     appears once, final. -->
+							<WorkLedger steps={chatsStore.workSteps} thinking={liveFeed} />
+							{#if !liveFeed}
 								<Skeleton class="h-4 w-2/3" />
 							{/if}
 						</div>

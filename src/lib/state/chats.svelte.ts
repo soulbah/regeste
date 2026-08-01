@@ -21,7 +21,9 @@ import {
 	contactAnswerValues,
 	durationValueMentions,
 	missingDurationCarrier,
-	ordinalScheduleValue
+	ordinalScheduleValue,
+	personAnswerNames,
+	personRoleCarrier
 } from '$lib/pipeline/retrieval';
 import { assistedPayloadBytes, buildAssistedExcerpts } from '$lib/assisted-payload';
 import { questionLocale } from '$lib/analysis/query-router';
@@ -46,6 +48,7 @@ import {
 	SYSTEM_PROMPT,
 	buildContactValuePrompt,
 	buildDurationValuePrompt,
+	buildPersonValuePrompt,
 	buildScheduleValuePrompt,
 	buildUserPrompt,
 	buildVerificationPrompt,
@@ -1216,6 +1219,43 @@ class ChatsStore {
 				}
 			} catch (err) {
 				console.error('[regeste] schedule-value retry failed:', err);
+			}
+		}
+		// Same judgment for a person holding a role: the letterhead and the legal
+		// footer both carry the role's own words, so a draft can answer "who is
+		// the branch director" with the bank and no person at all, while the
+		// signature block names one right beside the role. Retry naming the
+		// person; adopted only when the retry states them.
+		const personCarrier =
+			grounded && raw.trim() && !this.stopRequested && personAnswerNames(raw).length === 0
+				? hits
+						.map((hit, index) => ({ index, name: personRoleCarrier(question, hit.text) }))
+						.find((entry) => entry.name !== null)
+				: undefined;
+		if (personCarrier) {
+			try {
+				const retriedRaw = await llmStore.generate(
+					[
+						{ role: 'system' as const, content: SYSTEM_PROMPT },
+						{
+							role: 'user' as const,
+							content: `${groundedPrompt}\n\n${buildPersonValuePrompt(question, personCarrier.name!, personCarrier.index + 1)}`
+						}
+					],
+					() => {},
+					generationOptionsFor(question, 'targeted')
+				);
+				const retried = stripThink(retriedRaw);
+				if (
+					retried.trim() &&
+					!isDegenerateAnswer(retried) &&
+					retried.includes(personCarrier.name!)
+				) {
+					raw = retried;
+					this.streamingText = raw;
+				}
+			} catch (err) {
+				console.error('[regeste] person-value retry failed:', err);
 			}
 		}
 		raw = enforceAnswerInvariants(question, raw);

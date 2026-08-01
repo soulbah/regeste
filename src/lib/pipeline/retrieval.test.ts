@@ -26,6 +26,8 @@ import {
 	ordinalPaymentDirection,
 	ordinalScheduleValue,
 	multiClauseEvidenceCoverage,
+	personAnswerNames,
+	personRoleCarrier,
 	requestedDurationCount
 } from './retrieval';
 import { chunkBlocks } from './chunk';
@@ -1446,5 +1448,40 @@ describe('ordinalScheduleValue', () => {
 		expect(
 			ordinalScheduleValue('Quel est montant de la premiere mensualité ?', drifting)
 		).toBeNull();
+	});
+});
+
+describe('who holds a role', () => {
+	const letter =
+		'BANQUE DU LITTORAL Nord – Agence : AGENCE DE CALAIS\n' +
+		'Nous restons à votre disposition pour toute précision complémentaire.\n' +
+		'MARTINE DUVAL\n' +
+		"Votre Directrice d'Agence Caisse Régionale de Crédit Maritime Mutuel Société coopérative à capital variable, dont le siège social est 4 rue des Docks, 62100 CALAIS – 512 034";
+
+	it('finds the person named beside the requested role, footer glue included', () => {
+		expect(personRoleCarrier("Qui est la directrice d'agence ?", letter)).toBe('MARTINE DUVAL');
+	});
+
+	it('reads the other signature order too', () => {
+		const form = "Directeur d'agence\nPaul Vasseur\nTéléphone : 03 21 00 00 00";
+		expect(personRoleCarrier("Qui est le directeur d'agence ?", form)).toBe('Paul Vasseur');
+	});
+
+	it('never fires without a role question or without a person beside the role', () => {
+		expect(personRoleCarrier('Quel est le solde du compte ?', letter)).toBeNull();
+		expect(
+			personRoleCarrier("Qui est le directeur d'agence ?", 'Agence de Calais\nHoraires : 9h-17h')
+		).toBeNull();
+	});
+
+	it('rejects organisations as person names in a draft', () => {
+		expect(
+			personAnswerNames(
+				"Le directeur d'agence est BANQUE POPULAIRE Grand Ouest – Agence : AGENCE DE LILLE [1]."
+			)
+		).toEqual([]);
+		expect(personAnswerNames("Le directeur d'agence est MARTINE DUVAL [1].")).toEqual([
+			'MARTINE DUVAL'
+		]);
 	});
 });

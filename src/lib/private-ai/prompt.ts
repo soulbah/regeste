@@ -3,7 +3,7 @@
 // retrieved set after generation — an invalid [n] is silently dropped.
 
 import type { SearchHit } from '$lib/types';
-import { queryCoverage, splitQueryClauses } from '$lib/pipeline/retrieval';
+import { queryCoverage, roleHeadOf, splitQueryClauses } from '$lib/pipeline/retrieval';
 import { analyzeQuestion } from '$lib/analysis/query-router';
 import {
 	extractIdentifiers,
@@ -213,15 +213,23 @@ export function buildEvidenceInventory(
 		const neighbourJoined: string[] = [];
 		for (const [index, line] of rawLines.entries()) {
 			if (!carriesNoValue(line)) continue;
-			for (const neighbour of [rawLines[index - 1], rawLines[index + 1]]) {
+			for (const rawNeighbour of [rawLines[index - 1], rawLines[index + 1]]) {
+				if (!rawNeighbour) continue;
+				let neighbour = rawNeighbour;
 				if (
-					!neighbour ||
 					neighbour.split(/\s+/u).filter(Boolean).length > 8 ||
 					/[.!?»]\s*$/u.test(neighbour.trim())
-				)
-					continue;
+				) {
+					// The parser can glue the line this one binds to onto the letter's
+					// legal footer ("Votre Directeur d'Agence Caisse Régionale de …"),
+					// and the whole run fails the length test while its head is exactly
+					// the label being looked for. Keep the head, drop the boilerplate.
+					const head = roleHeadOf(neighbour);
+					if (!head) continue;
+					neighbour = head;
+				}
 				neighbourJoined.push(
-					neighbour === rawLines[index - 1] ? `${neighbour} ${line}` : `${line} ${neighbour}`
+					rawNeighbour === rawLines[index - 1] ? `${neighbour} ${line}` : `${line} ${neighbour}`
 				);
 			}
 		}
@@ -372,6 +380,22 @@ export function buildContactValuePrompt(
 	return `Question: ${question}
 
 Excerpt [${excerptNumber}] contains ${value}, which is what this question asks for. Answer the question from excerpt [${excerptNumber}], stating ${value} and citing [${excerptNumber}]. Do not describe which address, number or link to use without naming it. Answer in the language of the question and return only the answer.`;
+}
+
+/** A "who holds this role" question is answered by a person. The letterhead and
+ * the legal footer both out-score the signature block on every overlap feature
+ * (they carry the role's own words), so a draft can name the organisation and
+ * no person at all. Same contract as the other value corrections: used only
+ * when an excerpt demonstrably carries a name beside the role, and the draft is
+ * never quoted back. */
+export function buildPersonValuePrompt(
+	question: string,
+	name: string,
+	excerptNumber: number
+): string {
+	return `Question: ${question}
+
+Excerpt [${excerptNumber}] names ${name} directly beside the role this question asks about. Answer from excerpt [${excerptNumber}], stating that ${name} holds that role and citing [${excerptNumber}]. Name the person, never the organisation, the branch or the letterhead. Answer in the language of the question and return only the answer.`;
 }
 
 /** A multi-part question asking one deadline per part is only answered when
@@ -702,7 +726,61 @@ export function enforceAnswerInvariants(question: string, text: string): string 
 			.replace(/\best coh[eé]rent(e)?\b/iu, "n'est pas cohérent$1")
 			.replace(/\bis consistent\b/iu, 'is not consistent');
 	}
-	return corrected;
+	// "Quel est mon solde ?" answered "Mon solde est…": the model has echoed the
+	// asker's own possessive and speaks as them. The assistant never owns the
+	// asker's balance, so the sentence-initial first person is wrong whenever the
+	// question used one. Only sentence-initial, and only before a lowercase word:
+	// a product name spelt "Mon Compte Épargne" stays what the document calls it.
+	if (/\b(?:mon|ma|mes|my)\b/u.test(normalizedQuestion)) {
+		corrected = corrected
+			.replace(/(^|[.!?]\s+|\n)(?:Mon|Ma)(\s+\p{Ll})/gu, '$1Votre$2')
+			.replace(/(^|[.!?]\s+|\n)Mes(\s+\p{Ll})/gu, '$1Vos$2')
+			.replace(/(^|[.!?]\s+|\n)My(\s+\p{Ll})/gu, '$1Your$2');
+	}
+	return withoutRepeatedAnswerSentences(corrected);
+}
+
+/** A sentence in the answer long enough that its second occurrence is the model
+ * restating itself, not a short formula two parts legitimately share ("Oui",
+ * "Non couvert"). Shorter than the passage threshold on purpose: one answer
+ * repeating its own full sentence is redundancy at any realistic length. */
+const REPEATED_ANSWER_SENTENCE_CHARS = 24;
+
+/**
+ * The answer with its own repeated sentences removed.
+ *
+ * A small model told to answer every part of a multi-part question writes each
+ * part and then a closing paragraph that restates all of them — the same two
+ * sentences, word for word, read twice. Provable from the generated text alone,
+ * so it belongs with the other presentation-stage invariants: a sentence is
+ * dropped only when an earlier sentence normalises to exactly the same words,
+ * citations aside.
+ */
+export function withoutRepeatedAnswerSentences(text: string): string {
+	const seen = new Set<string>();
+	const parts = text.split(/(\n+)/u);
+	const kept = parts.map((part) => {
+		if (/^\n+$/u.test(part)) return part;
+		return part
+			.split(/(?<=[.!?])\s+/u)
+			.filter((sentence) => {
+				const key = sentence
+					.replace(/\s*\[\d+\]/gu, '')
+					.replace(/\s+/gu, ' ')
+					.replace(/[.!?\s]+$/u, '')
+					.trim()
+					.toLowerCase();
+				if (key.length < REPEATED_ANSWER_SENTENCE_CHARS) return true;
+				if (seen.has(key)) return false;
+				seen.add(key);
+				return true;
+			})
+			.join(' ');
+	});
+	return kept
+		.join('')
+		.replace(/\n{3,}/gu, '\n\n')
+		.trim();
 }
 
 /** A sentence long enough that seeing it twice is redundancy rather than a
