@@ -68,7 +68,17 @@ after each, and the stress benchmark shows no regressed answer group.
 
 ## T5 — The decoding grammar
 
-`todo`
+`built, not switched on`
+
+`src/lib/private-ai/answer-grammar.ts` builds it; both workers pass it through
+(`llm-worker.ts` as `response_format`, `wllama-worker.ts` as a sampling
+parameter, both compiling with `root`). `answerGrammarEnabled()` reads
+`localStorage['regeste:answer-grammar']` so one session can run both
+configurations. Default off until T5b.
+
+The honest limit is pinned by a test: a grammar constrains shape, never
+meaning. `"Je n'ai pas compris la question [1]."` satisfies it. Semantic
+failures stay the business of the evidence checks.
 
 Behind a flag, both runtimes: `response_format: { type: 'grammar' }` for
 web-llm, `grammar` in the sampling config for wllama. Admits a cited answer or
@@ -80,9 +90,19 @@ only if quality holds.
 
 ---
 
-## T6 — Delete Type C
+## T5b — Measure it
 
 `todo`
+
+Two stress runs in one session, flag off then on, on a profile that already
+holds a model and the owner's documents. Record `grammar_init_s` and
+`grammar_per_token_s`. The default flips only if no answer group regresses.
+
+---
+
+## T6 — Delete Type C
+
+`blocked by T5b`
 
 `isRefusalLike`, `BLAMES_THE_READER`, `isMetaNonAnswer`, `isPureRefusalLike`,
 `NON_QUERY_CANDIDATE`, the second-person flip, the citation repair. Each goes
