@@ -33,6 +33,19 @@
 		return () => clearInterval(timer);
 	});
 
+	/**
+	 * A duration in the unit a reader thinks in.
+	 *
+	 * "25050 ms" is five digits nobody converts on sight; a step that takes half
+	 * a minute should say so. Milliseconds stay only under a second, where they
+	 * are the honest unit and where seconds would round everything to "0 s".
+	 */
+	function elapsed(ms: number): string {
+		if (ms < 1000) return `${ms} ms`;
+		const seconds = ms / 1000;
+		return `${seconds < 10 ? seconds.toFixed(1) : Math.round(seconds)} s`;
+	}
+
 	function label(step: WorkStep): string {
 		if (step.status === 'waiting') return t('work.write.waiting');
 		const state = step.status === 'done' ? 'done' : 'active';
@@ -41,7 +54,7 @@
 		});
 		if (step.status === 'active' && step.id === 'write' && thinking && thinkingSeconds > 0)
 			return `${text} · ${thinkingSeconds} s`;
-		return step.status === 'done' && step.elapsedMs ? `${text} · ${step.elapsedMs} ms` : text;
+		return step.status === 'done' && step.elapsedMs ? `${text} · ${elapsed(step.elapsedMs)}` : text;
 	}
 
 	/** Tail of the live notes: the freshest words are the informative ones. */

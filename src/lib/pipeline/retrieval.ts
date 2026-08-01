@@ -721,8 +721,13 @@ export function ordinalScheduleValue(query: string, text: string): { literal: st
 // nothing with the question. Vocabulary below is French/English company forms
 // and interrogatives — never a document's own strings.
 
+// "Qui est le directeur ?" and "Quel est mon directeur ?" ask the same thing;
+// French says both. The second form is only safe because the evidence gate
+// below refuses a role line that is really a sentence carrying a value — see
+// `isBareRoleLine`, without which "Quel est mon solde ?" would go looking for
+// a person beside the balance.
 const PERSON_ROLE_ASKED =
-	/\b(?:qui\s+(?:est|sont|sera|serait|occupe|dirige|signe)|who\s+(?:is|are|heads|leads|signs))\b/iu;
+	/\b(?:qui\s+(?:est|sont|sera|serait|occupe|dirige|signe)|quel(?:le)?s?\s+(?:est|sont)|comment\s+s\s*appelle|who\s+(?:is|are|heads|leads|signs)|what\s+is\s+(?:my|the|your))\b/iu;
 
 /** Words that mark an organisation rather than a person. */
 const ORGANISATION_TOKEN =
@@ -825,11 +830,29 @@ export function personRoleCarrier(query: string, text: string): string | null {
 		const words = normalizeForFuzzy(run).split(/\s+/u);
 		return !words.some((word) => roleTokens.includes(word));
 	};
+	/**
+	 * Is this line a title rather than a sentence?
+	 *
+	 * A signature block writes the seat on a line of its own; a sentence that
+	 * merely contains the word is not a seat. The distinction is what makes the
+	 * neighbour lookup safe: without it, "Quel est mon solde ?" matches the line
+	 * stating the balance and adopts the account holder printed above it. Only
+	 * the neighbour lookup needs it — a person named on the role's own line is
+	 * bound by that line whatever its shape.
+	 */
+	const isBareRoleLine = (line: string): boolean => {
+		const candidate =
+			line.split(/\s+/u).filter(Boolean).length > 8 ? (roleHeadOf(line) ?? '') : line;
+		if (!candidate) return false;
+		return !/\d/u.test(candidate) && !/[.!?;]\s*$/u.test(candidate.trim());
+	};
+
 	for (const [index, line] of lines.entries()) {
 		if (!isRoleLine(line)) continue;
 		// The name on the role's own line, whatever joins them.
 		const inline = personRunsIn(line).find(outsideRole);
 		if (inline) return inline.trim();
+		if (!isBareRoleLine(line)) continue;
 		for (const neighbour of [lines[index - 1], lines[index + 1]]) {
 			if (!neighbour) continue;
 			if (isPersonNameLine(neighbour)) return neighbour.trim();
@@ -840,16 +863,6 @@ export function personRoleCarrier(query: string, text: string): string | null {
 		}
 	}
 	return null;
-}
-
-/** Person-shaped names an answer states. Empty when the draft answered a
- * who-question with an organisation, a branch or a letterhead. */
-export function personAnswerNames(text: string): string[] {
-	const runs =
-		text.match(
-			/(?:\p{Lu}[\p{L}'’-]+|\p{Lu}{2,})(?:\s+(?:(?:de|du|des|le|la)\s+)?(?:\p{Lu}[\p{L}'’-]+|\p{Lu}{2,})){1,3}/gu
-		) ?? [];
-	return runs.filter((run) => isPersonNameLine(run));
 }
 
 /** Deterministic answer-shape signal, deliberately limited to explicit numeric

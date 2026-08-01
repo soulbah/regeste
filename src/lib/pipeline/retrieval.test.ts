@@ -26,7 +26,6 @@ import {
 	ordinalPaymentDirection,
 	ordinalScheduleValue,
 	multiClauseEvidenceCoverage,
-	personAnswerNames,
 	personRoleCarrier,
 	requestedDurationCount
 } from './retrieval';
@@ -1499,6 +1498,41 @@ describe('who holds a role — the signature-block family', () => {
 	});
 });
 
+describe('who holds a role — the attestation that motivated it', () => {
+	// The owner's own document, verbatim from the parser: the signature block
+	// sits between the closing sentence and the legal footer, and the footer is
+	// what every overlap feature prefers because it repeats the role's words.
+	const attestation = [
+		'à KARIM TRAORE, sur sa demande, pour servir et valoir ce que de droit.',
+		'Fait à LILLE, le 23 Juillet 2026',
+		'AMELIE ROUSSEAU',
+		"Votre Directeur d'Agence",
+		'Caisse Régionale de Banque Populaire Mutuel Grand Ouest Société coopérative à capital',
+		'variable, agréé en tant qu’établissement de crédit, dont le siège social est 10 avenue Foch,',
+		'BP 369, 59020 LILLE - 987 654 321 RCS LILLE METROPOLE.',
+		'présente à ce jour un solde créditeur de 1 234,56 EUR.'
+	].join('\n');
+
+	it.each([
+		"Qui est le directeur d'agence ?",
+		"Quel est mon directeur d'agence ?",
+		"Comment s'appelle le directeur d'agence ?"
+	])('names the signatory for %s', (question) => {
+		expect(personRoleCarrier(question, attestation)).toBe('AMELIE ROUSSEAU');
+	});
+
+	it.each([
+		'Quel est mon solde ?',
+		'Quel est le solde du compte ?',
+		"Quelle est l'adresse de l'agence ?"
+	])('stays silent on %s, which asks for a value and not a person', (question) => {
+		// Widening the interrogative to "quel est" is only safe because a role
+		// line that is really a sentence carrying a figure is refused: otherwise
+		// the balance line would adopt the account holder printed above it.
+		expect(personRoleCarrier(question, attestation)).toBeNull();
+	});
+});
+
 describe('who holds a role', () => {
 	const letter =
 		'BANQUE DU LITTORAL Nord – Agence : AGENCE DE CALAIS\n' +
@@ -1520,16 +1554,5 @@ describe('who holds a role', () => {
 		expect(
 			personRoleCarrier("Qui est le directeur d'agence ?", 'Agence de Calais\nHoraires : 9h-17h')
 		).toBeNull();
-	});
-
-	it('rejects organisations as person names in a draft', () => {
-		expect(
-			personAnswerNames(
-				"Le directeur d'agence est BANQUE POPULAIRE Grand Ouest – Agence : AGENCE DE LILLE [1]."
-			)
-		).toEqual([]);
-		expect(personAnswerNames("Le directeur d'agence est MARTINE DUVAL [1].")).toEqual([
-			'MARTINE DUVAL'
-		]);
 	});
 });

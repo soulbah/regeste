@@ -22,7 +22,6 @@ import {
 	durationValueMentions,
 	missingDurationCarrier,
 	ordinalScheduleValue,
-	personAnswerNames,
 	personRoleCarrier
 } from '$lib/pipeline/retrieval';
 import { assistedPayloadBytes, buildAssistedExcerpts } from '$lib/assisted-payload';
@@ -1224,13 +1223,20 @@ class ChatsStore {
 		// Same judgment for a person holding a role: the letterhead and the legal
 		// footer both carry the role's own words, so a draft can answer "who is
 		// the branch director" with the bank and no person at all, while the
-		// signature block names one right beside the role. Retry naming the
-		// person; adopted only when the retry states them.
+		// signature block names one right beside the role.
+		//
+		// The test is whether the draft names THE person the evidence points to,
+		// never whether it names someone. Asking the looser question meant
+		// classifying capitalised runs as people, and a legal footer is full of
+		// two-word proper nouns that pass any such test — "RCS LILLE METROPOLE"
+		// was read as a person, so the draft looked answered and this correction
+		// never ran on the document that motivated it. Evidence first, then one
+		// substring check: no classifier, nothing to tune.
 		const personCarrier =
-			grounded && raw.trim() && !this.stopRequested && personAnswerNames(raw).length === 0
+			grounded && raw.trim() && !this.stopRequested
 				? hits
 						.map((hit, index) => ({ index, name: personRoleCarrier(question, hit.text) }))
-						.find((entry) => entry.name !== null)
+						.find((entry) => entry.name !== null && !raw.includes(entry.name))
 				: undefined;
 		if (personCarrier) {
 			try {
@@ -1710,7 +1716,8 @@ class ChatsStore {
 			selected,
 			excluded,
 			pending.conversationContext,
-			pending.route
+			pending.route,
+			{ staged: true }
 		);
 	}
 
@@ -1732,23 +1739,34 @@ class ChatsStore {
 		selected: SearchHit[],
 		excluded: SearchHit[] = [],
 		conversationContext: string | null = null,
-		route: QuestionRoute = 'targeted'
+		route: QuestionRoute = 'targeted',
+		/** Set when `stageAssisted` has already put the question in the thread and
+		 * is still holding `sending` open for the staged turn. The same contract
+		 * `send` carries, and its absence here was two bugs at once: the guard
+		 * below swallowed every confirmed send, so approving the passages produced
+		 * no answer at all; and on the no-excerpts hand-off, where staging had
+		 * released the guard, the question was inserted a second time and appeared
+		 * twice in the thread. */
+		opts: { staged?: boolean } = {}
 	): Promise<void> {
-		if (this.sending) return;
+		if (this.sending && !opts.staged) return;
 		this.sending = true;
 		try {
 			const { db } = await getLocalDb();
 			const chat = this.chats.find((c) => c.id === chatId);
-			if (chat && chat.title === 'New chat' && this.messages.length === 0) {
-				await db.renameChat(chatId, titleFromMessage(question));
+			// A staged turn already did both.
+			if (!opts.staged) {
+				if (chat && chat.title === 'New chat' && this.messages.length === 0) {
+					await db.renameChat(chatId, titleFromMessage(question));
+				}
+				await db.insertMessage({
+					id: crypto.randomUUID(),
+					chatId,
+					role: 'user',
+					content: question,
+					mode: null
+				});
 			}
-			await db.insertMessage({
-				id: crypto.randomUUID(),
-				chatId,
-				role: 'user',
-				content: question,
-				mode: null
-			});
 			this.messages = await db.listMessages(chatId);
 			const enabledDocumentCount = this.chatDocuments.filter(
 				(document) => document.enabled && document.status === 'ready'

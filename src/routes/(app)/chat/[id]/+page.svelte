@@ -34,8 +34,10 @@
 		if (chatsStore.activeChat?.mode === 'assisted') {
 			// Staging swaps the right panel into review mode (FEATURES 5ter).
 			const result = await chatsStore.stageAssisted(chatId, text);
+			// Staging already put the question in the thread before deciding it had
+			// no excerpts to show, so the refusal turn must not print it again.
 			if (result === 'no-excerpts') {
-				await chatsStore.sendAssisted(chatId, text, []);
+				await chatsStore.sendAssisted(chatId, text, [], [], null, 'targeted', { staged: true });
 			}
 			return;
 		}
