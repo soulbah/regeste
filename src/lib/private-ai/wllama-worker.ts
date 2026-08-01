@@ -67,6 +67,10 @@ async function generate(
 			// own output. llama.cpp spells the same control differently.
 			penalty_repeat: 1.15,
 			max_tokens: options.maxTokens,
+			// llama.cpp takes the same grammar string web-llm does, as a sampling
+			// parameter rather than a response format. Both use `root` as the entry
+			// rule, so `answer-grammar.ts` emits one grammar for the two engines.
+			...(options.grammar ? { grammar: options.grammar } : {}),
 			// Qwen3 thinks by default; grounded QA doesn't need it and CPU
 			// tokens are expensive. stripThink upstream catches any leak.
 			chat_template_kwargs: { enable_thinking: options.reasoning === 'on' }

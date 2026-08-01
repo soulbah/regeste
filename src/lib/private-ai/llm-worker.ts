@@ -48,6 +48,11 @@ async function generate(
 		frequency_penalty: 0.3,
 		max_tokens: options.maxTokens,
 		extra_body: { enable_thinking: options.reasoning === 'on' },
+		// XGrammar compiles the string with `root` as its entry rule, the same
+		// name llama.cpp uses, so `answer-grammar.ts` emits one grammar for both.
+		...(options.grammar
+			? { response_format: { type: 'grammar' as const, grammar: options.grammar } }
+			: {}),
 		stream_options: { include_usage: true }
 	});
 	let full = '';

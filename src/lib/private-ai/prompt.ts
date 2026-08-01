@@ -429,25 +429,25 @@ Excerpt [${excerptNumber}] states the amount "${value}" for exactly what this qu
 }
 
 /**
- * The model talking ABOUT answering instead of answering.
+ * Does the draft state the value this literal carries, however it spells it?
  *
- * A distinct failure from a refusal, and invisible to `isRefusalLike`, which
- * looks for claims that a fact is absent. Measured live on a branch letter:
- * "Je n'ai pas compris la question. Si vous voulez savoir qui est le directeur
- * d'agence, je peux vous répondre en utilisant les informations fournies." It
- * claims nothing false and cites nothing, so every existing guard passed it
- * through to the reader as the answer.
+ * The question a value correction actually needs to ask. It replaced a pair of
+ * vocabularies — one listing the ways a model refuses, one listing the ways it
+ * offers to answer instead of answering — that gated the amount correction
+ * before it. Those lists were trying to establish WHY the draft failed, which
+ * the correction does not need to know: an answer that omits a value the
+ * evidence proves is wrong whether the model refused, misread, or wrote a
+ * paragraph about how it could help.
  *
- * Detected on the promise, not on the apology: an apology can precede a real
- * answer, but a sentence offering to answer never is one. Used only to trigger
- * a retry that must independently prove itself, so a false positive costs one
- * reprompt and nothing else.
+ * Comparison is by canonical value, not by string, so a draft writing "1 100
+ * euros HT" counts as stating "1100 € HT" and no needless retry fires. That is
+ * a check on a token type, which is what survives `.claude/rules/nlp.md`.
  */
-const OFFERS_TO_ANSWER =
-	/\b(?:si vous (?:voulez|souhaitez|desirez) (?:savoir|connaitre)|je peux (?:vous )?(?:repondre|aider|fournir|donner)|n hesitez pas|pourriez vous (?:preciser|reformuler|clarifier)|veuillez (?:preciser|reformuler)|je n ai pas compris|reformulez votre question|if you (?:want|would like) to know|i can (?:help|answer|provide)|feel free to|could you (?:clarify|rephrase)|i (?:did not|didn t) understand)\b/u;
-
-export function isMetaNonAnswer(text: string): boolean {
-	return OFFERS_TO_ANSWER.test(normalizeQuestion(text));
+export function statesTheValue(draft: string, literal: string): boolean {
+	const wanted = canonicalNumbers(literal);
+	if (!wanted.length) return draft.includes(literal);
+	const stated = new Set(canonicalNumbers(draft));
+	return wanted.every((value) => stated.has(value));
 }
 
 /** A schedule row reads `rank date balance installment amortized interest`,

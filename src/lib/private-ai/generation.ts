@@ -4,6 +4,17 @@ export interface GenerationOptions {
 	reasoning: 'off' | 'on';
 	maxTokens: number;
 	temperature?: number;
+	/**
+	 * A BNF grammar the decoder must satisfy, from `answer-grammar.ts`.
+	 *
+	 * Both runtimes accept it on the call they already receive: web-llm as
+	 * `response_format: { type: 'grammar' }`, wllama as a sampling parameter.
+	 * Both compile it with `root` as the entry rule, so one string serves both.
+	 *
+	 * Only ever set for targeted generations. A reasoning run opens with a think
+	 * block, which no answer grammar admits.
+	 */
+	grammar?: string;
 }
 
 export interface GenerationResult {

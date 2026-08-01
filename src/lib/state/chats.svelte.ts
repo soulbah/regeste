@@ -44,6 +44,7 @@ import { hasAnswerBearingEvidence } from '$lib/pipeline/relevance';
 import { retrieveWithLocalQueryFallback } from '$lib/pipeline/query-translation';
 import { buildAuditedExtractiveAnswer } from '$lib/private-ai/extractive-answer';
 import { generateWithContextFit } from '$lib/private-ai/context-fit';
+import { ANSWER_GRAMMAR_ENABLED, buildAnswerGrammar } from '$lib/private-ai/answer-grammar';
 import {
 	SYSTEM_PROMPT,
 	buildAmountValuePrompt,
@@ -60,12 +61,11 @@ import {
 	groundedRefusal,
 	hasCollapsedIntoRepetition,
 	isDegenerateAnswer,
-	isMetaNonAnswer,
-	isRefusalLike,
 	isThinking,
 	needsGroundedVerification,
 	resolveCitations,
 	resolveTargetedCitations,
+	statesTheValue,
 	stripThink
 } from '$lib/private-ai/prompt';
 import type {
@@ -958,6 +958,16 @@ class ChatsStore {
 				question,
 				route === 'synthesis' ? 'synthesis' : 'targeted'
 			);
+			// Spec 033: constrain the decoder rather than repair its output. Targeted
+			// only, since a reasoning run opens with a think block that no answer
+			// grammar admits, and off until the stress benchmark says the shape costs
+			// no quality: forcing a citation onto every sentence can push a model into
+			// citing what it should have left alone.
+			if (ANSWER_GRAMMAR_ENABLED && options.reasoning === 'off' && hits.length)
+				options.grammar = buildAnswerGrammar({
+					excerptCount: hits.length,
+					refusal: groundedRefusal(question)
+				});
 			// Checked on a cadence rather than per token: the probe scans the text
 			// so far, and a stream that has collapsed stays collapsed for the next
 			// few hundred characters anyway.
@@ -1268,17 +1278,23 @@ class ChatsStore {
 				console.error('[regeste] person-value retry failed:', err);
 			}
 		}
-		// An amount the excerpts bind to the exact thing the question names, on a
-		// draft that refused or offered to answer instead of answering. A lowercase
-		// acronym inside a fee table ("(RAPO) : 1100 € HT") is retrieved, ranked and
-		// highlighted, then read as absent — the reader sees their answer on screen
-		// under a sentence saying it is not there, which is the worst shape a wrong
-		// answer can take.
+		// An amount the excerpts bind to the exact thing the question names, which
+		// the draft does not state. A lowercase acronym inside a fee table
+		// ("(RAPO) : 1100 € HT") is retrieved, ranked and highlighted, then read as
+		// absent — the reader sees their answer on screen under a sentence saying
+		// it is not there, which is the worst shape a wrong answer can take.
+		//
+		// The trigger is the evidence alone. It used to also require the draft to
+		// look like a refusal or like the model offering to answer, which meant
+		// keeping two vocabularies describing how a small model fails — and they
+		// were both incomplete on the day they were written. Whether the draft
+		// refused, misread or wrote a paragraph about how it could help, an answer
+		// missing a value the evidence proves is the same defect.
 		const amountCarrier =
-			grounded && raw.trim() && !this.stopRequested && (isRefusalLike(raw) || isMetaNonAnswer(raw))
+			grounded && raw.trim() && !this.stopRequested
 				? hits
 						.map((hit, index) => ({ index, value: labelledAmountCarrier(question, hit.text) }))
-						.find((entry) => entry.value !== null && !raw.includes(entry.value.literal))
+						.find((entry) => entry.value !== null && !statesTheValue(raw, entry.value.literal))
 				: undefined;
 		if (amountCarrier) {
 			try {

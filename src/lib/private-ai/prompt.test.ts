@@ -15,8 +15,8 @@ import {
 	isDegenerateAnswer,
 	withoutRepeatedAnswerSentences,
 	withoutRepeatedSentences,
-	isMetaNonAnswer,
 	isRefusalLike,
+	statesTheValue,
 	needsGroundedVerification,
 	resolveCitations,
 	resolveTargetedCitations
@@ -769,28 +769,30 @@ describe('withoutRepeatedAnswerSentences', () => {
 	});
 });
 
-describe('isMetaNonAnswer — talking about answering instead of answering', () => {
+describe('statesTheValue — the evidence check that replaced the refusal vocabularies', () => {
 	it.each([
-		"Je suis désolé, je n'ai pas compris la question. Si vous voulez savoir qui est le directeur d'agence du Banque Populaire, je peux vous répondre en utilisant les informations fournies.",
-		'Pourriez-vous préciser votre question ?',
-		"N'hésitez pas à reformuler votre question.",
-		'If you want to know the branch director, I can help.'
-	])('catches %s', (draft) => {
-		expect(isMetaNonAnswer(draft)).toBe(true);
+		['Le montant forfaitaire est de 1100 € HT [1].', '1100 € HT'],
+		['Le montant est de 1 100 euros HT [1].', '1100 € HT'],
+		['Il vous en coûtera 1100,00 € [1].', '1100 € HT']
+	])('counts %s as stating the value', (draft, literal) => {
+		expect(statesTheValue(draft, literal)).toBe(true);
 	});
 
 	it.each([
-		"Votre directeur d'agence est AMELIE ROUSSEAU [1].",
-		'Le montant forfaitaire pour un RAPO est de 1100 € HT [1].',
-		// An apology can precede a real answer; only the offer to answer counts.
-		"Désolé pour l'imprécision : le solde est de 1 234,56 EUR [1]."
-	])('leaves a real answer alone: %s', (draft) => {
-		expect(isMetaNonAnswer(draft)).toBe(false);
+		["Je n'ai pas trouvé cette information dans les passages fournis.", '1100 € HT'],
+		// The shape no vocabulary caught: the model offering to answer. It fails
+		// the same check as a refusal, which is the point of dropping the lists.
+		['Si vous voulez savoir le montant, je peux vous répondre.', '1100 € HT'],
+		// A different amount is not the amount.
+		['Le montant est de 1800 € HT [1].', '1100 € HT']
+	])('counts %s as not stating it', (draft, literal) => {
+		expect(statesTheValue(draft, literal)).toBe(false);
 	});
 
-	it('is disjoint from a refusal, which claims a fact is absent', () => {
-		const refusal = "Le montant n'est pas indiqué dans les passages fournis.";
-		expect(isRefusalLike(refusal)).toBe(true);
-		expect(isMetaNonAnswer(refusal)).toBe(false);
+	it('falls back to the literal when it carries no number', () => {
+		expect(statesTheValue('Votre conseiller est Paul Vasseur [1].', 'Paul Vasseur')).toBe(true);
+		expect(statesTheValue('Votre conseiller est nommé dans le document.', 'Paul Vasseur')).toBe(
+			false
+		);
 	});
 });
