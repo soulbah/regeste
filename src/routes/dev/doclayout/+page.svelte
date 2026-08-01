@@ -91,6 +91,11 @@
 		(params.get('precision') as (typeof PRECISIONS)[number]['value']) ?? 'q8'
 	);
 	let device = $state<'webgpu' | 'wasm'>((params.get('device') as 'webgpu' | 'wasm') ?? 'webgpu');
+	// The model card's instruction set goes well beyond full conversion: layout
+	// queries ("Detect footer elements on the page."), targeted extraction,
+	// region OCR. A structure-only ask emits tens of tokens instead of thousands,
+	// which turns the by-the-token billing from the problem into the point.
+	let prompt = $state(params.get('prompt') ?? 'Convert this page to docling.');
 	let status = $state('');
 	let output = $state('');
 	let timings = $state<{ load: number; render: number; generate: number } | null>(null);
@@ -146,13 +151,10 @@
 
 		status = 'generating';
 		const messages = [
-			{
-				role: 'user',
-				content: [{ type: 'image' }, { type: 'text', text: 'Convert this page to docling.' }]
-			}
+			{ role: 'user', content: [{ type: 'image' }, { type: 'text', text: prompt }] }
 		];
-		const prompt = processor.apply_chat_template(messages, { add_generation_prompt: true });
-		const inputs = await processor(prompt, image, { do_image_splitting: true });
+		const chatPrompt = processor.apply_chat_template(messages, { add_generation_prompt: true });
+		const inputs = await processor(chatPrompt, image, { do_image_splitting: true });
 		const generateStarted = performance.now();
 		const generated = await model.generate({ ...inputs, max_new_tokens: 1800, do_sample: false });
 		const generate = performance.now() - generateStarted;

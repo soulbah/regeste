@@ -64,18 +64,46 @@ Alternative, kept for the record: [DocLayout-YOLO](https://github.com/opendatala
 has not been pushed since April 2025 and has 55 open issues, and would need our
 own ONNX export plus browser inference. More work, staler upstream.
 
-### Rejected after checking: granite-docling-258M
+### granite-docling-258M — rejected, then reinstated by measurement
 
-A 258M vision-language model converting a page to structured DocTags in one
-pass, Apache 2.0, and **it genuinely runs in transformers.js with WebGPU** —
-`pipeline('image-text-to-text', 'onnx-community/granite-docling-258M-ONNX')`.
-It looked like the whole parsing pipeline replaced by one line.
+First reading: English-only per its model card, so dead for a French product.
+Second reading, after running it: **the model card is wrong about French** (the
+owner's attestation comes back correct and fully tagged at fp32/q8) and the
+"too slow" verdict was **our runtime's fault, not the model's**.
 
-**It does not support French.** English only, with Japanese, Arabic and Chinese
-marked experimental. ([model
-card](https://huggingface.co/ibm-granite/granite-docling-258M)) For a
-French-first product that ends it. Worth re-checking on each release, because
-the architecture is right and the size is right.
+Measured on the same two French pages, same Mac:
+
+| runtime                      | attestation | dense fee page |
+| ---------------------------- | ----------- | -------------- |
+| transformers.js ORT-WebGPU q8 | 20.0 s      | 123.6 s        |
+| llama.cpp native (BF16 GGUF) | **6.4 s**   | **8.3 s**      |
+
+Both native timings INCLUDE model load. Reported llama.cpp throughput for this
+model is [~500 tok/s on a 4090](https://huggingface.co/ibm-granite/granite-docling-258M/discussions/16);
+ORT-WebGPU here decodes at ~15 tok/s, which is where the "half an hour per
+contract" came from. A 14-page contract at native speed is under two minutes of
+background ingest.
+
+The browser path exists in a runtime we already ship: **wllama v3 supports
+multimodal** (`mmprojFile` in its HF loader, image input in chat completion),
+and IBM publishes the [official GGUF + mmproj](https://huggingface.co/ibm-granite/granite-docling-258M-GGUF)
+(332 MB + 190 MB). The wasm/WebGPU penalty against native Metal is the one
+number still missing.
+
+Two caveats that survive every runtime. Transcription slips at every precision
+("sole de créditeur", "RECURS", "METROPOLIE") — so the VLM's output can carry
+STRUCTURE and retrieval text, while citation text must keep coming from the
+real text layer, the same hybrid contract the liteparse routing already uses.
+And the ORT fp16/q4f16 exports emit garbage on WebGPU due to an upstream
+overflow bug ([onnxruntime#26732](https://github.com/microsoft/onnxruntime/issues/26732),
+[#26367](https://github.com/microsoft/onnxruntime/issues/26367)) — q8 is the
+only correct ORT setting today.
+
+Where this leaves the architecture: PP-DocLayout stays the cheap always-on
+layer (0.9 s/page, 130 MB, no decoder to loop), and granite-docling through
+wllama becomes the candidate for the pages a detector cannot settle — shaded
+tables with no ruling, scans, and anything where list nesting matters.
+
 
 ---
 
