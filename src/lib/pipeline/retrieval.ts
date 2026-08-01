@@ -412,6 +412,70 @@ export function numericLabelValueProximityCoverage(query: string, text: string):
 	return best;
 }
 
+/**
+ * The amount a passage binds to a distinctive term the question names, or null.
+ *
+ * The refusal case, which is the worst one the product produces: retrieval
+ * finds the page, the viewer highlights it, and the answer says it found
+ * nothing. A small model asked "combien coûte un rapo" does not always connect
+ * a lowercase acronym to "(RAPO) : 1100 € HT" sitting inside a fee table, and
+ * the honest-refusal instruction then fires on evidence that plainly answers.
+ *
+ * The proof required is deliberately narrow, and it is about the document
+ * rather than the phrasing: an amount must sit in the same clause as a term the
+ * question names which is NOT ordinary question vocabulary — an acronym, a
+ * reference, a proper noun. That is what distinguishes "the evidence answers
+ * this and the model missed it" from "the evidence is silent", and it is the
+ * same standard as the other value corrections.
+ */
+const AMOUNT_IN_TEXT =
+	/(?:\d[\d\s.,]*\s*(?:€|eur\b|euros?\b|usd\b|dollars?\b))(?:\s*(?:ht|ttc))?/giu;
+
+/** Question words that prove nothing about a document. */
+const QUESTION_VOCABULARY =
+	/^(?:combien|coute|couter|cout|prix|montant|quel|quelle|quels|quelles|est|sont|le|la|les|un|une|des|du|de|pour|par|dans|avec|sur|mon|ma|mes|votre|vos|how|much|many|what|is|are|the|a|an|of|for|in|with|my|your|cost|costs|price|amount|does)$/iu;
+
+/** Asking what something costs, robust to the accents people omit — the
+ *  existing numeric-kind classifier reads "coûte" and not "coute", and a
+ *  correction must not hinge on a circumflex. */
+const ASKS_A_COST =
+	/\b(?:combien|cout\w*|prix|montant|tarif\w*|honoraires?|frais|how\s+much|cost|price|fee)\b/iu;
+
+/**
+ * The distinctive terms a question names: acronyms, references, proper nouns —
+ * never its interrogative scaffolding.
+ *
+ * Cost vocabulary is scaffolding here even though it is not a question word: it
+ * is what identified the question as asking a price, and a word that plays that
+ * role cannot also stand as proof the document answers. Asking for "les
+ * honoraires pour un RAPO" must be proved by RAPO alone, since a fee table
+ * writes the amount under "montant forfaitaire" and never repeats the word the
+ * reader happened to use.
+ */
+function distinctiveQueryTerms(query: string): string[] {
+	return normalizeForFuzzy(query)
+		.split(/\s+/u)
+		.filter(
+			(word) => word.length >= 3 && !QUESTION_VOCABULARY.test(word) && !ASKS_A_COST.test(word)
+		);
+}
+
+export function labelledAmountCarrier(query: string, text: string): { literal: string } | null {
+	if (!ASKS_A_COST.test(normalizeForFuzzy(query))) return null;
+	const terms = distinctiveQueryTerms(query);
+	if (!terms.length) return null;
+	for (const match of text.matchAll(AMOUNT_IN_TEXT)) {
+		const index = match.index ?? 0;
+		// The clause around the amount, not the chunk: a fee table lists several
+		// amounts and only the one in the same clause is bound to the term.
+		const start = Math.max(0, text.lastIndexOf('\n', index) + 1);
+		const end = text.indexOf('\n', index);
+		const clause = normalizeForFuzzy(text.slice(start, end === -1 ? text.length : end));
+		if (terms.every((term) => clause.includes(term))) return { literal: match[0].trim() };
+	}
+	return null;
+}
+
 // A question asking for a way to reach someone wants a literal identifier, and
 // a passage that merely REPEATS the question's words without carrying one is a
 // non-answer ("the email address used for this request"). Structural like the
@@ -820,11 +884,30 @@ export function personRoleCarrier(query: string, text: string): string | null {
 		.split(/\n+/u)
 		.map((line) => line.trim())
 		.filter(Boolean);
+	/**
+	 * The organisation the passage belongs to, as one searchable string.
+	 *
+	 * A question naming a role often names the organisation with it ("le
+	 * directeur d'agence **du Banque Populaire**"). Those extra words identify the
+	 * DOCUMENT, not the line: no signature block repeats the letterhead beside
+	 * the seat. Requiring them on the role line is what made the whole family
+	 * miss as soon as the user qualified the question, so they are satisfied here
+	 * instead — by the letterhead the excerpt already carries.
+	 */
+	const organisationContext = normalizeForFuzzy(
+		lines.filter((line) => ORGANISATION_TOKEN.test(normalizeForFuzzy(line))).join(' ')
+	);
+	const [roleHead, ...roleQualifiers] = roleTokens;
 	const isRoleLine = (line: string): boolean => {
 		const candidate =
 			line.split(/\s+/u).filter(Boolean).length > 8 ? (roleHeadOf(line) ?? line) : line;
 		const normalized = normalizeForFuzzy(candidate);
-		return roleTokens.every((token) => normalized.includes(token));
+		// The head names the seat and must be on the line; a qualifier the
+		// document's own letterhead accounts for is not evidence against it.
+		if (!normalized.includes(roleHead)) return false;
+		return roleQualifiers.every(
+			(token) => normalized.includes(token) || organisationContext.includes(token)
+		);
 	};
 	const outsideRole = (run: string): boolean => {
 		const words = normalizeForFuzzy(run).split(/\s+/u);

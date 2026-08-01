@@ -414,6 +414,42 @@ export function buildDurationValuePrompt(
 Each part of this question asks for its own time limit. Excerpt [${excerptNumber}] states the time limit "${value}", which answers one part the draft missed. Answer every part of the question, stating each part's time limit from the excerpts, including "${value}" cited [${excerptNumber}]. Answer in the language of the question and return only the answer.`;
 }
 
+/** An amount the excerpts bind to a term the question names, which the draft
+ * did not state. Same contract as the other value corrections: the proof is in
+ * the document (amount and term in one clause), the draft is never quoted back,
+ * and the retry is adopted only if it states the literal. */
+export function buildAmountValuePrompt(
+	question: string,
+	value: string,
+	excerptNumber: number
+): string {
+	return `Question: ${question}
+
+Excerpt [${excerptNumber}] states the amount "${value}" for exactly what this question asks about. Answer from excerpt [${excerptNumber}], stating "${value}" and citing [${excerptNumber}]. Answer in the language of the question and return only the answer.`;
+}
+
+/**
+ * The model talking ABOUT answering instead of answering.
+ *
+ * A distinct failure from a refusal, and invisible to `isRefusalLike`, which
+ * looks for claims that a fact is absent. Measured live on a branch letter:
+ * "Je n'ai pas compris la question. Si vous voulez savoir qui est le directeur
+ * d'agence, je peux vous répondre en utilisant les informations fournies." It
+ * claims nothing false and cites nothing, so every existing guard passed it
+ * through to the reader as the answer.
+ *
+ * Detected on the promise, not on the apology: an apology can precede a real
+ * answer, but a sentence offering to answer never is one. Used only to trigger
+ * a retry that must independently prove itself, so a false positive costs one
+ * reprompt and nothing else.
+ */
+const OFFERS_TO_ANSWER =
+	/\b(?:si vous (?:voulez|souhaitez|desirez) (?:savoir|connaitre)|je peux (?:vous )?(?:repondre|aider|fournir|donner)|n hesitez pas|pourriez vous (?:preciser|reformuler|clarifier)|veuillez (?:preciser|reformuler)|je n ai pas compris|reformulez votre question|if you (?:want|would like) to know|i can (?:help|answer|provide)|feel free to|could you (?:clarify|rephrase)|i (?:did not|didn t) understand)\b/u;
+
+export function isMetaNonAnswer(text: string): boolean {
+	return OFFERS_TO_ANSWER.test(normalizeQuestion(text));
+}
+
 /** A schedule row reads `rank date balance installment amortized interest`,
  * and the model reliably answers the first large amount after the date — the
  * outstanding balance — when asked for an installment. Used only when the

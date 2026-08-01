@@ -20,6 +20,7 @@ import {
 	contactAnswerEvidenceCoverage,
 	contactAnswerValues,
 	durationValueMentions,
+	labelledAmountCarrier,
 	missingDurationCarrier,
 	ordinalScheduleValue,
 	personRoleCarrier
@@ -45,6 +46,7 @@ import { buildAuditedExtractiveAnswer } from '$lib/private-ai/extractive-answer'
 import { generateWithContextFit } from '$lib/private-ai/context-fit';
 import {
 	SYSTEM_PROMPT,
+	buildAmountValuePrompt,
 	buildContactValuePrompt,
 	buildDurationValuePrompt,
 	buildPersonValuePrompt,
@@ -58,6 +60,8 @@ import {
 	groundedRefusal,
 	hasCollapsedIntoRepetition,
 	isDegenerateAnswer,
+	isMetaNonAnswer,
+	isRefusalLike,
 	isThinking,
 	needsGroundedVerification,
 	resolveCitations,
@@ -1262,6 +1266,44 @@ class ChatsStore {
 				}
 			} catch (err) {
 				console.error('[regeste] person-value retry failed:', err);
+			}
+		}
+		// An amount the excerpts bind to the exact thing the question names, on a
+		// draft that refused or offered to answer instead of answering. A lowercase
+		// acronym inside a fee table ("(RAPO) : 1100 € HT") is retrieved, ranked and
+		// highlighted, then read as absent — the reader sees their answer on screen
+		// under a sentence saying it is not there, which is the worst shape a wrong
+		// answer can take.
+		const amountCarrier =
+			grounded && raw.trim() && !this.stopRequested && (isRefusalLike(raw) || isMetaNonAnswer(raw))
+				? hits
+						.map((hit, index) => ({ index, value: labelledAmountCarrier(question, hit.text) }))
+						.find((entry) => entry.value !== null && !raw.includes(entry.value.literal))
+				: undefined;
+		if (amountCarrier) {
+			try {
+				const retriedRaw = await llmStore.generate(
+					[
+						{ role: 'system' as const, content: SYSTEM_PROMPT },
+						{
+							role: 'user' as const,
+							content: `${groundedPrompt}\n\n${buildAmountValuePrompt(question, amountCarrier.value!.literal, amountCarrier.index + 1)}`
+						}
+					],
+					() => {},
+					generationOptionsFor(question, 'targeted')
+				);
+				const retried = stripThink(retriedRaw);
+				if (
+					retried.trim() &&
+					!isDegenerateAnswer(retried) &&
+					retried.includes(amountCarrier.value!.literal)
+				) {
+					raw = retried;
+					this.streamingText = raw;
+				}
+			} catch (err) {
+				console.error('[regeste] amount-value retry failed:', err);
 			}
 		}
 		raw = enforceAnswerInvariants(question, raw);

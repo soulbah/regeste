@@ -15,6 +15,7 @@ import {
 	isDegenerateAnswer,
 	withoutRepeatedAnswerSentences,
 	withoutRepeatedSentences,
+	isMetaNonAnswer,
 	isRefusalLike,
 	needsGroundedVerification,
 	resolveCitations,
@@ -765,5 +766,31 @@ describe('withoutRepeatedAnswerSentences', () => {
 				'Le délai de rétractation est de quatorze jours [1]. Le délai de rétractation est de quatorze jours [1]. Il court dès la signature [2].'
 			)
 		).toBe('Le délai de rétractation est de quatorze jours [1]. Il court dès la signature [2].');
+	});
+});
+
+describe('isMetaNonAnswer — talking about answering instead of answering', () => {
+	it.each([
+		"Je suis désolé, je n'ai pas compris la question. Si vous voulez savoir qui est le directeur d'agence du Banque Populaire, je peux vous répondre en utilisant les informations fournies.",
+		'Pourriez-vous préciser votre question ?',
+		"N'hésitez pas à reformuler votre question.",
+		'If you want to know the branch director, I can help.'
+	])('catches %s', (draft) => {
+		expect(isMetaNonAnswer(draft)).toBe(true);
+	});
+
+	it.each([
+		"Votre directeur d'agence est AMELIE ROUSSEAU [1].",
+		'Le montant forfaitaire pour un RAPO est de 1100 € HT [1].',
+		// An apology can precede a real answer; only the offer to answer counts.
+		"Désolé pour l'imprécision : le solde est de 1 234,56 EUR [1]."
+	])('leaves a real answer alone: %s', (draft) => {
+		expect(isMetaNonAnswer(draft)).toBe(false);
+	});
+
+	it('is disjoint from a refusal, which claims a fact is absent', () => {
+		const refusal = "Le montant n'est pas indiqué dans les passages fournis.";
+		expect(isRefusalLike(refusal)).toBe(true);
+		expect(isMetaNonAnswer(refusal)).toBe(false);
 	});
 });

@@ -26,6 +26,7 @@ import {
 	ordinalPaymentDirection,
 	ordinalScheduleValue,
 	multiClauseEvidenceCoverage,
+	labelledAmountCarrier,
 	personRoleCarrier,
 	requestedDurationCount
 } from './retrieval';
@@ -1521,6 +1522,27 @@ describe('who holds a role — the attestation that motivated it', () => {
 		expect(personRoleCarrier(question, attestation)).toBe('AMELIE ROUSSEAU');
 	});
 
+	// Naming the organisation with the role is the ordinary way to ask, and it
+	// used to defeat the whole correction: no signature block repeats the
+	// letterhead beside the seat, so requiring "crédit" and "agricole" on the
+	// role line made every qualified question miss.
+	it.each([
+		"Qui est le directeur d'agence du Banque Populaire ?",
+		"Qui est le directeur d'agence de la Caisse Régionale ?",
+		"Quel est le directeur d'agence du Banque Populaire Grand Ouest ?"
+	])('reads the organisation from the letterhead for %s', (question) => {
+		expect(personRoleCarrier(question, attestation)).toBe('AMELIE ROUSSEAU');
+	});
+
+	it('still refuses a role the document does not name', () => {
+		// The qualifier relaxation is bounded by the letterhead: a word that is
+		// neither on the role line nor in the organisation lines still refuses.
+		expect(personRoleCarrier('Qui est le directeur financier ?', attestation)).toBeNull();
+		expect(personRoleCarrier('Qui est le directeur des ressources humaines ?', attestation)).toBe(
+			null
+		);
+	});
+
 	it.each([
 		'Quel est mon solde ?',
 		'Quel est le solde du compte ?',
@@ -1530,6 +1552,44 @@ describe('who holds a role — the attestation that motivated it', () => {
 		// line that is really a sentence carrying a figure is refused: otherwise
 		// the balance line would adopt the account holder printed above it.
 		expect(personRoleCarrier(question, attestation)).toBeNull();
+	});
+});
+
+describe('an amount the excerpts bind to the term the question names', () => {
+	// Verbatim from the owner's fee schedule, where the answer was retrieved,
+	// ranked first and highlighted on screen while the draft said it was absent.
+	const fees = [
+		'Nos honoraires sont fixés forfaitairement selon la phase :',
+		'- le montant forfaitaire de base pour la phase administrative du recours (RAPO) : 1100 € HT.',
+		'- le montant forfaitaire pour la saisine du tribunal administratif : 1800 € HT.',
+		'Ces montants sont exigibles à la signature.'
+	].join('\n');
+
+	it.each([
+		'Combien coute un rapo ?',
+		'Combien coûte un RAPO ?',
+		'Quel est le montant du RAPO ?',
+		'Quels sont les honoraires pour un RAPO ?'
+	])('binds the amount to the acronym for %s', (question) => {
+		expect(labelledAmountCarrier(question, fees)?.literal).toBe('1100 € HT');
+	});
+
+	it('reads the other row rather than the first amount in the passage', () => {
+		expect(labelledAmountCarrier('Combien coûte la saisine du tribunal ?', fees)?.literal).toBe(
+			'1800 € HT'
+		);
+	});
+
+	it.each([
+		'Combien coûte un passeport ?',
+		'Combien coûte une naturalisation ?',
+		'Quel est le délai de recours ?',
+		'Qui est mon avocat ?'
+	])('stays silent on %s', (question) => {
+		// The proof is about the document, not the phrasing: without a term the
+		// question names sitting in the amount's own clause, the correction must
+		// not fire — an honest refusal is the right answer there.
+		expect(labelledAmountCarrier(question, fees)).toBeNull();
 	});
 });
 
