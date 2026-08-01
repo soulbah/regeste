@@ -18,6 +18,10 @@ export interface PositionedPdfText {
 export interface ReconstructedLine {
 	text: string;
 	retrievalContext?: string;
+	/** Layout-model region class (spec 034) when the line belongs to page
+	 *  chrome — footer, header, aside, page number. Chrome lines are emitted
+	 *  after the body and never glue to it. */
+	region?: string;
 }
 
 interface PdfLine {

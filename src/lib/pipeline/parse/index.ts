@@ -2,6 +2,7 @@
 
 import { parseText } from './text';
 import type { ParsedDoc } from '$lib/types';
+import type { ParsePdfOptions } from './pdf';
 
 export function isPdf(name: string, mime: string): boolean {
 	return mime === 'application/pdf' || name.toLowerCase().endsWith('.pdf');
@@ -10,12 +11,13 @@ export function isPdf(name: string, mime: string): boolean {
 export async function parseByName(
 	name: string,
 	mime: string,
-	data: ArrayBuffer
+	data: ArrayBuffer,
+	options: ParsePdfOptions = {}
 ): Promise<ParsedDoc> {
 	const lower = name.toLowerCase();
 	if (isPdf(name, mime)) {
 		const { parsePdf } = await import('./pdf');
-		return parsePdf(data);
+		return parsePdf(data, options);
 	}
 	if (lower.endsWith('.docx')) {
 		const { parseDocx } = await import('./docx');

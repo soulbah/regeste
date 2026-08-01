@@ -1,4 +1,12 @@
 // Parser adapters under test.
+import {
+	LAYOUT_INPUT_SIZE,
+	LAYOUT_THRESHOLD,
+	layoutUncertain,
+	regionsFromImage,
+	splitByChrome,
+	type LayoutRegion
+} from '../../src/lib/pipeline/layout-model';
 //
 // Every adapter returns the same two views per page, because the pipeline needs
 // both and they have different jobs:
@@ -89,7 +97,13 @@ function isPositionable(
 async function pdfjsPages(
 	bytes: Uint8Array,
 	detectScans = false
-): Promise<{ items: Positioned[][]; widths: number[]; numPages: number; scans: Set<number> }> {
+): Promise<{
+	items: Positioned[][];
+	widths: number[];
+	heights: number[];
+	numPages: number;
+	scans: Set<number>;
+}> {
 	const lib = await pdfjs();
 	const task = lib.getDocument({
 		data: bytes.slice(0),
@@ -100,12 +114,14 @@ async function pdfjsPages(
 	});
 	const doc = await task.promise;
 	const widths: number[] = [];
+	const heights: number[] = [];
 	const items: Positioned[][] = [];
 	const scans = new Set<number>();
 	for (let pageNum = 1; pageNum <= doc.numPages; pageNum++) {
 		const page = await doc.getPage(pageNum);
 		const viewport = page.getViewport({ scale: 1 });
 		widths.push(viewport.width);
+		heights.push(viewport.height);
 		const content = await page.getTextContent();
 		if (detectScans) {
 			const pageArea = viewport.width * viewport.height;
@@ -137,7 +153,7 @@ async function pdfjsPages(
 		page.cleanup();
 	}
 	await task.destroy();
-	return { items, widths, numPages: doc.numPages, scans };
+	return { items, widths, heights, numPages: doc.numPages, scans };
 }
 
 /**
@@ -568,6 +584,7 @@ export function defaultAdapters(): Adapter[] {
 		routedTextBaseAdapter(),
 		ocrNaiveAdapter(),
 		ocrBoxesAdapter(),
+		oursLayoutAdapter(),
 		// Scores nothing unless a Marker run has been precomputed, so it costs
 		// nothing to leave registered and it is reachable with --only marker.
 		markerAdapter()
@@ -594,7 +611,10 @@ export function defaultAdapters(): Adapter[] {
  * `Adapter` contract passes bytes alone and inventing a second channel for the
  * name would leak this one experiment into every other adapter.
  */
-export function markerAdapter(outputDir = '.marker-out', corpusDir = '.benchmark-corpus/parser-ab'): Adapter {
+export function markerAdapter(
+	outputDir = '.marker-out',
+	corpusDir = '.benchmark-corpus/parser-ab'
+): Adapter {
 	let index: Map<string, string> | null = null;
 
 	const buildIndex = async (): Promise<Map<string, string>> => {
@@ -602,7 +622,7 @@ export function markerAdapter(outputDir = '.marker-out', corpusDir = '.benchmark
 		const { readdir, readFile } = await import('node:fs/promises');
 		const { join } = await import('node:path');
 		const map = new Map<string, string>();
-		let files: string[] = [];
+		let files: string[];
 		try {
 			files = await readdir(corpusDir);
 		} catch {
@@ -648,6 +668,134 @@ export function markerAdapter(outputDir = '.marker-out', corpusDir = '.benchmark
 					citationText: text.replace(/[*_`#|]/gu, ' ').replace(/[ \t]+/gu, ' '),
 					retrievalText: text,
 					needsOcr: false
+				});
+			}
+			return { pages, ms: performance.now() - started };
+		}
+	};
+}
+
+// --- the layout-model architecture under test (spec 034) --------------------
+
+/**
+ * The shipped pipeline plus PP-DocLayout regions.
+ *
+ * Regions come from pre-rastered truth pages (pypdfium2, 200 DPI, in
+ * .benchmark-corpus/layout-pages as `<stem>-p<page>.png`) because this harness
+ * runs under bun where pdf.js cannot rasterise. Pages without a raster get no
+ * regions — exactly the app's degraded mode when the model cannot load, so the
+ * comparison stays honest: `ours+layout` differs from `shipped` only where the
+ * detector actually ran.
+ */
+export function oursLayoutAdapter(
+	pagesDir = '.benchmark-corpus/layout-pages',
+	corpusDir = '.benchmark-corpus/parser-ab'
+): Adapter {
+	let stemByHash: Map<string, string> | null = null;
+	let servicePromise: Promise<import('ppu-doclayout').DocLayoutService> | null = null;
+
+	const stems = async (): Promise<Map<string, string>> => {
+		const { createHash } = await import('node:crypto');
+		const { readdir, readFile } = await import('node:fs/promises');
+		const { join } = await import('node:path');
+		const map = new Map<string, string>();
+		let files: string[];
+		try {
+			files = await readdir(corpusDir);
+		} catch {
+			return map;
+		}
+		for (const name of files) {
+			if (!name.endsWith('.pdf')) continue;
+			const bytes = await readFile(join(corpusDir, name));
+			map.set(createHash('sha256').update(bytes).digest('hex'), name.slice(0, -4));
+		}
+		return map;
+	};
+
+	const service = (): Promise<import('ppu-doclayout').DocLayoutService> => {
+		servicePromise ??= (async () => {
+			const { DocLayoutService } = await import('ppu-doclayout');
+			const instance = new DocLayoutService({
+				detection: { threshold: LAYOUT_THRESHOLD, modelInputSize: LAYOUT_INPUT_SIZE },
+				debugging: { debug: false, verbose: false }
+			});
+			await instance.initialize();
+			return instance;
+		})();
+		return servicePromise;
+	};
+
+	const RASTER_SCALE = 200 / 72;
+
+	return {
+		id: 'ours+layout',
+		note: 'spec 034: shipped pipeline + PP-DocLayout chrome segregation on pre-rastered pages',
+		async parse(bytes) {
+			const started = performance.now();
+			const { createHash } = await import('node:crypto');
+			const { readFile } = await import('node:fs/promises');
+			stemByHash ??= await stems();
+			const stem = stemByHash.get(createHash('sha256').update(bytes).digest('hex'));
+
+			const { items, widths, heights } = await pdfjsPages(bytes, true);
+			const { result } = await liteparseParse(bytes, liteparseConfig({ outputFormat: 'markdown' }));
+			const routed = new Map<number, string[]>();
+			for (const page of result.pages) {
+				const markdown = page.markdown ?? '';
+				if (!shouldUseMarkdown(markdown)) continue;
+				const lines = markdownToLines(markdown);
+				if (lines.length) routed.set(page.pageNum, lines);
+			}
+			const normalized = normalizeFormMarks(items);
+			const pages: AdapterPage[] = [];
+			for (let index = 0; index < normalized.length; index++) {
+				const pageNum = index + 1;
+				const pageItems = normalized[index];
+				let positioned = orderPdfText(pageItems, widths[index]);
+				if (!routed.has(pageNum) && stem && layoutUncertain(pageItems, heights[index])) {
+					let regions: LayoutRegion[] = [];
+					try {
+						const png = await readFile(`${pagesDir}/${stem}-p${pageNum}.png`);
+						const detected = (await (await service()).analyze(png)) as {
+							boxes?: Array<{ label: string; score: number; box: number[] }>;
+						};
+						regions = regionsFromImage(detected.boxes ?? [], RASTER_SCALE);
+					} catch {
+						// No raster for this page: parse without regions, like the app
+						// when the model is unavailable.
+					}
+					if (regions.length) {
+						const { body, chrome } = splitByChrome(
+							pageItems,
+							regions,
+							widths[index],
+							heights[index]
+						);
+						positioned = [
+							...orderPdfText(body, widths[index]),
+							...chrome.flatMap((group) =>
+								orderPdfText(group.items, widths[index]).map((line) => ({
+									...line,
+									region: group.label
+								}))
+							)
+						];
+					}
+				}
+				const lines = routed.get(pageNum) ?? positioned.map((line) => line.text);
+				const text = lines.join('\n');
+				pages.push({
+					page: pageNum,
+					citationText: text,
+					retrievalText: routed.has(pageNum)
+						? text
+						: positioned
+								.map((line) =>
+									line.retrievalContext ? `${line.text}\t${line.retrievalContext}` : line.text
+								)
+								.join('\n'),
+					needsOcr: assessPdfTextLayer(text).reason !== null
 				});
 			}
 			return { pages, ms: performance.now() - started };

@@ -1478,8 +1478,12 @@ describe('who holds a role — the signature-block family', () => {
 			"Qui est le directeur d'agence ?"
 		],
 		[
-			'role glued onto the legal footer',
-			"MARTINE DUVAL\nVotre Directrice d'Agence Caisse Régionale de Crédit Maritime Mutuel Société coopérative à capital variable, dont le siège social est 4 rue des Docks, 62100 CALAIS – 512 034",
+			// Spec 034: the parser splits page chrome off by detected regions, so
+			// the legal footer arrives as its own chunk and the role line is bare.
+			// The glued shape this entry used to carry is unrepresentable now, and
+			// the repair that read through it (roleHeadOf) is deleted.
+			'role above its own footer-free line',
+			"MARTINE DUVAL\nVotre Directrice d'Agence",
 			"Qui est la directrice d'agence ?"
 		],
 		['accented role in English', 'Claims Manager\nJohn Smith', 'Who is the claims manager?']
@@ -1598,9 +1602,11 @@ describe('who holds a role', () => {
 		'BANQUE DU LITTORAL Nord – Agence : AGENCE DE CALAIS\n' +
 		'Nous restons à votre disposition pour toute précision complémentaire.\n' +
 		'MARTINE DUVAL\n' +
-		"Votre Directrice d'Agence Caisse Régionale de Crédit Maritime Mutuel Société coopérative à capital variable, dont le siège social est 4 rue des Docks, 62100 CALAIS – 512 034";
+		"Votre Directrice d'Agence";
 
-	it('finds the person named beside the requested role, footer glue included', () => {
+	it('finds the person named beside the requested role', () => {
+		// The letter as the spec-034 parser emits it: the legal footer is a chunk
+		// of its own, so this hit simply does not carry it.
 		expect(personRoleCarrier("Qui est la directrice d'agence ?", letter)).toBe('MARTINE DUVAL');
 	});
 

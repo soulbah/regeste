@@ -60,7 +60,10 @@ export function splitAtSectionMarkers(
 }
 
 function sectionKey(b: ParsedBlock): string {
-	return `${b.page ?? ''}|${b.headingPath?.join(' > ') ?? ''}`;
+	// Chrome (spec 034: footer, header, aside, page number) forms its own
+	// section per region class: a chunk can hold the whole legal footer, but
+	// never a footer line beside a signature or a closing sentence.
+	return `${b.page ?? ''}|${b.region ?? ''}|${b.headingPath?.join(' > ') ?? ''}`;
 }
 
 /** Split an oversized text on sentence-ish boundaries, keeping offsets. */
@@ -140,11 +143,39 @@ export function chunkBlocks(blocks: ParsedBlock[], documentName = ''): Chunk[] {
 	let seq = 0;
 
 	// Group blocks by section (page or heading path).
-	const sections: ParsedBlock[][] = [];
+	const grouped: ParsedBlock[][] = [];
 	for (const b of blocks) {
-		const last = sections[sections.length - 1];
+		const last = grouped[grouped.length - 1];
 		if (last && sectionKey(last[0]) === sectionKey(b)) last.push(b);
-		else sections.push([b]);
+		else grouped.push([b]);
+	}
+
+	// Fold a section that is nothing but its own heading line into the section
+	// that follows it. The parser promotes any short capitalised line to a
+	// heading, and a signature name ("AMELIE ROUSSEAU") is exactly that shape:
+	// alone it forms a one-block section under the noise floor below and
+	// vanishes. It never used to — the legal footer glued onto it and carried it
+	// over the floor, which is the defect spec 034 removes — so the fold is what
+	// keeps the name in a chunk now that the glue is gone, and it lands the name
+	// beside its role line, which is the pair every signature question needs.
+	const sections: ParsedBlock[][] = [];
+	for (let index = 0; index < grouped.length; index++) {
+		const section = grouped[index];
+		const next = grouped[index + 1];
+		const lone = section.length === 1 ? section[0] : null;
+		if (
+			lone &&
+			!lone.region &&
+			lone.headingPath?.length &&
+			lone.text.trim() === lone.headingPath[lone.headingPath.length - 1] &&
+			next &&
+			next[0].page === lone.page &&
+			!next[0].region
+		) {
+			next.unshift(lone);
+			continue;
+		}
+		sections.push(section);
 	}
 
 	for (const section of sections) {

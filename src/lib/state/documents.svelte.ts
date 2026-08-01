@@ -9,7 +9,7 @@ import type { DbInfo } from '$lib/local-db/worker';
 import { sha256Hex } from '$lib/pipeline/hash';
 import { chunkBlocks } from '$lib/pipeline/chunk';
 import { detectLanguage } from '$lib/pipeline/language';
-import { parseByName } from '$lib/pipeline/parse';
+import { parseWithLayout } from '$lib/pipeline/parse-with-layout';
 import { mergeParsedWithOcr } from '$lib/pipeline/pdf-text-quality';
 import { readOriginal } from '$lib/opfs';
 import type { EmbedApi } from '$lib/pipeline/embed-worker';
@@ -381,7 +381,7 @@ class DocumentsStore {
 			)) {
 				const data = await readOriginal(doc.hash);
 				if (!data) continue;
-				const parsed = await parseByName(doc.name, doc.mime, data);
+				const parsed = await parseWithLayout(doc.name, doc.mime, data);
 				if (!parsed.needsOcr?.length) continue;
 				await db.setDocumentStatus(doc.id, 'scanned');
 				this.setIngest(doc.id, { status: 'scanned', phaseProgress: 0 });
@@ -508,7 +508,7 @@ class DocumentsStore {
 
 			this.setIngest(id, { status: 'parsing', phaseProgress: 0 });
 			await db.setDocumentStatus(id, 'parsing');
-			const parsed = await parseByName(file.name, file.type, data);
+			const parsed = await parseWithLayout(file.name, file.type, data);
 			const needsOcr = parsed.needsOcr ?? [];
 
 			this.setIngest(id, { status: 'chunking', phaseProgress: 0 });
@@ -1055,7 +1055,7 @@ class DocumentsStore {
 				return;
 			}
 			this.setIngest(id, { status: 'parsing', phaseProgress: 0 });
-			const parsed = await parseByName(doc.name, doc.mime, data);
+			const parsed = await parseWithLayout(doc.name, doc.mime, data);
 			let blocks = parsed.blocks;
 			const needsOcr = parsed.needsOcr ?? [];
 			if (needsOcr.length) {
@@ -1133,11 +1133,11 @@ class DocumentsStore {
 		try {
 			this.setIngest(id, { status: 'ocr', phaseProgress: 0 });
 			await db.setDocumentStatus(id, 'ocr');
-			const parsed = await parseByName(doc.name, doc.mime, data);
+			const parsed = await parseWithLayout(doc.name, doc.mime, data);
 			const needsOcr = parsed.needsOcr ?? [];
 
 			const { ocrPages } = await import('$lib/pipeline/ocr');
-			// parseByName no longer detaches `data` (parsePdf slices), and ocrPages
+			// parseWithLayout no longer detaches `data` (parsePdf slices), and ocrPages
 			// slices again before its own getDocument, so reuse is safe.
 			const ocrBlocks = await ocrPages(
 				data,
@@ -1223,7 +1223,7 @@ class DocumentsStore {
 		const data = await file.arrayBuffer();
 		const hash = await sha256Hex(data);
 		try {
-			const parsed = await parseByName(file.name, file.type, data);
+			const parsed = await parseWithLayout(file.name, file.type, data);
 			let blocks = parsed.blocks;
 			const needsOcr = parsed.needsOcr ?? [];
 			if (needsOcr.length) {

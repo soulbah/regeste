@@ -9,6 +9,7 @@
 // all-or-nothing `scanned_pdf` throw that discarded the whole document.
 
 import type { ParsedDoc, ParsedBlock } from '$lib/types';
+import { layoutUncertain, splitByChrome, type LayoutRegion } from '../layout-model';
 import { orderPdfText, type ReconstructedLine } from './pdf-layout';
 import { normalizeFormMarks, type PositionedTextItem } from './pdf-form-marks';
 import { assessPdfTextLayer } from '../pdf-text-quality';
@@ -48,12 +49,16 @@ export function pageBlocks(lines: ReconstructedLine[], page: number): ParsedBloc
 	let offset = 0;
 	let heading: string | null = null;
 	for (let index = 0; index < lines.length; index++) {
-		const { text, retrievalContext } = lines[index];
-		if (isLikelyPdfSectionHeading(text, lines[index + 1]?.text ?? '')) heading = text.trim();
+		const { text, retrievalContext, region } = lines[index];
+		// Chrome never makes a heading and never inherits one: a legal footer
+		// under the body's last section is not part of that section.
+		if (!region && isLikelyPdfSectionHeading(text, lines[index + 1]?.text ?? ''))
+			heading = text.trim();
 		blocks.push({
 			text,
 			page,
-			headingPath: heading ? [heading] : undefined,
+			headingPath: !region && heading ? [heading] : undefined,
+			...(region ? { region } : {}),
 			// A table row's columns, named. Retrieval-only: `text` and the offsets
 			// stay exactly what the page says, so citations are unaffected.
 			...(retrievalContext ? { retrievalContext } : {}),
@@ -65,7 +70,49 @@ export function pageBlocks(lines: ReconstructedLine[], page: number): ParsedBloc
 	return blocks;
 }
 
-export async function parsePdf(data: ArrayBuffer): Promise<ParsedDoc> {
+export interface ParsePdfOptions {
+	/** Layout regions for one page, in PDF points, or null when unavailable.
+	 *  Wired to the OCR worker by parse-with-layout.ts; absent in unit tests and
+	 *  when the model cannot load — parsing then simply carries no regions. */
+	detectLayout?: (page: number) => Promise<LayoutRegion[] | null>;
+}
+
+/**
+ * Position-derived lines for one page, body first and chrome after.
+ *
+ * When the page trips a layout-uncertainty signal and a detector is wired,
+ * items are split by the model's own region boxes BEFORE ordering. Ordering
+ * body and chrome separately is what makes the old defect unrepresentable: a
+ * letter's closing sentence cannot read after its legal footer, and a
+ * signature block cannot glue to it, because they are never in the same
+ * sequence to begin with.
+ */
+export async function positionLines(
+	items: PositionedTextItem[],
+	pageWidth: number,
+	pageHeight: number,
+	pageNum: number,
+	options: ParsePdfOptions
+): Promise<ReconstructedLine[]> {
+	if (options.detectLayout && layoutUncertain(items, pageHeight)) {
+		const regions = await options.detectLayout(pageNum).catch(() => null);
+		if (regions?.length) {
+			const { body, chrome } = splitByChrome(items, regions, pageWidth, pageHeight);
+			return [
+				...orderPdfText(body, pageWidth),
+				...chrome.flatMap((group) =>
+					orderPdfText(group.items, pageWidth).map((line) => ({ ...line, region: group.label }))
+				)
+			];
+		}
+	}
+	return orderPdfText(items, pageWidth);
+}
+
+export async function parsePdf(
+	data: ArrayBuffer,
+	options: ParsePdfOptions = {}
+): Promise<ParsedDoc> {
 	const pdfjs = await import('pdfjs-dist');
 	const workerUrl = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default;
 	pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
@@ -91,6 +138,7 @@ export async function parsePdf(data: ArrayBuffer): Promise<ParsedDoc> {
 	// is document-wide (a glyph codepoint proven to be a checkbox on one page
 	// qualifies its lone instances everywhere).
 	const pageWidths: number[] = [];
+	const pageHeights: number[] = [];
 	const pagesPositioned: PositionedTextItem[][] = [];
 	/** Pages painted from a full-page raster whose text layer inks almost
 	 *  nothing: a scan carrying a worthless OCR layer (see pdf-scan.ts). */
@@ -99,6 +147,7 @@ export async function parsePdf(data: ArrayBuffer): Promise<ParsedDoc> {
 		const page = await doc.getPage(pageNum);
 		const viewport = page.getViewport({ scale: 1 });
 		pageWidths.push(viewport.width);
+		pageHeights.push(viewport.height);
 		const content = await page.getTextContent();
 		const pageArea = viewport.width * viewport.height;
 		// Coverage is free from the text items; the raster measurement walks every
@@ -148,9 +197,16 @@ export async function parsePdf(data: ArrayBuffer): Promise<ParsedDoc> {
 	const routedPages = await tableLinesByPage(data);
 	const normalizedPages = normalizeFormMarks(pagesPositioned);
 	for (let pageNum = 1; pageNum <= normalizedPages.length; pageNum++) {
-		const positioned = orderPdfText(normalizedPages[pageNum - 1], pageWidths[pageNum - 1]);
 		const routed = routedPages.get(pageNum);
-		const lines: ReconstructedLine[] = routed ? routed.map((text) => ({ text })) : positioned;
+		const lines: ReconstructedLine[] = routed
+			? routed.map((text) => ({ text }))
+			: await positionLines(
+					normalizedPages[pageNum - 1],
+					pageWidths[pageNum - 1],
+					pageHeights[pageNum - 1],
+					pageNum,
+					options
+				);
 		const text = lines
 			.map((line) => line.text)
 			.join('\n')

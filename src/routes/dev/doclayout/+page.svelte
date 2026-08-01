@@ -83,7 +83,8 @@
 
 	// Query parameters so a sweep can be driven from outside without clicking
 	// through a portalled menu: ?src=…&precision=fp16&device=webgpu&run=1
-	const params = typeof location === 'undefined' ? new URLSearchParams() : new URLSearchParams(location.search);
+	const params =
+		typeof location === 'undefined' ? new URLSearchParams() : new URLSearchParams(location.search);
 
 	let source = $state(params.get('src') ?? '/dev/owner/attestation-p1.png');
 	let pageNumber = $state(Number(params.get('page') ?? 1));
@@ -117,9 +118,9 @@
 	function looped(text: string): boolean {
 		const tags = text.match(/<(?:text|list_item)>[^<]*<\/(?:text|list_item)>/gu) ?? [];
 		if (tags.length < 8) return false;
-		const counts = new Map<string, number>();
-		for (const tag of tags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
-		return [...counts.values()].some((count) => count >= 5);
+		const counts: Record<string, number> = {};
+		for (const tag of tags) counts[tag] = (counts[tag] ?? 0) + 1;
+		return Object.values(counts).some((count) => count >= 5);
 	}
 
 	/** The half under test: image in, tagged structure out. Shared by both source
@@ -164,9 +165,12 @@
 		const completion = (
 			generated as { slice: (...args: unknown[]) => Parameters<typeof processor.batch_decode>[0] }
 		).slice(null, [inputs.input_ids.dims.at(-1), null]);
-		output = (processor.batch_decode(completion, { skip_special_tokens: false }) as string[])[0] ?? '';
+		output =
+			(processor.batch_decode(completion, { skip_special_tokens: false }) as string[])[0] ?? '';
 		timings = { load, render, generate };
-		status = looped(output) ? `LOOPED at ${precision} — unusable` : `done at ${precision} on ${device}`;
+		status = looped(output)
+			? `LOOPED at ${precision} — unusable`
+			: `done at ${precision} on ${device}`;
 		await model.dispose?.();
 	}
 
@@ -221,9 +225,11 @@
 
 	const tagCounts = $derived.by(() => {
 		const tags = output.match(/<([a-z_0-9]+)>/gu) ?? [];
-		const counts = new Map<string, number>();
-		for (const tag of tags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
-		return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12);
+		const counts: Record<string, number> = {};
+		for (const tag of tags) counts[tag] = (counts[tag] ?? 0) + 1;
+		return Object.entries(counts)
+			.sort((a, b) => b[1] - a[1])
+			.slice(0, 12);
 	});
 </script>
 

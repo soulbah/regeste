@@ -4,6 +4,14 @@ import { expose } from 'comlink';
 import { OCR_MODEL } from './ocr-model';
 import { shouldRetryOcr } from './ocr-quality';
 import { OCR_PADDING_HORIZONTAL, OCR_PADDING_VERTICAL, type OcrItem } from './ocr-boxes';
+import {
+	LAYOUT_CACHE,
+	LAYOUT_INPUT_SIZE,
+	LAYOUT_MODEL_URL,
+	LAYOUT_THRESHOLD,
+	regionsFromImage,
+	type LayoutRegion
+} from './layout-model';
 
 export interface OcrPageResult {
 	text: string;
@@ -117,27 +125,87 @@ async function closeDocument(): Promise<void> {
 	if (pending) await pending.destroy().catch(() => undefined);
 }
 
-/** Render one page at the given scale and recognise it, without the bitmap ever
- *  leaving this thread. */
-async function recognizePage(pageNumber: number, scale: number): Promise<OcrPageResult> {
-	if (!documentPromise) throw new Error('No document is open for recognition');
+async function renderPage(pageNumber: number, scale: number): Promise<OffscreenCanvas> {
+	if (!documentPromise) throw new Error('No document is open');
 	const doc = await documentPromise;
 	const page = await doc.getPage(pageNumber);
-	let canvas: OffscreenCanvas;
 	try {
 		const viewport = page.getViewport({ scale });
-		canvas = new OffscreenCanvas(
+		const canvas = new OffscreenCanvas(
 			Math.max(1, Math.ceil(viewport.width)),
 			Math.max(1, Math.ceil(viewport.height))
 		);
 		const context = canvas.getContext('2d');
-		if (!context) throw new Error('Could not create a worker 2D context for OCR');
+		if (!context) throw new Error('Could not create a worker 2D context');
 		context.fillStyle = '#ffffff';
 		context.fillRect(0, 0, canvas.width, canvas.height);
 		await page.render({ canvas, canvasContext: context, viewport } as never).promise;
+		return canvas;
 	} finally {
 		page.cleanup();
 	}
+}
+
+let layoutPromise: Promise<import('ppu-doclayout/web').DocLayoutService> | null = null;
+
+/**
+ * The layout detector, loaded once and fed model bytes we cache ourselves.
+ *
+ * The service is handed an ArrayBuffer rather than a URL for two reasons that
+ * are both measured, not stylistic: its URL path refetches 213 MB every
+ * session (the Cache API bucket makes it once per origin), and its
+ * ArrayBuffer-input `analyze` path dynamic-imports the NODE canvas package
+ * even from the /web build — bytes for the model plus a canvas for the image
+ * are the two inputs that avoid every broken path.
+ */
+function getLayoutService(): Promise<import('ppu-doclayout/web').DocLayoutService> {
+	if (!layoutPromise) {
+		layoutPromise = (async () => {
+			const cache = await caches.open(LAYOUT_CACHE);
+			let response = await cache.match(LAYOUT_MODEL_URL);
+			if (!response) {
+				await cache.add(LAYOUT_MODEL_URL);
+				response = (await cache.match(LAYOUT_MODEL_URL))!;
+			}
+			const model = await response.arrayBuffer();
+			const { DocLayoutService } = await import('ppu-doclayout/web');
+			installCanvasCompatibility();
+			const service = new DocLayoutService({
+				model: { model },
+				// Both non-defaults, both load-bearing; see layout-model.ts.
+				detection: { threshold: LAYOUT_THRESHOLD, modelInputSize: LAYOUT_INPUT_SIZE },
+				debugging: { debug: false, verbose: false }
+			});
+			await service.initialize();
+			return service;
+		})().catch((error) => {
+			layoutPromise = null;
+			throw error;
+		});
+	}
+	return layoutPromise;
+}
+
+/**
+ * Layout regions for one page, in PDF points, top-left origin.
+ *
+ * Rendering happens here for the same reason recognition does: a hidden tab
+ * starves the main thread of animation frames and pdf.js never finishes. The
+ * caller never sees the bitmap, only the regions.
+ */
+async function detectLayout(pageNumber: number, scale: number): Promise<LayoutRegion[]> {
+	const canvas = await renderPage(pageNumber, scale);
+	const service = await getLayoutService();
+	const result = (await service.analyze(canvas as never)) as {
+		boxes?: Array<{ label: string; score: number; box: number[] }>;
+	};
+	return regionsFromImage(result.boxes ?? [], scale);
+}
+
+/** Render one page at the given scale and recognise it, without the bitmap ever
+ *  leaving this thread. */
+async function recognizePage(pageNumber: number, scale: number): Promise<OcrPageResult> {
+	const canvas = await renderPage(pageNumber, scale);
 
 	const service = await getService();
 	let result = await service.recognize(canvas, { flatten: false, noCache: true });
@@ -164,7 +232,7 @@ async function recognizePage(pageNumber: number, scale: number): Promise<OcrPage
 	};
 }
 
-const api = { openDocument, recognizePage, closeDocument };
+const api = { openDocument, recognizePage, detectLayout, closeDocument };
 export type OcrWorkerApi = typeof api;
 
 expose(api);

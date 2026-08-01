@@ -40,6 +40,10 @@ export interface ParsedBlock {
 	headingPath?: string[];
 	/** 0-based paragraph index within the document (DOCX/MD). */
 	paraIndex?: number;
+	/** Layout-model region class (spec 034): set on page-chrome blocks (footer,
+	 *  header, aside_text, number) so the chunker keeps them out of the body
+	 *  flow. Absent means body. */
+	region?: string;
 	/** Char offsets within the block's page (PDF) or the full document text (others). */
 	charStart: number;
 	charEnd: number;

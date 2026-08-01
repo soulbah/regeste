@@ -42,11 +42,10 @@ const service = new DocLayoutService({
 const initialised = Date.now();
 await service.initialize();
 const ready = Date.now();
-const regions = (await service.analyze(await readFile(page))) as Array<{
-	label: string;
-	score: number;
-	box: [number, number, number, number];
-}>;
+const result = (await service.analyze(await readFile(page))) as {
+	boxes?: Array<{ label: string; score: number; box: [number, number, number, number] }>;
+};
+const regions = result.boxes ?? [];
 
 console.log(
 	`init ${((ready - initialised) / 1000).toFixed(1)}s · analyse ${((Date.now() - ready) / 1000).toFixed(1)}s · ${regions.length} regions @ threshold ${threshold}\n`

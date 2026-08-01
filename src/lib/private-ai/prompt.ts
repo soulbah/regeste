@@ -3,7 +3,7 @@
 // retrieved set after generation — an invalid [n] is silently dropped.
 
 import type { SearchHit } from '$lib/types';
-import { queryCoverage, roleHeadOf, splitQueryClauses } from '$lib/pipeline/retrieval';
+import { queryCoverage, splitQueryClauses } from '$lib/pipeline/retrieval';
 import { analyzeQuestion } from '$lib/analysis/query-router';
 import {
 	extractIdentifiers,
@@ -215,19 +215,15 @@ export function buildEvidenceInventory(
 			if (!carriesNoValue(line)) continue;
 			for (const rawNeighbour of [rawLines[index - 1], rawLines[index + 1]]) {
 				if (!rawNeighbour) continue;
-				let neighbour = rawNeighbour;
+				const neighbour = rawNeighbour;
+				// A long or sentence-shaped neighbour is prose, not a label. The
+				// glued-footer repair that used to salvage its head is gone with the
+				// glue itself: chrome is split off at parse time now (spec 034).
 				if (
 					neighbour.split(/\s+/u).filter(Boolean).length > 8 ||
 					/[.!?»]\s*$/u.test(neighbour.trim())
-				) {
-					// The parser can glue the line this one binds to onto the letter's
-					// legal footer ("Votre Directeur d'Agence Caisse Régionale de …"),
-					// and the whole run fails the length test while its head is exactly
-					// the label being looked for. Keep the head, drop the boilerplate.
-					const head = roleHeadOf(neighbour);
-					if (!head) continue;
-					neighbour = head;
-				}
+				)
+					continue;
 				neighbourJoined.push(
 					rawNeighbour === rawLines[index - 1] ? `${neighbour} ${line}` : `${line} ${neighbour}`
 				);

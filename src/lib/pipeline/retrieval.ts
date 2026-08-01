@@ -797,27 +797,6 @@ const PERSON_ROLE_ASKED =
 const ORGANISATION_TOKEN =
 	/\b(?:societe|caisse|banque|credit|mutuel(?:le)?|assurances?|groupe|agence|cabinet|etablissement|sarl|selarl|sasu?|eurl|sci|scp|rcs|siren|siret|france)\b/iu;
 
-/** Corporate boilerplate openers: where a letter's legal footer begins when the
- * parser glued it onto the line above ("Votre Directeur d'Agence Caisse
- * Régionale de …"). */
-const CORPORATE_BOILERPLATE =
-	/\b(?:soci[eé]t[eé]|caisse|banque|s\.?\s?a\.?\s?r\.?\s?l|selarl|s\.?\s?a\.?\s?s|e\.?\s?u\.?\s?r\.?\s?l|s\.?\s?c\.?\s?i|rcs|siren|siret|capital|immatricul\w*|si[eè]ge\s+social)\b/iu;
-
-/** The short head of a line whose tail is corporate boilerplate, or null when
- * the line does not divide that way. */
-export function roleHeadOf(line: string): string | null {
-	const match = CORPORATE_BOILERPLATE.exec(line);
-	if (!match || match.index < 4) return null;
-	const head = line
-		.slice(0, match.index)
-		.replace(/[\s,;·–—-]+$/u, '')
-		.trim();
-	const words = head.split(/\s+/u).filter(Boolean);
-	if (words.length < 2 || words.length > 8) return null;
-	if (/\d/u.test(head) || /[.!?»:]\s*$/u.test(head)) return null;
-	return head;
-}
-
 /** Honorifics a letter puts before a name; part of the name's shape, not of
  * the name itself. */
 const HONORIFIC = /^(?:m\.|mr\.?|mme|mlle|dr\.?|me|ma[iî]tre|monsieur|madame|mademoiselle)\s+/iu;
@@ -899,9 +878,10 @@ export function personRoleCarrier(query: string, text: string): string | null {
 	);
 	const [roleHead, ...roleQualifiers] = roleTokens;
 	const isRoleLine = (line: string): boolean => {
-		const candidate =
-			line.split(/\s+/u).filter(Boolean).length > 8 ? (roleHeadOf(line) ?? line) : line;
-		const normalized = normalizeForFuzzy(candidate);
+		// Spec 034 deleted the glued-footer repair that used to trim long lines
+		// here: page chrome is split off by detected regions before ordering, so
+		// a role line arrives bare. A long line is simply prose.
+		const normalized = normalizeForFuzzy(line);
 		// The head names the seat and must be on the line; a qualifier the
 		// document's own letterhead accounts for is not evidence against it.
 		if (!normalized.includes(roleHead)) return false;
@@ -924,10 +904,8 @@ export function personRoleCarrier(query: string, text: string): string | null {
 	 * bound by that line whatever its shape.
 	 */
 	const isBareRoleLine = (line: string): boolean => {
-		const candidate =
-			line.split(/\s+/u).filter(Boolean).length > 8 ? (roleHeadOf(line) ?? '') : line;
-		if (!candidate) return false;
-		return !/\d/u.test(candidate) && !/[.!?;]\s*$/u.test(candidate.trim());
+		if (line.split(/\s+/u).filter(Boolean).length > 8) return false;
+		return !/\d/u.test(line) && !/[.!?;]\s*$/u.test(line.trim());
 	};
 
 	for (const [index, line] of lines.entries()) {

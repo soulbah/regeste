@@ -73,10 +73,10 @@ owner's attestation comes back correct and fully tagged at fp32/q8) and the
 
 Measured on the same two French pages, same Mac:
 
-| runtime                      | attestation | dense fee page |
-| ---------------------------- | ----------- | -------------- |
+| runtime                       | attestation | dense fee page |
+| ----------------------------- | ----------- | -------------- |
 | transformers.js ORT-WebGPU q8 | 20.0 s      | 123.6 s        |
-| llama.cpp native (BF16 GGUF) | **6.4 s**   | **8.3 s**      |
+| llama.cpp native (BF16 GGUF)  | **6.4 s**   | **8.3 s**      |
 
 Both native timings INCLUDE model load. Reported llama.cpp throughput for this
 model is [~500 tok/s on a 4090](https://huggingface.co/ibm-granite/granite-docling-258M/discussions/16);
@@ -103,7 +103,6 @@ Where this leaves the architecture: PP-DocLayout stays the cheap always-on
 layer (0.9 s/page, 130 MB, no decoder to loop), and granite-docling through
 wllama becomes the candidate for the pages a detector cannot settle — shaded
 tables with no ruling, scans, and anything where list nesting matters.
-
 
 ---
 

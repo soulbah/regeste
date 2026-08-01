@@ -18,6 +18,7 @@ import { guardWorker } from '$lib/state/worker-health.svelte';
 import { positionedFromOcrLines } from './ocr-boxes';
 import { orderPdfText } from './parse/pdf-layout';
 import { pageBlocks } from './parse/pdf';
+import { splitByChrome, type LayoutRegion } from './layout-model';
 
 export interface OcrProgress {
 	page: number;
@@ -61,15 +62,28 @@ export function ocrPageBlocks(
 		imageHeight: number;
 		lines: import('./ocr-boxes').OcrItem[][];
 	},
-	page: number
+	page: number,
+	regions: LayoutRegion[] = []
 ): ParsedBlock[] {
 	const positioned = positionedFromOcrLines(result.lines ?? [], {
 		imageHeight: result.imageHeight,
 		scale: OCR_DPI_SCALE
 	});
-	const laidOut = positioned.length
-		? pageBlocks(orderPdfText(positioned, result.imageWidth / OCR_DPI_SCALE), page)
+	const pageWidth = result.imageWidth / OCR_DPI_SCALE;
+	const pageHeight = result.imageHeight / OCR_DPI_SCALE;
+	// Same contract as a born-digital page (spec 034): chrome is split off by
+	// the detector's boxes before ordering, so a scanned letter's legal footer
+	// cannot glue to its signature either.
+	const { body, chrome } = splitByChrome(positioned, regions, pageWidth, pageHeight);
+	const lines = positioned.length
+		? [
+				...orderPdfText(body, pageWidth),
+				...chrome.flatMap((group) =>
+					orderPdfText(group.items, pageWidth).map((line) => ({ ...line, region: group.label }))
+				)
+			]
 		: [];
+	const laidOut = lines.length ? pageBlocks(lines, page) : [];
 	if (laidOut.length)
 		return laidOut.map((block) => ({ ...block, ocrConfidence: result.confidence }));
 	const text = result.text;
@@ -99,7 +113,12 @@ export async function ocrPages(
 		for (const pageNum of pageNumbers) {
 			await yieldToMain();
 			if (signal?.aborted) throw new DOMException('OCR cancelled', 'AbortError');
-			out.push(...ocrPageBlocks(await api.recognizePage(pageNum, OCR_DPI_SCALE), pageNum));
+			const recognized = await api.recognizePage(pageNum, OCR_DPI_SCALE);
+			// The page bitmap already exists in the worker for recognition, so the
+			// regions are nearly free here. A failed model load degrades to no
+			// regions, never to a failed page.
+			const regions = await api.detectLayout(pageNum, OCR_DPI_SCALE).catch(() => []);
+			out.push(...ocrPageBlocks(recognized, pageNum, regions));
 			done++;
 			onProgress?.({ page: pageNum, done, total: pageNumbers.length });
 		}
@@ -108,4 +127,39 @@ export async function ocrPages(
 	}
 
 	return out;
+}
+
+/**
+ * A layout detector bound to one document, for the born-digital parse.
+ *
+ * `parsePdf` runs on the main thread and only reads text; rasterisation lives
+ * in the OCR worker (see ocr-worker.ts for why a hidden tab forces that). This
+ * client opens the document in that worker on the first uncertain page, serves
+ * every subsequent page from the same open document, and must be disposed by
+ * the caller. A model that cannot load resolves to null: parsing proceeds with
+ * no regions rather than failing the document.
+ */
+export function createLayoutDetector(data: ArrayBuffer): {
+	detect: (page: number) => Promise<LayoutRegion[] | null>;
+	dispose: () => Promise<void>;
+} {
+	const api = getOcrWorker();
+	let opened: Promise<unknown> | null = null;
+	return {
+		async detect(page) {
+			try {
+				if (!opened) {
+					const owned = data.slice(0);
+					opened = api.openDocument(transfer(owned, [owned]));
+				}
+				await opened;
+				return await api.detectLayout(page, OCR_DPI_SCALE);
+			} catch {
+				return null;
+			}
+		},
+		async dispose() {
+			if (opened) await api.closeDocument().catch(() => undefined);
+		}
+	};
 }

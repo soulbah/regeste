@@ -8,6 +8,7 @@ import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import fuzzyManifest from './benchmarks/fuzzy-corpus-manifest.json';
+import { fileURLToPath } from 'node:url';
 import type { Plugin } from 'vite';
 
 const FUZZY_FIXTURE_PREFIX = '/dev/fuzzy-public/';
@@ -36,9 +37,12 @@ function localBenchmarkFixtures(): Plugin {
 			server.middlewares.use(async (req, res, next) => {
 				try {
 					const pathname = new URL(req.url ?? '/', 'http://localhost').pathname;
-					const prefix = [FUZZY_FIXTURE_PREFIX, PRIVATE_FIXTURE_PREFIX, PARSER_AB_PREFIX, OWNER_PREFIX].find(
-						(candidate) => pathname.startsWith(candidate)
-					);
+					const prefix = [
+						FUZZY_FIXTURE_PREFIX,
+						PRIVATE_FIXTURE_PREFIX,
+						PARSER_AB_PREFIX,
+						OWNER_PREFIX
+					].find((candidate) => pathname.startsWith(candidate));
 					if (!prefix) return next();
 					const directory = {
 						[FUZZY_FIXTURE_PREFIX]: fuzzyFixtureDirectory,
@@ -130,7 +134,12 @@ export default defineConfig({
 		// this server's watcher read as a config change and answered with a
 		// full-reload of every client — killing any long browser run (the 117
 		// benchmark died twice at exactly those timestamps).
-		watch: { ignored: ['**/.claude/**'] },
+		//
+		// The blanket pattern also matches EVERY file of a server running inside
+		// a worktree (they live under .claude/worktrees), which silently killed
+		// HMR there and made each edit require a restart. Ignore only worktrees
+		// nested BELOW the running root, never the root's own files.
+		watch: { ignored: [`${import.meta.dirname}/.claude/**`] },
 		// Cross-origin isolation (spec 018): worker scripts are served by vite,
 		// not hooks.server.ts, and COEP blocks a worker whose own response lacks
 		// the headers. Prod equivalent lives in static/_headers.
@@ -145,9 +154,32 @@ export default defineConfig({
 			'Cross-Origin-Embedder-Policy': 'credentialless'
 		}
 	},
+	resolve: {
+		alias: {
+			// ppu-doclayout's ArrayBuffer path dynamic-imports the NODE canvas
+			// package; unreachable here (we always pass a canvas), but the
+			// production bundler still tries to read its native binary as JS.
+			'ppu-ocv/canvas': fileURLToPath(
+				new URL('./src/lib/pipeline/ppu-canvas-stub.ts', import.meta.url)
+			),
+			'@napi-rs/canvas': fileURLToPath(
+				new URL('./src/lib/pipeline/ppu-canvas-stub.ts', import.meta.url)
+			)
+		}
+	},
 	optimizeDeps: {
 		// Pre-bundling breaks these packages' runtime asset resolution (wasm/onnx).
-		exclude: ['sqlite-vec-wasm-demo', '@huggingface/transformers', 'pdfjs-dist']
+		// ppu-doclayout and ppu-ocv additionally drag in @napi-rs/canvas, a native
+		// node addon their /web entry never touches at runtime, and rolldown dies
+		// trying to read the .node binary as JS.
+		exclude: [
+			'sqlite-vec-wasm-demo',
+			'@huggingface/transformers',
+			'pdfjs-dist',
+			'ppu-doclayout',
+			'ppu-ocv',
+			'@napi-rs/canvas'
+		]
 	},
 	test: {
 		expect: { requireAssertions: true },
