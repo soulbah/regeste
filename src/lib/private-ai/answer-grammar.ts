@@ -15,18 +15,28 @@
  * needs no vocabulary describing how a model misbehaves.
  */
 
+/** The switch a benchmark run flips, so the two configurations can be compared
+ *  in one session without a rebuild. */
+export const ANSWER_GRAMMAR_KEY = 'regeste:answer-grammar';
+
 /**
  * Is the decoder constrained on targeted answers?
  *
  * Off until the stress benchmark has been run both ways. The grammar removes
  * whole classes of structural defect, but it also forces a citation onto every
  * sentence, and [format restrictions are measured to cost reasoning quality on
- * some tasks](https://arxiv.org/pdf/2408.02442). Flipping this without the
- * numbers would be trading a known problem for an unknown one.
- *
- * The dev pipeline page can turn it on for a run so the two can be compared.
+ * some tasks](https://arxiv.org/pdf/2408.02442). Flipping the default without
+ * the numbers would trade a known problem for an unknown one.
  */
-export const ANSWER_GRAMMAR_ENABLED = false;
+export function answerGrammarEnabled(): boolean {
+	if (typeof localStorage === 'undefined') return false;
+	try {
+		return localStorage.getItem(ANSWER_GRAMMAR_KEY) === 'on';
+	} catch {
+		// A locked-down browser refusing storage is not a reason to fail a turn.
+		return false;
+	}
+}
 
 export interface AnswerGrammarOptions {
 	/** How many excerpts are in the prompt. Citation indices are drawn from

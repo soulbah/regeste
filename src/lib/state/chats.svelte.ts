@@ -44,7 +44,7 @@ import { hasAnswerBearingEvidence } from '$lib/pipeline/relevance';
 import { retrieveWithLocalQueryFallback } from '$lib/pipeline/query-translation';
 import { buildAuditedExtractiveAnswer } from '$lib/private-ai/extractive-answer';
 import { generateWithContextFit } from '$lib/private-ai/context-fit';
-import { ANSWER_GRAMMAR_ENABLED, buildAnswerGrammar } from '$lib/private-ai/answer-grammar';
+import { answerGrammarEnabled, buildAnswerGrammar } from '$lib/private-ai/answer-grammar';
 import {
 	SYSTEM_PROMPT,
 	buildAmountValuePrompt,
@@ -963,7 +963,7 @@ class ChatsStore {
 			// grammar admits, and off until the stress benchmark says the shape costs
 			// no quality: forcing a citation onto every sentence can push a model into
 			// citing what it should have left alone.
-			if (ANSWER_GRAMMAR_ENABLED && options.reasoning === 'off' && hits.length)
+			if (answerGrammarEnabled() && options.reasoning === 'off' && hits.length)
 				options.grammar = buildAnswerGrammar({
 					excerptCount: hits.length,
 					refusal: groundedRefusal(question)
