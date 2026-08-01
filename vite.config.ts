@@ -154,6 +154,13 @@ export default defineConfig({
 			'Cross-Origin-Embedder-Policy': 'credentialless'
 		}
 	},
+	ssr: {
+		// The SSR build externalizes dependencies, which leaves a literal
+		// import of ppu-doclayout in the server bundle for wrangler's esbuild to
+		// chase into @napi-rs/canvas's native binary. Bundling them here lets the
+		// alias below replace that path with the stub.
+		noExternal: ['ppu-doclayout', 'ppu-ocv']
+	},
 	resolve: {
 		alias: {
 			// ppu-doclayout's ArrayBuffer path dynamic-imports the NODE canvas
