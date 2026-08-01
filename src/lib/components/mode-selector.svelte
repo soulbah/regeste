@@ -100,12 +100,6 @@
 	);
 
 	const current = $derived(mode ? modes.find((m) => m.id === mode) : null);
-	// Download progress stays visible from the pill (owner amendment).
-	const pillProgress = $derived(
-		mode === 'private' && current?.readiness.state === 'progress' && current.readiness.pct > 0
-			? current.readiness.pct
-			: null
-	);
 
 	function pick(m: (typeof modes)[number]) {
 		switch (m.readiness.state) {
@@ -175,11 +169,11 @@
 	<Popover.Root bind:open>
 		<Popover.Trigger>
 			{#snippet child({ props })}
+				<!-- One download, one number: the progress card above the input owns
+				     it. The pill stayed a place people read a percentage that was
+				     already written twice within the same viewport. -->
 				<Button {...props} variant="ghost" size="sm" class="gap-1.5">
 					{current ? current.label : t('modes.choose')}
-					{#if pillProgress !== null}
-						<span class="text-muted-foreground text-xs tabular-nums">· {pillProgress}%</span>
-					{/if}
 					<ChevronDownIcon class="text-muted-foreground size-3.5!" />
 				</Button>
 			{/snippet}

@@ -142,7 +142,6 @@ export const en = {
 	'onboard.cost.download': 'One-time download · {size}',
 	'onboard.cost.signIn': 'Sign in · nothing to install',
 	'onboard.cost.endpoint': 'Your own server · nothing to install',
-	'onboard.downloading': 'Downloading. Add a document while you wait.',
 	'llm.steppedDown': 'That model did not fit this device. A smaller one is downloading, {size}.',
 	'onboard.unfinished': 'Finish setting up to get answers.',
 	'onboard.resume': 'Finish',
@@ -343,6 +342,7 @@ export const en = {
 	'docsPage.introAction': 'Add a document to a chat to start asking questions.',
 	'docsPage.add': 'Add documents',
 	'docsPage.drop': 'Drop to add to your library',
+	'docsPage.sortAria': 'Sort documents',
 	'docsPage.sortRecent': 'Most recent',
 	'docsPage.sortName': 'Name',
 	'docsPage.sortSize': 'Size',
@@ -415,7 +415,7 @@ export const en = {
 	'settings.title': 'Settings',
 	'settings.subtitle': 'Storage · privacy · offline',
 	'advisory.eviction':
-		'This browser has not committed to keeping your documents, so it may clear them to reclaim space. Installing the app, or allowing storage, settles it.',
+		'This browser may clear your documents to reclaim space. Ask it to keep them from Settings, or export your workspace.',
 	'update.ready': 'A new version is ready.',
 	'update.cta': 'Reload',
 	'settings.storage.title': 'Storage',
@@ -513,7 +513,7 @@ export const en = {
 		'A private window keeps nothing once you close it. Chrome and Edge still let documents be added there and read normally, so nothing looks wrong until the window closes and the whole library goes with it. Firefox and Safari refuse the storage from the start, which at least fails where you can see it.',
 	'help.privateWindow.fix1': 'Open the app in a normal window and add your documents again.',
 	'help.privateWindow.fix2':
-		'In a normal window, Settings then Data reads Persistent once the browser has committed to keeping your library.',
+		'In a normal window, Settings then Data reads Persistent once the browser has agreed to keep your library.',
 	'help.privateWindow.fix3':
 		'If you cannot leave the private window, export your workspace from Settings before closing it.',
 	'help.tabs.title': 'Open in another tab',

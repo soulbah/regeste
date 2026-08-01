@@ -52,29 +52,28 @@
 		myai: 'onboard.needEndpoint'
 	} as const;
 	/**
-	 * Preparing an on-device model is two stages, and only the first has a
-	 * percentage.
+	 * Work in progress is not this line's job.
 	 *
-	 * The weights download, then they are compiled and uploaded to the GPU,
-	 * which reports nothing and can take another minute on a large model.
-	 * Showing "Downloading… 100%" through that second stage says the work is
-	 * finished when it is not, and the number sitting still is exactly what
-	 * makes a wait feel broken.
+	 * A model download used to be reported here too, with a filled bar across
+	 * the whole line and the percentage at its end — while the same download was
+	 * already named, sized and drawn directly above the input by
+	 * `background-work.svelte`, and again on the mode pill. One download, two
+	 * bars, three percentages. This line keeps the one thing the other surfaces
+	 * cannot say: what is missing, and the button that goes and fixes it.
 	 */
-	const preparingLoad = $derived(pendingMode === 'private' && llmStore.status === 'loading');
+	const preparing = $derived(
+		pendingMode === 'private' &&
+			(llmStore.status === 'downloading' || llmStore.status === 'loading')
+	);
 	const setupLine = $derived.by(() => {
 		if (!pendingMode) return '';
 		const readiness = modeReadiness(pendingMode);
-		if (preparingLoad) return t('modes.private.loading');
 		// The size on the card and the size now arriving are different numbers, and
 		// nobody would guess why. Said once, on the line that is already there.
 		if (llmStore.steppedDownTo)
 			return t('llm.steppedDown', { size: llmStore.steppedDownTo.downloadLabel });
-		if (home.downloadPct !== null) return t('onboard.downloading');
 		return readiness.blockedLine ?? t(NEEDS[pendingMode]);
 	});
-	/** Only while bytes are actually arriving. */
-	const showPct = $derived(home.downloadPct !== null && !preparingLoad);
 	/** "Sign in" or "Set up", from the same verdict the picker reads. */
 	const setupAction = $derived(pendingMode ? t(modeReadiness(pendingMode).setupKey) : '');
 
@@ -261,49 +260,30 @@
 		</div>
 	</div>
 
-	<!-- Setting up and adding a document run side by side, so the wait is spent
-	     rather than watched. Quiet, persistent, never a modal. -->
-	{#if pendingMode}
+	<!-- What is still missing, and the button that fixes it. Silent while the
+	     model is arriving: that work is named, sized and drawn once, above the
+	     input, and repeating it here put a second bar on the same download. -->
+	{#if pendingMode && !preparing}
 		<div class="px-6 pb-2">
 			<div
 				class="border-border bg-card/40 text-muted-foreground relative mx-auto flex max-w-3xl items-center gap-3 overflow-hidden rounded-lg border px-3 py-2 text-xs"
 			>
-				{#if showPct}
-					<!-- The progress fills the line itself rather than sitting beside it
-					     as a number. Gigabytes take minutes, and a bar that visibly
-					     advances is what tells someone the wait is finite. -->
-					<div
-						class="bg-accent-foreground/10 absolute inset-y-0 left-0 transition-[width] duration-500"
-						style="width: {home.downloadPct}%"
-					></div>
-				{:else if preparingLoad}
-					<!-- No percentage exists for the GPU stage, so the line sweeps
-					     instead of freezing at a number that has stopped meaning
-					     anything. -->
-					<div class="setup-sweep bg-accent-foreground/10 absolute inset-y-0 w-1/3"></div>
-				{/if}
 				<span class="relative flex-1 text-left">{setupLine}</span>
-				{#if showPct}
-					<span class="relative tabular-nums">{home.downloadPct}%</span>
-				{:else if preparingLoad}
-					<span class="relative"></span>
-				{:else}
-					<!-- The same routing the picker uses, so the button lands where the
-					     blocker actually is: the sign-in page for Cloud, the mode's
-					     Settings card for the two that have configuration. -->
-					<Button
-						variant="ghost"
-						size="sm"
-						onclick={() =>
-							pendingMode &&
-							dispatchMode(pendingMode, (m) => {
-								modeTouched = true;
-								mode = m;
-							})}
-					>
-						{setupAction}
-					</Button>
-				{/if}
+				<!-- The same routing the picker uses, so the button lands where the
+				     blocker actually is: the sign-in page for Cloud, the mode's
+				     Settings card for the two that have configuration. -->
+				<Button
+					variant="ghost"
+					size="sm"
+					onclick={() =>
+						pendingMode &&
+						dispatchMode(pendingMode, (m) => {
+							modeTouched = true;
+							mode = m;
+						})}
+				>
+					{setupAction}
+				</Button>
 			</div>
 		</div>
 	{/if}
@@ -327,27 +307,3 @@
 		</div>
 	{/if}
 </div>
-
-<style>
-	/* The GPU stage reports no progress, so the line sweeps to say the work is
-	   still moving. Slow on purpose: a fast shuttle reads as agitation. */
-	.setup-sweep {
-		animation: setup-sweep 1900ms ease-in-out infinite;
-	}
-
-	@keyframes setup-sweep {
-		from {
-			transform: translateX(-100%);
-		}
-		to {
-			transform: translateX(300%);
-		}
-	}
-
-	@media (prefers-reduced-motion: reduce) {
-		.setup-sweep {
-			animation: none;
-			width: 100%;
-		}
-	}
-</style>

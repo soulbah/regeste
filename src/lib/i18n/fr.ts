@@ -135,7 +135,6 @@ export const fr: Record<keyof typeof en, string> = {
 	'onboard.cost.download': 'Téléchargement unique · {size}',
 	'onboard.cost.signIn': 'Connexion · rien à installer',
 	'onboard.cost.endpoint': 'Votre propre serveur · rien à installer',
-	'onboard.downloading': 'Téléchargement en cours. Ajoutez un document en attendant.',
 	'llm.steppedDown':
 		'Ce modèle ne tenait pas sur cet appareil. Un plus petit se télécharge, {size}.',
 	'onboard.unfinished': 'Terminez la configuration pour obtenir des réponses.',
@@ -339,6 +338,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'docsPage.introAction': 'Ajoutez un document à une discussion pour poser vos questions.',
 	'docsPage.add': 'Ajouter des documents',
 	'docsPage.drop': 'Déposez pour ajouter à votre bibliothèque',
+	'docsPage.sortAria': 'Trier les documents',
 	'docsPage.sortRecent': 'Plus récents',
 	'docsPage.sortName': 'Nom',
 	'docsPage.sortSize': 'Taille',
@@ -412,7 +412,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'settings.title': 'Réglages',
 	'settings.subtitle': 'Stockage · confidentialité · hors ligne',
 	'advisory.eviction':
-		'Ce navigateur ne s’est pas engagé à conserver vos documents, il peut donc les effacer pour récupérer de la place. Installer l’application, ou autoriser le stockage, règle la question.',
+		'Ce navigateur peut effacer vos documents pour récupérer de la place. Demandez-lui de les conserver depuis les réglages, ou exportez votre espace de travail.',
 	'update.ready': 'Une nouvelle version est prête.',
 	'update.cta': 'Recharger',
 	'settings.storage.title': 'Stockage',
@@ -515,7 +515,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'help.privateWindow.fix1':
 		'Ouvrez l’application dans une fenêtre normale, puis ajoutez vos documents à nouveau.',
 	'help.privateWindow.fix2':
-		'Dans une fenêtre normale, Réglages puis Données affiche « Persistant » dès que le navigateur s’est engagé à conserver votre bibliothèque.',
+		'Dans une fenêtre normale, Réglages puis Données affiche « Persistant » dès que le navigateur a accepté de conserver votre bibliothèque.',
 	'help.privateWindow.fix3':
 		'Si vous ne pouvez pas quitter la fenêtre privée, exportez votre espace de travail depuis les Réglages avant de la fermer.',
 	'help.tabs.title': 'Déjà ouvert dans un autre onglet',
