@@ -57,7 +57,32 @@ letterhead) or deleted with the correction it serves.
 
 ## The three replacement mechanisms
 
-### 1. Prototype embeddings, for Type B
+### 0. First ask whether it must exist at all
+
+Measured 2026-08-01, before writing any of the rest: a prototype classifier on
+the embedder we already ship scores **12/41** against the word lists' **25/41**,
+and its ceiling with the best gate pair found by sweep is **27/41 with no gates
+at all**, which means never abstaining. Two questions of difference on 41 is
+noise.
+
+The cause is the encoder, and it is structural rather than fixable by writing
+better examples: `multilingual-e5-small` is an asymmetric RETRIEVAL encoder,
+trained to bring a query close to a PASSAGE and never to another query. Every
+short interrogative sentence lands in the same cone, so cosines compress into
+0.83-0.99 where nothing separates. Centring the space spreads them to 0.20-0.46
+and the ranking barely moves, because separation that is not in the geometry
+cannot be recovered from it.
+
+The lesson is larger than the number. A classic RAG has no question-intent
+classifier. Ours exists only to trigger corrections, and the corrections exist
+only because the decoder may emit anything. Porting the word lists to embeddings
+would build a more expensive version of the thing this spec exists to remove.
+
+So: delete first, constrain the decoder second, and reach for prototypes only
+for what genuinely survives both, measuring again then with the encoder choice
+reopened. `scripts/intent-calibration.ts` stays as the instrument that decides.
+
+### 1. Prototype embeddings, for what survives both
 
 The question is already encoded for retrieval and cached in
 `QueryEmbeddingCache`. Classifying it is a dot product per class, not a forward
@@ -111,18 +136,18 @@ need a list of company-law nouns.
 
 ## Phases, each with its own gate
 
-| #   | What                                                                  | Gate                                                                |
-| --- | --------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| 0   | Baseline: run the stress benchmark, record every answer group         | the numbers exist                                                   |
-| 1   | `intent-prototypes.ts` + calibration harness                          | classifies the benchmark's questions at or above the regex baseline |
-| 2   | Type B migration, file by file, deleting each list as its class lands | no regression per file                                              |
-| 3   | Decoding grammar behind a flag, both runtimes                         | quality at or above baseline, latency measured                      |
-| 4   | Type C deletion, once the grammar carries it                          | no regression                                                       |
-| 5   | Type D case by case                                                   | no regression                                                       |
-| 6   | A lint rule that fails the build on a new word-list regex             | it catches a planted one                                            |
+| #   | What                                                                     | Gate                                             |
+| --- | ------------------------------------------------------------------------ | ------------------------------------------------ |
+| 0   | Baseline: run the stress benchmark, record every answer group            | the numbers exist                                |
+| 1   | ~~Prototypes first~~ — measured and rejected, see mechanism 0            | done: 12/41 against 25/41                        |
+| 2   | Decoding grammar behind a flag, both runtimes                            | quality at or above baseline, latency measured   |
+| 3   | Type C deletion, once the grammar carries it                             | no regression                                    |
+| 4   | Type B: delete what only fed a deleted correction, migrate the remainder | no regression per file                           |
+| 5   | Type D case by case                                                      | no regression                                    |
+| 6   | A lint rule that fails the build on a new word-list regex                | it catches a planted one                         |
 
-Phases 1 and 3 are independent and can land in either order. Phase 4 depends on
-3, phase 5 on 2.
+The order is the finding, not a preference: phase 4 is only sized once phases 2
+and 3 have removed the corrections most of those lists exist to trigger.
 
 ## What is explicitly not changing
 
