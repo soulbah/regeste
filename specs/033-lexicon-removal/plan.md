@@ -109,12 +109,25 @@ is two classes.
 
 ### 2. Constrained decoding, for Type C
 
-Both runtimes we already ship support it, no new dependency:
+Both runtimes we already ship support it, no new dependency, and both take it on
+the exact call we already make. Read off the installed type definitions rather
+than from memory:
 
-- `@mlc-ai/web-llm` — `response_format: { type: 'grammar', grammar }` (XGrammar,
-  and `grammar_init_s` / `grammar_per_token_s` are already in its stats type, so
-  the cost is measurable).
-- `@wllama/wllama` — `grammar?: string` in the sampling config (llama.cpp GBNF).
+- `@mlc-ai/web-llm` — `engine.chat.completions.create({ response_format })`,
+  where the type is `'text' | 'json_object' | 'grammar' | 'structural_tag'`
+  (`lib/openai_api_protocols/chat_completion.d.ts:804`), backed by
+  `@mlc-ai/web-xgrammar`. Its stats already carry `grammar_init_s` and
+  `grammar_per_token_s`, so the cost is measurable without instrumenting
+  anything.
+- `@wllama/wllama` — `createChatCompletion` takes `ChatCompletionParams &
+SamplingParams`, and `SamplingParams` carries `grammar?: string`
+  (`types/types.d.ts:91`, `types/oai-compat.d.ts:97`). It also accepts
+  `response_format: { type: 'json_schema', json_schema }` if a schema reads
+  better than a GBNF grammar.
+
+Both call sites already pass an options object built from `GenerationOptions`
+(`llm-worker.ts:38`, `wllama-worker.ts:61`), so wiring is one optional field on
+that interface and one line at each site.
 
 The grammar admits an answer made of sentences each ending in one or more
 citation markers drawn from the excerpts actually in the prompt, or the app's
@@ -136,15 +149,15 @@ need a list of company-law nouns.
 
 ## Phases, each with its own gate
 
-| #   | What                                                                     | Gate                                             |
-| --- | ------------------------------------------------------------------------ | ------------------------------------------------ |
-| 0   | Baseline: run the stress benchmark, record every answer group            | the numbers exist                                |
-| 1   | ~~Prototypes first~~ — measured and rejected, see mechanism 0            | done: 12/41 against 25/41                        |
-| 2   | Decoding grammar behind a flag, both runtimes                            | quality at or above baseline, latency measured   |
-| 3   | Type C deletion, once the grammar carries it                             | no regression                                    |
-| 4   | Type B: delete what only fed a deleted correction, migrate the remainder | no regression per file                           |
-| 5   | Type D case by case                                                      | no regression                                    |
-| 6   | A lint rule that fails the build on a new word-list regex                | it catches a planted one                         |
+| #   | What                                                                     | Gate                                           |
+| --- | ------------------------------------------------------------------------ | ---------------------------------------------- |
+| 0   | Baseline: run the stress benchmark, record every answer group            | the numbers exist                              |
+| 1   | ~~Prototypes first~~ — measured and rejected, see mechanism 0            | done: 12/41 against 25/41                      |
+| 2   | Decoding grammar behind a flag, both runtimes                            | quality at or above baseline, latency measured |
+| 3   | Type C deletion, once the grammar carries it                             | no regression                                  |
+| 4   | Type B: delete what only fed a deleted correction, migrate the remainder | no regression per file                         |
+| 5   | Type D case by case                                                      | no regression                                  |
+| 6   | A lint rule that fails the build on a new word-list regex                | it catches a planted one                       |
 
 The order is the finding, not a preference: phase 4 is only sized once phases 2
 and 3 have removed the corrections most of those lists exist to trigger.
