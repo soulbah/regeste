@@ -15,6 +15,14 @@
 	// currently detects with hand-written vocabularies. A legal footer arrives as
 	// `page_footer` because it sits in the footer band, not because it contains
 	// company-law nouns.
+	//
+	// Where it landed, measured: correct on French at q8 on both a sparse and a
+	// dense page, and too slow to parse a whole document because an autoregressive
+	// model is billed by the token it writes. A DETECTION model — PP-DocLayoutV3
+	// through `ppu-doclayout`, one forward pass, no decoder to loop and no fp16
+	// path to overflow — pays a fixed cost per page instead, which is the shape
+	// this pipeline needs. This page keeps the VLM comparison honest and reachable
+	// for the pages a detector cannot settle.
 	import { Button } from '$lib/components/ui/button';
 	import * as Select from '$lib/components/ui/select';
 	import { Input } from '$lib/components/ui/input';
@@ -47,7 +55,10 @@
 	// Measured on the owner's French attestation, WebGPU, Apple metal-3. The
 	// labels record the verdict so nobody repeats the sweep:
 	//
-	//   q8/int8   correct, 20 s/page after a 43 s first load     <- the one to use
+	//   q8/int8   correct — but the cost follows the OUTPUT, not the page:
+	//             20 s on the sparse attestation, 124 s on a dense fee page for
+	//             2.5x the tokens. A 14-page agreement would be half an hour of
+	//             ingest. Correct, and too slow to parse a whole document with.
 	//   fp32      correct, 19-36 s/page, largest download
 	//   fp16      wall of "!!!!"
 	//   q4f16     wall of "!!!!"
