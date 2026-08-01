@@ -281,32 +281,39 @@
 				</div>
 			{:else}
 				<div class="mx-auto w-full max-w-4xl flex-1 space-y-4 overflow-y-auto p-6">
+					<!-- One toolbar, one control height. The search field takes the slack
+					     and wraps to its own full row on narrow screens; Add keeps the
+					     right edge, aligned with the card below, on every width. -->
 					<div class="flex flex-wrap items-center gap-2">
-						<div class="relative w-56">
+						<div class="relative min-w-36 flex-1 basis-40">
 							<SearchIcon
-								class="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2"
+								class="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
 							/>
 							<Input
 								bind:value={query}
 								placeholder={t('docsPage.search')}
-								class="h-8 pl-8 text-sm"
+								class="bg-card h-9 pl-9 text-sm"
 								aria-label={t('docsPage.search')}
 							/>
 						</div>
 						<Select.Root type="single" bind:value={sortBy}>
-							<Select.Trigger class="h-8 w-36 text-xs">{sortLabels[sortBy]}</Select.Trigger>
+							<Select.Trigger class="bg-card h-9 w-32 text-xs" aria-label={t('docsPage.sortAria')}>
+								{sortLabels[sortBy]}
+							</Select.Trigger>
 							<Select.Content>
 								<Select.Item value="recent">{t('docsPage.sortRecent')}</Select.Item>
 								<Select.Item value="name">{t('docsPage.sortName')}</Select.Item>
 								<Select.Item value="size">{t('docsPage.sortSize')}</Select.Item>
 							</Select.Content>
 						</Select.Root>
-						<div class="bg-muted/70 flex gap-0.5 rounded-lg p-0.5">
+						<div
+							class="border-border bg-muted/50 flex h-9 items-center gap-0.5 rounded-md border p-0.5"
+						>
 							{#each ['all', 'pdf', 'docx', 'md', 'txt'] as filter (filter)}
 								<Button
 									variant="ghost"
 									size="xs"
-									class="h-7 rounded-md px-2.5 font-mono text-[10px] uppercase {typeFilter ===
+									class="h-full rounded-[7px] px-2 font-mono text-[10px] uppercase {typeFilter ===
 									filter
 										? 'bg-card dark:bg-foreground/14 hover:bg-card dark:hover:bg-foreground/14 text-foreground shadow-xs'
 										: 'text-muted-foreground'}"
@@ -317,8 +324,10 @@
 								</Button>
 							{/each}
 						</div>
-						<div class="flex-1"></div>
-						<Button onclick={() => fileInput?.click()} class="shrink-0 gap-2">
+						<Button
+							onclick={() => fileInput?.click()}
+							class="ml-auto h-9 shrink-0 gap-2 max-sm:w-full"
+						>
 							<PlusIcon class="size-4" />
 							{t('docsPage.add')}
 						</Button>
@@ -342,12 +351,23 @@
 									{@const ingest = documentsStore.ingests[doc.id]}
 									{@const st = ingest?.status ?? doc.status}
 									<div
-										class="group hover:bg-foreground/3 flex items-center gap-4 px-4 py-3 {selected?.id ===
+										class="group hover:bg-foreground/3 flex items-center gap-3 px-4 py-3 {selected?.id ===
 										doc.id
 											? 'bg-foreground/4'
 											: ''}"
 									>
-										<FileTextIcon class="text-muted-foreground size-5 shrink-0" />
+										<!-- The type reads at a glance from the tile, so the meta line
+										     below no longer has to open with it. -->
+										<div
+											class="border-border/60 bg-muted/50 text-muted-foreground flex size-9 shrink-0 flex-col items-center justify-center rounded-lg border"
+										>
+											<FileTextIcon class="size-3.5" />
+											<span
+												class="font-mono text-[7px] leading-none font-semibold tracking-wider uppercase"
+											>
+												{docType(doc)}
+											</span>
+										</div>
 										<div class="min-w-0 flex-1">
 											<Button
 												variant="ghost"
@@ -360,8 +380,8 @@
 											>
 												{doc.name}
 											</Button>
-											<p class="text-muted-foreground font-mono text-[10px] uppercase">
-												{docType(doc)} · {(doc.size / 1024).toFixed(0)} KB{doc.pages
+											<p class="text-muted-foreground truncate font-mono text-[10px] uppercase">
+												{(doc.size / 1024).toFixed(0)} KB{doc.pages
 													? ` · ${t('common.pages', { n: doc.pages })}`
 													: ''} · {t('docsPage.added', {
 													date: new Date(doc.createdAt).toLocaleDateString()
@@ -376,7 +396,7 @@
 												<Progress value={ingest.phaseProgress * 100} class="mt-1.5 h-1" />
 											{/if}
 										</div>
-										<Badge variant="outline" class="shrink-0">
+										<Badge variant="outline" class="hidden shrink-0 sm:inline-flex">
 											{t('docsPage.inChats', {
 												count: doc.chatCount,
 												s: doc.chatCount === 1 ? '' : 's'
