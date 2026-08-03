@@ -58,7 +58,7 @@ export function buildAnswerCoverageContract(question: string): string {
 	const requirements: string[] = [];
 	if (parts.length) {
 		requirements.push(
-			`Answer each requested slot separately:\n${parts.map((part, index) => `${index + 1}. ${part}`).join('\n')}`
+			`Cover every requested slot, combining related facts into natural prose without repeating or labelling the questions:\n${parts.map((part, index) => `${index + 1}. ${part}`).join('\n')}`
 		);
 	}
 	if (
@@ -345,6 +345,7 @@ Rules:
 - Preserve names as written. Do not split a full name into an alias or add phrases such as "under the name" unless the source explicitly distinguishes them.
 - When asked for a line, section, sheet, or detail reference, copy the exact identifier adjacent to the requested label. Do not infer a different identifier from nearby arithmetic.
 - Answer every part of a multi-part question. For a calculation, state the operands and the result.
+- Combine related facts into one natural sentence or compact paragraph. Never repeat the questions, add field-style labels, or narrate where the answer was found; citations carry provenance.
 - Preserve strict bounds and comparisons exactly: "less than" is not "up to" or "a maximum of", and "after" is not "on or after".
 - Bind every value to its adjacent label and subject. Never substitute a document creation, signature, print or generation timestamp for a contract effective date, and never substitute a value from a neighboring category.
 - Keep the requested insured object or category exact: building, belongings, liability, assistance and optional cover are not interchangeable.
@@ -567,6 +568,51 @@ export function isDegenerateAnswer(text: string): boolean {
 	return repeatedLineRatio(visible) >= 0.5;
 }
 
+/** Verification may correct claims, but cannot erase attribution while the
+ * retrieval sufficiency gate still says evidence answers the question. This
+ * compares citation token shape only; no refusal vocabulary is involved. */
+export function verificationPreservesGrounding(
+	draft: string,
+	verified: string,
+	evidenceSufficient: boolean
+): boolean {
+	if (!evidenceSufficient) return true;
+	const citation = /\[\d{1,2}\]/u;
+	return !citation.test(draft) || citation.test(verified);
+}
+
+/** Stop a direct factual stream once it already covers every coordinated
+ * request in complete prose. Local decoders otherwise keep expanding a valid
+ * two-sentence answer into copied prompt scaffolding for tens of seconds.
+ * Coverage is semantic/lexical over arbitrary clauses; no document vocabulary
+ * or answer values are encoded here. Citations can be bound deterministically
+ * from the same evidence after generation. */
+export function hasCompleteFactualAnswer(question: string, draft: string): boolean {
+	return completeFactualAnswerPrefix(question, draft) !== null;
+}
+
+/** Reader-facing prefix proven complete even when one decoder delta already
+ * appended the beginning of another line. */
+export function completeFactualAnswerPrefix(question: string, draft: string): string | null {
+	const analysis = analyzeQuestion(question);
+	const clauses = answerableClauses(question);
+	const visible = stripThink(draft).trim();
+	if (analysis.answerShape !== 'fact' || clauses.length < 2 || visible.length < 30) return null;
+	const sentences = [...visible.matchAll(/[^.!?]+[.!?](?:\s+|$)/gu)]
+		.map((match) => match[0].trim())
+		.filter((sentence) => sentence.length >= 10);
+	for (let count = 1; count <= sentences.length; count++) {
+		const prefix = sentences.slice(0, count);
+		if (
+			clauses.every((clause) =>
+				prefix.some((sentence) => citationGroundingCoverage(clause, sentence) >= 0.15)
+			)
+		)
+			return prefix.join(' ');
+	}
+	return null;
+}
+
 export function groundedRefusal(question: string): string {
 	return analyzeQuestion(question).locale === 'fr'
 		? "Je n'ai pas trouvé assez d'informations dans les documents joints pour répondre."
@@ -615,9 +661,15 @@ export function needsGroundedVerification(question: string, draft = ''): boolean
 	const analysis = analyzeQuestion(question);
 	const identityCompanion =
 		isIdentityQuestion(question) && /\b(?:avec qui|with whom)\b/u.test(normalized);
+	// A short factual synthesis already constrained to cited evidence should not
+	// pay for a second full generation. Numeric grounding, citation resolution,
+	// typed-value retries and deterministic invariants still run afterwards. An
+	// uncited or refusing draft keeps the audit path.
+	const factualSynthesis =
+		analysis.route === 'synthesis' && analysis.answerShape === 'fact' && !isPureRefusalLike(draft);
 	return (
 		(draft.length > 0 && isPureRefusalLike(draft)) ||
-		(analysis.route === 'synthesis' && !identityCompanion) ||
+		(analysis.route === 'synthesis' && !identityCompanion && !factualSynthesis) ||
 		/\b(?:ligne|line|section|feuille|sheet|detail|reference)\b/u.test(normalized) ||
 		/\b(?:consequence|droit|obligation|ecart|difference|selectionne|choisi|exclu|rights?|duties|difference|selected|chosen|excluded)\w*\b/u.test(
 			verificationCore
@@ -633,7 +685,7 @@ export function needsGroundedVerification(question: string, draft = ''): boolean
 			normalized
 		) ||
 		STRICT_DIRECTION.test(normalized) ||
-		answerableClauses(question).length > 1
+		(answerableClauses(question).length > 1 && !factualSynthesis)
 	);
 }
 
@@ -730,6 +782,20 @@ Question: ${question}`;
  * arithmetic/consistency contradictions must never survive presentation. */
 export function enforceAnswerInvariants(question: string, text: string): string {
 	let corrected = stripThink(text);
+	// This heading is an internal prompt sentinel, never document content. If a
+	// small model copies the evidence scaffold after finishing its answer, keep
+	// only reader-facing prose. Stream completion normally stops before this;
+	// trimming is a last-resort boundary guard.
+	const leakedInventory = corrected.search(/\n+\s*Structured evidence inventory\s*:/iu);
+	if (leakedInventory >= 0) corrected = corrected.slice(0, leakedInventory).trimEnd();
+	// Some small decoders finish a natural answer, emit its citation, then start
+	// a field-style appendix (`[1]: value…`) copied from their own internal
+	// coverage scaffold. Reader-facing citations never introduce a colon, so the
+	// boundary is structural and document-agnostic. Keep the complete prose; the
+	// citation resolver below will bind it again from the supporting excerpts.
+	const labelledAppendix = corrected.search(/\s*\[\d{1,2}\]\s*:\s*(?=\p{L})/u);
+	if (labelledAppendix >= 40 && /[.!?]\s*$/u.test(corrected.slice(0, labelledAppendix).trim()))
+		corrected = corrected.slice(0, labelledAppendix).trimEnd();
 	const normalizedQuestion = normalizeQuestion(question);
 	let normalizedAnswer = normalizeQuestion(corrected);
 	const difference =
@@ -906,11 +972,19 @@ export function buildUserPrompt(
 		: '';
 	const parts = answerableClauses(question);
 	const multiPartConstraint = parts.length
-		? `Requested parts (answer each one separately):\n${parts.map((part, index) => `${index + 1}. ${part}`).join('\n')}\nUse only the excerpts relevant to each part. Never mix numbers between parts or documents. For each calculation, write its operands and formula before the result.\n\n`
+		? `Facts the answer must cover (combine them into natural prose; do not repeat or label these prompts):\n${parts.map((part, index) => `${index + 1}. ${part}`).join('\n')}\nUse only the excerpts relevant to each part. Never mix numbers between parts or documents. For each calculation, write its operands and formula before the result.\n\n`
 		: '';
-	const coverageContract = buildAnswerCoverageContract(question);
+	// multiPartConstraint already carries these slots. Repeating the same
+	// checklist increases prefill and encourages checklist-shaped output.
+	const coverageContract = parts.length ? '' : buildAnswerCoverageContract(question);
 	const coverageConstraint = coverageContract ? `${coverageContract}\n\n` : '';
-	const inventory = buildEvidenceInventory(question, inventoryHits ?? hits, citationNumbers);
+	// Coordinated factual lookup already has explicit clause constraints and a
+	// compact evidence set. Repeating it as an internal inventory adds prefill
+	// latency and gives a small model scaffold text it may copy to the reader.
+	const compactFactualLookup = parts.length > 1 && analyzeQuestion(question).answerShape === 'fact';
+	const inventory = compactFactualLookup
+		? ''
+		: buildEvidenceInventory(question, inventoryHits ?? hits, citationNumbers);
 	const inventoryConstraint = inventory ? `${inventory}\n\n` : '';
 	// Order follows the U-shaped attention curve measured for long contexts
 	// (Liu et al., "Lost in the Middle"): a model uses the head and the tail of

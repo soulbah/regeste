@@ -9,7 +9,11 @@ import { guardedFetch, OfflineError } from '$lib/net';
 import { myaiStore, endpointHost, type ChatMessage } from './myai.svelte';
 import { settingsStore } from './settings.svelte';
 import { llmStore } from '$lib/private-ai/llm.svelte';
-import { generationOptionsFor, verificationOptionsFor } from '$lib/private-ai/generation';
+import {
+	generationOptionsFor,
+	usesCompactFactualContext,
+	verificationOptionsFor
+} from '$lib/private-ai/generation';
 import {
 	buildClarificationContext,
 	buildRetrievalContext,
@@ -23,7 +27,8 @@ import {
 	labelledAmountCarrier,
 	missingDurationCarrier,
 	ordinalScheduleValue,
-	personRoleCarrier
+	personRoleCarrier,
+	splitQueryClauses
 } from '$lib/pipeline/retrieval';
 import { assistedPayloadBytes, buildAssistedExcerpts } from '$lib/assisted-payload';
 import { questionLocale } from '$lib/analysis/query-router';
@@ -49,6 +54,7 @@ import {
 	SYSTEM_PROMPT,
 	buildAmountValuePrompt,
 	buildContactValuePrompt,
+	completeFactualAnswerPrefix,
 	buildDurationValuePrompt,
 	buildPersonValuePrompt,
 	buildScheduleValuePrompt,
@@ -62,11 +68,14 @@ import {
 	hasCollapsedIntoRepetition,
 	isDegenerateAnswer,
 	isThinking,
+	isPureRefusalLike,
 	needsGroundedVerification,
 	resolveCitations,
 	resolveTargetedCitations,
+	selectVerificationHits,
 	statesTheValue,
-	stripThink
+	stripThink,
+	verificationPreservesGrounding
 } from '$lib/private-ai/prompt';
 import type {
 	ChatDocument,
@@ -247,6 +256,21 @@ class ChatsStore {
 			: null;
 	}
 
+	/** Defer scope ambiguity until retrieval. An attachment only counts as a
+	 * competing scope when its own evidence group can answer the question. */
+	private clarificationAfterRetrieval(
+		_question: string,
+		clarification: ClarificationKind | null,
+		_hits: SearchHit[],
+		_alternateQueries: string[] = []
+	): ClarificationKind | null {
+		// Scope guesses used lexical relevance twice and still asked “one record
+		// or all documents?” after retrieval had found the answer. Let grounded
+		// generation use selected evidence instead of spending a turn on a guessed
+		// ambiguity. Other structural clarifications remain unchanged.
+		return clarification === 'scope' ? null : clarification;
+	}
+
 	private async retrieveWithSearchFallback(
 		query: string,
 		documents: ChatDocument[],
@@ -255,6 +279,52 @@ class ChatsStore {
 		route: QuestionRoute,
 		onInspect?: () => void
 	): Promise<{ hits: SearchHit[]; alternateQueries: string[] }> {
+		const clauses = splitQueryClauses(refinementQuery);
+		if (clauses.length > 1) {
+			// Published multi-hop pattern: resolve broad subject first, then search
+			// elliptical sub-questions inside that evidence scope. Global searches
+			// for “on what date?” or “who signed?” drift to unrelated attachments.
+			const anchor = [...clauses].sort(
+				(left, right) =>
+					right.split(/\s+/u).length - left.split(/\s+/u).length ||
+					clauses.indexOf(left) - clauses.indexOf(right)
+			)[0];
+			const documentIds = documents.map((document) => document.id);
+			const anchorHits = await documentsStore.retrieve(
+				anchor,
+				documentIds,
+				anchor,
+				onInspect,
+				'targeted'
+			);
+			const anchorDocumentId = anchorHits[0]?.documentId;
+			if (anchorDocumentId) {
+				const clauseHits = await documentsStore.retrieveMany(
+					clauses.map((clause) => ({
+						query: clause,
+						documentIds: [anchorDocumentId],
+						refinementQuery: clause,
+						route: 'targeted' as const
+					}))
+				);
+				const lists = [
+					anchorHits.filter((hit) => hit.documentId === anchorDocumentId),
+					...clauseHits
+				];
+				const hits: SearchHit[] = [];
+				const seen = new Set<number>();
+				for (let rank = 0; rank < 16 && hits.length < 16; rank++) {
+					for (const list of lists) {
+						const hit = list[rank];
+						if (!hit || seen.has(hit.chunkId)) continue;
+						seen.add(hit.chunkId);
+						hits.push(hit);
+						if (hits.length === 16) break;
+					}
+				}
+				return { hits, alternateQueries: clauses };
+			}
+		}
 		const retrieve = (alternateQueries: string[]) =>
 			documentsStore.retrieve(
 				query,
@@ -508,7 +578,7 @@ class ChatsStore {
 			const analysisQuestion = context?.analysisQuery ?? question;
 			const frame = await resolveQuestion(analysisQuestion, this.embedQuestions);
 			const clarification = this.clarificationFor(question, context, frame, enabledDocs.length);
-			if (clarification) {
+			if (clarification && clarification !== 'scope') {
 				await this.insertClarification(chatId, clarification, frame.locale, versionGroup);
 				this.messages = await db.listMessages(chatId);
 				return;
@@ -541,18 +611,28 @@ class ChatsStore {
 				await this.refresh();
 				return;
 			}
-			const hits = enabledDocs.length
-				? (
-						await this.retrieveWithSearchFallback(
-							context?.searchQuery ?? question,
-							enabledDocs,
-							this.chats.find((item) => item.id === chatId)?.mode ?? null,
-							question,
-							route,
-							() => this.advanceWork('inspect')
-						)
-					).hits
-				: [];
+			const retrieved = enabledDocs.length
+				? await this.retrieveWithSearchFallback(
+						context?.searchQuery ?? question,
+						enabledDocs,
+						this.chats.find((item) => item.id === chatId)?.mode ?? null,
+						question,
+						route,
+						() => this.advanceWork('inspect')
+					)
+				: { hits: [], alternateQueries: [] };
+			const hits = retrieved.hits;
+			const finalClarification = this.clarificationAfterRetrieval(
+				question,
+				clarification,
+				hits,
+				retrieved.alternateQueries
+			);
+			if (finalClarification) {
+				await this.insertClarification(chatId, finalClarification, frame.locale, versionGroup);
+				this.messages = await db.listMessages(chatId);
+				return;
+			}
 			if (enabledDocs.length) this.setWorkCount('inspect', hits.length);
 			else this.advanceWork('inspect', 0);
 			await this.answer(
@@ -707,7 +787,7 @@ class ChatsStore {
 			const analysisQuestion = context?.analysisQuery ?? question;
 			const frame = await resolveQuestion(analysisQuestion, this.embedQuestions);
 			const clarification = this.clarificationFor(question, context, frame, enabledDocs.length);
-			if (clarification) {
+			if (clarification && clarification !== 'scope') {
 				await this.insertClarification(chatId, clarification, frame.locale);
 				await db.touchChat(chatId);
 				this.messages = await db.listMessages(chatId);
@@ -735,7 +815,7 @@ class ChatsStore {
 				await this.generateColumnAnswer(chatId, columnAnswer, frame.locale);
 			} else {
 				let hits: SearchHit[] = [];
-				let rejected: SearchHit[] = [];
+				let alternateQueries: string[] = [];
 				if (enabledDocs.length) {
 					const retrieved = await this.retrieveWithSearchFallback(
 						context?.searchQuery ?? question,
@@ -746,11 +826,19 @@ class ChatsStore {
 						() => this.advanceWork('inspect')
 					);
 					hits = retrieved.hits;
-					if (!hasAnswerBearingEvidence(question, hits, retrieved.alternateQueries)) {
-						// Kept out of generation on purpose, kept here so a refusal can
-						// still show what was looked at.
-						rejected = hits;
-						hits = [];
+					alternateQueries = retrieved.alternateQueries;
+					const finalClarification = this.clarificationAfterRetrieval(
+						question,
+						clarification,
+						hits,
+						alternateQueries
+					);
+					if (finalClarification) {
+						await this.insertClarification(chatId, finalClarification, frame.locale);
+						await db.touchChat(chatId);
+						this.messages = await db.listMessages(chatId);
+						await this.refresh();
+						return;
 					}
 				}
 
@@ -763,8 +851,7 @@ class ChatsStore {
 					enabledDocs.length,
 					null,
 					route,
-					context?.promptContext ?? null,
-					rejected
+					context?.promptContext ?? null
 				);
 			}
 			await db.touchChat(chatId);
@@ -915,6 +1002,28 @@ class ChatsStore {
 		const { db } = await getLocalDb();
 		this.streamingText = '';
 		const grounded = documentCount > 0;
+		const factualSynthesis = usesCompactFactualContext(
+			question,
+			route === 'synthesis' ? 'synthesis' : 'targeted'
+		);
+		// Factual coordination needs several retrieval branches, not a long model
+		// context. If one passage is already sufficient, pass only that passage;
+		// otherwise keep strongest anchors plus local neighbours. This is
+		// evidence-guided extractive compression, with zero extra model latency.
+		if (grounded && factualSynthesis) {
+			const clauses = splitQueryClauses(question);
+			if (clauses.length > 1) {
+				// retrieveWithSearchFallback interleaves one result per document-scoped
+				// clause. Preserve that diversity: a global lexical rerank collapses
+				// elliptical parts such as “when?” and “who signed?” back onto the
+				// subject passage, hiding the date/signature continuations it found.
+				hits = hits.slice(0, Math.min(8, clauses.length * 2));
+			} else {
+				const ranked = selectVerificationHits(question, hits, 4);
+				const strongest = ranked[0];
+				hits = strongest && hasAnswerBearingEvidence(question, [strongest]) ? [strongest] : ranked;
+			}
+		}
 		// Trim BEFORE anything numbers the excerpts: prompt, citations and the
 		// what-AI-saw record must all see the same list (see fitEvidenceToContext).
 		if (grounded) hits = fitEvidenceToContext(question, hits, conversationContext);
@@ -944,6 +1053,8 @@ class ChatsStore {
 		// Draft notes: the <think> trace of whichever pass produced the answer.
 		let reasoning = '';
 		let reasoningMs: number | null = null;
+		let completedFactAnswer: string | null = null;
+		let completedRefusal: string | null = null;
 		// A contested turn re-weighs evidence; a deterministic extract would just
 		// repeat whichever clause matches and cannot concede or confirm.
 		const contested = conversationContext !== null && isContestation(question);
@@ -977,6 +1088,13 @@ class ChatsStore {
 				streamRaw += delta;
 				this.streamingText = isThinking(streamRaw) ? '' : stripThink(streamRaw);
 				this.streamingThinking = extractThink(streamRaw) || null;
+				const refusal = groundedRefusal(question);
+				if (completedRefusal === null && stripThink(streamRaw).trim().startsWith(refusal)) {
+					// System prompt requires this exact complete sentence and nothing
+					// else. Once decoded, later tokens can only be unwanted expansion.
+					completedRefusal = refusal;
+					void llmStore.stop();
+				}
 				// Greedy decoding cannot leave a loop it has entered, so the only way
 				// out is to stop it. Left alone it ran 86 seconds and ended because
 				// the reader pressed the button.
@@ -986,6 +1104,14 @@ class ChatsStore {
 						collapsed = true;
 						void llmStore.stop();
 					}
+				}
+				if (
+					completedFactAnswer === null &&
+					options.reasoning === 'off' &&
+					(completeFactualAnswerPrefix(question, streamRaw) ?? null) !== null
+				) {
+					completedFactAnswer = completeFactualAnswerPrefix(question, streamRaw);
+					void llmStore.stop();
 				}
 			};
 			const writeStartedAt = performance.now();
@@ -1034,7 +1160,7 @@ class ChatsStore {
 			const streamCollapsed = collapsed;
 			if (
 				(options.reasoning === 'on' && visibleAnswer.length < 40 && !this.stopRequested) ||
-				(streamCollapsed && !this.stopRequested)
+				(streamCollapsed && !this.stopRequested && completedFactAnswer === null)
 			) {
 				this.streamingThinking = null;
 				streamRaw = '';
@@ -1052,6 +1178,7 @@ class ChatsStore {
 				// during this turn, and the direct retry answered the same prompt.
 			} else if (
 				options.reasoning !== 'on' &&
+				completedFactAnswer === null &&
 				isDegenerateAnswer(visibleAnswer) &&
 				!this.stopRequested
 			) {
@@ -1073,6 +1200,8 @@ class ChatsStore {
 				}
 			}
 		}
+		if (completedFactAnswer) raw = completedFactAnswer;
+		if (completedRefusal) raw = completedRefusal;
 		raw = stripThink(raw || streamRaw);
 		// Selection extracts are drafts like any other: they can bind the
 		// right-looking clause to the wrong subject, and grounded verification is
@@ -1090,27 +1219,38 @@ class ChatsStore {
 				// verified answer when it is non-empty, otherwise keep the good draft.
 				this.ensureVerifyStep();
 				const verificationStartedAt = performance.now();
-				const verifiedRaw = await llmStore.generate(
-					[
-						{ role: 'system', content: SYSTEM_PROMPT },
-						{
-							role: 'user',
-							content: buildVerificationPrompt(
-								question,
-								buildVerificationUserPrompt(question, hits, conversationContext),
-								raw
-							)
-						}
-					],
-					() => {},
-					verificationOptionsFor()
+				const refusalDraft = isPureRefusalLike(raw);
+				const verificationTimeout = window.setTimeout(
+					() => void llmStore.stop(),
+					refusalDraft ? 8_000 : 12_000
 				);
+				const verifiedRaw = await llmStore
+					.generate(
+						[
+							{ role: 'system', content: SYSTEM_PROMPT },
+							{
+								role: 'user',
+								content: buildVerificationPrompt(
+									question,
+									buildVerificationUserPrompt(question, hits, conversationContext),
+									raw
+								)
+							}
+						],
+						() => {},
+						verificationOptionsFor(refusalDraft)
+					)
+					.finally(() => window.clearTimeout(verificationTimeout));
 				const verified = stripThink(verifiedRaw);
 				// Non-empty is not enough: the verification pass runs the same engine
 				// with the same failure modes, and adopting a "1" that died after one
 				// token REPLACES a coherent draft with garbage. A degenerate output
 				// means the audit failed, not that the draft was wrong — keep the draft.
-				if (verified.trim() && !isDegenerateAnswer(verified)) {
+				if (
+					verified.trim() &&
+					!isDegenerateAnswer(verified) &&
+					verificationPreservesGrounding(raw, verified, hits.length > 0)
+				) {
 					raw = verified;
 					this.streamingText = raw;
 					// The displayed answer now comes from the verification pass; its
@@ -1313,7 +1453,7 @@ class ChatsStore {
 				if (
 					retried.trim() &&
 					!isDegenerateAnswer(retried) &&
-					retried.includes(amountCarrier.value!.literal)
+					statesTheValue(retried, amountCarrier.value!.literal)
 				) {
 					raw = retried;
 					this.streamingText = raw;
@@ -1734,7 +1874,7 @@ class ChatsStore {
 			question,
 			plan.route
 		);
-		if (!hits.length || !hasAnswerBearingEvidence(question, hits)) {
+		if (!hits.length) {
 			this.sending = false;
 			this.workSteps = [];
 			return 'no-excerpts';

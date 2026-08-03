@@ -713,18 +713,17 @@ describe('retrieval refinement', () => {
 		expect(variants).toContain('vole cafe couvert');
 	});
 
-	it('searches substantial clauses of a multi-part request independently', () => {
+	it('globally searches only clauses with enough independent context', () => {
 		const variants = retrievalQueryVariants(
 			'Donne le total des ventes 2019 et les données American Express nécessaires au calcul.'
 		);
-		expect(variants).toContain('Donne le total des ventes 2019');
 		expect(variants).toContain('les données American Express nécessaires au calcul.');
+		expect(variants).toContain('Donne le total des ventes 2019');
 		const partyVariants = retrievalQueryVariants("Qui est l'acheteur et le vendeur ?");
-		expect(partyVariants).toContain("Qui est l'acheteur");
-		expect(partyVariants).toContain('le vendeur ?');
+		expect(partyVariants).toEqual(["Qui est l'acheteur et le vendeur ?"]);
 	});
 
-	it('does not retrieve an unscoped how-long fragment independently', () => {
+	it('keeps elliptical measurement fragments out of global retrieval', () => {
 		const question =
 			"Pendant combien de temps et jusqu'à quel montant les dépenses de logement inhabitable sont-elles couvertes ?";
 		expect(retrievalQueryVariants(question)).toEqual([question]);
@@ -734,14 +733,20 @@ describe('retrieval refinement', () => {
 	it('keeps sparse expansions out of dense retrieval and splits only broad routes', () => {
 		const question = "Qui est l'acheteur et le vendeur ?";
 		expect(denseRetrievalQueryVariants(question, 'targeted')).toEqual([question]);
-		expect(denseRetrievalQueryVariants(question, 'synthesis')).toEqual([
-			question,
-			"Qui est l'acheteur",
-			'le vendeur ?'
-		]);
+		expect(denseRetrievalQueryVariants(question, 'synthesis')).toEqual([question]);
 		expect(
 			denseRetrievalQueryVariants('Quel est le prix ?', 'targeted', ['What is the sale price?'])
 		).toEqual(['Quel est le prix ?', 'What is the sale price?']);
+	});
+
+	it('defers short date and signatory clauses to document-scoped retrieval', () => {
+		const question = "Quel solde le document certifie-t-il, à quelle date, et qui l'a signé ?";
+		expect(denseRetrievalQueryVariants(question, 'synthesis')).toEqual([question]);
+		expect(splitQueryClauses(question)).toEqual([
+			'Quel solde le document certifie-t-il',
+			'à quelle date',
+			"qui l'a signé ?"
+		]);
 	});
 
 	it('shares substantial clause decomposition with answer generation', () => {

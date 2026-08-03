@@ -79,9 +79,7 @@
 					     that case is a moving indicator rather than a still bar, which
 					     reads as stalled. -->
 					<div class="bg-secondary mt-2 h-1 overflow-hidden rounded-full">
-						<div
-							class="bg-primary/70 h-full w-1/3 rounded-full motion-safe:animate-[work_1.4s_ease-in-out_infinite]"
-						></div>
+						<div class="model-loading-indicator bg-primary/70 h-full w-1/3 rounded-full"></div>
 					</div>
 				{/if}
 			</div>
@@ -90,12 +88,27 @@
 {/if}
 
 <style>
+	/* Keep animation name and selector in the same Svelte-owned stylesheet.
+	 * Tailwind's arbitrary animation value kept the literal `work` name while
+	 * Svelte scoped the @keyframes name, leaving a stationary one-third bar. */
+	.model-loading-indicator {
+		animation: work 1.4s ease-in-out infinite;
+	}
+
 	@keyframes work {
 		0% {
 			transform: translateX(-100%);
 		}
 		100% {
 			transform: translateX(400%);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.model-loading-indicator {
+			width: 100%;
+			opacity: 0.35;
+			animation: none;
 		}
 	}
 </style>

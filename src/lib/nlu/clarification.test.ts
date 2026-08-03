@@ -5,9 +5,6 @@ import { contextualClarification } from './clarification';
 describe('contextual clarification dimensions', () => {
 	it.each([
 		['Et lui ?', false, 1, 'entity'],
-		['Que s’est-il passé récemment ?', true, 1, 'time'],
-		['Que dit la dernière version ?', true, 3, 'document'],
-		['Convertis tous les montants', true, 2, 'unit_currency'],
 		['Qui est Malik ? Où habite-t-il ?', true, 2, 'multi_part']
 	] as const)('%s', (question, hasConversationContext, documentCount, expected) => {
 		expect(
@@ -17,6 +14,22 @@ describe('contextual clarification dimensions', () => {
 			})
 		).toBe(expected);
 	});
+
+	it.each([
+		['Que s’est-il passé récemment ?', 1],
+		['Que dit la dernière version ?', 3],
+		['Convertis tous les montants', 2]
+	] as const)(
+		'answers best-effort instead of guessing a clarification for %s',
+		(question, documentCount) => {
+			expect(
+				contextualClarification(question, analyzeQuestion(question), {
+					hasConversationContext: true,
+					documentCount
+				})
+			).toBeNull();
+		}
+	);
 
 	it('does not ask which entity when a demonstrative names its noun', () => {
 		// Regression: "cette fiche de paie" asked "De quelle personne ou de quel
@@ -51,6 +64,21 @@ describe('contextual clarification dimensions', () => {
 		).toBeNull();
 		// A bare subject pronoun with no named subject stays a back-reference.
 		expect(analyzeQuestion('Et lui ?').referencesPrevious).toBe(true);
+	});
+
+	it('resolves possessives inside self-contained coordinated questions', () => {
+		for (const question of [
+			'Qui dirige cette société et quel est son identifiant ?',
+			'À qui appartient le compte et quel est son numéro ?'
+		]) {
+			expect(analyzeQuestion(question).referencesPrevious).toBe(false);
+			expect(
+				contextualClarification(question, analyzeQuestion(question), {
+					hasConversationContext: false,
+					documentCount: 2
+				})
+			).toBeNull();
+		}
 	});
 
 	it('never asks single-or-all-documents with one document attached', () => {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { SearchHit } from '$lib/types';
 import { buildDeterministicExtractiveAnswer } from './extractive-answer';
+import { checkNumericGrounding } from './grounding';
 
 const hit = (chunkId: number, text: string, page = 1, seq = chunkId): SearchHit => ({
 	chunkId,
@@ -15,6 +16,89 @@ const hit = (chunkId: number, text: string, page = 1, seq = chunkId): SearchHit 
 });
 
 describe('deterministic extractive answers', () => {
+	it('answers an exact-value reverse lookup from its shortest local clause', () => {
+		const evidence = [
+			hit(
+				1,
+				'Tarifs :\n• 275 € HT, pour un atelier de médiation sur site (6 participants)\n• Le déplacement reste facturé séparément.'
+			)
+		];
+		const answer = buildDeterministicExtractiveAnswer(
+			'Quelle prestation correspond au forfait de 275 € HT et combien de participants concerne-t-elle ?',
+			evidence
+		);
+
+		expect(answer).toBe(
+			'Le document indique : « 275 € HT, pour un atelier de médiation sur site (6 participants) » [1].'
+		);
+		expect(
+			checkNumericGrounding(
+				answer!,
+				evidence.map((item) => item.text)
+			).grounded
+		).toBe(true);
+	});
+
+	it('declines an exact-value reverse lookup when evidence carries another value', () => {
+		expect(
+			buildDeterministicExtractiveAnswer('Que couvre le forfait de 275 € ?', [
+				hit(1, 'Forfait disponible : 280 € pour une intervention.')
+			])
+		).toBeNull();
+	});
+
+	it('does not answer a three-fact question with an unrelated identity pair', () => {
+		expect(
+			buildDeterministicExtractiveAnswer(
+				"Quel solde le document certifie-t-il, à quelle date, et qui l'a signé ?",
+				[
+					hit(
+						1,
+						'Compte n° 60012345678 ouvert au nom de KARIM TRAORE. Solde créditeur : 1 234,56 EUR. Fait le 23 juillet 2026. AMELIE ROUSSEAU.'
+					)
+				]
+			)
+		).toBeNull();
+	});
+
+	it('reconstructs a split printed total from a generic multi-item decomposition', () => {
+		const total = hit(1, ['Total du lot :', '3 0 00 € HT.'].join('\n'), 10, 20);
+		const decomposition = hit(
+			2,
+			[
+				'Détail :',
+				'- première ligne : 1000 € HT.',
+				'- deuxième ligne : 1250 € HT.',
+				'- troisième ligne : 750 € HT.'
+			].join('\n'),
+			10,
+			21
+		);
+		const evidence = [decomposition, total];
+		const answer = buildDeterministicExtractiveAnswer('Quel est le montant total ?', evidence);
+
+		expect(answer).toContain('3000 € HT');
+		expect(answer).toContain('1000 € HT + 1250 € HT + 750 € HT = 3000 € HT');
+		expect(
+			checkNumericGrounding(
+				answer!,
+				evidence.map((item) => item.text)
+			).grounded
+		).toBe(true);
+	});
+
+	it('uses arithmetic proof for a naturally phrased financial decomposition', () => {
+		const answer = buildDeterministicExtractiveAnswer(
+			'Quel total faut-il prévoir pour les postes alpha et bêta, et comment se décompose-t-il ?',
+			[
+				hit(1, 'Montant global : 3000 € HT', 4, 10),
+				hit(2, 'Détail : 1000 € HT\n1250 € HT\n750 € HT', 4, 11)
+			]
+		);
+		expect(answer).toContain('3000 € HT');
+		expect(answer).toContain('1000 € HT + 1250 € HT + 750 € HT = 3000 € HT');
+	});
+
 	it('leaves section-reference questions to model synthesis', () => {
 		// Regression: "Que dit l'article 110 …" anchored the number-anchored
 		// extractor, which dumped the whole chunk (starting inside article 109).
@@ -414,6 +498,19 @@ describe('deterministic extractive answers', () => {
 		expect(answer).toContain('deux mois');
 		expect(answer).toContain('un an');
 		expect(answer).not.toContain('14 jours');
+	});
+
+	it('extracts a co-located identity and identifier without domain vocabulary', () => {
+		const answer = buildDeterministicExtractiveAnswer(
+			'À qui appartient le dossier et quel est son numéro ?',
+			[
+				hit(
+					1,
+					'Nous certifions que le dossier n° 987654321 ouvert au nom de CAMILLE MOREAU présente un solde positif.'
+				)
+			]
+		);
+		expect(answer).toBe('Le dossier n° 987654321 est ouvert au nom de CAMILLE MOREAU [1].');
 	});
 
 	it('joins an incomplete consequence to its immediate continuation', () => {

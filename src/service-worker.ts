@@ -13,6 +13,10 @@ import type { GenerationOptions, GenerationResult } from '$lib/private-ai/genera
 const sw = self as unknown as ServiceWorkerGlobalScope;
 let engine: MLCEngineInterface | null = null;
 let loadedModel: string | null = null;
+// A controller can stay stable while the browser kills and reboots its backing
+// Service Worker. The page heartbeats this per-boot id to detect that otherwise
+// invisible replacement and reject requests orphaned in the previous instance.
+const workerInstance = crypto.randomUUID();
 
 // ---------------------------------------------------------------------------
 // App shell (spec 030). This worker keeps its WebLLM role above; the cache
@@ -249,6 +253,10 @@ sw.addEventListener('message', (event: ExtendableMessageEvent) => {
 	event.waitUntil(
 		(async () => {
 			try {
+				if (message.kind === 'ping') {
+					reply(client, { id: message.id, kind: 'result', result: workerInstance });
+					return;
+				}
 				if (message.kind === 'load') await load(client, message.id, message.model);
 				else if (message.kind === 'generate') {
 					const result = await generate(message.messages, message.options, (delta) =>

@@ -494,6 +494,116 @@ function formatDecimal(value: number, locale: 'fr' | 'en'): string {
 	return value.toFixed(2).replace('.', locale === 'fr' ? ',' : '.');
 }
 
+interface MoneyFact {
+	index: number;
+	literal: string;
+	value: number;
+	hit: SearchHit;
+	seq: number;
+}
+
+const MONEY_FACT = /(\d[\d\s]*(?:[.,]\d+)?)\s*(?:€|eur\b|euros?\b)(?:\s*(?:ht|ttc))?/giu;
+
+function moneyFacts(hit: SearchHit, fallbackSeq: number): MoneyFact[] {
+	const text = hit.text;
+	return [...text.matchAll(MONEY_FACT)].map((match) => ({
+		index: match.index ?? 0,
+		literal: match[0].trim(),
+		value: parseDecimal(match[1]),
+		hit,
+		seq: hit.seq ?? fallbackSeq
+	}));
+}
+
+function displayedMoney(fact: MoneyFact): string {
+	const suffix = fact.literal.replace(/^[\d\s.,]+/u, '').trim();
+	const number = Number.isInteger(fact.value)
+		? String(fact.value)
+		: String(fact.value).replace('.', ',');
+	return `${number} ${suffix}`;
+}
+
+/** Exact value in question acts as evidence anchor. Return shortest local
+ * clause carrying same typed value, without guessing requested domain or
+ * teaching product vocabulary. This handles reverse lookups such as “what
+ * does 275 € buy, and for how many people?” across arbitrary documents. */
+function buildMoneyAnchoredClauseAnswer(question: string, hits: SearchHit[]): string | null {
+	const requested = [...question.matchAll(MONEY_FACT)];
+	if (requested.length !== 1) return null;
+	const requestedValue = parseDecimal(requested[0][1]);
+	for (const hit of hits) {
+		for (const match of hit.text.matchAll(MONEY_FACT)) {
+			if (Math.abs(parseDecimal(match[1]) - requestedValue) > 0.005) continue;
+			const at = match.index ?? 0;
+			const after = hit.text.slice(at, at + 260);
+			const numberedParenthesis = /\([^)]*\d[^)]*\)/u.exec(after);
+			let end = numberedParenthesis
+				? numberedParenthesis.index + numberedParenthesis[0].length
+				: -1;
+			if (end < 0) {
+				const boundary = /(?:\n|[;•●]|[.!?](?:\s|$))/u.exec(after.slice(match[0].length));
+				end = boundary ? match[0].length + boundary.index + boundary[0].length : after.length;
+			}
+			const clause = after
+				.slice(0, end)
+				.replace(/\s+/gu, ' ')
+				.replace(/[;,.!?]+$/u, '')
+				.trim();
+			if (clause.length < match[0].length + 8) continue;
+			const marker = citation(hit, hits);
+			return analyzeQuestion(question).locale === 'fr'
+				? `Le document indique : « ${clause} » ${marker}.`
+				: `The document states: “${clause}” ${marker}.`;
+		}
+	}
+	return null;
+}
+
+/** A printed total followed by a local decomposition of two to six values.
+ * Pure arithmetic + layout proof: no document term or category is encoded. */
+function buildDecomposedTotalAnswer(question: string, hits: SearchHit[]): string | null {
+	const frame = analyzeQuestion(question);
+	if (frame.operation !== 'sum') return null;
+	const groups = new Map<string, SearchHit[]>();
+	for (const hit of hits) {
+		const key = `${hit.documentId}:${hit.page ?? hit.headingPath ?? ''}`;
+		groups.set(key, [...(groups.get(key) ?? []), hit]);
+	}
+	for (const group of groups.values()) {
+		const ordered = group
+			.map((hit, rank) => ({ hit, rank }))
+			.sort(
+				(left, right) =>
+					(left.hit.seq ?? left.rank) - (right.hit.seq ?? right.rank) || left.rank - right.rank
+			);
+		const facts = ordered.flatMap(({ hit, rank }) => moneyFacts(hit, rank));
+		for (let totalIndex = 0; totalIndex < facts.length - 2; totalIndex++) {
+			const total = facts[totalIndex];
+			const local = facts.slice(totalIndex + 1).filter((fact) => {
+				if (fact.seq - total.seq > 2) return false;
+				return fact.seq !== total.seq || fact.index - total.index <= 900;
+			});
+			for (let start = 0; start < Math.min(3, local.length - 1); start++) {
+				for (let count = 2; count <= Math.min(6, local.length - start); count++) {
+					const operands = local.slice(start, start + count);
+					const sum = operands.reduce((value, operand) => value + operand.value, 0);
+					if (Math.abs(total.value - sum) > 0.005) continue;
+					const markers = [...operands.map((operand) => operand.hit), total.hit]
+						.map((hit) => citation(hit, hits))
+						.filter((marker, index, all) => all.indexOf(marker) === index)
+						.join('');
+					const literal = displayedMoney(total);
+					const arithmetic = `${operands.map(displayedMoney).join(' + ')} = ${literal}`;
+					return frame.locale === 'fr'
+						? `Le montant total est de ${literal} (${arithmetic}) ${markers}.`
+						: `The total stated amount is ${literal} (${arithmetic}) ${markers}.`;
+				}
+			}
+		}
+	}
+	return null;
+}
+
 function buildArithmeticAnswer(question: string, hits: SearchHit[]): string | null {
 	const normalized = normalizeQuestion(question);
 	if (!/\b(?:calcul|calcule|calculate|compute|font elles|do they equal)\b/u.test(normalized))
@@ -670,6 +780,51 @@ function buildCoLocatedMultiFactAnswer(question: string, hits: SearchHit[]): str
 		);
 	if (!candidates[0]) return null;
 	return `${candidates[0].hit.text.trim()} ${citation(candidates[0].hit, hits)}`;
+}
+
+/** A common OCR/form sentence co-locates a long identifier and an uppercase
+ * identity. Extract both typed atoms without teaching document vocabulary or
+ * paraphrasing their relationship. Nearest uppercase sequence after the
+ * identifier is structural evidence; output reuses source label text. */
+function buildCoLocatedIdentifierIdentityAnswer(
+	question: string,
+	hits: SearchHit[]
+): string | null {
+	if (splitQueryClauses(question).length !== 2 || analyzeQuestion(question).answerShape !== 'fact')
+		return null;
+	const identifierPattern = /\b\d(?:[\d ]{7,}\d)\b/gu;
+	const uppercaseSequence =
+		/\b\p{Lu}{2,}(?:[-'’]\p{Lu}+)?(?:\s+\p{Lu}{2,}(?:[-'’]\p{Lu}+)?){1,4}\b/gu;
+	for (const hit of hits) {
+		if (coverage(question, hit.text) < 0.18) continue;
+		for (const match of hit.text.matchAll(identifierPattern)) {
+			const identifier = match[0].replace(/\s+/gu, '');
+			const at = match.index ?? -1;
+			if (at < 0) continue;
+			const following = hit.text.slice(at + match[0].length, at + match[0].length + 180);
+			const identityMatch = uppercaseSequence.exec(following);
+			const identity = identityMatch?.[0]?.trim();
+			uppercaseSequence.lastIndex = 0;
+			if (!identity) continue;
+			const prefix = hit.text.slice(Math.max(0, at - 60), at);
+			const labelMatch = /(?:\p{L}[\p{L}'’.-]*\s+){0,3}(?:n[°ºo]|№)\s*$/iu.exec(prefix)?.[0];
+			if (!labelMatch) continue;
+			const labelTokens = labelMatch.trim().split(/\s+/u).slice(-3);
+			const label = labelTokens.join(' ').replace(/^\p{Ll}/u, (letter) => letter.toUpperCase());
+			const bridge = following.slice(0, identityMatch?.index ?? 0).trim();
+			const grammaticalBridge =
+				bridge.length >= 3 &&
+				bridge.length <= 70 &&
+				!/[\d:;,.!?()[\]]/u.test(bridge) &&
+				/\p{Ll}/u.test(bridge);
+			if (grammaticalBridge) {
+				const copula = analyzeQuestion(question).locale === 'fr' ? 'est' : 'is';
+				return `${label} ${identifier} ${copula} ${bridge} ${identity} ${citation(hit, hits)}.`;
+			}
+			return `${label} ${identifier} — ${identity} ${citation(hit, hits)}.`;
+		}
+	}
+	return null;
 }
 
 function buildConsequenceAnswer(question: string, hits: SearchHit[]): string | null {
@@ -1284,12 +1439,15 @@ const EXTRACTIVE_BUILDERS: ReadonlyArray<
 > = [
 	['qualified-missing-attribute', buildQualifiedMissingAttribute],
 	['comparison', buildComparisonAnswer],
+	['decomposed-total', buildDecomposedTotalAnswer],
 	['arithmetic', buildArithmeticAnswer],
+	['money-anchored-clause', buildMoneyAnchoredClauseAnswer],
 	['duration-threshold', buildDurationThresholdAnswer],
 	['exact-date-time', buildExactDateTimeAnswer],
 	['percentage-modifier', buildPercentageModifierAnswer],
 	['action-obligations', buildActionObligationsAnswer],
 	['enumerated-evidence', buildEnumeratedEvidenceAnswer],
+	['co-located-identifier-identity', buildCoLocatedIdentifierIdentityAnswer],
 	['co-located-multi-fact', buildCoLocatedMultiFactAnswer],
 	['consequence', buildConsequenceAnswer],
 	['exhaustive-quantified-form', buildExhaustiveQuantifiedFormAnswer],

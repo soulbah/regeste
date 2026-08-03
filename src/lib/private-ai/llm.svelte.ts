@@ -341,7 +341,9 @@ class LlmStore {
 			this.lastMetrics = {
 				ttftMs: result.ttftMs,
 				tokensPerSecond: result.tokensPerSecond,
-				completionTokens: result.completionTokens
+				completionTokens: result.completionTokens,
+				grammarInitMs: result.grammarInitMs ?? null,
+				grammarPerTokenMs: result.grammarPerTokenMs ?? null
 			};
 			localStorage.setItem(METRICS_KEY, JSON.stringify(this.lastMetrics));
 			return result.text;

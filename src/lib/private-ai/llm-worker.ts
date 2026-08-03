@@ -35,6 +35,8 @@ async function generate(
 	const started = performance.now();
 	let firstTokenAt: number | null = null;
 	let completionTokens: number | null = null;
+	let grammarInitMs: number | null = null;
+	let grammarPerTokenMs: number | null = null;
 	const chunks = await engine.chat.completions.create({
 		messages,
 		stream: true,
@@ -64,6 +66,12 @@ async function generate(
 			onDelta?.(delta);
 		}
 		completionTokens = chunk.usage?.completion_tokens ?? completionTokens;
+		grammarInitMs = chunk.usage?.extra.grammar_init_s
+			? chunk.usage.extra.grammar_init_s * 1000
+			: grammarInitMs;
+		grammarPerTokenMs = chunk.usage?.extra.grammar_per_token_s
+			? chunk.usage.extra.grammar_per_token_s * 1000
+			: grammarPerTokenMs;
 	}
 	const finished = performance.now();
 	return {
@@ -73,7 +81,9 @@ async function generate(
 			completionTokens && firstTokenAt !== null && finished > firstTokenAt
 				? completionTokens / ((finished - firstTokenAt) / 1000)
 				: null,
-		completionTokens
+		completionTokens,
+		grammarInitMs,
+		grammarPerTokenMs
 	};
 }
 

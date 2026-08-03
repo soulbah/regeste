@@ -21,6 +21,7 @@
 		"test": "vitest run",
 		"verify": "bun run check && bun run lint && bun run test && bun run build",
 		"benchmark:fetch": "bun scripts/fetch-fuzzy-benchmark.ts",
+		"audit:nlp": "bun scripts/audit-nlp-vocabularies.ts",
 		"parser-ab:fetch": "bun scripts/parser-ab/fetch.ts",
 		"parser-ab": "bun scripts/parser-ab/run.ts",
 		"db:generate": "drizzle-kit generate",

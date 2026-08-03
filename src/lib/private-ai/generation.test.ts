@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { adaptGenerationOptions, generationOptionsFor } from './generation';
+import {
+	adaptGenerationOptions,
+	generationOptionsFor,
+	usesCompactFactualContext,
+	verificationOptionsFor
+} from './generation';
 
 describe('generationOptionsFor', () => {
 	it('uses short budgets for French and English facts', () => {
@@ -11,7 +16,29 @@ describe('generationOptionsFor', () => {
 		expect(generationOptionsFor('What is their account number?', 'targeted').maxTokens).toBe(160);
 	});
 
-	it('reasons on synthesis with a budget covering the trace and the answer', () => {
+	it('keeps coordinated factual synthesis direct and short', () => {
+		expect(
+			generationOptionsFor('Qui détient le compte et quel est son identifiant ?', 'synthesis')
+		).toEqual({
+			reasoning: 'off',
+			maxTokens: 240,
+			temperature: 0
+		});
+	});
+
+	it('never collapses calculation evidence to one passage', () => {
+		expect(
+			usesCompactFactualContext(
+				'Quel total faut-il prévoir et comment se décompose-t-il ?',
+				'synthesis'
+			)
+		).toBe(false);
+		expect(
+			usesCompactFactualContext('Qui détient le dossier et quel est son identifiant ?', 'synthesis')
+		).toBe(true);
+	});
+
+	it('reserves reasoning synthesis for explanatory work', () => {
 		expect(generationOptionsFor('Compare les contrats', 'synthesis')).toEqual({
 			reasoning: 'on',
 			maxTokens: 1100,
@@ -27,6 +54,15 @@ describe('generationOptionsFor', () => {
 		expect(adaptGenerationOptions({ reasoning: 'on', maxTokens: 700 }, 'webllm')).toEqual({
 			reasoning: 'on',
 			maxTokens: 700
+		});
+	});
+
+	it('bounds refusal verification more tightly than answer correction', () => {
+		expect(verificationOptionsFor()).toEqual({ reasoning: 'off', maxTokens: 240, temperature: 0 });
+		expect(verificationOptionsFor(true)).toEqual({
+			reasoning: 'off',
+			maxTokens: 120,
+			temperature: 0
 		});
 	});
 });

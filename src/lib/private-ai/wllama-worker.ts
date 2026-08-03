@@ -100,7 +100,9 @@ async function generate(
 			completionTokens && firstTokenAt !== null && finished > firstTokenAt
 				? completionTokens / ((finished - firstTokenAt) / 1000)
 				: null,
-		completionTokens
+		completionTokens,
+		grammarInitMs: null,
+		grammarPerTokenMs: null
 	};
 }
 

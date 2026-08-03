@@ -220,16 +220,11 @@ export function splitQueryClauses(query: string): string[] {
 	return clauses.length > 1 ? clauses : [];
 }
 
-/** Elliptical measurement fragments have no subject of their own. Searching
- * them independently retrieves any nearby duration/amount in the corpus and
- * adds noise; the complete query still carries the requested slot and scope. */
+/** Keep only clauses with enough independent lexical mass for global search.
+ * Short elliptical clauses are resolved inside the anchor document by the
+ * chat's two-stage decomposition; searching them across all files adds noise. */
 function retrievalClauses(query: string): string[] {
-	return splitQueryClauses(query).filter((clause) => {
-		const normalized = normalizeForFuzzy(clause);
-		return !/^(?:(?:pendant|for)\s+)?(?:combien de temps|how long|quelle duree|what duration|jusqu a quel montant|how much|a quelle date|when)$/u.test(
-			normalized
-		);
-	});
+	return splitQueryClauses(query).filter((clause) => terms(clause).length >= 4);
 }
 
 export function retrievalQueryVariants(query: string): string[] {
@@ -251,8 +246,8 @@ export function retrievalQueryVariants(query: string): string[] {
 }
 
 /** Dense retrieval receives natural-language questions, never sparse keyword
- * expansions. Independent clauses are useful only when the route must gather
- * several facts; targeted questions keep one semantic vector. */
+ * expansions. Context-anchored clauses are useful only when the route must
+ * gather several facts; targeted questions keep one semantic vector. */
 export function denseRetrievalQueryVariants(
 	query: string,
 	route: QuestionRoute | undefined,

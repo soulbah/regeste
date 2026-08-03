@@ -5,10 +5,12 @@ import {
 	buildAnswerCoverageContract,
 	buildEvidenceInventory,
 	buildVerificationPrompt,
+	completeFactualAnswerPrefix,
 	buildVerificationUserPrompt,
 	citationGroundingCoverage,
 	compactCitationMarkers,
 	enforceAnswerInvariants,
+	hasCompleteFactualAnswer,
 	extractThink,
 	fitEvidenceToContext,
 	hasCollapsedIntoRepetition,
@@ -19,7 +21,8 @@ import {
 	statesTheValue,
 	needsGroundedVerification,
 	resolveCitations,
-	resolveTargetedCitations
+	resolveTargetedCitations,
+	verificationPreservesGrounding
 } from './prompt';
 import type { SearchHit } from '$lib/types';
 
@@ -39,6 +42,27 @@ describe('buildUserPrompt', () => {
 		expect(p).toContain('[1] (Contract.pdf · page 1)');
 		expect(p).toContain('[2] (Contract.pdf · page 2)');
 		expect(p.endsWith('Question: Q?')).toBe(true);
+	});
+
+	it('stops a coordinated factual stream after natural complete prose', () => {
+		expect(
+			hasCompleteFactualAnswer(
+				'À qui appartient le dossier et quel est son numéro ?',
+				'Le dossier appartient à Camille Moreau. Son numéro est 12345.'
+			)
+		).toBe(true);
+		expect(
+			hasCompleteFactualAnswer(
+				'À qui appartient le dossier et quel est son numéro ?',
+				'Le dossier appartient à Camille Moreau.'
+			)
+		).toBe(false);
+		expect(
+			completeFactualAnswerPrefix(
+				'À qui appartient le dossier et quel est son numéro ?',
+				'Le dossier appartient à Camille Moreau. Son numéro est 12345. Structured'
+			)
+		).toBe('Le dossier appartient à Camille Moreau. Son numéro est 12345.');
 	});
 
 	it('labels prior conversation as context rather than evidence', () => {
@@ -71,15 +95,17 @@ describe('buildUserPrompt', () => {
 		);
 	});
 
-	it('turns substantial coordinated requests into an explicit answer checklist', () => {
+	it('covers coordinated requests without asking for checklist-shaped output', () => {
 		const prompt = buildUserPrompt(
 			'Donne le total des ventes 2019 et le volume moyen par transaction American Express.',
 			[hit(1)]
 		);
-		expect(prompt).toContain('Requested parts (answer each one separately):');
+		expect(prompt).toContain('Facts the answer must cover');
+		expect(prompt).toContain('combine them into natural prose');
 		expect(prompt).toContain('1. Donne le total des ventes 2019');
 		expect(prompt).toContain('2. le volume moyen par transaction American Express.');
 		expect(prompt).toContain('Never mix numbers between parts or documents');
+		expect(prompt).not.toContain('Structured evidence inventory');
 	});
 
 	it('selects only structural, directional and multi-part answers for a verification pass', () => {
@@ -90,6 +116,18 @@ describe('buildUserPrompt', () => {
 				'Donne le total des ventes 2019 et le volume moyen par transaction American Express.'
 			)
 		).toBe(true);
+		expect(
+			needsGroundedVerification(
+				'Qui détient le compte et quel est son identifiant ?',
+				'Le compte appartient à Camille Moreau et porte le numéro 12345 [1].'
+			)
+		).toBe(false);
+		expect(
+			needsGroundedVerification(
+				'Qui détient le compte et quel est son identifiant ?',
+				'Le compte appartient à Camille Moreau et porte le numéro 12345.'
+			)
+		).toBe(false);
 		expect(needsGroundedVerification('Qui est le vendeur ?')).toBe(false);
 		expect(needsGroundedVerification('Qui est assuré par ce devis et avec qui ?')).toBe(false);
 		expect(needsGroundedVerification('Quels sont tous mes droits sur mes données ?')).toBe(true);
@@ -99,6 +137,15 @@ describe('buildUserPrompt', () => {
 		expect(needsGroundedVerification('Quel écart entre la prime annoncée et le total ?')).toBe(
 			true
 		);
+	});
+
+	it('removes internal evidence scaffolding copied after a complete answer', () => {
+		expect(
+			enforceAnswerInvariants(
+				'À qui appartient le dossier et quel est son numéro ?',
+				'Le dossier appartient à Camille Moreau. Son numéro est 12345.\nStructured evidence inventory:\n- dossier n° 12345 [1]'
+			)
+		).toBe('Le dossier appartient à Camille Moreau. Son numéro est 12345.');
 	});
 
 	it('does not verify simple questions with a "de … à" span or a leading framing clause', () => {
@@ -166,7 +213,7 @@ describe('buildUserPrompt', () => {
 			buildAnswerCoverageContract(
 				'Résume type, surface, période de construction, matériau et dépendances.'
 			)
-		).toContain('Answer each requested slot separately');
+		).toContain('Cover every requested slot');
 		expect(buildAnswerCoverageContract('Dans quel délai déclarer le sinistre ?')).toContain(
 			'exact starting event/trigger'
 		);
@@ -333,6 +380,15 @@ describe('buildUserPrompt', () => {
 		expect(enforceAnswerInvariants('Quel est le solde ?', 'Mon solde est de 10 € [1].')).toBe(
 			'Mon solde est de 10 € [1].'
 		);
+	});
+
+	it('drops a decoder field appendix after complete reader-facing prose', () => {
+		expect(
+			enforceAnswerInvariants(
+				'Quel niveau, quelle date et quel responsable ?',
+				'Le niveau est 42. La date est le 8 mars 2031. Le responsable est Camille Durand. [2] : Niveau : 42. [3] : Date : 8 mars 2031.'
+			)
+		).toBe('Le niveau est 42. La date est le 8 mars 2031. Le responsable est Camille Durand.');
 	});
 });
 
@@ -652,6 +708,23 @@ describe('isDegenerateAnswer — output that must never replace a draft', () => 
 
 	it('keeps a short answer that carries a citation', () => {
 		expect(isDegenerateAnswer('800 € HT [1].')).toBe(false);
+	});
+});
+
+describe('verification grounding monotonicity', () => {
+	it('does not replace a cited draft with an uncited output when evidence is sufficient', () => {
+		expect(verificationPreservesGrounding('Valeur étayée [2].', 'Sortie sans source.', true)).toBe(
+			false
+		);
+		expect(verificationPreservesGrounding('Valeur étayée [2].', 'Valeur corrigée [1].', true)).toBe(
+			true
+		);
+	});
+
+	it('allows an uncited output when evidence was independently judged insufficient', () => {
+		expect(verificationPreservesGrounding('Valeur supposée [2].', 'Aucune preuve.', false)).toBe(
+			true
+		);
 	});
 });
 

@@ -1,8 +1,27 @@
-import { describe, expect, it } from 'vitest';
-import { buildAnswerGrammar, matchesAnswerGrammar } from './answer-grammar';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+	ANSWER_GRAMMAR_KEY,
+	answerGrammarEnabled,
+	buildAnswerGrammar,
+	matchesAnswerGrammar
+} from './answer-grammar';
 
 const REFUSAL = "Je n'ai pas trouvé assez d'informations dans les documents joints pour répondre.";
 const options = { excerptCount: 3, refusal: REFUSAL };
+
+afterEach(() => vi.unstubAllGlobals());
+
+describe('the answer grammar switch', () => {
+	it('stays off by default and keeps an explicit benchmark opt-in', () => {
+		const values = new Map<string, string>();
+		vi.stubGlobal('localStorage', {
+			getItem: (key: string) => values.get(key) ?? null
+		});
+		expect(answerGrammarEnabled()).toBe(false);
+		values.set(ANSWER_GRAMMAR_KEY, 'on');
+		expect(answerGrammarEnabled()).toBe(true);
+	});
+});
 
 describe('the answer grammar', () => {
 	it('draws citation indices from the excerpts actually in the prompt', () => {

@@ -2,6 +2,11 @@ import { wrap, type Remote } from 'comlink';
 import { guardWorker } from '$lib/state/worker-health.svelte';
 import type { GenerationOptions, GenerationResult } from './generation';
 import type { LlmApi } from './llm-worker';
+import {
+	SERVICE_WORKER_RESTARTED,
+	ServiceWorkerLifecycle,
+	type ServiceRequest
+} from './service-worker-lifecycle';
 
 export interface WebLlmClient {
 	load(model: string, onProgress?: (progress: number, text: string) => void): Promise<void>;
@@ -11,13 +16,6 @@ export interface WebLlmClient {
 		options?: GenerationOptions
 	): Promise<GenerationResult>;
 	abort(): Promise<void>;
-}
-
-interface PendingRequest<T> {
-	resolve: (value: T) => void;
-	reject: (error: Error) => void;
-	onProgress?: (progress: number, text: string) => void;
-	onDelta?: (delta: string) => void;
 }
 
 type WorkerResponse =
@@ -30,7 +28,8 @@ let dedicated: Remote<LlmApi> | null = null;
 let serviceModel: string | null = null;
 let listenerInstalled = false;
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
-const pending = new Map<string, PendingRequest<unknown>>();
+let heartbeatInFlight = false;
+const serviceLifecycle = new ServiceWorkerLifecycle();
 
 function dedicatedClient(): Remote<LlmApi> {
 	if (!dedicated) {
@@ -47,33 +46,52 @@ function installListener(): void {
 	navigator.serviceWorker.addEventListener('message', (event: MessageEvent<WorkerResponse>) => {
 		const message = event.data;
 		if (!message || message.source !== 'regeste-llm') return;
-		const request = pending.get(message.id);
+		const request = serviceLifecycle.get(message.id);
 		if (!request) return;
 		if (message.kind === 'progress') request.onProgress?.(message.progress, message.text);
 		else if (message.kind === 'delta') request.onDelta?.(message.delta);
-		else if (message.kind === 'result') {
-			pending.delete(message.id);
-			request.resolve(message.result);
-		} else {
-			pending.delete(message.id);
-			request.reject(new Error(message.error));
-		}
+		else if (message.kind === 'result') serviceLifecycle.resolve(message.id, message.result);
+		else serviceLifecycle.reject(message.id, new Error(message.error));
+	});
+	navigator.serviceWorker.addEventListener('controllerchange', () => {
+		serviceLifecycle.controllerChanged();
 	});
 }
 
 function serviceRequest<T>(
-	kind: 'load' | 'generate' | 'abort',
+	kind: 'load' | 'generate' | 'abort' | 'ping',
 	payload: Record<string, unknown>,
-	callbacks: Pick<PendingRequest<T>, 'onProgress' | 'onDelta'> = {}
+	callbacks: Pick<ServiceRequest<T>, 'onProgress' | 'onDelta'> = {},
+	timeoutMs?: number
 ): Promise<T> {
 	installListener();
 	const controller = navigator.serviceWorker.controller;
 	if (!controller) return Promise.reject(new Error('inference service worker unavailable'));
 	const id = crypto.randomUUID();
 	return new Promise<T>((resolve, reject) => {
-		pending.set(id, { resolve: resolve as (value: unknown) => void, reject, ...callbacks });
+		serviceLifecycle.add(id, { resolve, reject, ...callbacks }, timeoutMs);
 		controller.postMessage({ source: 'regeste-llm', id, kind, ...payload });
 	});
+}
+
+async function probeServiceInstance(timeoutMs = 30_000): Promise<void> {
+	const instance = await serviceRequest<unknown>('ping', {}, {}, timeoutMs);
+	if (typeof instance !== 'string' || !instance)
+		throw new Error('inference service worker returned no boot id');
+	serviceLifecycle.observeInstance(instance);
+}
+
+function startHeartbeat(): void {
+	if (heartbeatTimer) return;
+	heartbeatTimer = setInterval(() => {
+		if (heartbeatInFlight) return;
+		heartbeatInFlight = true;
+		void probeServiceInstance()
+			.catch(() => serviceLifecycle.controllerChanged())
+			.finally(() => {
+				heartbeatInFlight = false;
+			});
+	}, 10_000);
 }
 
 async function waitForController(timeoutMs = 2000): Promise<boolean> {
@@ -98,17 +116,13 @@ async function loadService(
 	onProgress?: (progress: number, text: string) => void
 ): Promise<boolean> {
 	if (!(await waitForController())) return false;
+	// Establish worker identity before the long model load. The heartbeat then
+	// detects a browser killing this instance and booting another behind the
+	// same controller — the case controllerchange alone cannot see.
+	await probeServiceInstance(5_000);
+	startHeartbeat();
 	await serviceRequest<void>('load', { model }, { onProgress });
 	serviceModel = model;
-	if (!heartbeatTimer) {
-		heartbeatTimer = setInterval(() => {
-			navigator.serviceWorker.controller?.postMessage({
-				source: 'regeste-llm',
-				id: crypto.randomUUID(),
-				kind: 'ping'
-			});
-		}, 10_000);
-	}
 	return true;
 }
 
@@ -120,7 +134,11 @@ async function generateService(
 	try {
 		return await serviceRequest<GenerationResult>('generate', { messages, options }, { onDelta });
 	} catch (error) {
-		if (!serviceModel || !String(error).includes('not loaded')) throw error;
+		const recoverable =
+			String(error).includes('not loaded') ||
+			String(error).includes(SERVICE_WORKER_RESTARTED) ||
+			String(error).includes('timed out');
+		if (!serviceModel || !recoverable) throw error;
 		await loadService(serviceModel);
 		return serviceRequest<GenerationResult>('generate', { messages, options }, { onDelta });
 	}
@@ -128,7 +146,15 @@ async function generateService(
 
 export const webLlmClient: WebLlmClient = {
 	async load(model, onProgress) {
-		if (await loadService(model, onProgress)) return;
+		for (let attempt = 0; attempt < 2; attempt++) {
+			try {
+				if (await loadService(model, onProgress)) return;
+				break;
+			} catch (error) {
+				if (attempt === 0 && String(error).includes(SERVICE_WORKER_RESTARTED)) continue;
+				throw error;
+			}
+		}
 		await dedicatedClient().load(model, onProgress);
 	},
 

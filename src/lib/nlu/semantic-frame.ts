@@ -306,6 +306,10 @@ function detectLocale(question: string): 'fr' | 'en' {
 }
 
 function referencesPrevious(question: string): boolean {
+	// A self-contained multi-part question may use a possessive in its second
+	// part ("who owns X and what is its number?"). Its explicit first part is the
+	// antecedent; dialogue history must not replace it.
+	if (hasCoordinatedFactQuestions(question)) return false;
 	// French subject-verb inversion writes its clitic with a hyphen
 	// ("AWP accuse-t-il…", "répond-il") — the pronoun is grammar, not an
 	// anaphor, whatever the verb. The verb-list rewrite below only covers

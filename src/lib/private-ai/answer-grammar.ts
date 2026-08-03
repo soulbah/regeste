@@ -23,10 +23,10 @@ export const ANSWER_GRAMMAR_KEY = 'regeste:answer-grammar';
  * Is the decoder constrained on targeted answers?
  *
  * Off until the stress benchmark has been run both ways. The grammar removes
- * whole classes of structural defect, but it also forces a citation onto every
- * sentence, and [format restrictions are measured to cost reasoning quality on
- * some tasks](https://arxiv.org/pdf/2408.02442). Flipping the default without
- * the numbers would trade a known problem for an unknown one.
+ * whole classes of structural defect, but a shape constraint can also push a
+ * small model into copying irrelevant evidence. `on` remains a session-level
+ * benchmark switch so quality and decoder overhead stay measurable on the same
+ * model and documents.
  */
 export function answerGrammarEnabled(): boolean {
 	if (typeof localStorage === 'undefined') return false;

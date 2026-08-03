@@ -129,6 +129,15 @@ describe('buildRetrievalContext', () => {
 		expect(needsRetrievalContext('What about their address?')).toBe(true);
 	});
 
+	it('resolves a possessive inside a coordinated question without prior-turn context', () => {
+		expect(needsRetrievalContext('Qui dirige cette société et quel est son identifiant ?')).toBe(
+			false
+		);
+		expect(needsRetrievalContext('À qui appartient le compte et quel est son numéro ?')).toBe(
+			false
+		);
+	});
+
 	it('puts the current aggregate scope before the referenced question', () => {
 		const current = 'Et en mai ?';
 		const context = buildRetrievalContext(
