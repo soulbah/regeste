@@ -363,10 +363,8 @@ class ChatsStore {
 			financial_role: 'clarification.financialRole',
 			intent: 'clarification.intent',
 			time: 'clarification.time',
-			entity: 'clarification.entity',
 			document: 'clarification.document',
-			unit_currency: 'clarification.unitCurrency',
-			multi_part: 'clarification.multiPart'
+			unit_currency: 'clarification.unitCurrency'
 		} as const;
 		const messageId = crypto.randomUUID();
 		await db.insertMessage({

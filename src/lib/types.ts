@@ -125,15 +125,7 @@ export interface MethodSummary {
 	reasoningMs?: number | null;
 	calculation?: string | null;
 	clarification?:
-		| 'scope'
-		| 'financial_role'
-		| 'intent'
-		| 'time'
-		| 'entity'
-		| 'document'
-		| 'unit_currency'
-		| 'multi_part'
-		| null;
+		'scope' | 'financial_role' | 'intent' | 'time' | 'document' | 'unit_currency' | null;
 }
 
 export interface WorkStep {

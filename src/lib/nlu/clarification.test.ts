@@ -4,8 +4,8 @@ import { contextualClarification } from './clarification';
 
 describe('contextual clarification dimensions', () => {
 	it.each([
-		['Et lui ?', false, 1, 'entity'],
-		['Qui est Malik ? Où habite-t-il ?', true, 2, 'multi_part']
+		['Et lui ?', false, 1, null],
+		['Qui est Malik ? Où habite-t-il ?', true, 2, null]
 	] as const)('%s', (question, hasConversationContext, documentCount, expected) => {
 		expect(
 			contextualClarification(question, analyzeQuestion(question), {
@@ -31,9 +31,9 @@ describe('contextual clarification dimensions', () => {
 		}
 	);
 
-	it('does not ask which entity when a demonstrative names its noun', () => {
-		// Regression: "cette fiche de paie" asked "De quelle personne ou de quel
-		// sujet précédent parlez-vous ?" on the first turn with a document attached.
+	it('never asks the opaque entity clarification', () => {
+		// Regression: "cette fiche de paie" triggered an opaque entity
+		// clarification on the first turn with a document attached.
 		expect(
 			contextualClarification(
 				'Quel est le salaire dans cette fiche de paie ?',
@@ -46,13 +46,13 @@ describe('contextual clarification dimensions', () => {
 				hasConversationContext: false,
 				documentCount: 2
 			})
-		).toBe('entity');
+		).toBeNull();
 	});
 
 	it('never reads a hyphenated inversion clitic as a back-reference', () => {
 		// Regression: "AWP accuse-t-il réception … et répond-il ?" asked
-		// "De quelle personne parlez-vous ?" on the first turn — the named
-		// subject (AWP) IS the referent; "-t-il"/"-il" is inversion grammar.
+		// An entity clarification fired on the first turn — the named subject
+		// (AWP) IS the referent; "-t-il"/"-il" is inversion grammar.
 		const question =
 			'Sous quels délais AWP accuse-t-il réception d’une réclamation écrite et répond-il ?';
 		expect(analyzeQuestion(question).referencesPrevious).toBe(false);
@@ -69,7 +69,8 @@ describe('contextual clarification dimensions', () => {
 	it('resolves possessives inside self-contained coordinated questions', () => {
 		for (const question of [
 			'Qui dirige cette société et quel est son identifiant ?',
-			'À qui appartient le compte et quel est son numéro ?'
+			'À qui appartient le compte et quel est son numéro ?',
+			'Quel est le montant du RAPO ? Et celui du TA ?'
 		]) {
 			expect(analyzeQuestion(question).referencesPrevious).toBe(false);
 			expect(

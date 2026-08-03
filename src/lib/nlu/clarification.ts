@@ -1,15 +1,9 @@
-import { normalizeQuestion, type ClarificationKind, type SemanticFrame } from './semantic-frame';
+import type { ClarificationKind, SemanticFrame } from './semantic-frame';
 
 export interface ClarificationContext {
 	hasConversationContext: boolean;
 	documentCount: number;
 }
-
-// "cette fiche de paie", "ce contrat": the noun names the referent (usually the
-// attached document), so there is nothing to clarify. Only bare back-references
-// ("Et lui ?", "ce dernier") leave the entity genuinely unresolved.
-const DEMONSTRATIVE_WITH_NOUN =
-	/\b(?:ce|cet|cette|ces|this|that|these|those)\s+(?!derni|latter)\p{L}{3,}/u;
 
 /** Does the question name a specific thing, rather than only an operation?
  *  Capitalised tokens away from the opening word: RAPO, TA, Sécuriplus, Nantes. */
@@ -37,13 +31,9 @@ export function contextualClarification(
 	// its own to recognise.
 	if (frame.clarification === 'scope' && namesItsSubject(question)) return null;
 	if (frame.clarification) return frame.clarification;
-	const normalized = normalizeQuestion(question);
-	if (
-		frame.referencesPrevious &&
-		!context.hasConversationContext &&
-		!DEMONSTRATIVE_WITH_NOUN.test(normalized)
-	)
-		return 'entity';
-	if ((question.match(/\?/g)?.length ?? 0) > 1) return 'multi_part';
+	// An unresolved pronoun is not grounds for the opaque “Which person or
+	// earlier subject?” turn. Search selected documents best-effort; retrieval
+	// context resolves real follow-ups, while first-turn pronouns often refer to
+	// the only plausible entity in an attached document.
 	return null;
 }

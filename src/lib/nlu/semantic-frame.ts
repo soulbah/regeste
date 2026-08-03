@@ -6,14 +6,7 @@ export type FinancialRole =
 	'sent' | 'received' | 'fee' | 'debited' | 'total_ttc' | 'subtotal' | 'tax';
 export type QueryScopeKind = 'collection' | 'record' | 'page' | 'temporal' | 'unspecified';
 export type ClarificationKind =
-	| 'scope'
-	| 'financial_role'
-	| 'intent'
-	| 'time'
-	| 'entity'
-	| 'document'
-	| 'unit_currency'
-	| 'multi_part';
+	'scope' | 'financial_role' | 'intent' | 'time' | 'document' | 'unit_currency';
 
 export interface TemporalScope {
 	start: string | null;
@@ -352,6 +345,11 @@ function targetsSingleRecord(q: string, identifiers: string[]): boolean {
  * list of document-domain words. */
 export function hasCoordinatedFactQuestions(question: string): boolean {
 	const q = normalizeQuestion(question);
+	// Two explicit question boundaries in one message are already two requested
+	// facts. This also gives a pronoun in the second sentence an in-turn
+	// antecedent instead of borrowing an unrelated previous chat answer.
+	const currentTurn = question.split(/\nPrevious question:/u, 1)[0];
+	if ((currentTurn.match(/\?/gu)?.length ?? 0) >= 2) return true;
 	const hasCoordinator = /(?:,|;|\b(?:et|and)\b)/u.test(q);
 	if (!hasCoordinator) return false;
 	const interrogatives =
@@ -394,7 +392,7 @@ export function analyzeQuestion(question: string): SemanticFrame {
 	) {
 		roles = roles.filter((role) => role !== 'sent');
 	}
-	const coordinatedFacts = hasCoordinatedFactQuestions(q);
+	const coordinatedFacts = hasCoordinatedFactQuestions(question);
 	const synthesis =
 		coordinatedFacts || SYNTHESIS_CONCEPTS.some((concept) => phraseMatches(q, concept));
 	const collection = COLLECTION_CONCEPTS.some((concept) => phraseMatches(q, concept));

@@ -55,11 +55,20 @@ fixture; the accent pair (`coûte` / `coute`) classifies identically.
 
 ## T4 — Migrate Type B, file by file
 
-`todo` — after T5/T6, since most of these lists only feed corrections that go away
+`doing` — `execution-plan.ts` and `clarification.ts` complete
 
 `execution-plan.ts` (3) → `clarification.ts` (3) → `semantic-frame.ts` (10) →
 `relevance.ts` (14) → `retrieval.ts` (23) → `extractive-answer.ts` (41). Each
 list is deleted in the same change that lands its class, never before.
+
+Completed 2026-08-03: the three dead execution-plan intent classifiers were
+deleted; the clarification module now contains zero vocabulary candidates. It
+never emits entity or multi-part clarifications: retrieval context resolves a
+real follow-up, while first-turn pronouns and several questions are answered
+best-effort from selected documents. The corresponding user-facing strings and
+types are gone, so those opaque prompts cannot reappear through another call
+site. Scope remains temporarily in the frame for aggregate analysis, but the
+chat path suppresses it after retrieval under spec 035.
 
 **Done when:** each file's word-list count is zero, `bun run verify` is green
 after each, and the stress benchmark shows no regressed answer group.
