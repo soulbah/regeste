@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { SearchHit } from '$lib/types';
-import { buildDeterministicExtractiveAnswer } from './extractive-answer';
+import {
+	buildAuditedExtractiveAnswer,
+	buildDeterministicExtractiveAnswer
+} from './extractive-answer';
 import { checkNumericGrounding } from './grounding';
+import { answerClauseCoverageRatio } from './prompt';
 
 const hit = (chunkId: number, text: string, page = 1, seq = chunkId): SearchHit => ({
 	chunkId,
@@ -58,6 +62,21 @@ describe('deterministic extractive answers', () => {
 		).toBe(true);
 	});
 
+	it('states a proven total once without a redundant parenthetical equation', () => {
+		const answer = buildDeterministicExtractiveAnswer(
+			'Quel est le montant total des deux phases ?',
+			[
+				hit(1, 'Montant total : 2000 € HT', 10, 10),
+				hit(2, 'Phase A : 1100 € HT\nPhase B : 900 € HT', 10, 11)
+			]
+		);
+
+		expect(answer).toBe(
+			'Le montant total ressort du calcul suivant : 1100 € HT + 900 € HT = 2000 € HT [2][1].'
+		);
+		expect(answer).not.toContain('(');
+	});
+
 	it('declines an exact-value reverse lookup when evidence carries another value', () => {
 		expect(
 			buildDeterministicExtractiveAnswer('Que couvre le forfait de 275 € ?', [
@@ -78,6 +97,28 @@ describe('deterministic extractive answers', () => {
 				]
 			)
 		).toBeNull();
+	});
+
+	it('audits an identity pair retrieved beside another natural multi-part request', () => {
+		const question =
+			'Quel est le solde du compte, à quelle date l’attestation a-t-elle été signée et qui l’a signée ?';
+		const queries = [
+			'Quel est le solde du compte',
+			'à quelle date l’attestation a-t-elle été signée et qui l’a signée'
+		];
+		const answer = buildAuditedExtractiveAnswer(
+			question,
+			[
+				hit(
+					1,
+					'Compte n° 60012345678 ouvert au nom de KARIM TRAORE. Solde créditeur : 1 234,56 EUR. Fait le 23 juillet 2026. AMELIE ROUSSEAU.'
+				)
+			],
+			queries
+		);
+
+		expect(answer?.needsAudit).toBe(true);
+		expect(answerClauseCoverageRatio(question, answer!.answer, queries)).toBeLessThan(0.8);
 	});
 
 	it('answers a cross-passage numeric contradiction without smoothing it over', () => {
@@ -131,6 +172,7 @@ describe('deterministic extractive answers', () => {
 
 		expect(answer).toContain('3000 € HT');
 		expect(answer).toContain('1000 € HT + 1250 € HT + 750 € HT = 3000 € HT');
+		expect(answer).not.toContain('(');
 		expect(
 			checkNumericGrounding(
 				answer!,
@@ -674,6 +716,77 @@ describe('deterministic extractive answers', () => {
 			]
 		);
 		expect(answer).toBe('Le dossier n° 987654321 est ouvert au nom de CAMILLE MOREAU [1].');
+	});
+
+	it('answers a targeted long identifier from its printed label relation', () => {
+		const answer = buildDeterministicExtractiveAnswer('Et quel est le numéro du compte ?', [
+			hit(
+				1,
+				'Nous certifions que le compte n° 60012345678 ouvert au nom de KARIM TRAORE présente un solde positif.'
+			)
+		]);
+
+		expect(answer).toBe('Le numéro demandé est 60012345678 [1].');
+	});
+
+	it('answers the same structural identifier relation in English', () => {
+		const answer = buildDeterministicExtractiveAnswer('What is the account number?', [
+			hit(1, 'We certify that account n° 60012345678 is opened in the name of JANE DOE.')
+		]);
+
+		expect(answer).toBe('The requested number is 60012345678 [1].');
+	});
+
+	it('does not mistake several search rewrites for several requested facts', () => {
+		const answer = buildDeterministicExtractiveAnswer(
+			'Et quel est le numéro du compte ?',
+			[
+				hit(
+					1,
+					'Nous certifions que le compte n° 60012345678 ouvert au nom de KARIM TRAORE.'
+				)
+			],
+			['numéro du compte', 'identifiant bancaire du compte']
+		);
+
+		expect(answer).toBe('Le numéro demandé est 60012345678 [1].');
+	});
+
+	it.each([
+		[
+			'Quel nom et numéro du compte ?',
+			['nom du compte', 'numéro du compte'],
+			'Compte n° 60012345678 ouvert au nom de KARIM TRAORE.'
+		],
+		[
+			'Which name and account number?',
+			['account holder name', 'account number'],
+			'Account n° 60012345678 opened in the name of KARIM TRAORE.'
+		]
+	])(
+		'leaves a shared-interrogative multi-slot lookup to synthesis: %s',
+		(question, queries, text) => {
+			expect(buildDeterministicExtractiveAnswer(question, [hit(1, text)], queries)).toBeNull();
+		}
+	);
+
+	it('does not substitute a nearby identifier for another requested attribute', () => {
+		expect(
+			buildDeterministicExtractiveAnswer('Quel est le solde du compte ?', [
+				hit(
+					1,
+					'Compte n° 60012345678 ouvert au nom de KARIM TRAORE. Solde créditeur : 1 234,56 EUR.'
+				)
+			])
+		).toBeNull();
+	});
+
+	it('does not confuse another labelled identifier with the requested one', () => {
+		expect(
+			buildDeterministicExtractiveAnswer('Quel est le numéro du compte ?', [
+				hit(1, 'SIRET n° 987654321 — conditions particulières du cabinet.')
+			])
+		).toBeNull();
 	});
 
 	it('joins an incomplete consequence to its immediate continuation', () => {

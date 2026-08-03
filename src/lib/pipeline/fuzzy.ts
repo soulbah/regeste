@@ -54,7 +54,11 @@ function cachedCoverage(
 /** Language-library stopword filtering for sparse retrieval channels. Dense
  * retrieval still receives the untouched question. If everything is filtered,
  * preserve the original tokens so short queries never become empty. */
-export function significantQueryTokens(text: string, minimumLength = 2): string[] {
+export function significantQueryTokens(
+	text: string,
+	minimumLength = 2,
+	fallbackToAll = true
+): string[] {
 	const tokens = normalizeForFuzzy(text)
 		.split(' ')
 		.filter((token) => token.length >= minimumLength);
@@ -72,7 +76,7 @@ export function significantQueryTokens(text: string, minimumLength = 2): string[
 	]);
 	const retained = new Set(removeStopwords(tokens, RETRIEVAL_STOPWORDS));
 	const significant = tokens.filter((token) => retained.has(token) || protectedTokens.has(token));
-	return significant.length ? significant : tokens;
+	return significant.length || !fallbackToAll ? significant : tokens;
 }
 
 /** Language-agnostic sparse view for the two product languages. Prefixing

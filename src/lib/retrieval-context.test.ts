@@ -136,6 +136,61 @@ describe('buildRetrievalContext', () => {
 		expect(needsRetrievalContext('What about their address?')).toBe(true);
 	});
 
+	it('does not pin a self-contained subject introduced by a discourse connector', () => {
+		const current = 'Et quel est le numéro du compte ?';
+		const context = buildRetrievalContext(
+			[
+				message('user', 'Quel est le coût total du recours ?'),
+				message('assistant', 'Le total est de 2 000 € HT [1].', 'private', 'answer-1'),
+				message('user', current)
+			],
+			current,
+			false,
+			new Set(),
+			{ 'answer-1': [{ documentName: 'recours.pdf' }] }
+		);
+
+		expect(context?.evidenceDocumentNames).toEqual([]);
+		expect(context?.searchQuery).toBe(current);
+		expect(context?.analysisQuery).toBe(current);
+		expect(context?.resolvedQuestion).toBe(current);
+	});
+
+	it('still pins a cited lane when the continuation contains an anaphor', () => {
+		const current = 'Et quel est son numéro ?';
+		const context = buildRetrievalContext(
+			[
+				message('user', 'À qui appartient le compte ?'),
+				message('assistant', 'Il appartient à KARIM TRAORE [1].', 'private', 'answer-1'),
+				message('user', current)
+			],
+			current,
+			false,
+			new Set(),
+			{ 'answer-1': [{ documentName: 'attestation.pdf' }] }
+		);
+
+		expect(context?.evidenceDocumentNames).toEqual(['attestation.pdf']);
+	});
+
+	it('keeps an English all-pronoun continuation in the cited lane', () => {
+		const current = 'And what about it?';
+		const context = buildRetrievalContext(
+			[
+				message('user', 'What is the contract duration?'),
+				message('assistant', 'It lasts twelve months [1].', 'private', 'answer-1'),
+				message('user', current)
+			],
+			current,
+			false,
+			new Set(),
+			{ 'answer-1': [{ documentName: 'contract.pdf' }] }
+		);
+
+		expect(context?.evidenceDocumentNames).toEqual(['contract.pdf']);
+		expect(context?.searchQuery).toContain('twelve months');
+	});
+
 	it('resolves a possessive inside a coordinated question without prior-turn context', () => {
 		expect(needsRetrievalContext('Qui dirige cette société et quel est son identifiant ?')).toBe(
 			false
@@ -150,13 +205,18 @@ describe('buildRetrievalContext', () => {
 		const context = buildRetrievalContext(
 			[
 				message('user', 'Combien ai-je envoyé en juin ?'),
-				message('assistant', 'La somme est 320,00 € [1][2][3].'),
+				message('assistant', 'La somme est 320,00 € [1][2][3].', 'private', 'answer-1'),
 				message('user', current)
 			],
-			current
+			current,
+			false,
+			new Set(),
+			{ 'answer-1': [{ documentName: 'releve.pdf' }] }
 		);
 		expect(context?.analysisQuery.startsWith('Et en mai ?')).toBe(true);
 		expect(context?.analysisQuery).toContain('Combien ai-je envoyé en juin ?');
+		expect(context?.searchQuery).toContain('320,00 €');
+		expect(context?.evidenceDocumentNames).toEqual(['releve.pdf']);
 	});
 
 	it('binds a clarification reply to the original question even without a pronoun', () => {

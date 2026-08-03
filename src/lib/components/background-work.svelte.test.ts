@@ -37,6 +37,12 @@ describe('background model work', () => {
 		expect(host.textContent).not.toContain('0%');
 		expect(host.querySelector('.model-loading-indicator')).not.toBeNull();
 
+		llmStore.progress = 0.004;
+		flushSync();
+		expect(host.textContent).toContain('Downloading the model');
+		expect(host.textContent).toContain('<1%');
+		expect(host.textContent).not.toContain('0%');
+
 		llmStore.progress = 0.05;
 		flushSync();
 		expect(host.textContent).toContain('Downloading the model');

@@ -125,6 +125,7 @@ type RequestMessage =
 			source: 'regeste-llm';
 			id: string;
 			kind: 'generate';
+			model: string;
 			messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>;
 			options: GenerationOptions;
 	  }
@@ -159,6 +160,9 @@ async function load(
 				onProgress({ progress: 1, text: 'Model already loaded' });
 				return;
 			}
+			// reload() mutates engine state. From here until success, no previous
+			// model may be advertised as usable.
+			loadedModel = null;
 			if (!engine) {
 				// Keep the engine handle before reload starts. MLCEngine.unload() aborts
 				// its reload controller, but CreateMLCEngine only returns the handle after
@@ -172,7 +176,11 @@ async function load(
 				try {
 					await created.reload(model);
 				} catch (error) {
-					if (engine === created) engine = null;
+					if (engine === created) {
+						engine = null;
+						loadedModel = null;
+						await created.unload().catch(() => undefined);
+					}
 					throw error;
 				}
 				if (generation !== loadGeneration) {
@@ -183,7 +191,16 @@ async function load(
 			} else {
 				const current = engine;
 				current.setInitProgressCallback(onProgress);
-				await current.reload(model);
+				try {
+					await current.reload(model);
+				} catch (error) {
+					if (engine === current) {
+						engine = null;
+						loadedModel = null;
+					}
+					await current.unload().catch(() => undefined);
+					throw error;
+				}
 				if (generation !== loadGeneration) throw new Error('model load cancelled');
 			}
 			loadedModel = model;
@@ -193,6 +210,9 @@ async function load(
 
 async function unload(): Promise<void> {
 	loadGeneration++;
+	// Generation owns the same exclusive gate as reload. Interrupt it before
+	// waiting for that gate, otherwise a wipe would wait for every remaining token.
+	await engine?.interruptGenerate().catch(() => undefined);
 	await modelLoads.cancelAndRunExclusive(async () => {
 		const current = engine;
 		engine = null;
@@ -205,42 +225,47 @@ async function unload(): Promise<void> {
 }
 
 async function generate(
+	model: string,
 	messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
 	options: GenerationOptions,
 	onDelta: (delta: string) => void
 ): Promise<GenerationResult> {
-	if (!engine) throw new Error('private engine not loaded');
-	const started = performance.now();
-	let firstTokenAt: number | null = null;
-	let completionTokens: number | null = null;
-	let text = '';
-	const chunks = await engine.chat.completions.create({
-		messages,
-		stream: true,
-		temperature: 0.2,
-		max_tokens: options.maxTokens,
-		extra_body: { enable_thinking: options.reasoning === 'on' },
-		stream_options: { include_usage: true }
-	});
-	for await (const chunk of chunks) {
-		const delta = chunk.choices[0]?.delta?.content ?? '';
-		if (delta) {
-			firstTokenAt ??= performance.now();
-			text += delta;
-			onDelta(delta);
+	return modelLoads.runExclusive(async () => {
+		if (!engine || !loadedModel) throw new Error('private engine not loaded');
+		if (loadedModel !== model) throw new Error('private engine model changed');
+		const current = engine;
+		const started = performance.now();
+		let firstTokenAt: number | null = null;
+		let completionTokens: number | null = null;
+		let text = '';
+		const chunks = await current.chat.completions.create({
+			messages,
+			stream: true,
+			temperature: 0.2,
+			max_tokens: options.maxTokens,
+			extra_body: { enable_thinking: options.reasoning === 'on' },
+			stream_options: { include_usage: true }
+		});
+		for await (const chunk of chunks) {
+			const delta = chunk.choices[0]?.delta?.content ?? '';
+			if (delta) {
+				firstTokenAt ??= performance.now();
+				text += delta;
+				onDelta(delta);
+			}
+			completionTokens = chunk.usage?.completion_tokens ?? completionTokens;
 		}
-		completionTokens = chunk.usage?.completion_tokens ?? completionTokens;
-	}
-	const finished = performance.now();
-	return {
-		text,
-		ttftMs: firstTokenAt === null ? null : firstTokenAt - started,
-		tokensPerSecond:
-			completionTokens && firstTokenAt !== null && finished > firstTokenAt
-				? completionTokens / ((finished - firstTokenAt) / 1000)
-				: null,
-		completionTokens
-	};
+		const finished = performance.now();
+		return {
+			text,
+			ttftMs: firstTokenAt === null ? null : firstTokenAt - started,
+			tokensPerSecond:
+				completionTokens && firstTokenAt !== null && finished > firstTokenAt
+					? completionTokens / ((finished - firstTokenAt) / 1000)
+					: null,
+			completionTokens
+		};
+	});
 }
 
 // No skipWaiting: an update that activated mid-session would delete the shell
@@ -317,7 +342,7 @@ sw.addEventListener('message', (event: ExtendableMessageEvent) => {
 				}
 				if (message.kind === 'load') await load(client, message.id, message.model);
 				else if (message.kind === 'generate') {
-					const result = await generate(message.messages, message.options, (delta) =>
+					const result = await generate(message.model, message.messages, message.options, (delta) =>
 						reply(client, { id: message.id, kind: 'delta', delta })
 					);
 					reply(client, { id: message.id, kind: 'result', result });
@@ -329,7 +354,8 @@ sw.addEventListener('message', (event: ExtendableMessageEvent) => {
 				reply(client, {
 					id: message.id,
 					kind: 'error',
-					error: error instanceof Error ? error.message : String(error)
+					error: error instanceof Error ? error.message : String(error),
+					errorName: error instanceof Error ? error.name : 'Error'
 				});
 			}
 		})()

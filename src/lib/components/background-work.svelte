@@ -14,6 +14,7 @@
 	// is now two named steps, and the second says why it is slow.
 	import { Progress } from '$lib/components/ui/progress';
 	import { llmStore } from '$lib/private-ai/llm.svelte';
+	import { modelProgressDisplay } from '$lib/private-ai/model-progress';
 	import { documentsStore } from '$lib/state/documents.svelte';
 	import { t } from '$lib/i18n/index.svelte';
 
@@ -23,6 +24,8 @@
 		body: string;
 		/** 0-100, or null when the work reports no measurable progress. */
 		percent: number | null;
+		/** Human label when rounding the visual value would lie. */
+		percentLabel?: string;
 		/** Right-aligned count, for work measured in whole units rather than %. */
 		tally?: string;
 	}
@@ -30,7 +33,8 @@
 	const jobs = $derived.by<Job[]>(() => {
 		const rows: Job[] = [];
 		if (llmStore.status === 'downloading') {
-			const started = llmStore.progress > 0;
+			const measured = modelProgressDisplay(llmStore.progress);
+			const started = measured !== null;
 			rows.push({
 				id: 'model-download',
 				title: t(started ? 'work.model.downloading.title' : 'work.model.starting.title'),
@@ -40,7 +44,8 @@
 				// Before the first measured byte, 0% is not progress. A moving
 				// indicator tells the truth while the service worker and model manifest
 				// start; the numerical bar appears only when WebLLM reports a number.
-				percent: started ? Math.round(llmStore.progress * 100) : null
+				percent: measured?.value ?? null,
+				percentLabel: measured?.label
 			});
 		} else if (llmStore.status === 'loading') {
 			// No percentage here on purpose: the engine reports none for this
@@ -74,7 +79,7 @@
 					<p
 						class="text-muted-foreground shrink-0 font-mono text-[10px] tracking-wider tabular-nums"
 					>
-						{job.tally ?? (job.percent !== null ? `${job.percent}%` : '')}
+						{job.tally ?? job.percentLabel ?? (job.percent !== null ? `${job.percent}%` : '')}
 					</p>
 				</div>
 				<p class="text-muted-foreground mt-0.5 text-[11px] leading-relaxed">{job.body}</p>

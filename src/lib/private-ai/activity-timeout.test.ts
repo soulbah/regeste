@@ -1,11 +1,28 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ActivityTimeoutError, withActivityTimeout } from './activity-timeout';
+import {
+	ActivityTimeoutError,
+	measuredProgressActivity,
+	withActivityTimeout
+} from './activity-timeout';
 
 afterEach(() => {
 	vi.useRealTimers();
 });
 
 describe('activity timeout', () => {
+	it('ignores setup zeroes until measured progress begins', () => {
+		const activity = vi.fn();
+		const report = measuredProgressActivity(activity);
+
+		report(0);
+		report(Number.NaN);
+		expect(activity).not.toHaveBeenCalled();
+
+		report(0.001);
+		report(0);
+		expect(activity).toHaveBeenCalledTimes(2);
+	});
+
 	it('resolves work that completes inside the inactivity window', async () => {
 		vi.useFakeTimers();
 		const cleanup = vi.fn();

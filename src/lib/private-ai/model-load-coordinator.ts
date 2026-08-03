@@ -68,7 +68,7 @@ export class ModelLoadCoordinator<T> {
 	}
 
 	/** Block new loads, drain current flight, then mutate engine ownership. */
-	async runExclusive(operation: () => Promise<void>): Promise<void> {
+	async runExclusive<Result>(operation: () => Promise<Result>): Promise<Result> {
 		for (;;) {
 			if (this.exclusiveGate) {
 				await this.exclusiveGate.catch(() => undefined);
@@ -81,12 +81,11 @@ export class ModelLoadCoordinator<T> {
 			this.exclusiveGate = gate;
 			try {
 				await this.waitForIdle();
-				await operation();
+				return await operation();
 			} finally {
 				if (this.exclusiveGate === gate) this.exclusiveGate = null;
 				release();
 			}
-			return;
 		}
 	}
 
@@ -106,8 +105,14 @@ export class ModelLoadCoordinator<T> {
 			});
 			this.exclusiveGate = gate;
 			try {
-				await cancel();
-				await this.waitForIdle();
+				// Keep the gate until the flight settles even when engine cancellation
+				// itself rejects. Releasing it from that error path lets a fresh load
+				// overlap the still-unwinding engine the wipe was meant to stop.
+				try {
+					await cancel();
+				} finally {
+					await this.waitForIdle();
+				}
 			} finally {
 				if (this.exclusiveGate === gate) this.exclusiveGate = null;
 				release();

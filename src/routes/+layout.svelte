@@ -4,7 +4,7 @@
 	import { ModeWatcher } from 'mode-watcher';
 	import { toast } from 'svelte-sonner';
 	import { Toaster } from '$lib/components/ui/sonner';
-	import { beforeNavigate, goto } from '$app/navigation';
+	import { afterNavigate, beforeNavigate, goto, replaceState } from '$app/navigation';
 	import { browser } from '$app/environment';
 	import { resolve } from '$app/paths';
 	import { openInNewTab } from '$lib/external-page';
@@ -31,9 +31,9 @@
 	let { children } = $props();
 	const wipeContext = browser
 		? panicWipeContext(new URL(window.location.href))
-		: { active: false, locale: 'en' as const };
+		: { active: false, complete: false, locale: 'en' as const };
 	const panicWipe = wipeContext.active;
-	if (panicWipe) i18n.locale = wipeContext.locale;
+	if (panicWipe || wipeContext.complete) i18n.locale = wipeContext.locale;
 
 	// On routes with a contextual panel (chat, documents), the viewer rides that
 	// panel. Elsewhere the right pane doesn't exist, so ⌘K document results open
@@ -111,12 +111,24 @@
 		}
 		if (dbBooted) return;
 		dbBooted = true;
-		i18n.init();
+		i18n.init(wipeContext.complete ? wipeContext.locale : undefined);
 		pwaStore.init();
 		guardDb(documentsStore.init());
 		guardDb(chatsStore.refresh());
 		// Offline switch loads first so a forced-offline session never phones home.
 		guardDb(settingsStore.init().then(() => sessionStore.refresh()));
+	});
+
+	// The isolated wipe boot must restart the runtime once so no closed database
+	// or terminated worker remains mounted. Confirm that restart in plain sight,
+	// preserve the chosen language, then remove the one-shot URL marker without
+	// another navigation.
+	let wipeCompletionShown = false;
+	afterNavigate(() => {
+		if (!wipeContext.complete || wipeCompletionShown) return;
+		wipeCompletionShown = true;
+		toast.success(t('settings.wipe.complete'));
+		replaceState(resolve('/chat'), {});
 	});
 
 	// Spec 030 — the service worker hosts WebLLM AND caches the app shell, in

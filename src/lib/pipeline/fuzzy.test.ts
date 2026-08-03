@@ -35,6 +35,10 @@ describe('fuzzy retrieval views', () => {
 			'quote'
 		]);
 	});
+	it('can report that a fragment contains no substantive token', () => {
+		expect(significantQueryTokens('And what about it?', 3, false)).toEqual([]);
+		expect(significantQueryTokens('And what about it?', 3)).not.toEqual([]);
+	});
 	it('preserves stopword components inside meaningful hyphenated compounds', () => {
 		expect(significantQueryTokens('Que se passe-t-il en cas de sous-assurance ?')).toEqual(
 			expect.arrayContaining(['sous', 'assurance'])

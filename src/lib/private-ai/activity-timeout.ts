@@ -5,6 +5,23 @@ export class ActivityTimeoutError extends Error {
 	}
 }
 
+/**
+ * Turn measured 0..1 progress into watchdog activity.
+ *
+ * WebLLM emits a zero-valued setup callback before any model shard has arrived.
+ * Treating that callback as progress replaced the short startup deadline with
+ * the much longer idle deadline while the UI still showed no measurable work.
+ * Once a positive value has arrived, later zeroes are activity too: WebLLM
+ * resets progress when it moves from cache download to memory loading.
+ */
+export function measuredProgressActivity(activity: () => void): (progress: number) => void {
+	let started = false;
+	return (progress) => {
+		if (Number.isFinite(progress) && progress > 0) started = true;
+		if (started) activity();
+	};
+}
+
 /** Reject work that stops reporting activity, while allowing slow work that
  * continues to advance. The timeout callback owns cancellation because only
  * the caller knows which worker or request must be discarded. */

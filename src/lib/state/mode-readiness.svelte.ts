@@ -7,6 +7,7 @@ import { myaiStore } from '$lib/state/myai.svelte';
 import { sessionStore } from '$lib/state/session.svelte';
 import { settingsStore } from '$lib/state/settings.svelte';
 import { t, type MessageKey } from '$lib/i18n/index.svelte';
+import { modelProgressDisplay } from '$lib/private-ai/model-progress';
 import type { ChatMode } from '$lib/types';
 
 export type ReadinessState = 'ready' | 'setup' | 'progress' | 'blocked';
@@ -15,6 +16,8 @@ export interface ModeReadiness {
 	state: ReadinessState;
 	/** 0–100, only meaningful when state is 'progress'. */
 	pct: number;
+	/** Human percentage label, null before any measured byte. */
+	pctLabel: string | null;
 	/** Reason line when blocked (already translated); null otherwise. */
 	blockedLine: string | null;
 	/** i18n key for the setup call to action ("Set up" / "Sign in"). */
@@ -29,6 +32,7 @@ export function modeReadiness(mode: ChatMode, opts: { privateOnly?: boolean } = 
 	const base: ModeReadiness = {
 		state: 'ready',
 		pct: 0,
+		pctLabel: null,
 		blockedLine: null,
 		setupKey: 'modes.state.setup'
 	};
@@ -39,8 +43,15 @@ export function modeReadiness(mode: ChatMode, opts: { privateOnly?: boolean } = 
 				return base;
 			case 'detecting':
 				return { ...base, state: 'progress' };
-			case 'downloading':
-				return { ...base, state: 'progress', pct: Math.round(llmStore.progress * 100) };
+			case 'downloading': {
+				const measured = modelProgressDisplay(llmStore.progress);
+				return {
+					...base,
+					state: 'progress',
+					pct: measured?.value ?? 0,
+					pctLabel: measured?.label ?? null
+				};
+			}
 			case 'loading':
 				// Memory placement has no trustworthy percentage. Every consumer gets
 				// zero so it renders an indeterminate state instead of a frozen bar.
@@ -52,8 +63,9 @@ export function modeReadiness(mode: ChatMode, opts: { privateOnly?: boolean } = 
 			case 'error':
 				return {
 					...base,
-					state: 'blocked',
-					blockedLine: llmStore.errorMessage ?? t('modes.error')
+					state: 'setup',
+					blockedLine: llmStore.errorMessage ?? t('modes.error'),
+					setupKey: llmStore.smallerTier ? 'llm.error.tooLarge.cta' : 'notice.retry'
 				};
 		}
 	}

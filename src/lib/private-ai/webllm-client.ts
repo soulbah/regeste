@@ -7,11 +7,18 @@ import {
 	ServiceWorkerLifecycle,
 	type ServiceRequest
 } from './service-worker-lifecycle';
-import { ActivityTimeoutError, withActivityTimeout } from './activity-timeout';
+import {
+	ActivityTimeoutError,
+	measuredProgressActivity,
+	withActivityTimeout
+} from './activity-timeout';
 
 const CACHED_LOAD_IDLE_TIMEOUT_MS = 60_000;
 const DOWNLOAD_IDLE_TIMEOUT_MS = 180_000;
-const DOWNLOAD_START_TIMEOUT_MS = 30_000;
+// WebLLM reports progress after a complete shard reaches Cache Storage, not
+// after the first network byte. A valid first shard can exceed 30 seconds on a
+// normal connection, so the startup watchdog must cover that reporting model.
+const DOWNLOAD_START_TIMEOUT_MS = 90_000;
 const GENERATION_IDLE_TIMEOUT_MS = 180_000;
 
 export interface WebLlmLoadOptions {
@@ -37,7 +44,13 @@ type WorkerResponse =
 	| { source: 'regeste-llm'; id: string; kind: 'progress'; progress: number; text: string }
 	| { source: 'regeste-llm'; id: string; kind: 'delta'; delta: string }
 	| { source: 'regeste-llm'; id: string; kind: 'result'; result: unknown }
-	| { source: 'regeste-llm'; id: string; kind: 'error'; error: string };
+	| {
+			source: 'regeste-llm';
+			id: string;
+			kind: 'error';
+			error: string;
+			errorName?: string;
+	  };
 
 let dedicated: Remote<LlmApi> | null = null;
 let dedicatedWorker: Worker | null = null;
@@ -103,7 +116,11 @@ function installListener(): void {
 		if (message.kind === 'progress') request.onProgress?.(message.progress, message.text);
 		else if (message.kind === 'delta') request.onDelta?.(message.delta);
 		else if (message.kind === 'result') serviceLifecycle.resolve(message.id, message.result);
-		else serviceLifecycle.reject(message.id, new Error(message.error));
+		else {
+			const error = new Error(message.error);
+			error.name = message.errorName ?? 'Error';
+			serviceLifecycle.reject(message.id, error);
+		}
 	});
 	navigator.serviceWorker.addEventListener('controllerchange', () => {
 		invalidateServiceClient();
@@ -186,17 +203,19 @@ async function loadService(
 	// same controller — the case controllerchange alone cannot see.
 	await probeServiceInstance(5_000);
 	await withActivityTimeout(
-		(activity) =>
-			serviceRequest<void>(
+		(activity) => {
+			const measuredActivity = measuredProgressActivity(activity);
+			return serviceRequest<void>(
 				'load',
 				{ model },
 				{
 					onProgress: (progress, text) => {
-						activity();
+						measuredActivity(progress);
 						onProgress?.(progress, text);
 					}
 				}
-			),
+			);
+		},
 		idleTimeoutMs,
 		() => {
 			controlService('unload');
@@ -216,14 +235,16 @@ async function loadDedicated(
 	initialTimeoutMs = idleTimeoutMs
 ): Promise<void> {
 	await withActivityTimeout(
-		(activity) =>
-			dedicatedClient().load(
+		(activity) => {
+			const measuredActivity = measuredProgressActivity(activity);
+			return dedicatedClient().load(
 				model,
 				proxy((progress: number, text: string) => {
-					activity();
+					measuredActivity(progress);
 					onProgress?.(progress, text);
 				})
-			),
+			);
+		},
 		idleTimeoutMs,
 		resetDedicatedClient,
 		initialTimeoutMs
@@ -253,6 +274,7 @@ async function generateDedicated(
 }
 
 function generateServiceRequest(
+	model: string,
 	messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
 	onDelta: ((delta: string) => void) | undefined,
 	options: GenerationOptions
@@ -261,7 +283,7 @@ function generateServiceRequest(
 		(activity) =>
 			serviceRequest<GenerationResult>(
 				'generate',
-				{ messages, options },
+				{ model, messages, options },
 				{
 					onDelta: (delta) => {
 						activity();
@@ -283,17 +305,19 @@ async function generateService(
 	options: GenerationOptions
 ): Promise<GenerationResult> {
 	const model = serviceModel;
+	if (!model) throw new Error('private engine not loaded');
 	try {
-		return await generateServiceRequest(messages, onDelta, options);
+		return await generateServiceRequest(model, messages, onDelta, options);
 	} catch (error) {
 		const recoverable =
 			String(error).includes('not loaded') ||
+			String(error).includes('model changed') ||
 			String(error).includes(SERVICE_WORKER_RESTARTED) ||
 			String(error).includes('timed out') ||
 			error instanceof ActivityTimeoutError;
-		if (!model || !recoverable) throw error;
+		if (!recoverable) throw error;
 		if (!(await loadService(model, undefined, CACHED_LOAD_IDLE_TIMEOUT_MS))) throw error;
-		return generateServiceRequest(messages, onDelta, options);
+		return generateServiceRequest(model, messages, onDelta, options);
 	}
 }
 
@@ -313,7 +337,11 @@ export const webLlmClient: WebLlmClient = {
 				break;
 			} catch (error) {
 				if (attempt === 0 && String(error).includes(SERVICE_WORKER_RESTARTED)) continue;
-				if (error instanceof ActivityTimeoutError || String(error).includes('timed out')) break;
+				// A stalled transfer is not proof the Service Worker is unavailable.
+				// Starting the same multi-GB load again in a Dedicated Worker made the
+				// progress bar jump backwards and doubled network work.
+				if (error instanceof ActivityTimeoutError || String(error).includes('timed out'))
+					throw error;
 				throw error;
 			}
 		}

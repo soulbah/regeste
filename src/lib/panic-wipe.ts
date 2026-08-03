@@ -4,6 +4,7 @@ import { SERVICE_WORKER_RESTARTED } from '$lib/private-ai/service-worker-lifecyc
 
 const WIPE_PARAM = 'wipe-local-data';
 const LOCALE_PARAM = 'wipe-locale';
+const COMPLETE_PARAM = 'reset-complete';
 const SERVER_TIMEOUT_MS = 15_000;
 const STOP_TIMEOUT_MS = 15_000;
 const DELETE_TIMEOUT_MS = 60_000;
@@ -112,9 +113,10 @@ async function deleteOpfs(): Promise<void> {
 const browserActions: PanicWipeActions = {
 	requestNativeWipe,
 	stopInference: async () => {
-		// Keep WebLLM out of the root layout's eager chunk. Most visits never wipe,
-		// and marketing pages must not pay for an inference control path they do
-		// not use.
+		// Entering this isolated wipe boot already terminated page-owned WebLLM and
+		// wllama Workers. Only the inference Service Worker survives navigation, so
+		// stop it explicitly before its cache disappears. Keep that control path out
+		// of the root layout's eager chunk; most visits never wipe.
 		const { webLlmClient } = await import('$lib/private-ai/webllm-client');
 		await webLlmClient.unload();
 	},
@@ -167,12 +169,25 @@ export async function performPanicWipe(
 	onPhase('finishing');
 }
 
-export function panicWipeContext(url: URL): { active: boolean; locale: Locale } {
+export function panicWipeContext(url: URL): {
+	active: boolean;
+	complete: boolean;
+	locale: Locale;
+} {
 	const locale = url.searchParams.get(LOCALE_PARAM) === 'fr' ? 'fr' : 'en';
-	return { active: url.searchParams.get(WIPE_PARAM) === '1', locale };
+	return {
+		active: url.searchParams.get(WIPE_PARAM) === '1',
+		complete: url.searchParams.get(COMPLETE_PARAM) === '1',
+		locale
+	};
 }
 
 export function panicWipeUrl(locale: Locale): string {
 	const params = new URLSearchParams({ [WIPE_PARAM]: '1', [LOCALE_PARAM]: locale });
+	return `${resolve('/chat')}?${params}`;
+}
+
+export function panicWipeCompletionUrl(locale: Locale): string {
+	const params = new URLSearchParams({ [COMPLETE_PARAM]: '1', [LOCALE_PARAM]: locale });
 	return `${resolve('/chat')}?${params}`;
 }

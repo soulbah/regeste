@@ -49,7 +49,13 @@ export function dispatchMode(mode: ChatMode, onReady: (mode: ChatMode) => void):
 	// document. Opening a modal to reveal a Download button was a step that
 	// existed only because the button happened to live there.
 	if (mode === 'private') {
-		void llmStore.prepare();
+		if (llmStore.status === 'error' && llmStore.smallerTier) {
+			uiStore.openSettings('ai', mode);
+		} else if (llmStore.status === 'error') {
+			void llmStore.retry();
+		} else {
+			void llmStore.prepare();
+		}
 		return { activated: false };
 	}
 	// Cloud is missing an account, which has its own page.

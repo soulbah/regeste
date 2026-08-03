@@ -1,5 +1,10 @@
 import type { LocalMessage } from '$lib/types';
-import { analyzeQuestion, normalizeQuestion } from '$lib/analysis/query-router';
+import {
+	analyzeQuestion,
+	normalizeQuestion,
+	questionReferenceKind
+} from '$lib/analysis/query-router';
+import { significantQueryTokens } from '$lib/pipeline/fuzzy';
 
 const MAX_PART_CHARS = 700;
 const CITATION_MARKER = /\[(?:\d{1,2})\]/g;
@@ -92,15 +97,29 @@ export function buildRetrievalContext(
 	if (!previousQuestion || !previousAnswer) return null;
 	const question = clean(currentQuestion);
 	const conjunction = analyzeQuestion(question).locale === 'fr' ? ' et ' : ' and ';
+	// A pronoun genuinely needs the cited evidence lane. A bare discourse lead
+	// ("Et…" / "And…") may introduce a new subject. Two content tokens after
+	// standard library stopword removal make it independently searchable; shorter
+	// fragments stay in the cited lane. No document vocabulary is maintained.
+	const referenceKind = questionReferenceKind(question);
+	const selfContainedContinuation =
+		referenceKind === 'continuation' && significantQueryTokens(question, 3, false).length >= 2;
+	const pinEvidenceLane =
+		force ||
+		referenceKind === 'anaphoric' ||
+		(referenceKind === 'continuation' && !selfContainedContinuation);
+	const composedQuestion = `${previousQuestion.replace(/[?.!]+$/u, '').trimEnd()}${conjunction}${question}`;
+	const contextualSearch = `${previousQuestion}\n${previousAnswer}\n${question}`;
+	const contextualAnalysis = `${question}\nPrevious question: ${previousQuestion}`;
 	return {
 		previousQuestion,
 		previousAnswer,
-		evidenceDocumentNames: [
-			...new Set((citationsByMessage[previousAnswerId] ?? []).map((row) => row.documentName))
-		],
-		resolvedQuestion: `${previousQuestion.replace(/[?.!]+$/u, '').trimEnd()}${conjunction}${question}`,
-		searchQuery: `${previousQuestion}\n${previousAnswer}\n${question}`,
-		analysisQuery: `${question}\nPrevious question: ${previousQuestion}`,
+		evidenceDocumentNames: pinEvidenceLane
+			? [...new Set((citationsByMessage[previousAnswerId] ?? []).map((row) => row.documentName))]
+			: [],
+		resolvedQuestion: selfContainedContinuation ? question : composedQuestion,
+		searchQuery: selfContainedContinuation ? question : contextualSearch,
+		analysisQuery: selfContainedContinuation ? question : contextualAnalysis,
 		clarificationQuery: question,
 		promptContext: `Previous question: ${previousQuestion}\nPrevious answer: ${previousAnswer}`
 	};

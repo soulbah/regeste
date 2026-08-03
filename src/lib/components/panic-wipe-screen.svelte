@@ -1,8 +1,7 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
 	import { Button } from '$lib/components/ui/button';
-	import { t, type MessageKey } from '$lib/i18n/index.svelte';
-	import { performPanicWipe, type PanicWipePhase } from '$lib/panic-wipe';
+	import { i18n, t, type MessageKey } from '$lib/i18n/index.svelte';
+	import { panicWipeCompletionUrl, performPanicWipe, type PanicWipePhase } from '$lib/panic-wipe';
 
 	const PHASE_LINE = {
 		stopping: 'settings.wipe.progress.stopping',
@@ -19,7 +18,9 @@
 		phase = 'stopping';
 		try {
 			await performPanicWipe((next) => (phase = next));
-			window.location.replace(resolve('/chat'));
+			// Let the final sentence be seen before the one intentional restart.
+			await new Promise((resolveDelay) => setTimeout(resolveDelay, 500));
+			window.location.replace(panicWipeCompletionUrl(i18n.locale));
 		} catch (error) {
 			console.error('[regeste] local wipe failed:', error);
 			failed = true;

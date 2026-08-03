@@ -12,6 +12,7 @@ import { llmStore } from '$lib/private-ai/llm.svelte';
 import { SvelteSet } from 'svelte/reactivity';
 import {
 	generationOptionsFor,
+	requiresSemanticSlotSynthesis,
 	usesCompactFactualContext,
 	verificationOptionsFor
 } from '$lib/private-ai/generation';
@@ -1171,10 +1172,12 @@ class ChatsStore {
 		// A semantic factual synthesis without punctuation has no safe deterministic
 		// slot boundary: splitting conjunctions cuts names such as “John et Jane”.
 		// Let model-written subqueries drive retrieval and generation for this shape.
-		const requiresSemanticSlotSynthesis =
-			factualSynthesis && splitQueryClauses(question).length === 0;
+		const needsSemanticSlotSynthesis = requiresSemanticSlotSynthesis(
+			question,
+			route === 'synthesis' ? 'synthesis' : 'targeted'
+		);
 		let extractive =
-			grounded && !contested && !requiresSemanticSlotSynthesis
+			grounded && !contested && !needsSemanticSlotSynthesis
 				? buildAuditedExtractiveAnswer(extractiveQuestion, hits, evidenceQueries)
 				: null;
 		// Selection extractors are allowed to abstain. A copied table can be

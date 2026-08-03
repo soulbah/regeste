@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	adaptGenerationOptions,
 	generationOptionsFor,
+	requiresSemanticSlotSynthesis,
 	usesCompactFactualContext,
 	verificationOptionsFor
 } from './generation';
@@ -36,6 +37,18 @@ describe('generationOptionsFor', () => {
 		expect(
 			usesCompactFactualContext('Qui détient le dossier et quel est son identifiant ?', 'synthesis')
 		).toBe(true);
+	});
+
+	it('keeps semantic synthesis for unpunctuated multi-slot questions only', () => {
+		expect(
+			requiresSemanticSlotSynthesis(
+				'Quel montant John et Jane doivent-ils payer et à quelle date est-il dû et quelle est leur adresse ?',
+				'synthesis'
+			)
+		).toBe(true);
+		expect(requiresSemanticSlotSynthesis('Et quel est le numéro du compte ?', 'targeted')).toBe(
+			false
+		);
 	});
 
 	it('reserves reasoning synthesis for explanatory work', () => {

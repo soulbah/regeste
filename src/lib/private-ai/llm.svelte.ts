@@ -5,7 +5,8 @@
 //             → needs-download                 (first use, explicit consent)
 //             → downloading(progress) → ready  (weights cached by WebLLM)
 //   ready     → generating → ready
-//   load failure → downgrade one tier → retry once → error (plain language)
+//   capacity failure → downgrade one tier → retry once → error (plain language)
+//   interrupted load → error → explicit retry of the same cached transfer
 
 import { wrap, proxy, type Remote } from 'comlink';
 import { detectTier } from './capability';
@@ -18,7 +19,8 @@ import type { GenerationResult } from './generation';
 import type { WebLlmClient } from './webllm-client';
 import { t } from '$lib/i18n/index.svelte';
 import { modelPreparationStatus, restoreModelPreparation } from './model-resume';
-import { withActivityTimeout } from './activity-timeout';
+import { measuredProgressActivity, withActivityTimeout } from './activity-timeout';
+import { classifyModelLoadFailure, type ModelLoadFailure } from './model-load-failure';
 
 const PREPARED_KEY = 'regeste:private-prepared-model';
 const CONSENTED_KEY = 'regeste:private-consented-model';
@@ -66,9 +68,6 @@ async function freeStorageBytes(): Promise<number | null> {
 		return null;
 	}
 }
-
-/** Why a load attempt ended. Storage and memory need different recoveries. */
-type LoadFailure = 'storage' | 'memory';
 
 export type PrivateStatus =
 	| 'detecting'
@@ -206,6 +205,16 @@ class LlmStore {
 		await this.prepare({ force: true });
 	}
 
+	/** Retry an interrupted transfer with the same tier and its partial cache. */
+	async retry(): Promise<void> {
+		if (this.status !== 'error' || !this.tier || this.smallerTier) return;
+		this.errorMessage = null;
+		this.steppedDownTo = null;
+		this.prepared = localStorage.getItem(PREPARED_KEY) === this.tier.model;
+		this.status = 'needs-download';
+		await this.prepare({ force: true });
+	}
+
 	/** Explicit user consent → download (or fast cache load) then ready.
 	 *
 	 * `force` skips the space warning, for someone who has read it and wants the
@@ -282,6 +291,12 @@ class LlmStore {
 				this.steppedDownTo = null;
 				return;
 			}
+			// A network, watchdog or worker interruption says nothing about device
+			// capacity. Preserve the partial cache and stop until an explicit retry.
+			if (failure === 'transient') {
+				await this.reportFailure(failure, null);
+				return;
+			}
 			// Annotated, or TypeScript reads `this.tier = next` as making the field's
 			// own type depend on itself and gives up on both.
 			const current: Tier | null = this.tier;
@@ -299,8 +314,8 @@ class LlmStore {
 	}
 
 	/** One load, start to finish. Resolves to null on success, or to why it ended. */
-	private async attempt(): Promise<LoadFailure | null> {
-		if (!this.tier) return 'memory';
+	private async attempt(): Promise<ModelLoadFailure | null> {
+		if (!this.tier) return 'transient';
 		this.status = this.prepared ? 'loading' : 'downloading';
 		this.progress = 0;
 		this.errorMessage = null;
@@ -321,14 +336,16 @@ class LlmStore {
 				});
 			} else {
 				await withActivityTimeout(
-					(activity) =>
-						(worker as Remote<LlmApi>).load(
+					(activity) => {
+						const measuredActivity = measuredProgressActivity(activity);
+						return (worker as Remote<LlmApi>).load(
 							this.tier!.model,
 							proxy((p: number) => {
-								activity();
+								measuredActivity(p);
 								progress(p);
 							})
-						),
+						);
+					},
 					this.prepared ? WLLAMA_CACHED_LOAD_IDLE_TIMEOUT_MS : WLLAMA_DOWNLOAD_IDLE_TIMEOUT_MS,
 					resetWllamaWorker,
 					this.prepared ? WLLAMA_CACHED_LOAD_IDLE_TIMEOUT_MS : WLLAMA_DOWNLOAD_START_TIMEOUT_MS
@@ -340,24 +357,13 @@ class LlmStore {
 			return null;
 		} catch (err) {
 			console.error('[regeste] private engine load failed:', err);
-			const message = err instanceof Error ? err.message : String(err);
-			// Storage or memory, and the distinction decides both the message and
-			// which rung to try next.
-			//
-			// "Failed to execute 'add' on 'Cache': Unexpected internal error" is how
-			// Chrome reports a cache write it could not complete, and it carries
-			// neither "quota" nor "storage" in its text. Matching only those two
-			// words told a visitor whose browser had refused to store the weights
-			// that their device had run out of memory, and sent them closing tabs
-			// for a problem no tab was causing.
-			return /quota|storage|exceeded/i.test(message) || /on 'Cache'/.test(message)
-				? 'storage'
-				: 'memory';
+			return classifyModelLoadFailure(err);
 		}
 	}
 
 	/** The rung to try next, or null when there is nothing worth trying. */
-	private async rungAfter(tier: Tier, failure: LoadFailure): Promise<Tier | null> {
+	private async rungAfter(tier: Tier, failure: ModelLoadFailure): Promise<Tier | null> {
+		if (failure === 'transient') return null;
 		if (failure === 'memory') return downgrade(tier);
 		// Space, so the ladder is not the measure — the space is. Ask again after the
 		// failure, because a partial download leaves bytes behind and the number that
@@ -369,14 +375,20 @@ class LlmStore {
 	/** `offer` is the rung that exists but that the app stopped short of taking,
 	 * which is precisely when handing the choice over is worth doing: null means
 	 * there was nothing left to try, and inviting a third download would be a lie. */
-	private async reportFailure(failure: LoadFailure, offer: Tier | null): Promise<void> {
+	private async reportFailure(failure: ModelLoadFailure, offer: Tier | null): Promise<void> {
 		// A deterministic final failure must not restart itself on every refresh.
 		// The next attempt is explicit, via the recovery action shown below.
 		localStorage.removeItem(CONSENTED_KEY);
-		localStorage.removeItem(PREPARED_KEY);
+		// A transient failure may have a complete cache marker or useful partial
+		// shards. Keep both; only proven capacity failure invalidates preparation.
+		if (failure !== 'transient') localStorage.removeItem(PREPARED_KEY);
 		this.status = 'error';
 		this.steppedDownTo = null;
 		this.smallerTier = offer;
+		if (failure === 'transient') {
+			this.errorMessage = t('llm.error.interrupted');
+			return;
+		}
 		if (offer) {
 			// Which of the two happened decides the sentence: "could not load that
 			// much" sends someone to close tabs, "no room left" sends them to their

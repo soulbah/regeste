@@ -5,6 +5,7 @@ export type AggregateOperation = 'sum' | 'average' | 'minimum' | 'maximum' | 'co
 export type FinancialRole =
 	'sent' | 'received' | 'fee' | 'debited' | 'total_ttc' | 'subtotal' | 'tax';
 export type QueryScopeKind = 'collection' | 'record' | 'page' | 'temporal' | 'unspecified';
+export type ReferenceKind = 'none' | 'anaphoric' | 'continuation';
 export type ClarificationKind =
 	'scope' | 'financial_role' | 'intent' | 'time' | 'document' | 'unit_currency';
 
@@ -298,11 +299,11 @@ function detectLocale(question: string): 'fr' | 'en' {
 	return fr >= en ? 'fr' : 'en';
 }
 
-function referencesPrevious(question: string): boolean {
+export function questionReferenceKind(question: string): ReferenceKind {
 	// A self-contained multi-part question may use a possessive in its second
 	// part ("who owns X and what is its number?"). Its explicit first part is the
 	// antecedent; dialogue history must not replace it.
-	if (hasCoordinatedFactQuestions(question)) return false;
+	if (hasCoordinatedFactQuestions(question)) return 'none';
 	// French subject-verb inversion writes its clitic with a hyphen
 	// ("AWP accuse-t-il…", "répond-il") — the pronoun is grammar, not an
 	// anaphor, whatever the verb. The verb-list rewrite below only covers
@@ -313,10 +314,12 @@ function referencesPrevious(question: string): boolean {
 		/\b(?:est|sont|a|ont|avait|etaient|peut|peuvent|doit|doivent|sera|seront|fait|font)\s+(?:t\s+)?(?:il|elle|ils|elles)\b/gu,
 		''
 	);
-	return (
-		words(withoutInversion).some((token) => REFERENCE_CONCEPTS.has(token)) ||
-		/^(?:et\b|and\b|qu en est il\b|what about\b)/u.test(normalized)
-	);
+	if (words(withoutInversion).some((token) => REFERENCE_CONCEPTS.has(token))) return 'anaphoric';
+	return /^(?:et\b|and\b|qu en est il\b|what about\b)/u.test(normalized) ? 'continuation' : 'none';
+}
+
+function referencesPrevious(question: string): boolean {
+	return questionReferenceKind(question) !== 'none';
 }
 
 function targetsSingleRecord(q: string, identifiers: string[]): boolean {

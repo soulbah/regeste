@@ -468,11 +468,15 @@
 										{:else}
 											<Badge variant="outline" class="font-mono text-[10px] uppercase">
 												{r.state === 'setup'
-													? t('settings.ai.status.setup')
+													? t(r.setupKey)
 													: r.state === 'progress'
 														? id === 'private' && llmStore.status === 'loading'
 															? t('modes.private.loading')
-															: t('settings.ai.status.progress', { pct: r.pct })
+															: id === 'private' && llmStore.status === 'detecting'
+																? t('modes.private.checking')
+																: t('settings.ai.status.progress', {
+																		pct: (r.pctLabel ?? `${r.pct}%`).replace('%', '')
+																	})
 														: t('settings.ai.status.blocked')}
 											</Badge>
 										{/if}
@@ -497,6 +501,10 @@
 													onclick={() => llmStore.acceptSmaller()}
 												>
 													{t('llm.error.tooLarge.cta')}
+												</Button>
+											{:else if llmStore.status === 'error'}
+												<Button size="sm" onclick={() => llmStore.retry()}>
+													{t('notice.retry')}
 												</Button>
 											{:else if privateR.state === 'setup'}
 												<Button size="sm" onclick={() => llmStore.prepare()}>
@@ -533,7 +541,12 @@
 																	? t('modes.private.loading')
 																	: llmStore.status === 'detecting'
 																		? t('modes.private.checking')
-																		: t('modes.private.preparing', { pct: privateR.pct })
+																		: t('modes.private.preparing', {
+																				pct: (privateR.pctLabel ?? `${privateR.pct}%`).replace(
+																					'%',
+																					''
+																				)
+																			})
 																: t(
 																		llmStore.tier?.id === 'lite'
 																			? 'modes.private.downloadLite'

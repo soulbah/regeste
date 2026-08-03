@@ -741,8 +741,8 @@ function buildDecomposedTotalAnswer(question: string, hits: SearchHit[]): string
 					const literal = displayedMoney(total);
 					const arithmetic = `${operands.map(displayedMoney).join(' + ')} = ${literal}`;
 					return frame.locale === 'fr'
-						? `Le montant total est de ${literal} (${arithmetic}) ${markers}.`
-						: `The total stated amount is ${literal} (${arithmetic}) ${markers}.`;
+						? `Le montant total ressort du calcul suivant : ${arithmetic} ${markers}.`
+						: `The total follows from this calculation: ${arithmetic} ${markers}.`;
 				}
 			}
 		}
@@ -959,6 +959,50 @@ function buildCoLocatedMultiFactAnswer(question: string, hits: SearchHit[]): str
 		);
 	if (!candidates[0]) return null;
 	return `${candidates[0].hit.text.trim()} ${citation(candidates[0].hit, hits)}`;
+}
+
+/**
+ * Exact identifier lookup from a printed “label n° value” relation.
+ *
+ * The number shape and `n°` marker are token types. The label is read from the
+ * document and must match the question; the complete candidate must also cover
+ * the question better than a nearby balance/date fact would. No document label
+ * or question-intent vocabulary is maintained here.
+ */
+function buildLabelBoundIdentifierAnswer(question: string, hits: SearchHit[]): string | null {
+	const analysis = analyzeQuestion(question);
+	if (analysis.route !== 'targeted' || analysis.answerShape !== 'fact') return null;
+	const identifierPattern = /\b\d(?:[\d ]{5,}\d)\b/gu;
+	const labelAtEnd = /([\p{L}][\p{L}'’.-]*(?:\s+[\p{L}][\p{L}'’.-]*){0,5})\s+(?:n\s*[°ºo]|№)\s*$/iu;
+	for (const hit of hits) {
+		const text = evidenceText(hit);
+		for (const match of text.matchAll(identifierPattern)) {
+			const at = match.index ?? -1;
+			if (at < 0) continue;
+			const rawLabel = labelAtEnd.exec(text.slice(Math.max(0, at - 100), at))?.[1];
+			if (!rawLabel) continue;
+			const tokens = rawLabel.trim().split(/\s+/u);
+			const candidates = tokens
+				.map((_, index) => tokens.slice(index).join(' '))
+				.map((label) => ({ label, score: coverage(label, question) }))
+				.sort((left, right) => right.score - left.score || left.label.length - right.label.length);
+			const chosen = candidates[0];
+			if (!chosen || chosen.score < 0.75) continue;
+			const identifier = match[0].replace(/\s+/gu, '');
+			const answer =
+				analysis.locale === 'fr'
+					? `Le numéro demandé est ${identifier} ${citation(hit, hits)}.`
+					: `The requested number is ${identifier} ${citation(hit, hits)}.`;
+			const labelTokens = new Set(normalizeForFuzzy(chosen.label).split(' '));
+			const residualQuestion = normalizeForFuzzy(question)
+				.split(' ')
+				.filter((token) => !labelTokens.has(token))
+				.join(' ');
+			if (coverage(residualQuestion, answer) < 0.8) continue;
+			return answer;
+		}
+	}
+	return null;
 }
 
 /** A common OCR/form sentence co-locates a long identifier and an uppercase
@@ -1663,6 +1707,7 @@ const EXTRACTIVE_BUILDERS: ReadonlyArray<
 	['percentage-modifier', buildPercentageModifierAnswer],
 	['action-obligations', buildActionObligationsAnswer],
 	['enumerated-evidence', buildEnumeratedEvidenceAnswer],
+	['label-bound-identifier', buildLabelBoundIdentifierAnswer],
 	['co-located-identifier-identity', buildCoLocatedIdentifierIdentityAnswer],
 	['co-located-multi-fact', buildCoLocatedMultiFactAnswer],
 	['consequence', buildConsequenceAnswer],
@@ -1693,6 +1738,11 @@ export function buildDeterministicExtractiveAnswer(
 const AUDITED_EXTRACTIVE_BUILDERS = new Set([
 	'multi-fact',
 	'co-located-multi-fact',
+	'decomposed-total',
+	// Identity + identifier is exact only when those are the requested slots.
+	// A longer multi-part question can retrieve the same sentence beside its real
+	// answers; clause coverage must then make this selector abstain.
+	'co-located-identifier-identity',
 	'percentage-modifier',
 	'enumerated-evidence'
 ]);
@@ -1718,7 +1768,14 @@ export function explainDeterministicExtractiveAnswer(
 	// Model-written subqueries prove that an unpunctuated turn carries several
 	// semantic slots. A conjunction is not a safe boundary here: it can join a
 	// name or noun phrase, so deterministic selectors must abstain.
-	if (evidenceQueries.length > 1 && splitQueryClauses(question).length === 0) return null;
+	if (evidenceQueries.length > 1 && splitQueryClauses(question).length === 0) {
+		// Several model-written views with no trustworthy punctuation normally mean
+		// several semantic slots. One exact label+n° relation is safe only when its
+		// complete candidate nearly covers the whole question; any extra requested
+		// fact makes that builder abstain before this exception is reached.
+		const exactIdentifier = buildLabelBoundIdentifierAnswer(question, hits);
+		return exactIdentifier ? { builder: 'label-bound-identifier', answer: exactIdentifier } : null;
+	}
 	for (const [builder, build] of EXTRACTIVE_BUILDERS) {
 		const answer = build(question, hits, evidenceQueries);
 		if (answer !== null) return { builder, answer };

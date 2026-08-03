@@ -1,4 +1,5 @@
-import { analyzeQuestion } from '$lib/analysis/query-router';
+import { analyzeQuestion } from '$lib/nlu/semantic-frame';
+import { splitQueryClauses } from '$lib/pipeline/retrieval';
 
 export interface GenerationOptions {
 	reasoning: 'off' | 'on';
@@ -34,6 +35,17 @@ export function usesCompactFactualContext(
 ): boolean {
 	const frame = analyzeQuestion(question);
 	return route === 'synthesis' && frame.answerShape === 'fact' && frame.operation === null;
+}
+
+/** Only a genuinely multi-slot question needs semantic synthesis when ordinary
+ * punctuation cannot expose its boundaries. A single factual follow-up may be
+ * answered by an exact structural extractor, even when routing keeps the wider
+ * conversational lane. */
+export function requiresSemanticSlotSynthesis(
+	question: string,
+	route: 'targeted' | 'synthesis'
+): boolean {
+	return usesCompactFactualContext(question, route) && splitQueryClauses(question).length === 0;
 }
 
 export function generationOptionsFor(

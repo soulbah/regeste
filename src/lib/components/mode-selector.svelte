@@ -9,13 +9,12 @@
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
-	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
 	import { NEW_TAB } from '$lib/external-page';
 	import { toast } from 'svelte-sonner';
 	import { t } from '$lib/i18n/index.svelte';
 	import { llmStore } from '$lib/private-ai/llm.svelte';
 	import { modeReadiness } from '$lib/state/mode-readiness.svelte';
+	import { dispatchMode } from '$lib/state/mode-dispatch';
 	import { myaiStore } from '$lib/state/myai.svelte';
 	import { settingsStore } from '$lib/state/settings.svelte';
 	import { uiStore } from '$lib/state/ui.svelte';
@@ -108,15 +107,8 @@
 				open = false;
 				break;
 			case 'setup':
-				// Route to the source of truth; activate once setup completes.
-				uiStore.pendingActivation = m.id;
 				open = false;
-				if (m.id === 'assisted') {
-					// Sign-in has its own page; the watcher picks the mode up on return.
-					goto(resolve('/auth'));
-					return;
-				}
-				uiStore.openSettings('ai', m.id);
+				dispatchMode(m.id, select);
 				break;
 			default:
 				// progress/blocked rows are inert; the line says why.
@@ -209,7 +201,7 @@
 								<span class="text-muted-foreground text-xs">{t(m.readiness.setupKey)} →</span>
 							{:else if m.readiness.state === 'progress'}
 								<span class="text-muted-foreground text-xs tabular-nums">
-									{m.readiness.pct > 0 ? `${m.readiness.pct}%` : '…'}
+									{m.readiness.pctLabel ?? '…'}
 								</span>
 							{/if}
 						</span>

@@ -132,6 +132,8 @@ export const en = {
 		'This browser ran out of storage for the model. Free up disk space and retry, or pick Cloud or Your server.',
 	'llm.error.memory':
 		'This device ran out of memory preparing the model. Close other tabs and retry.',
+	'llm.error.interrupted':
+		'Model setup was interrupted. Files already downloaded are kept. Try again.',
 	'modes.locked': 'Locked · this chat is private-only',
 	'modes.offlineOn': 'Offline mode is on',
 	'modes.choose': 'Answer mode',
@@ -583,7 +585,7 @@ export const en = {
 	'work.model.downloading.title': 'Downloading the model',
 	'work.model.downloading.body': 'One download of {size}.',
 	'work.model.starting.title': 'Starting the download',
-	'work.model.starting.body': 'This can take a few seconds.',
+	'work.model.starting.body': 'Progress appears after the first part arrives.',
 	'work.model.loading.title': 'Starting the model',
 	'work.model.loading.body': 'The file is downloaded, it is being placed in memory.',
 	'reindex.title': 'Rereading your documents',
@@ -685,10 +687,11 @@ export const en = {
 	'settings.wipe.progress.title': 'Erasing local data',
 	'settings.wipe.progress.stopping': 'Stopping current work.',
 	'settings.wipe.progress.clearing': 'Removing documents, chats, indexes and downloads.',
-	'settings.wipe.progress.finishing': 'Finishing, this page will reload.',
+	'settings.wipe.progress.finishing': 'Done. Regeste will restart once.',
 	'settings.wipe.progress.failed':
 		'The browser could not finish. Close other tabs, then try again.',
 	'settings.wipe.progress.retry': 'Try again',
+	'settings.wipe.complete': 'Everything on this device was erased.',
 
 	// Privacy Report
 	'privacy.title': 'Privacy report',

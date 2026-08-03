@@ -125,6 +125,8 @@ export const fr: Record<keyof typeof en, string> = {
 		'Ce navigateur n’a plus de place pour le modèle. Libérez de l’espace disque et réessayez, ou choisissez Cloud ou Votre serveur.',
 	'llm.error.memory':
 		'Cet appareil n’a plus de mémoire pour préparer le modèle. Fermez d’autres onglets et réessayez.',
+	'llm.error.interrupted':
+		'La préparation du modèle s’est interrompue. Les fichiers déjà téléchargés sont conservés. Réessayez.',
 	'modes.locked': 'Verrouillé · cette discussion reste en mode Cet appareil',
 	'modes.offlineOn': 'Le mode hors ligne est activé',
 	'modes.choose': 'Mode de réponse',
@@ -588,7 +590,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'work.model.downloading.title': 'Téléchargement du modèle',
 	'work.model.downloading.body': 'Un seul téléchargement de {size}.',
 	'work.model.starting.title': 'Démarrage du téléchargement',
-	'work.model.starting.body': 'Cela peut prendre quelques secondes.',
+	'work.model.starting.body': 'La progression s’affiche dès que la première partie arrive.',
 	'work.model.loading.title': 'Démarrage du modèle',
 	'work.model.loading.body': 'Le fichier est téléchargé, il se met en mémoire.',
 	'reindex.title': 'Relecture de vos documents',
@@ -693,10 +695,11 @@ export const fr: Record<keyof typeof en, string> = {
 	'settings.wipe.progress.stopping': 'Arrêt des opérations en cours.',
 	'settings.wipe.progress.clearing':
 		'Suppression des documents, discussions, index et téléchargements.',
-	'settings.wipe.progress.finishing': 'Dernière étape, cette page va se recharger.',
+	'settings.wipe.progress.finishing': 'Terminé. Regeste va redémarrer une fois.',
 	'settings.wipe.progress.failed':
 		'Le navigateur n’a pas terminé. Fermez les autres onglets, puis réessayez.',
 	'settings.wipe.progress.retry': 'Réessayer',
+	'settings.wipe.complete': 'Toutes les données de cet appareil ont été effacées.',
 
 	// Privacy Report
 	'privacy.title': 'Rapport de confidentialité',

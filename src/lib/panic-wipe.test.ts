@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SERVICE_WORKER_RESTARTED } from './private-ai/service-worker-lifecycle';
-import { panicWipeContext, performPanicWipe, type PanicWipeActions } from './panic-wipe';
+import {
+	panicWipeCompletionUrl,
+	panicWipeContext,
+	performPanicWipe,
+	type PanicWipeActions
+} from './panic-wipe';
 
 afterEach(() => {
 	vi.useRealTimers();
@@ -85,10 +90,15 @@ describe('panic wipe', () => {
 	it('only enters wipe boot for the explicit query and carries its language', () => {
 		expect(
 			panicWipeContext(new URL('https://regeste.com/chat?wipe-local-data=1&wipe-locale=fr'))
-		).toEqual({ active: true, locale: 'fr' });
+		).toEqual({ active: true, complete: false, locale: 'fr' });
 		expect(panicWipeContext(new URL('https://regeste.com/chat'))).toEqual({
 			active: false,
+			complete: false,
 			locale: 'en'
 		});
+		expect(
+			panicWipeContext(new URL('https://regeste.com/chat?reset-complete=1&wipe-locale=fr'))
+		).toEqual({ active: false, complete: true, locale: 'fr' });
+		expect(panicWipeCompletionUrl('fr')).toBe('/chat?reset-complete=1&wipe-locale=fr');
 	});
 });

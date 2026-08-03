@@ -136,4 +136,39 @@ describe('ModelLoadCoordinator', () => {
 		await Promise.all([cancel, second]);
 		expect(order).toEqual(['a:start', 'cancel:start', 'a:cancelled', 'b:start']);
 	});
+
+	it('keeps the exclusive gate until the flight drains when cancellation rejects', async () => {
+		const coordinator = new ModelLoadCoordinator<number>();
+		const flightGate = deferred();
+		const order: string[] = [];
+		const first = coordinator.run(
+			'model-a',
+			() => {},
+			async () => {
+				order.push('a:start');
+				await flightGate.promise;
+				order.push('a:end');
+			}
+		);
+		await Promise.resolve();
+		const cancel = coordinator.cancelAndRunExclusive(async () => {
+			order.push('cancel');
+			throw new Error('unload failed');
+		});
+		const second = coordinator.run(
+			'model-b',
+			() => {},
+			async () => {
+				order.push('b:start');
+			}
+		);
+
+		await Promise.resolve();
+		expect(order).toEqual(['a:start', 'cancel']);
+		flightGate.resolve();
+		await first;
+		await expect(cancel).rejects.toThrow('unload failed');
+		await second;
+		expect(order).toEqual(['a:start', 'cancel', 'a:end', 'b:start']);
+	});
 });

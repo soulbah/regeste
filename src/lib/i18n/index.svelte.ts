@@ -24,15 +24,20 @@ class I18nStore {
 	locale = $state<Locale>('en');
 	private loaded = false;
 
-	async init(): Promise<void> {
+	async init(preferredLocale?: Locale): Promise<void> {
 		if (this.loaded) return;
 		this.loaded = true;
 		try {
 			const { db } = await getLocalDb();
 			const saved = await db.getSetting('locale');
-			this.locale = saved === 'fr' || saved === 'en' ? saved : browserLocale();
+			if (saved === 'fr' || saved === 'en') {
+				this.locale = saved;
+			} else {
+				this.locale = preferredLocale ?? browserLocale();
+				if (preferredLocale) await db.setSetting('locale', preferredLocale);
+			}
 		} catch {
-			this.locale = browserLocale();
+			this.locale = preferredLocale ?? browserLocale();
 		}
 	}
 
