@@ -93,6 +93,9 @@ export interface SearchHit {
 	documentId: string;
 	documentName: string;
 	text: string;
+	/** Retrieval-only lead text from the same page. It restores page identity
+	 * without consuming a separate generation passage. */
+	pageContext?: string | null;
 	/** This row's columns, named, when it came from a table with a header. */
 	structuralContext?: string | null;
 	page: number | null;

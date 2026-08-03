@@ -39,6 +39,13 @@ const hit = (n: number): SearchHit => ({
 });
 
 describe('buildUserPrompt', () => {
+	it('requires an explicitly named subject for which-one questions', () => {
+		expect(SYSTEM_PROMPT).toContain('name that subject explicitly before giving the attributes');
+		expect(
+			buildVerificationPrompt('Quelle candidate maîtrise Java ?', 'Excerpts', 'Elle maîtrise Java.')
+		).toContain('corrected answer must name that subject explicitly');
+	});
+
 	it('numbers excerpts with locators', () => {
 		const p = buildUserPrompt('Q?', [hit(1), hit(2)]);
 		expect(p).toContain('[1] (Contract.pdf · page 1)');

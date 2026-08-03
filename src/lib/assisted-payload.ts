@@ -18,6 +18,7 @@ export function buildAssistedExcerpts(
 	hits: Array<{
 		text: string;
 		structuralContext?: string | null;
+		pageContext?: string | null;
 		documentId: string;
 		page?: number | null;
 		headingPath?: string | null;

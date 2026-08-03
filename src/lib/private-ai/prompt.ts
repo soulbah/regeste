@@ -348,6 +348,7 @@ Rules:
 - Answer in the language of the question.
 - Answer the exact question immediately. For a name, number, date, or amount, use one short natural sentence unless clarification is necessary.
 - Preserve names as written. Do not split a full name into an alias or add phrases such as "under the name" unless the source explicitly distinguishes them.
+- When the question asks which person, organisation, item, or record has the requested attributes, name that subject explicitly before giving the attributes. A page or section lead may identify facts carried by other excerpts from that same page or section; never transfer an identity across pages or sections.
 - When asked for a line, section, sheet, or detail reference, copy the exact identifier adjacent to the requested label. Do not infer a different identifier from nearby arithmetic.
 - Answer every part of a multi-part question. For a calculation, state the operands and the result.
 - Combine related facts into one natural sentence or compact paragraph. Never repeat the questions, add field-style labels, or narrate where the answer was found; citations carry provenance.
@@ -812,7 +813,7 @@ export function buildVerificationPrompt(
 ): string {
 	const coverageContract = buildAnswerCoverageContract(question);
 	return `Audit and correct the draft against the excerpts. Return only the corrected answer in the question's language, with citations.
-Treat the draft as untrusted. Re-solve the question from the excerpts before comparing it with the draft. Output the corrected answer only: prose for the reader, no checklist, no headings, no field labels, no notes about your own process.
+Treat the draft as untrusted. Re-solve the question from the excerpts before comparing it with the draft. Output the corrected answer only: prose for the reader, no checklist, no headings, no field labels, no notes about your own process. When the question asks which person, organisation, item, or record has the requested attributes, the corrected answer must name that subject explicitly; a page or section lead may identify facts carried by other excerpts from that same page or section, never another page or section.
 Check every requested part, exact form/output identifiers, strict bounds and comparisons, start-to-end direction, units and any arithmetic the user requested. Never add an unrequested formula or percentage. Bind each value to its exact adjacent source label and requested subject; when two similar labels exist, keep both labels distinct rather than silently choosing one. Reject document creation/signature/print timestamps when the question asks for a contract effective date, and reject values from neighboring categories. A duration cannot be replaced by a price, deductible or retention period for another subject. For every deadline, copy the exact starting event after "from"/"à compter de". For lists, rights, obligations, consequences and selected/excluded options, compare the draft item by item with every relevant bullet, continuation, or following subsection; restore omissions. When asked how a payment, entitlement or remedy works, include supported prerequisites, deadlines and proof requirements from adjacent excerpts. When asked what is covered, use the clause matching the exact scenario and remove unrelated exclusions or assistance services. For coverage questions, preserve the decisive limitation and any explicitly offered option. For requested actions, include relevant notices, evidence and deadlines. If a requested value is absent but a related status or condition is present, return a qualified answer containing both the known status and the explicit absence; do not give a generic refusal. If the premise is disproved by the excerpts, state the contradiction and the useful supported fact instead of giving a generic refusal. Check contradictions instead of smoothing them over. Never add unsupported facts.
 If two compared values are unequal or the computed difference is non-zero, the yes/no conclusion must be "no", never "yes".
 
@@ -1253,8 +1254,8 @@ function bindUncitedAnswerParts(
 		const best = hits
 			.map((hit) => ({
 				hit,
-				answerSupport: citationGroundingCoverage(content, hit.text),
-				support: citationGroundingCoverage(`${question} ${content}`, hit.text)
+				answerSupport: citationGroundingCoverage(content, evidenceText(hit)),
+				support: citationGroundingCoverage(`${question} ${content}`, evidenceText(hit))
 			}))
 			.sort(
 				(left, right) =>
@@ -1362,8 +1363,8 @@ export function resolveTargetedCitations(
 		const supporting = citationCandidates
 			.map((hit) => ({
 				hit,
-				support: citationGroundingCoverage(`${question} ${text}`, hit.text),
-				answerSupport: citationGroundingCoverage(text, hit.text)
+				support: citationGroundingCoverage(`${question} ${text}`, evidenceText(hit)),
+				answerSupport: citationGroundingCoverage(text, evidenceText(hit))
 			}))
 			.sort(
 				(left, right) =>
@@ -1400,8 +1401,8 @@ export function resolveTargetedCitations(
 	const best = [...citationCandidates]
 		.map((hit) => ({
 			hit,
-			answerSupport: citationGroundingCoverage(answerText, hit.text),
-			support: citationGroundingCoverage(grounding, hit.text)
+			answerSupport: citationGroundingCoverage(answerText, evidenceText(hit)),
+			support: citationGroundingCoverage(grounding, evidenceText(hit))
 		}))
 		.sort(
 			(a, b) =>

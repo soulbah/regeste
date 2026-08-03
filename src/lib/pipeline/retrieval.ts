@@ -19,7 +19,7 @@ const RERANK_CANDIDATE_LIMIT = 96;
 export const MAX_EVIDENCE_CHARS = 10000;
 /** Query/ranking behavior fingerprint. Unlike RETRIEVAL_VERSION this does not
  * require re-indexing documents; it invalidates benchmark/result caches only. */
-export const RETRIEVAL_PIPELINE_VERSION = 50;
+export const RETRIEVAL_PIPELINE_VERSION = 51;
 
 /** A batched DB read may return the union of several requests' neighbors.
  * Restore per-request isolation before ranking so batching cannot change a
@@ -1308,6 +1308,51 @@ export function expandStructuralParents(
 		if (!previous || promoted.score > previous.score) candidates.set(child.chunkId, promoted);
 	}
 	return [...candidates.values()].sort((left, right) => right.score - left.score).slice(0, limit);
+}
+
+function pageLocation(hit: SearchHit): string | null {
+	return hit.page == null ? null : `${hit.documentId}:${hit.page}`;
+}
+
+/** A page can answer with several precise body chunks while its identity lives
+ * in the page lead. Keep that structural parent available without teaching the
+ * retriever names, roles, document types, or any domain vocabulary. */
+export function enrichRepeatedPageLeadContext(
+	pageLeads: SearchHit[],
+	hits: SearchHit[],
+	limit = 2
+): SearchHit[] {
+	const groups = new Map<string, SearchHit[]>();
+	for (const hit of hits) {
+		const location = pageLocation(hit);
+		if (!location || hit.paraIndex === -1 || hit.seq === undefined) continue;
+		const group = groups.get(location) ?? [];
+		group.push(hit);
+		groups.set(location, group);
+	}
+
+	const leads = new Map(
+		[...groups.entries()]
+			.filter(([, hits]) => hits.length >= 2)
+			.sort(
+				([, left], [, right]) =>
+					right.reduce((sum, hit) => sum + (hit.rerankScore ?? hit.score), 0) -
+					left.reduce((sum, hit) => sum + (hit.rerankScore ?? hit.score), 0)
+			)
+			.flatMap(([location]) => {
+				const lead = pageLeads
+					.filter(
+						(hit) => pageLocation(hit) === location && hit.paraIndex !== -1 && hit.seq !== undefined
+					)
+					.sort((left, right) => left.seq! - right.seq!)[0];
+				return lead ? [[location, lead] as const] : [];
+			})
+			.slice(0, limit)
+	);
+	return hits.map((hit) => {
+		const lead = leads.get(pageLocation(hit) ?? '');
+		return lead && lead.chunkId !== hit.chunkId ? { ...hit, pageContext: lead.text } : hit;
+	});
 }
 
 /** Add only useful immediate context, then control duplicate/page-heavy output. */

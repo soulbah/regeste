@@ -35,6 +35,7 @@ import {
 	expandStructuralParents,
 	mergeRankedCandidateLists,
 	neighborsForAnchors,
+	enrichRepeatedPageLeadContext,
 	refineCandidates,
 	isNumericAnswerQuestion,
 	retrievalQueryVariants,
@@ -759,15 +760,21 @@ class DocumentsStore {
 					request.evidenceQuery,
 					candidateLimit
 				);
-				const neighbors = await db.listNeighborChunks(
-					ranked.slice(0, request.route === 'synthesis' ? 24 : 12).map((hit) => hit.chunkId),
-					analyzeQuestion(request.evidenceQuery).answerShape === 'explanation'
-						? 8
-						: request.route === 'synthesis'
+				const anchorIds = ranked
+					.slice(0, request.route === 'synthesis' ? 24 : 12)
+					.map((hit) => hit.chunkId);
+				const [neighbors, pageLeads] = await Promise.all([
+					db.listNeighborChunks(
+						anchorIds,
+						analyzeQuestion(request.evidenceQuery).answerShape === 'explanation'
 							? 8
-							: 1
-				);
-				return { ranked, neighbors };
+							: request.route === 'synthesis'
+								? 8
+								: 1
+					),
+					db.listPageLeadChunks(anchorIds)
+				]);
+				return { ranked, neighbors, pageLeads };
 			})
 		);
 		const finalRankingStartedAt = performance.now();
@@ -798,8 +805,11 @@ class DocumentsStore {
 				final: results[index].map(diagnosticHit)
 			});
 		}
+		const contextualizedResults = results.map((hits, index) =>
+			enrichRepeatedPageLeadContext(rankedSets[index].pageLeads, hits)
+		);
 		const reranked = await this.rerankResults(
-			results,
+			contextualizedResults,
 			channelRankedSets.map((set) => set.request.evidenceQuery)
 		);
 		onBatchTiming?.({
@@ -843,11 +853,11 @@ class DocumentsStore {
 					const scores = await api.score(queries[index], hits.map(evidenceText));
 					if (scores.length !== hits.length) return hits;
 					this.rerankReady = true;
-					return hits
+					const rescored = hits
 						.map((hit, position) => ({ hit, score: scores[position] }))
 						.sort((left, right) => right.score - left.score)
-						.slice(0, RERANK_KEEP)
 						.map((entry) => ({ ...entry.hit, rerankScore: entry.score }));
+					return rescored.slice(0, RERANK_KEEP);
 				})
 			);
 		} catch (error) {

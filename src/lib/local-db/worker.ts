@@ -875,6 +875,54 @@ function listNeighborChunks(chunkIds: number[], radius = 1): SearchHit[] {
 		}));
 }
 
+/** First precise chunk of every PDF page represented by the anchors. This is
+ * bounded hierarchical context: callers still decide whether a page has enough
+ * winning evidence to deserve its lead. */
+function listPageLeadChunks(chunkIds: number[]): SearchHit[] {
+	if (!chunkIds.length) return [];
+	const placeholders = chunkIds.map(() => '?').join(',');
+	return db
+		.selectObjects(
+			`WITH anchor_pages AS (
+				SELECT DISTINCT document_id, page
+				FROM chunks
+				WHERE id IN (${placeholders}) AND page IS NOT NULL
+			)
+			SELECT c.id AS chunk_id, c.document_id, d.name AS document_name,
+			       c.text, c.seq, c.structural_context, c.page, c.heading_path,
+			       c.para_index, c.ocr_confidence
+			FROM chunks c
+			JOIN documents d ON d.id = c.document_id
+			JOIN anchor_pages p ON p.document_id = c.document_id AND p.page = c.page
+			WHERE d.status = 'ready'
+			  AND COALESCE(c.para_index, 0) != -1
+			  AND c.seq = (
+				SELECT MIN(first.seq)
+				FROM chunks first
+				WHERE first.document_id = c.document_id
+				  AND first.page = c.page
+				  AND COALESCE(first.para_index, 0) != -1
+			  )
+			ORDER BY c.document_id, c.page`,
+			chunkIds
+		)
+		.map((r: any) => ({
+			chunkId: r.chunk_id,
+			documentId: r.document_id,
+			documentName: r.document_name,
+			text: r.text,
+			structuralContext: r.structural_context ?? null,
+			seq: r.seq,
+			paraIndex: r.para_index,
+			page: r.page,
+			headingPath: r.heading_path,
+			score: 0,
+			semanticScore: null,
+			lexicalScore: null,
+			ocrConfidence: r.ocr_confidence
+		}));
+}
+
 /** Replace retrieval-only structural parents with their precise citation
  * children. Parents contribute recall/routing only and never enter prompts. */
 function listChildChunksForParents(parentIds: number[]): SearchHit[] {
@@ -1763,6 +1811,7 @@ const api = {
 	searchVectorMany,
 	listChunksForDocuments,
 	listNeighborChunks,
+	listPageLeadChunks,
 	listChildChunksForParents,
 	countChunks,
 	databaseBytes,

@@ -28,6 +28,7 @@ import {
 	multiClauseEvidenceCoverage,
 	labelledAmountCarrier,
 	personRoleCarrier,
+	enrichRepeatedPageLeadContext,
 	referencedDocumentIds,
 	requestedDurationCount
 } from './retrieval';
@@ -1442,6 +1443,55 @@ describe('synthesis mid-sentence continuation', () => {
 		expect(selected.map((item) => item.chunkId)).toContain(2);
 		// The anchor itself stays; the continuation displaces a tail filler only.
 		expect(selected.map((item) => item.chunkId)).toContain(1);
+	});
+});
+
+describe('repeated page lead context', () => {
+	const lead = {
+		...hit(1, 'resume', 0.02),
+		seq: 20,
+		page: 4,
+		text: 'Joanne H. Student | Houston, Texas'
+	};
+	const skills = {
+		...hit(2, 'resume', 0.9),
+		seq: 23,
+		page: 4,
+		text: 'Programming: Java, Python, C++, C#'
+	};
+	const systems = {
+		...hit(3, 'resume', 0.8),
+		seq: 24,
+		page: 4,
+		text: 'Operating systems: Windows, OSX, Linux'
+	};
+	const project = {
+		...hit(4, 'resume', 0.7),
+		seq: 25,
+		page: 4,
+		text: 'Calculator project, lead developer'
+	};
+
+	it('enriches repeated page facts without consuming another passage', () => {
+		const distractors = [5, 6, 7, 8, 9].map((chunkId) => ({
+			...hit(chunkId, `other-${chunkId}`, 0.6),
+			seq: chunkId,
+			page: 1
+		}));
+		const kept = [skills, systems, project, ...distractors];
+		const enriched = enrichRepeatedPageLeadContext([lead], kept);
+		expect(enriched).toHaveLength(kept.length);
+		expect(enriched.slice(0, 3).map((item) => item.pageContext)).toEqual([
+			lead.text,
+			lead.text,
+			lead.text
+		]);
+		expect(enriched.slice(3).every((item) => item.pageContext === undefined)).toBe(true);
+	});
+
+	it('does not add page lead for an isolated hit', () => {
+		const kept = [skills, { ...hit(5, 'other', 0.8), seq: 1, page: 1 }];
+		expect(enrichRepeatedPageLeadContext([lead], kept)).toEqual(kept);
 	});
 });
 
