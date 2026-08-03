@@ -415,6 +415,12 @@ describe('buildUserPrompt', () => {
 				"<think>calcul</think>1. Oui, 14,91 € × 12 = 178,92 € ; l'écart est de 6,58 €."
 			)
 		).toMatch(/^1\. Non,/);
+		expect(
+			enforceAnswerInvariants(
+				'Lequel est inférieur et quel est l’écart ?',
+				"Le premier vaut 260 et le second 400. L'écart est de 140 (260 - 400)."
+			)
+		).toContain("L'écart est de 140 (400 - 260).");
 	});
 
 	it('answers the asker in the second person instead of echoing their possessive', () => {

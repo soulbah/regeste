@@ -234,8 +234,10 @@ function bindTableHeaders(
 ): ReconstructedLine[] {
 	const plain = () => asLines(lines.map((line) => joinItems([...line.items])).filter(Boolean));
 	const isValueItem = (text: string) => /^[\d\s.,/€%'-]+$/.test(text) && /\d/.test(text);
-	const isDataRow = (line: PdfLine) =>
-		line.items.length >= 3 && line.items.every((item) => isValueItem(item.text));
+	const isDataRow = (line: PdfLine) => {
+		const values = line.items.filter((item) => isValueItem(item.text)).length;
+		return values >= 3 && line.items.length - values <= 3;
+	};
 	const dataRows = lines.filter(isDataRow);
 	if (dataRows.length < 3) return plain();
 
@@ -297,20 +299,20 @@ function emitColumnRegions(
 	 * region it introduces can bind to it. Reset by any other separator, so only
 	 * an immediately preceding header ever applies. */
 	let pendingHeaderLine: PdfLine | null = null;
-	// A data-table row is a self-contained record: two or more columns whose
-	// every cell is a bare value (number, amount, date). An amortization
-	// schedule is made of them; a fact-sheet table (checkbox grids, IPID-style
-	// prose cells that wrap over several lines) has none. Data rows must be
+	// A data-table row is a self-contained record with several bare values
+	// (number, amount, date) and only a few descriptive cells. This covers both
+	// all-numeric schedules and fact tables whose row also carries a product
+	// name, serving-size text, or an unavailable-value marker. Prose grids have
+	// too few values to qualify. Data rows must be
 	// emitted row-major — column-major shears the record apart and re-titles a
 	// lone column with the full table header, which is how an
 	// outstanding-balance cell got answered as the first installment.
 	const isValueCell = (cell: string) => /^[\d\s.,/€%'-]+$/.test(cell) && /\d/.test(cell);
 	const isDataRow = (line: PdfLine) => {
-		const columns = [...new Set(line.items.map((item) => columnOf(item, gutters)))];
-		if (columns.length < 2) return false;
-		return columns.every((column) =>
-			isValueCell(joinItems(line.items.filter((item) => columnOf(item, gutters) === column)))
-		);
+		// Detected gutters may merge adjacent narrow numeric columns. Use source
+		// cells here; the header binder derives its own finer column geometry too.
+		const values = line.items.filter((item) => isValueCell(item.text)).length;
+		return values >= 3 && line.items.length - values <= 3;
 	};
 	// A line-item / subtotal row: a label on the left and a monetary amount in
 	// its rightmost populated column ("2 Extension … 17 056,11 €"). These MUST
@@ -338,7 +340,7 @@ function emitColumnRegions(
 			region.filter((line) => line.items.some((item) => columnOf(item, gutters) === column))
 		).every((linesInColumn) => linesInColumn.length >= populationFloor);
 		const dataRows = region.filter((line) => isDataRow(line) || endsWithAmount(line)).length;
-		if (region.length >= 3 && dataRows >= Math.max(3, Math.ceil(region.length * 0.5))) {
+		if (region.length >= 3 && dataRows >= Math.max(3, Math.ceil(multiColumnLines * 0.5))) {
 			// Row-major: each record stays one line, headers keep their own line.
 			// One binder for both ordering paths, and it derives columns from the
 			// data rows rather than from the page's gutters: gutter bands are wide
@@ -585,9 +587,10 @@ function orderLinesWithSingleGutter(lines: PdfLine[], pageWidth: number): Recons
 	// half — dates left, installments right (measured: an amortization page
 	// answered "the first installment" with an outstanding balance).
 	const isValueItem = (text: string) => /^[\d\s.,/€%'-]+$/.test(text) && /\d/.test(text);
-	const dataRowCount = lines.filter(
-		(line) => line.items.length >= 3 && line.items.every((item) => isValueItem(item.text))
-	).length;
+	const dataRowCount = lines.filter((line) => {
+		const values = line.items.filter((item) => isValueItem(item.text)).length;
+		return values >= 3 && line.items.length - values <= 3;
+	}).length;
 	// Line-item / statement rows ending in a monetary amount (invoice, devis):
 	// the left/right article split would file every amount after every label,
 	// severing "Extension" from "17 056,11 €". Keep them line-ordered.

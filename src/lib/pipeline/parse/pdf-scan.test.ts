@@ -84,6 +84,10 @@ describe('isUntrustedScan', () => {
 		expect(isUntrustedScan(1, 0.02)).toBe(true);
 	});
 
+	it('flags a page-dominating scan that retains ordinary document margins', () => {
+		expect(isUntrustedScan(0.84, 0.023)).toBe(true);
+	});
+
 	it('spares a scan whose OCR layer actually covers the page', () => {
 		expect(isUntrustedScan(1, 0.2)).toBe(false);
 	});

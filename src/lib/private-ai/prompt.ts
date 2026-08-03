@@ -863,6 +863,23 @@ export function enforceAnswerInvariants(question: string, text: string): string 
 					`${prefix}${analyzeQuestion(question).locale === 'en' ? 'No' : 'Non'}`
 			);
 		}
+		const trailingFormula = /\(\s*(-?\d+(?:[.,]\d+)?)\s*([-−])\s*(-?\d+(?:[.,]\d+)?)\s*\)/u.exec(
+			corrected.slice(difference.index + difference[0].length)
+		);
+		if (Number.isFinite(value) && trailingFormula) {
+			const left = Number(trailingFormula[1].replace(',', '.'));
+			const right = Number(trailingFormula[3].replace(',', '.'));
+			if (
+				Number.isFinite(left) &&
+				Number.isFinite(right) &&
+				Math.abs(right - left - value) < 1e-9 &&
+				Math.abs(left - right - value) >= 1e-9
+			) {
+				const start = difference.index + difference[0].length + trailingFormula.index;
+				const end = start + trailingFormula[0].length;
+				corrected = `${corrected.slice(0, start)}(${trailingFormula[3]} ${trailingFormula[2]} ${trailingFormula[1]})${corrected.slice(end)}`;
+			}
+		}
 	}
 	normalizedAnswer = normalizeQuestion(corrected);
 	if (

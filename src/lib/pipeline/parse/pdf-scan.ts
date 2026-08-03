@@ -102,9 +102,11 @@ export function textCoverage(runs: PositionedGlyphRun[], pageArea: number): numb
 	return Math.min(inked / pageArea, 1);
 }
 
-/** A full-page raster leaves little room for doubt; the threshold only has to
- *  exclude a large figure that still shares the page with a text column. */
-const RASTER_COVERAGE = 0.9;
+/** A page-dominating raster leaves little room for doubt; scanners commonly
+ *  retain page margins, so requiring edge-to-edge paint misses ordinary bills
+ *  and forms. Sparse text remains mandatory, which excludes illustrated pages
+ *  whose digital text occupies the rest of the layout. */
+const RASTER_COVERAGE = 0.8;
 /** Below this the text layer is a scattering over a photograph, not a page of
  *  text. Measured separation on the corpus: real pages 0.17–0.49, junk 0.00–0.11. */
 const USABLE_TEXT_COVERAGE = 0.08;

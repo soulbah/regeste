@@ -77,6 +77,76 @@ export interface ParsePdfOptions {
 	detectLayout?: (page: number) => Promise<LayoutRegion[] | null>;
 }
 
+/** pdf.js keeps glyph order in the text object's drawing direction. A text
+ * matrix with a negative horizontal scale therefore yields both a right-edge
+ * x coordinate and a reversed string. Normalize from geometry alone. */
+export function horizontalPositionedText(
+	text: string,
+	transform: number[],
+	width: number
+): PositionedTextItem {
+	const reversed = transform[0] < 0;
+	return {
+		text: reversed ? [...text].reverse().join('') : text,
+		x: reversed ? transform[4] - width : transform[4],
+		y: transform[5],
+		width
+	};
+}
+
+interface RawPdfTextItem {
+	str: string;
+	transform: number[];
+	width: number;
+}
+
+/** Keep ordinary horizontal text plus genuine vertical table-header bands.
+ * Isolated rotated stamps remain excluded: a header needs several labels on
+ * one baseline and meaningful horizontal span. */
+export function positionedPageText(
+	items: RawPdfTextItem[],
+	pageWidth: number
+): PositionedTextItem[] {
+	const vertical = items.filter(
+		(item) => Math.abs(item.transform[0]) <= 0.01 && Math.abs(item.transform[1]) > 0.01
+	);
+	const verticalGroups: RawPdfTextItem[][] = [];
+	for (const item of vertical) {
+		let group = verticalGroups.find(
+			(candidate) => Math.abs(candidate[0].transform[5] - item.transform[5]) <= 3
+		);
+		if (!group) {
+			group = [];
+			verticalGroups.push(group);
+		}
+		group.push(item);
+	}
+	const keptVertical = new Set(
+		verticalGroups
+			.filter((group) => {
+				const xs = group.map((item) => item.transform[4]);
+				return group.length >= 3 && Math.max(...xs) - Math.min(...xs) >= pageWidth * 0.2;
+			})
+			.flat()
+	);
+
+	return items.flatMap((item) => {
+		if (!item.str.trim()) return [];
+		if (Math.abs(item.transform[0]) > 0.01) {
+			return [horizontalPositionedText(item.str.trim(), item.transform, item.width)];
+		}
+		if (!keptVertical.has(item)) return [];
+		return [
+			{
+				text: item.str.trim(),
+				x: item.transform[4],
+				y: item.transform[5],
+				width: Math.abs(item.transform[1])
+			}
+		];
+	});
+}
+
 /**
  * Position-derived lines for one page, body first and chrome after.
  *
@@ -165,25 +235,19 @@ export async function parsePdf(
 			if (isUntrustedScan(raster, coverage)) untrustedScans.add(pageNum);
 		}
 		pagesPositioned.push(
-			content.items
-				.filter(
-					(item): item is (typeof content.items)[number] & { str: string; transform: number[] } =>
-						'str' in item && Array.isArray(item.transform)
-				)
-				// Rotated (vertical) text is print-margin plumbing — page ids, batch
-				// numbers stamped along the sheet edge. Its y lands mid-table, where
-				// the line clustering absorbs it into a data row and pushes the row's
-				// own first cell out (measured: an amortization row lost its rank to
-				// the stamp "184320"). transform[0] is cos(rotation)·scale: ~0 means
-				// the glyphs run vertically.
-				.filter((item) => Math.abs(item.transform[0]) > 0.01)
-				.map((item) => ({
-					text: item.str.trim(),
-					x: item.transform[4],
-					y: item.transform[5],
-					width: 'width' in item && typeof item.width === 'number' ? item.width : 0
-				}))
-				.filter((item) => item.text.length > 0)
+			positionedPageText(
+				content.items
+					.filter(
+						(item): item is (typeof content.items)[number] & { str: string; transform: number[] } =>
+							'str' in item && Array.isArray(item.transform)
+					)
+					.map((item) => ({
+						str: item.str,
+						transform: item.transform,
+						width: 'width' in item && typeof item.width === 'number' ? item.width : 0
+					})),
+				pageWidths[pageWidths.length - 1]
+			).filter((item) => item.text.length > 0)
 		);
 		page.cleanup();
 	}
