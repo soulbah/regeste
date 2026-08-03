@@ -196,6 +196,36 @@ describe('crossLingualQueryVariants', () => {
 		});
 	});
 
+	it('always decontextualizes a follow-up before trusting generic identifier evidence', async () => {
+		const composed =
+			'À qui appartient le compte ?\nLe compte appartient à KARIM TRAORE\nQuel est son numéro ?';
+		const unrelatedNumber = [
+			hit(1, 'Martine Duval — numéro SIRET 987 654 321 — conditions particulières.')
+		];
+		const accountNumber = [
+			hit(2, 'Compte n° 60012345678 ouvert au nom de KARIM TRAORE.')
+		];
+		const rewrite = vi.fn().mockResolvedValue('numéro du compte de KARIM TRAORE');
+		const retrieve = vi
+			.fn()
+			.mockResolvedValueOnce(unrelatedNumber)
+			.mockResolvedValueOnce(accountNumber);
+
+		await expect(
+			retrieveWithLocalQueryFallback({
+				query: composed,
+				refinementQuery: 'Quel est son numéro ?',
+				documentLanguages: ['fr', 'fr'],
+				rewrite,
+				retrieve
+			})
+		).resolves.toEqual({
+			hits: accountNumber,
+			alternateQueries: ['numéro du compte de KARIM TRAORE']
+		});
+		expect(rewrite).toHaveBeenCalledOnce();
+	});
+
 	it('retries a weak original query and accepts a grounded rewrite', async () => {
 		const primary = [hit(1, 'Conditions générales sans information recherchée.', 0.01)];
 		const fallback = [hit(2, 'La cotisation mensuelle est de 14,91 euros.')];

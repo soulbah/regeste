@@ -77,14 +77,21 @@ describe('buildRetrievalContext', () => {
 		const context = buildRetrievalContext(
 			[
 				message('user', 'Qui est le destinataire ?'),
-				message('assistant', 'Le destinataire est JOHN DOE [2].'),
+				message('assistant', 'Le destinataire est JOHN DOE [2].', 'private', 'answer-1'),
 				message('user', current)
 			],
-			current
+			current,
+			false,
+			new Set(),
+			{
+				'answer-1': [{ documentName: 'attestation.pdf' }, { documentName: 'attestation.pdf' }]
+			}
 		);
 		expect(context?.searchQuery).toContain('JOHN DOE');
 		expect(context?.searchQuery).toContain('Quel est son numéro ?');
 		expect(context?.promptContext).not.toContain('[2]');
+		expect(context?.evidenceDocumentNames).toEqual(['attestation.pdf']);
+		expect(context?.resolvedQuestion).toBe('Qui est le destinataire et Quel est son numéro ?');
 	});
 
 	it('keeps recipient identity for an English follow-up', () => {

@@ -8,6 +8,13 @@ const NO_EXCLUDED_IDS: ReadonlySet<string> = new Set();
 export interface RetrievalContext {
 	previousQuestion: string;
 	previousAnswer: string;
+	/** Documents that grounded the referenced answer. A contextual follow-up
+	 * searches this evidence lane first, instead of drifting across unrelated
+	 * attachments that happen to contain the same generic value type. */
+	evidenceDocumentNames: string[];
+	/** Context-complete question used only by deterministic evidence extractors.
+	 * User-facing generation still receives the current turn unchanged. */
+	resolvedQuestion: string;
 	searchQuery: string;
 	/** Current question first so its date scope overrides the referenced turn. */
 	analysisQuery: string;
@@ -48,11 +55,13 @@ export function buildRetrievalContext(
 	messages: LocalMessage[],
 	currentQuestion: string,
 	force = false,
-	excludeAssistantIds: ReadonlySet<string> = NO_EXCLUDED_IDS
+	excludeAssistantIds: ReadonlySet<string> = NO_EXCLUDED_IDS,
+	citationsByMessage: Readonly<Record<string, ReadonlyArray<{ documentName: string }>>> = {}
 ): RetrievalContext | null {
 	if (!force && !needsRetrievalContext(currentQuestion)) return null;
 	let skippedCurrent = false;
 	let previousAnswer = '';
+	let previousAnswerId = '';
 	let previousQuestion = '';
 	for (let i = messages.length - 1; i >= 0; i--) {
 		const message = messages[i];
@@ -72,6 +81,7 @@ export function buildRetrievalContext(
 			!excludeAssistantIds.has(message.id)
 		) {
 			previousAnswer = clean(message.content);
+			previousAnswerId = message.id;
 			continue;
 		}
 		if (previousAnswer && message.role === 'user') {
@@ -81,9 +91,14 @@ export function buildRetrievalContext(
 	}
 	if (!previousQuestion || !previousAnswer) return null;
 	const question = clean(currentQuestion);
+	const conjunction = analyzeQuestion(question).locale === 'fr' ? ' et ' : ' and ';
 	return {
 		previousQuestion,
 		previousAnswer,
+		evidenceDocumentNames: [
+			...new Set((citationsByMessage[previousAnswerId] ?? []).map((row) => row.documentName))
+		],
+		resolvedQuestion: `${previousQuestion.replace(/[?.!]+$/u, '').trimEnd()}${conjunction}${question}`,
 		searchQuery: `${previousQuestion}\n${previousAnswer}\n${question}`,
 		analysisQuery: `${question}\nPrevious question: ${previousQuestion}`,
 		clarificationQuery: question,
@@ -141,6 +156,8 @@ export function buildClarificationContext(
 	return {
 		previousQuestion: parts[0],
 		previousAnswer: '',
+		evidenceDocumentNames: [],
+		resolvedQuestion: analysisQuery,
 		searchQuery: analysisQuery,
 		analysisQuery,
 		clarificationQuery: analysisQuery,

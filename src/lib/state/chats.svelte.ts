@@ -9,6 +9,7 @@ import { guardedFetch, OfflineError } from '$lib/net';
 import { myaiStore, endpointHost, type ChatMessage } from './myai.svelte';
 import { settingsStore } from './settings.svelte';
 import { llmStore } from '$lib/private-ai/llm.svelte';
+import { SvelteSet } from 'svelte/reactivity';
 import {
 	generationOptionsFor,
 	usesCompactFactualContext,
@@ -133,6 +134,10 @@ class ChatsStore {
 	methodByMessage = $state<Record<string, MethodSummary>>({});
 	workSteps = $state<WorkStep[]>([]);
 	private workStepStartedAt = 0;
+	/** Related-question generation is background work. A real user turn always
+	 * preempts it instead of queueing behind a decorative model call. */
+	private generatingRelated = false;
+	private relatedTimer: number | null = null;
 	private readonly embedQuestions: EmbedQuestions = (texts) => documentsStore.embedQueries(texts);
 
 	activeChat = $derived(this.chats.find((c) => c.id === this.activeChatId) ?? null);
@@ -222,8 +227,24 @@ class ChatsStore {
 		// context even without a pronoun: the disputed answer IS its subject.
 		return (
 			buildClarificationContext(this.messages, question, clarificationIds) ??
-			buildRetrievalContext(this.messages, question, isContestation(question), clarificationIds)
+			buildRetrievalContext(
+				this.messages,
+				question,
+				isContestation(question),
+				clarificationIds,
+				this.citations
+			)
 		);
+	}
+
+	/** Context-dependent turns continue inside the evidence lane established by
+	 * the previous answer. This is conversational context identification, not a
+	 * document-name classifier: names come from persisted citations. */
+	private retrievalDocuments(context: RetrievalContext | null, documents: ChatDocument[]) {
+		if (!context?.evidenceDocumentNames.length) return documents;
+		const names = new Set(context.evidenceDocumentNames);
+		const scoped = documents.filter((document) => names.has(document.name));
+		return scoped.length ? scoped : documents;
 	}
 
 	/** Kind of the clarification the assistant just asked, if the immediately
@@ -259,10 +280,7 @@ class ChatsStore {
 	/** Defer scope ambiguity until retrieval. An attachment only counts as a
 	 * competing scope when its own evidence group can answer the question. */
 	private clarificationAfterRetrieval(
-		_question: string,
-		clarification: ClarificationKind | null,
-		_hits: SearchHit[],
-		_alternateQueries: string[] = []
+		clarification: ClarificationKind | null
 	): ClarificationKind | null {
 		// Scope guesses used lexical relevance twice and still asked “one record
 		// or all documents?” after retrieval had found the answer. Let grounded
@@ -312,7 +330,7 @@ class ChatsStore {
 					...clauseHits
 				];
 				const hits: SearchHit[] = [];
-				const seen = new Set<number>();
+				const seen = new SvelteSet<number>();
 				for (let rank = 0; rank < 16 && hits.length < 16; rank++) {
 					for (const list of lists) {
 						const hit = list[rank];
@@ -444,7 +462,16 @@ class ChatsStore {
 
 			let raw = '';
 			if (last.mode === 'private' && llmStore.status === 'ready') {
-				raw = await llmStore.generate(prompt, () => {});
+				this.generatingRelated = true;
+				try {
+					raw = await llmStore.generate(prompt, () => {}, {
+						reasoning: 'off',
+						maxTokens: 96,
+						temperature: 0
+					});
+				} finally {
+					this.generatingRelated = false;
+				}
 			} else if (last.mode === 'myai' && myaiStore.baseUrl) {
 				const model = chat.myaiModel ?? myaiStore.defaultModel;
 				if (!model) return;
@@ -473,6 +500,26 @@ class ChatsStore {
 		} catch {
 			// Silent absence by design (spec 020): no spinner, no error state.
 		}
+	}
+
+	/** Give an immediate follow-up a quiet window before background inference
+	 * starts. This avoids paying an abort/restart cycle on the single local model. */
+	private scheduleRelated(chatId: string): void {
+		if (this.relatedTimer !== null) window.clearTimeout(this.relatedTimer);
+		this.relatedTimer = window.setTimeout(() => {
+			this.relatedTimer = null;
+			void this.generateRelated(chatId);
+		}, 15_000);
+	}
+
+	private async cancelRelatedWork(): Promise<void> {
+		if (this.relatedTimer !== null) {
+			window.clearTimeout(this.relatedTimer);
+			this.relatedTimer = null;
+		}
+		if (!this.generatingRelated) return;
+		this.generatingRelated = false;
+		await llmStore.stop();
 	}
 
 	openWhatAiSaw(messageId: string): void {
@@ -556,6 +603,7 @@ class ChatsStore {
 	/** C2 — replace the last answer: same question, fresh retrieval + generation. */
 	async regenerate(chatId: string): Promise<void> {
 		if (this.sending) return;
+		await this.cancelRelatedWork();
 		const last = this.messages[this.messages.length - 1];
 		const question = [...this.messages].reverse().find((m) => m.role === 'user')?.content;
 		if (!last || last.role !== 'assistant' || !question) return;
@@ -573,6 +621,7 @@ class ChatsStore {
 			this.messages = await db.listMessages(chatId);
 			const context = this.retrievalContext(question);
 			const enabledDocs = this.chatDocuments.filter((d) => d.enabled && d.status === 'ready');
+			const retrievalDocs = this.retrievalDocuments(context, enabledDocs);
 			const analysisQuestion = context?.analysisQuery ?? question;
 			const frame = await resolveQuestion(analysisQuestion, this.embedQuestions);
 			const clarification = this.clarificationFor(question, context, frame, enabledDocs.length);
@@ -612,7 +661,7 @@ class ChatsStore {
 			const retrieved = enabledDocs.length
 				? await this.retrieveWithSearchFallback(
 						context?.searchQuery ?? question,
-						enabledDocs,
+						retrievalDocs,
 						this.chats.find((item) => item.id === chatId)?.mode ?? null,
 						question,
 						route,
@@ -620,12 +669,7 @@ class ChatsStore {
 					)
 				: { hits: [], alternateQueries: [] };
 			const hits = retrieved.hits;
-			const finalClarification = this.clarificationAfterRetrieval(
-				question,
-				clarification,
-				hits,
-				retrieved.alternateQueries
-			);
+			const finalClarification = this.clarificationAfterRetrieval(clarification);
 			if (finalClarification) {
 				await this.insertClarification(chatId, finalClarification, frame.locale, versionGroup);
 				this.messages = await db.listMessages(chatId);
@@ -640,7 +684,8 @@ class ChatsStore {
 				enabledDocs.length,
 				versionGroup,
 				route,
-				context?.promptContext ?? null
+				context?.promptContext ?? null,
+				context?.resolvedQuestion ?? question
 			);
 			await db.touchChat(chatId);
 			this.messages = await db.listMessages(chatId);
@@ -652,7 +697,7 @@ class ChatsStore {
 			this.streamingThinking = null;
 			this.workSteps = [];
 		}
-		void this.generateRelated(chatId);
+		this.scheduleRelated(chatId);
 	}
 
 	/** C2 — edit the last question: the old exchange is replaced entirely. */
@@ -751,6 +796,7 @@ class ChatsStore {
 	): Promise<void> {
 		const question = text.trim();
 		if (!question || (this.sending && !opts.staged)) return;
+		await this.cancelRelatedWork();
 		if (!opts.staged) {
 			this.sending = true;
 			this.related = null;
@@ -782,6 +828,7 @@ class ChatsStore {
 			const context = this.retrievalContext(question);
 
 			const enabledDocs = this.chatDocuments.filter((d) => d.enabled && d.status === 'ready');
+			const retrievalDocs = this.retrievalDocuments(context, enabledDocs);
 			const analysisQuestion = context?.analysisQuery ?? question;
 			const frame = await resolveQuestion(analysisQuestion, this.embedQuestions);
 			const clarification = this.clarificationFor(question, context, frame, enabledDocs.length);
@@ -813,24 +860,17 @@ class ChatsStore {
 				await this.generateColumnAnswer(chatId, columnAnswer, frame.locale);
 			} else {
 				let hits: SearchHit[] = [];
-				let alternateQueries: string[] = [];
 				if (enabledDocs.length) {
 					const retrieved = await this.retrieveWithSearchFallback(
 						context?.searchQuery ?? question,
-						enabledDocs,
+						retrievalDocs,
 						chat?.mode ?? null,
 						question,
 						route,
 						() => this.advanceWork('inspect')
 					);
 					hits = retrieved.hits;
-					alternateQueries = retrieved.alternateQueries;
-					const finalClarification = this.clarificationAfterRetrieval(
-						question,
-						clarification,
-						hits,
-						alternateQueries
-					);
+					const finalClarification = this.clarificationAfterRetrieval(clarification);
 					if (finalClarification) {
 						await this.insertClarification(chatId, finalClarification, frame.locale);
 						await db.touchChat(chatId);
@@ -849,7 +889,8 @@ class ChatsStore {
 					enabledDocs.length,
 					null,
 					route,
-					context?.promptContext ?? null
+					context?.promptContext ?? null,
+					context?.resolvedQuestion ?? question
 				);
 			}
 			await db.touchChat(chatId);
@@ -861,7 +902,7 @@ class ChatsStore {
 			this.streamingThinking = null;
 			this.workSteps = [];
 		}
-		void this.generateRelated(chatId);
+		this.scheduleRelated(chatId);
 	}
 
 	/** Route a question to the chat's mode (shared by send/regenerate). */
@@ -873,6 +914,7 @@ class ChatsStore {
 		versionGroup: string | null = null,
 		route: QuestionRoute = 'targeted',
 		conversationContext: string | null = null,
+		extractiveQuestion = question,
 		/** Retrieved but judged too weak to answer from — shown with the refusal. */
 		rejected: SearchHit[] = []
 	): Promise<void> {
@@ -916,7 +958,8 @@ class ChatsStore {
 				documentCount,
 				versionGroup,
 				route,
-				conversationContext
+				conversationContext,
+				extractiveQuestion
 			);
 		} else if (
 			chat?.mode === 'myai' &&
@@ -995,7 +1038,8 @@ class ChatsStore {
 		documentCount: number,
 		versionGroup: string | null = null,
 		route: QuestionRoute = 'targeted',
-		conversationContext: string | null = null
+		conversationContext: string | null = null,
+		extractiveQuestion = question
 	): Promise<void> {
 		const { db } = await getLocalDb();
 		this.streamingText = '';
@@ -1056,7 +1100,8 @@ class ChatsStore {
 		// A contested turn re-weighs evidence; a deterministic extract would just
 		// repeat whichever clause matches and cannot concede or confirm.
 		const contested = conversationContext !== null && isContestation(question);
-		const extractive = grounded && !contested ? buildAuditedExtractiveAnswer(question, hits) : null;
+		const extractive =
+			grounded && !contested ? buildAuditedExtractiveAnswer(extractiveQuestion, hits) : null;
 		this.advanceWork('write');
 		if (extractive) {
 			raw = extractive.answer;
@@ -1806,9 +1851,13 @@ class ChatsStore {
 	async retrieveForActive(
 		query: string,
 		refinementQuery = query,
-		route?: QuestionRoute
+		route?: QuestionRoute,
+		evidenceDocumentNames: readonly string[] = []
 	): Promise<SearchHit[]> {
-		const enabledDocs = this.chatDocuments.filter((d) => d.enabled && d.status === 'ready');
+		const enabled = this.chatDocuments.filter((d) => d.enabled && d.status === 'ready');
+		const names = new Set(evidenceDocumentNames);
+		const scoped = names.size ? enabled.filter((document) => names.has(document.name)) : enabled;
+		const enabledDocs = scoped.length ? scoped : enabled;
 		if (!enabledDocs.length) return [];
 		return documentsStore.retrieve(
 			query,
@@ -1870,7 +1919,8 @@ class ChatsStore {
 		const hits = await this.retrieveForActive(
 			context?.searchQuery ?? question,
 			question,
-			plan.route
+			plan.route,
+			context?.evidenceDocumentNames ?? []
 		);
 		if (!hits.length) {
 			this.sending = false;

@@ -202,8 +202,12 @@ export async function retrieveWithLocalQueryFallback(input: {
 	retrieve: (alternateQueries: string[]) => Promise<SearchHit[]>;
 }): Promise<{ hits: SearchHit[]; alternateQueries: string[] }> {
 	const question = input.refinementQuery ?? input.query;
+	const contextualFollowUp =
+		input.refinementQuery !== undefined && input.refinementQuery.trim() !== input.query.trim();
+	const contextAlreadyScoped = contextualFollowUp && input.documentLanguages.length === 1;
 	const primaryHits = await input.retrieve([]);
 	if (
+		(!contextualFollowUp || contextAlreadyScoped) &&
 		!isWeakMatch(primaryHits) &&
 		hasAnswerBearingEvidence(question, primaryHits) &&
 		hasClauseLevelLexicalEvidence(question, primaryHits) &&
@@ -230,6 +234,12 @@ export async function retrieveWithLocalQueryFallback(input: {
 	) {
 		return { hits: primaryHits, alternateQueries: [] };
 	}
+	// Conversational retrieval must decontextualize follow-ups before ranking.
+	// A generic noun such as “number” can look fully answered by an unrelated
+	// attachment, while the rewrite binds the missing referent from history.
+	// Once that context-aware result passes the same evidence gates, keep it:
+	// comparing lexical scores against the ambiguous original recreates the bug.
+	if (contextualFollowUp) return { hits: fallbackHits, alternateQueries };
 	// A rewrite may find useful vocabulary while losing a precise structured
 	// declaration already recalled by user wording. Compare evidence quality;
 	// never replace a stronger primary result merely because retry is valid.

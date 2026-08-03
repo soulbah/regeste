@@ -20,6 +20,11 @@ grounded-answer promise in PRD P3 and the private/cloud answer flows in FEATURES
 - WHEN a question contains several dependent clauses THEN retrieval SHALL establish one
   answer-bearing document before resolving short elliptical clauses inside that document, so a
   date or signatory from another attachment cannot drift into the answer.
+- WHEN a follow-up depends on the previous answer THEN retrieval SHALL decontextualize the query
+  and continue inside the documents cited by that answer, so a generic value type cannot drift to
+  an unrelated attachment.
+- WHEN the user sends a new turn while related-question suggestions are being generated THEN the
+  foreground turn SHALL preempt that background generation instead of waiting behind it.
 - WHEN a coordinated factual answer needs several passages THEN prompt compression SHALL retain
   evidence from each retrieval branch instead of collapsing to the globally strongest passage.
 - WHEN a cached local model is being placed in memory THEN the app SHALL show a visibly
@@ -51,6 +56,8 @@ the expected behavior.
    for RAPO/TA fee questions and page 1 for balance/account questions.
 3. Ask direct, paraphrased, coordinated and combined-total questions in `/chat`; confirm answers
    contain the supported values and citations, with no scope clarification or false refusal.
+   With both PDFs attached, ask who owns the account and then `Quel est son numéro ?`; confirm the
+   follow-up stays on the cited bank attestation and returns `60012345678`.
 4. Refresh while a cached model is loading; confirm the indeterminate indicator moves and the
    model either becomes ready or surfaces a recoverable error after a worker restart.
 5. Run one grounded request through each offered Cloudflare model and confirm non-empty cited

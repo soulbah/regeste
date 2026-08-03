@@ -349,7 +349,8 @@ export function hasCoordinatedFactQuestions(question: string): boolean {
 	// facts. This also gives a pronoun in the second sentence an in-turn
 	// antecedent instead of borrowing an unrelated previous chat answer.
 	const currentTurn = question.split(/\nPrevious question:/u, 1)[0];
-	if ((currentTurn.match(/\?/gu)?.length ?? 0) >= 2) return true;
+	const questionClauses = currentTurn.split(/\?+/u).filter((clause) => words(clause).length > 0);
+	if (questionClauses.length >= 2) return true;
 	const hasCoordinator = /(?:,|;|\b(?:et|and)\b)/u.test(q);
 	if (!hasCoordinator) return false;
 	const interrogatives =
