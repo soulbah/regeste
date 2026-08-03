@@ -152,3 +152,60 @@ export function positionedFromOcrLines(
 	}
 	return out;
 }
+
+function coveredWidth(intervals: Array<[number, number]>): number {
+	if (!intervals.length) return 0;
+	const ordered = intervals
+		.filter(([start, end]) => end > start)
+		.sort((left, right) => left[0] - right[0]);
+	if (!ordered.length) return 0;
+	let total = 0;
+	let [start, end] = ordered[0];
+	for (const [nextStart, nextEnd] of ordered.slice(1)) {
+		if (nextStart <= end) {
+			end = Math.max(end, nextEnd);
+			continue;
+		}
+		total += end - start;
+		[start, end] = [nextStart, nextEnd];
+	}
+	return total + end - start;
+}
+
+/**
+ * Overlay a sound PDF text layer on the OCR reading of the same page.
+ *
+ * Hybrid PDFs often paint a raster while keeping a few exact digital fields.
+ * OCR is still needed for the rest of the page, but an OCR token occupying the
+ * same rectangle as digital text must not be allowed to replace that exact
+ * value. Matching is geometric only: no field names, language, or document
+ * vocabulary. OCR-only regions stay untouched.
+ *
+ * A wide OCR region is removed only when native items cover at least half of
+ * its width. This lets several native runs replace one merged OCR line while a
+ * small native fragment cannot erase unrelated OCR text beside it.
+ */
+export function overlayNativePdfText(
+	ocrItems: PositionedPdfText[],
+	nativeItems: PositionedPdfText[],
+	pageHeight: number
+): PositionedPdfText[] {
+	if (!nativeItems.length) return ocrItems;
+	if (!ocrItems.length) return nativeItems;
+	// PDF layout reconstruction itself uses a 2 pt line tolerance. Allow a small
+	// OCR-baseline offset, but cap it below ordinary form line spacing so a value
+	// can never erase the label printed directly above it.
+	const baselineTolerance = Math.max(2, Math.min(4, pageHeight * 0.004));
+	const keptOcr = ocrItems.filter((ocr) => {
+		const start = ocr.x;
+		const end = ocr.x + Math.max(ocr.width, 1);
+		const overlaps = nativeItems
+			.filter((native) => Math.abs(native.y - ocr.y) <= baselineTolerance)
+			.map((native): [number, number] => [
+				Math.max(start, native.x),
+				Math.min(end, native.x + Math.max(native.width, 1))
+			]);
+		return coveredWidth(overlaps) / Math.max(end - start, 1) < 0.5;
+	});
+	return [...keptOcr, ...nativeItems];
+}

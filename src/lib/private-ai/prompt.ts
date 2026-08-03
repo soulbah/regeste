@@ -51,12 +51,27 @@ function answerableClauses(question: string): string[] {
 	return clauses;
 }
 
+/** Requested slots from deterministic punctuation when available, otherwise
+ * from local model question decomposition. No document text enters this step,
+ * and semantic subqueries replace conjunction vocabularies. */
+function requestedParts(question: string, evidenceQueries: string[] = []): string[] {
+	const clauses = answerableClauses(question);
+	return clauses.length > 1
+		? clauses
+		: evidenceQueries.length > 1
+			? evidenceQueries.slice(0, 4)
+			: [];
+}
+
 /** Deterministic answer schema derived from the question. The model fills this
  * contract from evidence; it does not decide for itself what "complete" means. */
-export function buildAnswerCoverageContract(question: string): string {
+export function buildAnswerCoverageContract(
+	question: string,
+	evidenceQueries: string[] = []
+): string {
 	const normalized = normalizeQuestion(question);
 	const analysis = analyzeQuestion(question);
-	const parts = answerableClauses(question);
+	const parts = requestedParts(question, evidenceQueries);
 	const requirements: string[] = [];
 	if (parts.length) {
 		requirements.push(
@@ -132,11 +147,15 @@ function logicalEvidenceLines(text: string): string[] {
 	let current = '';
 	for (const line of lines) {
 		const startsItem = /^(?:[-•●✓✗!]\s+|\d+[.)]\s+)/u.test(line);
+		const continuesItem = current.length > 0 && /^(?:[-•●✓✗!]\s+|\d+[.)]\s+)/u.test(current);
 		if (startsItem && current) {
 			logical.push(current);
 			current = line;
+		} else if (continuesItem) {
+			current = `${current} ${line}`;
 		} else {
-			current = current ? `${current} ${line}` : line;
+			if (current) logical.push(current);
+			current = line;
 		}
 	}
 	if (current) logical.push(current);
@@ -152,11 +171,21 @@ export function buildEvidenceInventory(
 	evidenceQueries: string[] = []
 ): string {
 	if (!hits.length) return '';
-	const parts = answerableClauses(question);
+	const parts = requestedParts(question, evidenceQueries);
 	const queryViews = parts.length
 		? [question, ...parts, ...evidenceQueries]
 		: [question, ...evidenceQueries];
 	const items: EvidenceInventoryItem[] = [];
+	const structuralLabelsByPage = new Map<string, Set<string>>();
+	for (const hit of hits) {
+		const pageKey = `${hit.documentId}\u0000${hit.page ?? ''}`;
+		const labels = structuralLabelsByPage.get(pageKey) ?? new Set<string>();
+		for (const cell of (hit.structuralContext ?? '').split(/\s*\|\s*/u)) {
+			const label = /^([^:：]{2,100})[:：]\s*\S/u.exec(cell)?.[1];
+			if (label) labels.add(normalizeQuestion(label));
+		}
+		if (labels.size) structuralLabelsByPage.set(pageKey, labels);
+	}
 	const score = (text: string) =>
 		Math.max(
 			...queryViews.map((view) =>
@@ -169,16 +198,19 @@ export function buildEvidenceInventory(
 			)
 		);
 	for (const [hitIndex, hit] of hits.entries()) {
-		const lines = logicalEvidenceLines(hit.text);
-		const sentences = hit.text
-			.replace(/\s*\n\s*/gu, ' ')
-			.split(/(?<=[.!?;:])\s+(?=[\p{Lu}\d«“"'’●•✓✗!-])/gu)
+		// Geometry-derived table/form labels are evidence too. Recovery must read
+		// the same labelled view as retrieval and generation, not raw source alone.
+		const sourceText = evidenceText(hit);
+		const lines = logicalEvidenceLines(sourceText);
+		const sentences = sourceText
+			.split(/\n+/u)
+			.flatMap((line) => line.split(/(?<=[.!?;:])\s+(?=[\p{Lu}\d«“"'’●•✓✗!-])/gu))
 			.map((sentence) => sentence.trim())
 			.filter((sentence) => sentence.length >= 25 && sentence.length <= 500);
 		// PDF form layers often split a label from its value across visual lines
 		// ("Prénom et Nom :" / "Camille Moreau"). Rebind them so the inventory
 		// carries complete facts instead of dangling labels.
-		const rawLines = hit.text
+		const rawLines = sourceText
 			.split(/\n+/u)
 			.map((line) => line.trim())
 			.filter(Boolean);
@@ -216,19 +248,41 @@ export function buildEvidenceInventory(
 		// Raw lines, not the logical ones: logicalEvidenceLines merges consecutive
 		// lines into one run, which is exactly the adjacency this needs.
 		const neighbourJoined: string[] = [];
+		// Geometry-derived label/value relations outrank blind line adjacency. If
+		// layout already resolved a label, never pair that same label with its
+		// other raw neighbour (for example a mailing address printed above a
+		// service-address heading). Labels are discovered from structure itself;
+		// no domain vocabulary is encoded here.
+		const resolvedStructuralLabels =
+			structuralLabelsByPage.get(`${hit.documentId}\u0000${hit.page ?? ''}`) ?? new Set<string>();
 		for (const [index, line] of rawLines.entries()) {
 			if (!carriesNoValue(line)) continue;
+			if (resolvedStructuralLabels.has(normalizeQuestion(line))) continue;
 			for (const rawNeighbour of [rawLines[index - 1], rawLines[index + 1]]) {
 				if (!rawNeighbour) continue;
 				const neighbour = rawNeighbour;
 				// A long or sentence-shaped neighbour is prose, not a label. The
 				// glued-footer repair that used to salvage its head is gone with the
 				// glue itself: chrome is split off at parse time now (spec 034).
-				if (
-					neighbour.split(/\s+/u).filter(Boolean).length > 8 ||
-					/[.!?»]\s*$/u.test(neighbour.trim())
-				)
+				const neighbourWords = neighbour.split(/\s+/u).filter(Boolean);
+				if (neighbourWords.length > 8) {
+					// A signature name can precede a short role whose parser line then
+					// continues into footer boilerplate. Recover only query-supported
+					// prefixes beside an all-caps name token shape; arbitrary long prose
+					// remains excluded. Prefix length is structural, not vocabulary.
+					const upperName =
+						/^(?:\p{Lu}[\p{Lu}\p{M}'’.-]*)(?:\s+\p{Lu}[\p{Lu}\p{M}'’.-]*){1,4}$/u.test(line);
+					if (rawNeighbour !== rawLines[index + 1] || !upperName) continue;
+					const prefix = Array.from(
+						{ length: Math.min(6, neighbourWords.length - 1) - 1 },
+						(_, i) => neighbourWords.slice(0, i + 2).join(' ')
+					)
+						.filter((candidate) => !/\d/u.test(candidate))
+						.sort((left, right) => score(right) - score(left) || left.length - right.length)[0];
+					if (prefix && score(prefix) >= 0.2) neighbourJoined.push(`${line} ${prefix}`);
 					continue;
+				}
+				if (/[.!?»]\s*$/u.test(neighbour.trim())) continue;
 				neighbourJoined.push(
 					rawNeighbour === rawLines[index - 1] ? `${neighbour} ${line}` : `${line} ${neighbour}`
 				);
@@ -352,6 +406,7 @@ Rules:
 - When asked for a line, section, sheet, or detail reference, copy the exact identifier adjacent to the requested label. Do not infer a different identifier from nearby arithmetic.
 - Answer every part of a multi-part question. For a calculation, state the operands and the result.
 - Combine related facts into one natural sentence or compact paragraph. Never repeat the questions, add field-style labels, or narrate where the answer was found; citations carry provenance.
+- Never append source labels, quoted excerpt text, or provenance in parentheses after an answer. A citation marker alone is sufficient.
 - Preserve strict bounds and comparisons exactly: "less than" is not "up to" or "a maximum of", and "after" is not "on or after".
 - Bind every value to its adjacent label and subject. Never substitute a document creation, signature, print or generation timestamp for a contract effective date, and never substitute a value from a neighboring category.
 - Keep the requested insured object or category exact: building, belongings, liability, assistance and optional cover are not interchangeable.
@@ -627,27 +682,122 @@ export function hasCompleteFactualAnswer(question: string, draft: string): boole
 	return completeFactualAnswerPrefix(question, draft) !== null;
 }
 
+const EVIDENCE_COPY_WINDOW_TOKENS = 18;
+
+function copyTokens(text: string): string[] {
+	return normalizeQuestion(text).match(/[\p{L}\p{N}]+/gu) ?? [];
+}
+
+/** A factual synthesis that copied a long uninterrupted source span instead of
+ * answering. Token windows make this language- and document-independent; short
+ * exact values, names, addresses and quotations remain valid answers. */
+export function isCopiedEvidenceAnswer(
+	question: string,
+	draft: string,
+	evidence: readonly string[]
+): boolean {
+	// A long source transcription is not a reader-facing factual answer, whether
+	// the question has one part or several. Clause punctuation must not decide
+	// whether copied OCR/table layout is allowed through.
+	if (analyzeQuestion(question).answerShape !== 'fact') return false;
+	const answer = copyTokens(stripThink(draft));
+	if (answer.length < EVIDENCE_COPY_WINDOW_TOKENS) return false;
+	const copiedWindows = new Set<string>();
+	for (const excerpt of evidence) {
+		const tokens = copyTokens(excerpt);
+		for (let index = 0; index <= tokens.length - EVIDENCE_COPY_WINDOW_TOKENS; index++) {
+			copiedWindows.add(tokens.slice(index, index + EVIDENCE_COPY_WINDOW_TOKENS).join('\u0001'));
+		}
+	}
+	for (let index = 0; index <= answer.length - EVIDENCE_COPY_WINDOW_TOKENS; index++) {
+		if (copiedWindows.has(answer.slice(index, index + EVIDENCE_COPY_WINDOW_TOKENS).join('\u0001')))
+			return true;
+	}
+	return false;
+}
+
+export const COMPACT_SYNTHESIS_SYSTEM_PROMPT =
+	'For this recovery pass, turn supplied source facts into one concise, natural answer. Never infer or add a fact. Return reader-facing prose only, in the question language, and cite every factual statement with its supplied [n]. Never append source labels, quoted excerpts, or provenance in parentheses; a citation marker alone is sufficient.';
+
+/** Second-stage synthesis for a decoder that transcribed its evidence. A short,
+ * delimited fact plan removes the long source layout that anchored the first
+ * pass. This is prompt chaining: inspect one measurable failure shape, then
+ * give the next call one focused transformation instead of another full audit. */
+export function buildCompactSynthesisPrompt(
+	question: string,
+	hits: SearchHit[],
+	evidenceQueries: string[] = []
+): string {
+	const inventory = buildEvidenceInventory(question, hits, null, evidenceQueries).replace(
+		/^Internal evidence facts[^:]*:\s*/u,
+		''
+	);
+	const fallback = selectVerificationHits(question, hits, 4)
+		.map(
+			(hit, index) => `- ${evidenceText(hit).slice(0, 420)} [${hits.indexOf(hit) + 1 || index + 1}]`
+		)
+		.join('\n');
+	const facts = inventory || fallback;
+	if (!facts) return '';
+	const parts = requestedParts(question, evidenceQueries);
+	const requested = (parts.length ? parts : [question])
+		.map((part, index) => `${index + 1}. ${part}`)
+		.join('\n');
+	return `<source_facts>
+${facts}
+</source_facts>
+
+<requested_parts>
+${requested}
+</requested_parts>
+
+<answer_format>
+Write one smooth sentence or compact paragraph. Cover every requested part exactly once. Keep exact names, values, dates, units, conditions, and their [n] citations from source_facts. Include only facts needed for the answer; omit source layout, headings, labels, OCR debris, and parenthetical provenance. Use [n] alone instead of repeating a source label or excerpt after the answer.
+</answer_format>
+
+<question>${question}</question>`;
+}
+
 /** Fraction of independently requested clauses that a draft addresses. Pure
  * semantic/lexical coverage: used to make a selector abstain when it copied a
  * relevant table but omitted a requested result. */
-export function answerClauseCoverageRatio(question: string, draft: string): number {
-	const clauses = answerableClauses(question).filter(
+export function answerClauseCoverageRatio(
+	question: string,
+	draft: string,
+	evidenceQueries: string[] = []
+): number {
+	const clauses = requestedParts(question, evidenceQueries).filter(
 		(clause) => significantQueryTokens(clause, 2).length >= 2
 	);
 	if (clauses.length < 2) return 1;
-	const covered = clauses.filter(
-		(clause) => citationGroundingCoverage(clause, draft) >= 0.15
-	).length;
+	const tokenSets = clauses.map((clause) => new Set(significantQueryTokens(clause, 2)));
+	const covered = clauses.filter((clause, index) => {
+		// Repeated subject terms prove no requested slot: an answer naming John
+		// and Jane cannot count as covering amount and address. Remove a token when
+		// any other subquestion repeats it; remaining tokens identify this slot.
+		const distinctive = [...tokenSets[index]]
+			.filter(
+				(token) => !tokenSets.some((other, otherIndex) => otherIndex !== index && other.has(token))
+			)
+			.join(' ');
+		return citationGroundingCoverage(distinctive || clause, draft) >= 0.15;
+	}).length;
 	return covered / clauses.length;
 }
 
 /** Reader-facing prefix proven complete even when one decoder delta already
  * appended the beginning of another line. */
-export function completeFactualAnswerPrefix(question: string, draft: string): string | null {
+export function completeFactualAnswerPrefix(
+	question: string,
+	draft: string,
+	evidence: readonly string[] = [],
+	evidenceQueries: string[] = []
+): string | null {
 	const analysis = analyzeQuestion(question);
-	const clauses = answerableClauses(question);
+	const clauses = requestedParts(question, evidenceQueries);
 	const visible = stripThink(draft).trim();
 	if (analysis.answerShape !== 'fact' || clauses.length < 2 || visible.length < 30) return null;
+	if (evidence.length && isCopiedEvidenceAnswer(question, visible, evidence)) return null;
 	const sentences = [...visible.matchAll(/[^.!?]+[.!?](?:\s+|$)/gu)]
 		.map((match) => match[0].trim())
 		.filter((sentence) => sentence.length >= 10);
@@ -705,6 +855,54 @@ export function isPureRefusalLike(text: string): boolean {
 	);
 }
 
+/** Verification is monotonic: an audit may correct an answer, never replace
+ * reader-facing evidence with a refusal or preserve a copied source dump merely
+ * because the dump has higher lexical overlap than concise prose. */
+export function verificationCanReplaceDraft(
+	question: string,
+	draft: string,
+	verified: string,
+	evidence: readonly string[],
+	evidenceQueries: string[] = []
+): boolean {
+	if (!verified.trim() || isDegenerateAnswer(verified)) return false;
+	if (isCopiedEvidenceAnswer(question, verified, evidence)) return false;
+	if (isPureRefusalLike(verified) && !isPureRefusalLike(draft)) return false;
+	if (isCopiedEvidenceAnswer(question, draft, evidence)) {
+		return answerClauseCoverageRatio(question, verified, evidenceQueries) >= 0.8;
+	}
+	if (evidenceQueries.length > 1) {
+		const draftCoverage = answerClauseCoverageRatio(question, draft, evidenceQueries);
+		const verifiedCoverage = answerClauseCoverageRatio(question, verified, evidenceQueries);
+		// Semantic decomposition is the only trustworthy slot schema for an
+		// unpunctuated coordinated question. An audit may restore a missing slot,
+		// never replace one incomplete answer with another or erase a slot from a
+		// complete draft while retaining superficially valid citations.
+		if (verifiedCoverage + Number.EPSILON < Math.max(0.8, draftCoverage)) return false;
+	}
+	return verificationPreservesGrounding(draft, verified, evidence.length > 0, question);
+}
+
+/** Compact synthesis may legitimately omit citation markers even while it
+ * restores semantic slots missing from the draft. Citation resolution and
+ * numeric grounding run after selection, so completeness can improve without
+ * letting a refusal, source dump, or degenerate fragment replace the draft. */
+export function recoveryCanReplaceDraft(
+	question: string,
+	draft: string,
+	recovered: string,
+	evidence: readonly string[],
+	evidenceQueries: string[] = []
+): boolean {
+	if (!recovered.trim() || isDegenerateAnswer(recovered)) return false;
+	if (isCopiedEvidenceAnswer(question, recovered, evidence)) return false;
+	if (isPureRefusalLike(recovered) && !isPureRefusalLike(draft)) return false;
+	const before = answerClauseCoverageRatio(question, draft, evidenceQueries);
+	const after = answerClauseCoverageRatio(question, recovered, evidenceQueries);
+	if (after >= 0.8 && after > before) return true;
+	return verificationCanReplaceDraft(question, draft, recovered, evidence, evidenceQueries);
+}
+
 export function needsGroundedVerification(question: string, draft = ''): boolean {
 	const normalized = normalizeQuestion(question);
 	const verificationCore = normalized.replace(/^(?:d apres|selon)[^,]*,\s*/u, '');
@@ -750,7 +948,7 @@ export function selectVerificationHits(
 ): SearchHit[] {
 	if (hits.length <= 1) return hits;
 	const utility = (hit: SearchHit) => {
-		const candidate = `${hit.headingPath ?? ''}\n${hit.text}`;
+		const candidate = `${hit.headingPath ?? ''}\n${evidenceText(hit)}`;
 		return (
 			queryCoverage(question, candidate) * 0.8 +
 			fuzzyQueryCoverage(question, candidate) * 0.65 +
@@ -832,6 +1030,10 @@ Question: ${question}`;
  * arithmetic/consistency contradictions must never survive presentation. */
 export function enforceAnswerInvariants(question: string, text: string): string {
 	let corrected = stripThink(text);
+	// Some chat templates end generation with an XML-like answer delimiter even
+	// when no opening delimiter was requested. It is protocol residue, never
+	// reader content.
+	corrected = corrected.replace(/\s*<\/?answer>\s*$/giu, '').trimEnd();
 	// This heading is an internal prompt sentinel, never document content. If a
 	// small model copies the evidence scaffold after finishing its answer, keep
 	// only reader-facing prose. Stream completion normally stops before this;
@@ -848,6 +1050,20 @@ export function enforceAnswerInvariants(question: string, text: string): string 
 	const labelledAppendix = corrected.search(/\s*\[\d{1,2}\]\s*:\s*(?=\p{L})/u);
 	if (labelledAppendix >= 40 && /[.!?]\s*$/u.test(corrected.slice(0, labelledAppendix).trim()))
 		corrected = corrected.slice(0, labelledAppendix).trimEnd();
+	// A decoder can turn each evidence row into a redundant parenthetical gloss:
+	// `12 August 2015 (the due date [1]: Due date: 08/12/2015)`. `[n]:` is the
+	// structural signature of the internal evidence inventory, not ordinary
+	// parenthetical prose. Keep every unique citation and drop the copied label
+	// and excerpt. This is independent of document vocabulary and answer domain.
+	corrected = corrected.replace(
+		/\s*\(([^()\n]*\[\d{1,2}\]\s*:[^()\n]*)\)/gu,
+		(_whole, inventoryGloss: string) => {
+			const markers = [
+				...new Set([...inventoryGloss.matchAll(/\[\d{1,2}\]/gu)].map((match) => match[0]))
+			];
+			return markers.length ? ` ${markers.join('')}` : '';
+		}
+	);
 	const normalizedQuestion = normalizeQuestion(question);
 	let normalizedAnswer = normalizeQuestion(corrected);
 	const difference =
@@ -1147,13 +1363,15 @@ export function buildUserPrompt(
 	const referenceHint = nearbyReferences.size
 		? `Exact nearby references copied from the excerpts: ${[...nearbyReferences].slice(0, 6).join(', ')}.\n\n`
 		: '';
-	const parts = answerableClauses(question);
+	const parts = requestedParts(question, evidenceQueries);
 	const multiPartConstraint = parts.length
 		? `Facts the answer must cover (combine them into natural prose; do not repeat or label these prompts):\n${parts.map((part, index) => `${index + 1}. ${part}`).join('\n')}\nUse only the excerpts relevant to each part. Never mix numbers between parts or documents. Only when the user explicitly requests a calculation, write its operands and formula before the result.\n\n`
 		: '';
 	// multiPartConstraint already carries these slots. Repeating the same
 	// checklist increases prefill and encourages checklist-shaped output.
-	const coverageContract = parts.length ? '' : buildAnswerCoverageContract(question);
+	const coverageContract = parts.length
+		? ''
+		: buildAnswerCoverageContract(question, evidenceQueries);
 	const coverageConstraint = coverageContract ? `${coverageContract}\n\n` : '';
 	// Coordinated factual lookup already has explicit clause constraints and a
 	// compact evidence set. Repeating it as an internal inventory adds prefill

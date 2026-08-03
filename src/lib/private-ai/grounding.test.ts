@@ -37,6 +37,20 @@ describe('checkNumericGrounding', () => {
 		expect(checkNumericGrounding('Le prêt court sur 300 mois [1].', evidence).grounded).toBe(true);
 	});
 
+	it('accepts a supported calendar date reformatted in natural language', () => {
+		const evidence = ['Current Billing Due Date: 08/12/2015'];
+		expect(checkNumericGrounding('La date de paiement est le 12 août 2015.', evidence)).toEqual({
+			unsupported: [],
+			grounded: true
+		});
+		expect(checkNumericGrounding('Payment is due on August 12, 2015.', evidence).grounded).toBe(
+			true
+		);
+		expect(
+			checkNumericGrounding('La date de paiement est le 13 août 2016.', evidence).grounded
+		).toBe(false);
+	});
+
 	it('does not trip on an answer numbering its own list', () => {
 		const evidence = ['La franchise est de 300 € par sinistre.'];
 		expect(

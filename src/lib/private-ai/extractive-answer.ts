@@ -401,7 +401,11 @@ function buildTwoPeriodAggregateChangeAnswer(
 	return `The “${terminal.label}” row changes from EUR ${start.literal} million in ${years[0]} to EUR ${end.literal} million in ${years[1]} ${marker}, a change of EUR ${signed(change)} million (${signed(percentage, 2)}%).`;
 }
 
-function buildFormAnswer(question: string, hits: SearchHit[]): string | null {
+function buildFormAnswer(
+	question: string,
+	hits: SearchHit[],
+	evidenceQueries: string[] = []
+): string | null {
 	const normalized = normalizeQuestion(question);
 	if (/\b(?:coherent|coherence|difference|ecart|contradiction|compare)\w*\b/u.test(normalized))
 		return null;
@@ -413,7 +417,11 @@ function buildFormAnswer(question: string, hits: SearchHit[]): string | null {
 		)
 	)
 		return null;
-	const slots = splitQueryClauses(question);
+	// Local question decomposition is the answer schema. Punctuation is only a
+	// fallback when no semantic slots were produced; conjunction words never
+	// become boundaries because they also join names and noun phrases.
+	const slots =
+		evidenceQueries.length > 1 ? evidenceQueries.slice(0, 8) : splitQueryClauses(question);
 	if (slots.length < 2) return null;
 	// A declared-form fact carries a concrete value (number, yes/no, unit, short
 	// entry) — a glossary definition ("Période subséquente : Période se situant
@@ -472,7 +480,11 @@ function buildFormAnswer(question: string, hits: SearchHit[]): string | null {
 		.flatMap((slot) =>
 			rankedBySlot
 				.get(slot)!
-				.filter((candidate) => candidate.score >= minimumScoreFor(slot))
+				.filter(
+					(candidate) =>
+						candidate.score >= minimumScoreFor(slot) ||
+						(evidenceQueries.length > 1 && candidate.exact >= 0.1 && candidate.score >= 0.24)
+				)
 				.map((candidate) => ({ slot, ...candidate }))
 		)
 		.sort((left, right) => right.score + 0.5 * right.exact - (left.score + 0.5 * left.exact));
@@ -486,7 +498,10 @@ function buildFormAnswer(question: string, hits: SearchHit[]): string | null {
 	for (const slot of slots) {
 		if (!assignedSlots.has(slot)) continue;
 		const ranked = rankedBySlot.get(slot)!;
-		if (/\b(?:quels|quelles|which|what)\b/u.test(normalizeQuestion(slot))) {
+		if (
+			/\b(?:quels|quelles|which|what)\b/u.test(normalizeQuestion(slot)) ||
+			/\b(?:quels|quelles|which|what)\b/u.test(normalized)
+		) {
 			const topChunkId = ranked[0].fact.hit.chunkId;
 			for (const related of ranked
 				.slice(1)
@@ -954,7 +969,12 @@ function buildCoLocatedIdentifierIdentityAnswer(
 	question: string,
 	hits: SearchHit[]
 ): string | null {
-	if (splitQueryClauses(question).length !== 2 || analyzeQuestion(question).answerShape !== 'fact')
+	const analysis = analyzeQuestion(question);
+	if (
+		analysis.route !== 'synthesis' ||
+		analysis.answerShape !== 'fact' ||
+		splitQueryClauses(question).length > 2
+	)
 		return null;
 	const identifierPattern = /\b\d(?:[\d ]{7,}\d)\b/gu;
 	const uppercaseSequence =
@@ -1542,7 +1562,11 @@ function buildListAnswer(question: string, hits: SearchHit[]): string | null {
 		.join('\n');
 }
 
-function buildNumberedExplanation(question: string, hits: SearchHit[]): string | null {
+function buildNumberedExplanation(
+	question: string,
+	hits: SearchHit[],
+	evidenceQueries: string[] = []
+): string | null {
 	const analysis = analyzeQuestion(question);
 	const queryNumbers = normalizeQuestion(question).match(/\b\d+(?:[.,]\d+)?\b/gu) ?? [];
 	// Comparative/synthesis turns need relations between several evidence
@@ -1562,7 +1586,7 @@ function buildNumberedExplanation(question: string, hits: SearchHit[]): string |
 		queryNumbers.every((number) => normalizeQuestion(evidenceText(hit)).includes(number))
 	);
 	if (!constrainedHits.length) return null;
-	const clauses = splitQueryClauses(question);
+	const clauses = evidenceQueries.length > 1 ? evidenceQueries : splitQueryClauses(question);
 	const views = clauses.length ? clauses : [question];
 	const units = evidenceUnits(hits);
 	const selected: EvidenceUnit[] = [];
@@ -1574,24 +1598,25 @@ function buildNumberedExplanation(question: string, hits: SearchHit[]): string |
 		if (best && coverage(view, best.text) >= 0.2) selected.push(best);
 	}
 	for (const anchor of constrainedHits.slice(0, 2)) {
-		const continuation = hits.find(
-			(hit) =>
-				hit.documentId === anchor.documentId &&
-				hit.page === anchor.page &&
-				hit.seq !== undefined &&
-				anchor.seq !== undefined &&
-				hit.seq > anchor.seq &&
-				hit.seq - anchor.seq <= 2 &&
-				/^(?:ce|cet|cette|ces|seulement|si|lorsque|apres|toutefois|mais)\b/u.test(
-					normalizeQuestion(hit.text)
-				)
-		);
-		if (continuation)
-			selected.push({
-				hit: continuation,
-				text: continuation.text,
-				order: hits.indexOf(continuation)
-			});
+		selected.push({ hit: anchor, text: anchor.text, order: hits.indexOf(anchor) });
+		if (anchor.seq === undefined) continue;
+		for (const neighbor of hits
+			.filter(
+				(hit) =>
+					hit.documentId === anchor.documentId &&
+					hit.page === anchor.page &&
+					hit.seq !== undefined &&
+					hit.chunkId !== anchor.chunkId &&
+					Math.abs(hit.seq - anchor.seq!) <= 1
+			)
+			.sort((left, right) => left.seq! - right.seq!)) {
+			const structuralContinuation =
+				neighbor.seq === anchor.seq + 1 &&
+				!/[.!?;:]\s*$/u.test(anchor.text.trim()) &&
+				/^\p{Ll}/u.test(neighbor.text.trim());
+			if (coverage(question, neighbor.text) < 0.12 && !structuralContinuation) continue;
+			selected.push({ hit: neighbor, text: neighbor.text, order: hits.indexOf(neighbor) });
+		}
 	}
 	const unique = selected.filter(
 		(unit, index, all) =>
@@ -1599,6 +1624,10 @@ function buildNumberedExplanation(question: string, hits: SearchHit[]): string |
 	);
 	if (unique.length < 2) return null;
 	return unique
+		.sort(
+			(left, right) =>
+				(left.hit.seq ?? left.order) - (right.hit.seq ?? right.order) || left.order - right.order
+		)
 		.slice(0, 4)
 		.map((unit, index) => {
 			let text = unit.text.trim().replace(/^[\p{Ll}\d][^.!?]{0,80}\?\s+(?=\p{Lu})/u, '');
@@ -1686,6 +1715,10 @@ export function explainDeterministicExtractiveAnswer(
 	evidenceQueries: string[] = []
 ): { builder: string; answer: string } | null {
 	if (!hits.length) return null;
+	// Model-written subqueries prove that an unpunctuated turn carries several
+	// semantic slots. A conjunction is not a safe boundary here: it can join a
+	// name or noun phrase, so deterministic selectors must abstain.
+	if (evidenceQueries.length > 1 && splitQueryClauses(question).length === 0) return null;
 	for (const [builder, build] of EXTRACTIVE_BUILDERS) {
 		const answer = build(question, hits, evidenceQueries);
 		if (answer !== null) return { builder, answer };

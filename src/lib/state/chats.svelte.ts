@@ -54,9 +54,11 @@ import { generateWithContextFit } from '$lib/private-ai/context-fit';
 import { answerGrammarEnabled, buildAnswerGrammar } from '$lib/private-ai/answer-grammar';
 import { evidenceText } from '$lib/pipeline/evidence-text';
 import {
+	COMPACT_SYNTHESIS_SYSTEM_PROMPT,
 	SYSTEM_PROMPT,
 	answerClauseCoverageRatio,
 	buildAmountValuePrompt,
+	buildCompactSynthesisPrompt,
 	buildContactValuePrompt,
 	completeFactualAnswerPrefix,
 	buildDurationValuePrompt,
@@ -70,16 +72,18 @@ import {
 	fitEvidenceToContext,
 	groundedRefusal,
 	hasCollapsedIntoRepetition,
+	isCopiedEvidenceAnswer,
 	isDegenerateAnswer,
 	isThinking,
 	isPureRefusalLike,
 	needsGroundedVerification,
 	resolveCitations,
 	resolveTargetedCitations,
+	recoveryCanReplaceDraft,
 	selectVerificationHits,
 	statesTheValue,
 	stripThink,
-	verificationPreservesGrounding
+	verificationCanReplaceDraft
 } from '$lib/private-ai/prompt';
 import type {
 	ChatDocument,
@@ -394,6 +398,7 @@ class ChatsStore {
 			query,
 			refinementQuery,
 			documentLanguages: retrievalDocuments.map((document) => document.language),
+			decompose: route === 'synthesis' && analyzeQuestion(refinementQuery).answerShape === 'fact',
 			rewrite: (messages) =>
 				llmStore.generate(messages, () => {}, {
 					reasoning: 'off',
@@ -1099,16 +1104,25 @@ class ChatsStore {
 		// evidence-guided extractive compression, with zero extra model latency.
 		if (grounded && factualSynthesis) {
 			const clauses = splitQueryClauses(question);
-			if (clauses.length > 1) {
+			const retrievalParts = clauses.length > 1 ? clauses : evidenceQueries;
+			if (retrievalParts.length > 1) {
 				// retrieveWithSearchFallback interleaves one result per document-scoped
 				// clause. Preserve that diversity: a global lexical rerank collapses
 				// elliptical parts such as “when?” and “who signed?” back onto the
 				// subject passage, hiding the date/signature continuations it found.
-				hits = hits.slice(0, Math.min(8, clauses.length * 2));
+				hits = hits.slice(0, Math.min(8, retrievalParts.length * 2));
 			} else {
 				const ranked = selectVerificationHits(question, hits, 4);
 				const strongest = ranked[0];
-				hits = strongest && hasAnswerBearingEvidence(question, [strongest]) ? [strongest] : ranked;
+				// No punctuation means no trustworthy deterministic slot boundary.
+				// Keep several anchors even if local query decomposition was unavailable;
+				// one broadly relevant hit must not hide another requested fact.
+				hits =
+					clauses.length === 0
+						? ranked
+						: strongest && hasAnswerBearingEvidence(question, [strongest])
+							? [strongest]
+							: ranked;
 			}
 		}
 		// Trim BEFORE anything numbers the excerpts: prompt, citations and the
@@ -1154,8 +1168,13 @@ class ChatsStore {
 		// A contested turn re-weighs evidence; a deterministic extract would just
 		// repeat whichever clause matches and cannot concede or confirm.
 		const contested = conversationContext !== null && isContestation(question);
+		// A semantic factual synthesis without punctuation has no safe deterministic
+		// slot boundary: splitting conjunctions cuts names such as “John et Jane”.
+		// Let model-written subqueries drive retrieval and generation for this shape.
+		const requiresSemanticSlotSynthesis =
+			factualSynthesis && splitQueryClauses(question).length === 0;
 		let extractive =
-			grounded && !contested
+			grounded && !contested && !requiresSemanticSlotSynthesis
 				? buildAuditedExtractiveAnswer(extractiveQuestion, hits, evidenceQueries)
 				: null;
 		// Selection extractors are allowed to abstain. A copied table can be
@@ -1163,7 +1182,10 @@ class ChatsStore {
 		// computed change). In that case use grounded generation instead of showing
 		// the incomplete table as an answer. Coverage is clause-based and carries no
 		// document vocabulary.
-		if (extractive?.needsAudit && answerClauseCoverageRatio(question, extractive.answer) < 0.6)
+		if (
+			extractive?.needsAudit &&
+			answerClauseCoverageRatio(question, extractive.answer, evidenceQueries) < 0.8
+		)
 			extractive = null;
 		this.advanceWork('write');
 		if (extractive) {
@@ -1190,6 +1212,7 @@ class ChatsStore {
 			// few hundred characters anyway.
 			let collapseCheckedAt = 0;
 			let collapsed = false;
+			let copiedStream = false;
 			const onDelta = (delta: string) => {
 				streamRaw += delta;
 				this.streamingText = isThinking(streamRaw) ? '' : stripThink(streamRaw);
@@ -1211,12 +1234,19 @@ class ChatsStore {
 						void llmStore.stop();
 					}
 				}
-				if (
-					completedFactAnswer === null &&
-					options.reasoning === 'off' &&
-					(completeFactualAnswerPrefix(question, streamRaw) ?? null) !== null
-				) {
-					completedFactAnswer = completeFactualAnswerPrefix(question, streamRaw);
+				if (!copiedStream && isCopiedEvidenceAnswer(question, streamRaw, hits.map(evidenceText))) {
+					copiedStream = true;
+					this.streamingText = '';
+					void llmStore.stop();
+				}
+				const factualPrefix = completeFactualAnswerPrefix(
+					question,
+					streamRaw,
+					hits.map(evidenceText),
+					evidenceQueries
+				);
+				if (completedFactAnswer === null && options.reasoning === 'off' && factualPrefix !== null) {
+					completedFactAnswer = factualPrefix;
 					void llmStore.stop();
 				}
 			};
@@ -1309,6 +1339,48 @@ class ChatsStore {
 		if (completedFactAnswer) raw = completedFactAnswer;
 		if (completedRefusal) raw = completedRefusal;
 		raw = stripThink(raw || streamRaw);
+		let copiedEvidence = isCopiedEvidenceAnswer(question, raw, hits.map(evidenceText));
+		let incompleteDecomposedAnswer =
+			evidenceQueries.length > 1 && answerClauseCoverageRatio(question, raw, evidenceQueries) < 0.8;
+		// A source transcription or a missing semantic slot is an observable
+		// diagnosis. A compact second stage synthesises the ranked fact plan; it is
+		// adopted only when it stops copying and covers every requested part.
+		if ((copiedEvidence || incompleteDecomposedAnswer) && !this.stopRequested) {
+			try {
+				this.ensureVerifyStep();
+				const recoveryPrompt = buildCompactSynthesisPrompt(question, hits, evidenceQueries);
+				if (recoveryPrompt) {
+					const recoveryTimeout = window.setTimeout(() => void llmStore.stop(), 10_000);
+					const recoveredRaw = await llmStore
+						.generate(
+							[
+								{ role: 'system', content: COMPACT_SYNTHESIS_SYSTEM_PROMPT },
+								{ role: 'user', content: recoveryPrompt }
+							],
+							() => {},
+							verificationOptionsFor(false)
+						)
+						.finally(() => window.clearTimeout(recoveryTimeout));
+					const recovered = stripThink(recoveredRaw).trim();
+					const recoveryAccepted = recoveryCanReplaceDraft(
+						question,
+						raw,
+						recovered,
+						hits.map(evidenceText),
+						evidenceQueries
+					);
+					if (recoveryAccepted) {
+						raw = recovered;
+						this.streamingText = raw;
+					}
+				}
+			} catch (err) {
+				console.error('[regeste] compact synthesis recovery failed:', err);
+			}
+		}
+		copiedEvidence = isCopiedEvidenceAnswer(question, raw, hits.map(evidenceText));
+		incompleteDecomposedAnswer =
+			evidenceQueries.length > 1 && answerClauseCoverageRatio(question, raw, evidenceQueries) < 0.8;
 		// Selection extracts are drafts like any other: they can bind the
 		// right-looking clause to the wrong subject, and grounded verification is
 		// what audits slot completeness. Exact-copy extracts are never paraphrased.
@@ -1317,7 +1389,7 @@ class ChatsStore {
 			grounded &&
 			hits.length &&
 			raw.trim() &&
-			needsGroundedVerification(question, raw)
+			(needsGroundedVerification(question, raw) || copiedEvidence || incompleteDecomposedAnswer)
 		) {
 			try {
 				// The verification is a fresh generation; a small/CPU model can spend
@@ -1352,11 +1424,14 @@ class ChatsStore {
 				// with the same failure modes, and adopting a "1" that died after one
 				// token REPLACES a coherent draft with garbage. A degenerate output
 				// means the audit failed, not that the draft was wrong — keep the draft.
-				if (
-					verified.trim() &&
-					!isDegenerateAnswer(verified) &&
-					verificationPreservesGrounding(raw, verified, hits.length > 0, question)
-				) {
+				const verificationAccepted = verificationCanReplaceDraft(
+					question,
+					raw,
+					verified,
+					hits.map(evidenceText),
+					evidenceQueries
+				);
+				if (verificationAccepted) {
 					raw = verified;
 					this.streamingText = raw;
 					// The displayed answer now comes from the verification pass; its
@@ -1573,6 +1648,12 @@ class ChatsStore {
 			} catch (err) {
 				console.error('[regeste] amount-value retry failed:', err);
 			}
+		}
+		// Raw source transcription is never a reader-facing answer. The audit above
+		// gets one chance to turn it into prose; if that generation also fails, an
+		// honest refusal is safer than dumping a document passage into the chat.
+		if (isCopiedEvidenceAnswer(question, raw, hits.map(evidenceText))) {
+			raw = groundedRefusal(question);
 		}
 		raw = enforceAnswerInvariants(question, raw);
 		// A figure the excerpts do not carry is refused rather than shown under a

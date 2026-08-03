@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 
 import { expose } from 'comlink';
-import { OCR_MODEL } from './ocr-model';
+import { OCR_DETECTION_MAX_SIDE, OCR_MODEL } from './ocr-model';
 import { shouldRetryOcr } from './ocr-quality';
 import { OCR_PADDING_HORIZONTAL, OCR_PADDING_VERTICAL, type OcrItem } from './ocr-boxes';
 import {
@@ -24,6 +24,9 @@ export interface OcrPageResult {
 	 *  into page positions; without them a scanned page reaches the chunker with
 	 *  no geometry at all (see ocr-boxes.ts). */
 	lines: OcrItem[][];
+	/** Exact positioned runs already present in the PDF text layer. Hybrid pages
+	 *  overlay these on matching OCR boxes instead of trusting a second reading. */
+	nativeItems: Array<{ str: string; transform: number[]; width: number }>;
 }
 
 /** ppu-paddle-ocr's image engine is OffscreenCanvas-compatible, but its web
@@ -57,6 +60,7 @@ function getService(): Promise<import('ppu-paddle-ocr/web').PaddleOcrService> {
 				// geometry is un-padded with exactly these numbers, so they must
 				// not be free to drift with a dependency bump.
 				detection: {
+					maxSideLength: OCR_DETECTION_MAX_SIDE,
 					paddingVertical: OCR_PADDING_VERTICAL,
 					paddingHorizontal: OCR_PADDING_HORIZONTAL
 				}
@@ -146,6 +150,29 @@ async function renderPage(pageNumber: number, scale: number): Promise<OffscreenC
 	}
 }
 
+async function nativePageItems(
+	pageNumber: number
+): Promise<Array<{ str: string; transform: number[]; width: number }>> {
+	if (!documentPromise) throw new Error('No document is open');
+	const doc = await documentPromise;
+	const page = await doc.getPage(pageNumber);
+	try {
+		const content = await page.getTextContent();
+		return content.items.flatMap((item) => {
+			if (!('str' in item) || !item.str.trim() || !Array.isArray(item.transform)) return [];
+			return [
+				{
+					str: item.str,
+					transform: [...item.transform],
+					width: 'width' in item && typeof item.width === 'number' ? item.width : 0
+				}
+			];
+		});
+	} finally {
+		page.cleanup();
+	}
+}
+
 let layoutPromise: Promise<import('ppu-doclayout/web').DocLayoutService> | null = null;
 
 /**
@@ -206,6 +233,9 @@ async function detectLayout(pageNumber: number, scale: number): Promise<LayoutRe
  *  leaving this thread. */
 async function recognizePage(pageNumber: number, scale: number): Promise<OcrPageResult> {
 	const canvas = await renderPage(pageNumber, scale);
+	// Existing digital runs are exact source text. Extraction failure must never
+	// block OCR, so image-only and malformed-text PDFs keep the old path.
+	const nativeItems = await nativePageItems(pageNumber).catch(() => []);
 
 	const service = await getService();
 	let result = await service.recognize(canvas, { flatten: false, noCache: true });
@@ -223,6 +253,7 @@ async function recognizePage(pageNumber: number, scale: number): Promise<OcrPage
 		confidence: result.confidence,
 		imageWidth: canvas.width,
 		imageHeight: canvas.height,
+		nativeItems,
 		lines: lines.map((line) =>
 			line.map((item) => ({
 				text: item.text,

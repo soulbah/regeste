@@ -216,7 +216,11 @@ export function expandRetrievalQuery(query: string): string {
  * bounded FTS token budget before structural vocabulary is reached. */
 export function splitQueryClauses(query: string): string[] {
 	const clauses = query
-		.split(/(?:;|,\s+|\b(?:et|and)\b)/iu)
+		// Punctuation marks clause boundaries. Conjunction words do not: they
+		// also join names ("John et Jane"), noun phrases and single facts.
+		// Treating them as boundaries was a hand-written language classifier and
+		// could detach the subject from every fact in a coordinated question.
+		.split(/(?:;|,\s+|\?+\s+)/u)
 		.map((clause) => clause.trim())
 		.filter((clause) => terms(clause).length >= 1);
 	return clauses.length > 1 ? clauses : [];
@@ -642,7 +646,14 @@ export function requestedDurationCount(query: string): number {
 		/\bdelais\b/u.test(normalizeForFuzzy(clause));
 	if (!asksDelay(query)) return 0;
 	const clauses = splitQueryClauses(query.split('\n', 1)[0]);
-	if (clauses.length < 2) return 1;
+	if (clauses.length < 2) {
+		// French inversion is a grammatical token shape, not a verb vocabulary.
+		// A plural duration request distributed over two inverted predicates asks
+		// for two deadlines even when the writer omitted a comma between them.
+		const invertedPredicates =
+			query.match(/\p{L}+(?:-t)?-(?:il|elle|ils|elles|on)\b/giu)?.length ?? 0;
+		return invertedPredicates >= 2 ? invertedPredicates : 1;
+	}
 	const asksDuration = clauses.map(asksDelay);
 	let count = 0;
 	for (let index = 0; index < clauses.length; index++) {

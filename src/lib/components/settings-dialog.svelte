@@ -470,7 +470,9 @@
 												{r.state === 'setup'
 													? t('settings.ai.status.setup')
 													: r.state === 'progress'
-														? t('settings.ai.status.progress', { pct: r.pct })
+														? id === 'private' && llmStore.status === 'loading'
+															? t('modes.private.loading')
+															: t('settings.ai.status.progress', { pct: r.pct })
 														: t('settings.ai.status.blocked')}
 											</Badge>
 										{/if}

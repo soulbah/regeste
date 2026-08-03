@@ -140,6 +140,7 @@ export function cleanRetrievalQueryVariants(raw: string, original: string): stri
 					line
 						.replace(/^\s*(?:[-*]|\d+[.)])\s*/u, '')
 						.replace(RETRIEVAL_PREFIX, '')
+						.replace(/^["“”']|["“”']$/gu, '')
 						.trim()
 				)
 				.filter(
@@ -150,7 +151,7 @@ export function cleanRetrievalQueryVariants(raw: string, original: string): stri
 						!NON_QUERY_CANDIDATE.test(candidate)
 				)
 		)
-	].slice(0, 2);
+	].slice(0, 4);
 }
 
 /** Preserve the original query and add model-written search views. The model
@@ -177,8 +178,8 @@ export async function localRetrievalQueryVariants(
 	const raw = await rewrite([
 		{
 			role: 'system',
-			content: `Rewrite the user's question into up to two concise document-search queries in ${needsEnglish ? 'English' : locale === 'fr' ? 'French' : 'English'}.
-Use likely form labels, formal contract vocabulary and close synonyms for every sub-question. Do not write a hypothetical answer or source sentence and do not add facts.
+			content: `Rewrite the user's question into up to four concise document-search queries in ${needsEnglish ? 'English' : locale === 'fr' ? 'French' : 'English'}.
+When the question requests several independent facts, write one self-contained query per requested fact and repeat the shared subject in each query. Every line must name both the requested field or relation and its subject; never output an entity alone. For a single requested fact, write one query. Use likely form labels, formal contract vocabulary and close synonyms. Do not use quotes, write a hypothetical answer or source sentence, or add facts.
 Silently correct misspellings. Preserve every user-supplied name, identifier, number, negation, strict comparison and scope.${followUp ? ' Rewrite only the final question; use the earlier conversation lines solely to resolve pronouns and references into the named entity or subject.' : ''}${needsEnglish ? ' The first query must be a faithful English translation of the whole question, preserving every requested side; a second query may use likely document labels.' : ''} Output search queries only, one per line.`
 		},
 		{
@@ -203,6 +204,9 @@ export async function retrieveWithLocalQueryFallback(input: {
 	documentLanguages: Array<string | null>;
 	rewrite: QueryTranslator;
 	retrieve: (alternateQueries: string[]) => Promise<SearchHit[]>;
+	/** A semantic synthesis route needs one retrieval branch per requested fact,
+	 * even when the broad original query already found one plausible passage. */
+	decompose?: boolean;
 }): Promise<{ hits: SearchHit[]; alternateQueries: string[] }> {
 	const question = input.refinementQuery ?? input.query;
 	const contextualFollowUp =
@@ -214,6 +218,7 @@ export async function retrieveWithLocalQueryFallback(input: {
 		splitQueryClauses(question).length > 1;
 	const primaryHits = await input.retrieve([]);
 	if (
+		!input.decompose &&
 		!requiresCrossLingualDecomposition &&
 		(!contextualFollowUp || contextAlreadyScoped) &&
 		!isWeakMatch(primaryHits) &&
@@ -223,7 +228,6 @@ export async function retrieveWithLocalQueryFallback(input: {
 	) {
 		return { hits: primaryHits, alternateQueries: [] };
 	}
-
 	// The rewrite still sees the composed query: a pronoun question needs the
 	// referenced entity to produce useful search views.
 	let alternateQueries = await localRetrievalQueryVariants(
@@ -257,6 +261,10 @@ export async function retrieveWithLocalQueryFallback(input: {
 	) {
 		return { hits: primaryHits, alternateQueries: [] };
 	}
+	// The fallback pool includes the primary branch plus every decomposed branch.
+	// Once it passes the same evidence gates, keeping it cannot lose the original
+	// evidence and prevents one broad match from hiding another requested fact.
+	if (input.decompose) return { hits: fallbackHits, alternateQueries };
 	// Conversational retrieval must decontextualize follow-ups before ranking.
 	// A generic noun such as “number” can look fully answered by an unrelated
 	// attachment, while the rewrite binds the missing referent from history.

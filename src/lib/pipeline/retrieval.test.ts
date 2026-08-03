@@ -665,7 +665,7 @@ describe('retrieval refinement', () => {
 	});
 
 	it('scores coherent coverage of independent query clauses', () => {
-		const query = "Qui assure l'assistance et sur quel territoire s'applique-t-elle ?";
+		const query = "Qui assure l'assistance, et sur quel territoire s'applique-t-elle ?";
 		expect(
 			multiClauseEvidenceCoverage(
 				query,
@@ -784,9 +784,9 @@ describe('retrieval refinement', () => {
 
 	it('globally searches only clauses with enough independent context', () => {
 		const variants = retrievalQueryVariants(
-			'Donne le total des ventes 2019 et les données American Express nécessaires au calcul.'
+			'Donne le total des ventes 2019, et les données American Express nécessaires au calcul.'
 		);
-		expect(variants).toContain('les données American Express nécessaires au calcul.');
+		expect(variants).toContain('et les données American Express nécessaires au calcul.');
 		expect(variants).toContain('Donne le total des ventes 2019');
 		const partyVariants = retrievalQueryVariants("Qui est l'acheteur et le vendeur ?");
 		expect(partyVariants).toEqual(["Qui est l'acheteur et le vendeur ?"]);
@@ -814,7 +814,7 @@ describe('retrieval refinement', () => {
 		expect(splitQueryClauses(question)).toEqual([
 			'Quel solde le document certifie-t-il',
 			'à quelle date',
-			"qui l'a signé ?"
+			"et qui l'a signé ?"
 		]);
 	});
 
@@ -842,13 +842,31 @@ describe('retrieval refinement', () => {
 	it('shares substantial clause decomposition with answer generation', () => {
 		expect(
 			splitQueryClauses(
-				'Donne le total des ventes 2019 et le volume moyen par transaction American Express.'
+				'Donne le total des ventes 2019, et le volume moyen par transaction American Express.'
 			)
 		).toHaveLength(2);
 		expect(splitQueryClauses("Qui est l'acheteur, qui est le vendeur ?")).toEqual([
 			"Qui est l'acheteur",
 			'qui est le vendeur ?'
 		]);
+	});
+
+	it('never splits a coordinated person name at a conjunction', () => {
+		expect(
+			splitQueryClauses(
+				'Quel montant John et Jane Doe doivent-ils payer, à quelle date, et quelle est l’adresse de service ?'
+			)
+		).toEqual([
+			'Quel montant John et Jane Doe doivent-ils payer',
+			'à quelle date',
+			'et quelle est l’adresse de service ?'
+		]);
+	});
+
+	it('keeps an unpunctuated coordinated request whole for semantic retrieval', () => {
+		const query = 'Quel montant faut-il payer et à quelle date est-il exigible ?';
+		expect(splitQueryClauses(query)).toEqual([]);
+		expect(retrievalQueryVariants(query)).toContain(query);
 	});
 
 	it('promotes the compromis price, loan and cadastral-area passages', () => {

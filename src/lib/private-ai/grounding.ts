@@ -12,7 +12,7 @@
 // the same on a quote, a loan offer and a payment schedule.
 
 import { numberTokens } from './prompt';
-import { NUMBER_RUN, canonicalNumber, numericValues } from '$lib/numbers';
+import { NUMBER_RUN, calendarDateMentions, canonicalNumber, numericValues } from '$lib/numbers';
 
 /** Numbers that carry no claim about the document: list markers, citation
  * markers, and the small ordinals answers use to enumerate ("1.", "2)"). */
@@ -43,6 +43,26 @@ const OPERATIONS: ReadonlyArray<(left: number, right: number) => number> = [
 
 /** Money rounds to the cent, so a derived value has to land within half of one. */
 const TOLERANCE = 0.005;
+
+function maskSupportedCalendarDates(answer: string, evidence: readonly string[]): string {
+	const supported = new Set(
+		evidence.flatMap((passage) => calendarDateMentions(passage).flatMap((mention) => mention.keys))
+	);
+	if (!supported.size) return answer;
+	const accepted = calendarDateMentions(answer)
+		.filter((mention) => mention.keys.some((key) => supported.has(key)))
+		.sort((left, right) => left.start - right.start);
+	if (!accepted.length) return answer;
+	let result = '';
+	let cursor = 0;
+	for (const mention of accepted) {
+		if (mention.start < cursor) continue;
+		result += answer.slice(cursor, mention.start);
+		result += ' '.repeat(mention.end - mention.start);
+		cursor = mention.end;
+	}
+	return result + answer.slice(cursor);
+}
 
 function derivable(value: number, pool: readonly number[]): boolean {
 	for (const left of pool)
@@ -179,7 +199,7 @@ export interface GroundingVerdict {
  * gate can refuse that.
  */
 export function checkNumericGrounding(answer: string, evidence: string[]): GroundingVerdict {
-	const text = answer.replace(/\[\d{1,2}\]/gu, ' ');
+	const text = maskSupportedCalendarDates(answer.replace(/\[\d{1,2}\]/gu, ' '), evidence);
 	const stated = numberTokens(text);
 	const supported = new Set(evidence.flatMap((passage) => numberTokens(passage)));
 	const computing = DERIVATION_MARK.test(text);

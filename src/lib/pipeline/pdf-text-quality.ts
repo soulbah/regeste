@@ -111,11 +111,11 @@ export function mergeParsedWithOcr(parsed: ParsedDoc, ocrBlocks: ParsedBlock[]):
 			continue;
 		}
 		const nativeText = fallback.map((block) => block.text).join('\n');
-		// The page is judged whole: its lines are one recognition pass and share
-		// its confidence, so keeping some and dropping others would mix two
-		// readings of the same page.
 		const ocrText = ocr.map((block) => block.text).join('\n');
 		if (ocr.length && preferOcr(nativeText, ocrText, ocr[0].ocrConfidence ?? 0)) {
+			// ocrPageBlocks has already fused exact native runs into OCR geometry
+			// before reading-order reconstruction. Re-prepending fallback blocks here
+			// would duplicate those values and move bottom fields ahead of page body.
 			selected.push(...ocr);
 		} else {
 			selected.push(...fallback.map((block) => ({ ...block, ocrConfidence: 0 })));

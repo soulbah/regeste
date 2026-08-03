@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+	COMPACT_SYNTHESIS_SYSTEM_PROMPT,
 	SYSTEM_PROMPT,
 	answerClauseCoverageRatio,
+	buildCompactSynthesisPrompt,
 	buildUserPrompt,
 	buildAnswerCoverageContract,
 	buildEvidenceInventory,
@@ -15,6 +17,7 @@ import {
 	extractThink,
 	fitEvidenceToContext,
 	hasCollapsedIntoRepetition,
+	isCopiedEvidenceAnswer,
 	isDegenerateAnswer,
 	withoutRepeatedAnswerSentences,
 	withoutRepeatedSentences,
@@ -23,7 +26,9 @@ import {
 	needsGroundedVerification,
 	resolveCitations,
 	resolveTargetedCitations,
+	recoveryCanReplaceDraft,
 	sharedIdentifierNumericClaims,
+	verificationCanReplaceDraft,
 	verificationPreservesGrounding
 } from './prompt';
 import type { SearchHit } from '$lib/types';
@@ -91,22 +96,89 @@ describe('buildUserPrompt', () => {
 	it('stops a coordinated factual stream after natural complete prose', () => {
 		expect(
 			hasCompleteFactualAnswer(
-				'À qui appartient le dossier et quel est son numéro ?',
+				'À qui appartient le dossier, et quel est son numéro ?',
 				'Le dossier appartient à Camille Moreau. Son numéro est 12345.'
 			)
 		).toBe(true);
 		expect(
 			hasCompleteFactualAnswer(
-				'À qui appartient le dossier et quel est son numéro ?',
+				'À qui appartient le dossier, et quel est son numéro ?',
 				'Le dossier appartient à Camille Moreau.'
 			)
 		).toBe(false);
 		expect(
 			completeFactualAnswerPrefix(
-				'À qui appartient le dossier et quel est son numéro ?',
+				'À qui appartient le dossier, et quel est son numéro ?',
 				'Le dossier appartient à Camille Moreau. Son numéro est 12345. Structured'
 			)
 		).toBe('Le dossier appartient à Camille Moreau. Son numéro est 12345.');
+	});
+
+	it('does not stop on a copied evidence passage', () => {
+		const question =
+			'Quel montant John et Jane Doe doivent-ils payer, à quelle date, et quelle est l’adresse de service ?';
+		const evidence = [
+			'Sample of Your New Utility Bill 55 NO NAME DRIVE DOE JOHN AND JANE PO BOX 123 Service Address Bill Number Account Number Customer Number Current Billing Due Date 08/12/2015 Total Amount Due $526.07'
+		];
+		const copied =
+			'Sample of Your New Utility Bill 55 NO NAME DRIVE DOE JOHN AND JANE PO BOX 123 Service Address Bill Number Account Number Customer Number.';
+		const natural =
+			'John et Jane Doe doivent payer 526,07 $ avant le 08/12/2015 pour le service situé 55 NO NAME DRIVE.';
+		expect(isCopiedEvidenceAnswer(question, copied, evidence)).toBe(true);
+		expect(completeFactualAnswerPrefix(question, copied, evidence)).toBeNull();
+		expect(isCopiedEvidenceAnswer(question, natural, evidence)).toBe(false);
+		expect(isCopiedEvidenceAnswer('Quel est le montant dû ?', copied, evidence)).toBe(true);
+	});
+
+	it('turns copied-evidence recovery into one compact, delimited synthesis task', () => {
+		const evidence = {
+			...hit(1),
+			text: 'Account holder: Camille Moreau. Amount due: 81.20 EUR. Due date: 2026-08-12.'
+		};
+		const prompt = buildCompactSynthesisPrompt('Qui doit payer, quel montant, et à quelle date ?', [
+			evidence
+		]);
+		expect(COMPACT_SYNTHESIS_SYSTEM_PROMPT).toContain('natural answer');
+		expect(prompt).toContain('<source_facts>');
+		expect(prompt).toContain('<requested_parts>');
+		expect(prompt).toContain('Camille Moreau');
+		expect(prompt).toContain('81.20 EUR');
+		expect(prompt).not.toContain('Internal evidence facts');
+	});
+
+	it('uses semantic decomposition as the slot contract when conjunctions have no punctuation', () => {
+		const question =
+			'Quel montant John et Jane Doe doivent-ils payer et à quelle date est-il dû et quelle est leur adresse de service ?';
+		const queries = [
+			'Quel montant John et Jane Doe doivent-ils payer ?',
+			'À quelle date John et Jane Doe doivent-ils payer ?',
+			'Quelle est l’adresse de service de John et Jane Doe ?'
+		];
+		const evidence = {
+			...hit(1),
+			text: 'Total Amount Due $526.07\nCurrent Billing Due Date 08/12/2015\nService Address 55 NO NAME DRIVE'
+		};
+		const prompt = buildUserPrompt(question, [evidence], null, null, null, queries);
+		const recovery = buildCompactSynthesisPrompt(question, [evidence], queries);
+
+		for (const query of queries) {
+			expect(prompt).toContain(query);
+			expect(recovery).toContain(query);
+		}
+		expect(
+			answerClauseCoverageRatio(
+				question,
+				'John et Jane Doe doivent payer 526,07 $ le 08/12/2015.',
+				queries
+			)
+		).toBeLessThan(0.8);
+		expect(
+			answerClauseCoverageRatio(
+				question,
+				'Le montant dû par John et Jane Doe est de 526,07 $. La date de paiement est le 08/12/2015 et leur adresse de service est 55 NO NAME DRIVE.',
+				queries
+			)
+		).toBeGreaterThanOrEqual(0.8);
 	});
 
 	it('detects a relevant table dump that omits requested outputs', () => {
@@ -115,9 +187,9 @@ describe('buildUserPrompt', () => {
 		const incomplete =
 			'Assets (EUR millions) 2024 2023 Gold 872,156 649,110 Securities 4,532,962 4,898,730.';
 		const complete =
-			'Les actifs passent de 6 887 265 millions d’euros en 2023 à 6 420 536 en 2024, soit une baisse de 466 729 millions ou 6,78 %.';
-		expect(answerClauseCoverageRatio(question, incomplete)).toBeLessThan(0.6);
-		expect(answerClauseCoverageRatio(question, complete)).toBeGreaterThanOrEqual(0.6);
+			'Les deux valeurs de départ sont 6 887 265 millions d’euros en 2023 et 6 420 536 en 2024. Les actifs diminuent donc de 466 729 millions, soit 6,78 %.';
+		expect(answerClauseCoverageRatio(question, incomplete)).toBeLessThan(0.8);
+		expect(answerClauseCoverageRatio(question, complete)).toBeGreaterThanOrEqual(0.8);
 	});
 
 	it('labels prior conversation as context rather than evidence', () => {
@@ -152,13 +224,13 @@ describe('buildUserPrompt', () => {
 
 	it('covers coordinated requests without asking for checklist-shaped output', () => {
 		const prompt = buildUserPrompt(
-			'Donne le total des ventes 2019 et le volume moyen par transaction American Express.',
+			'Donne le total des ventes 2019, et le volume moyen par transaction American Express.',
 			[hit(1)]
 		);
 		expect(prompt).toContain('Facts the answer must cover');
 		expect(prompt).toContain('combine them into natural prose');
 		expect(prompt).toContain('1. Donne le total des ventes 2019');
-		expect(prompt).toContain('2. le volume moyen par transaction American Express.');
+		expect(prompt).toContain('2. et le volume moyen par transaction American Express.');
 		expect(prompt).toContain('Never mix numbers between parts or documents');
 		expect(prompt).not.toContain('Structured evidence inventory');
 	});
@@ -168,7 +240,7 @@ describe('buildUserPrompt', () => {
 		expect(needsGroundedVerification('Variation de 2018 à 2019 ?')).toBe(true);
 		expect(
 			needsGroundedVerification(
-				'Donne le total des ventes 2019 et le volume moyen par transaction American Express.'
+				'Donne le total des ventes 2019, et le volume moyen par transaction American Express.'
 			)
 		).toBe(true);
 		expect(
@@ -451,6 +523,23 @@ describe('buildUserPrompt', () => {
 			)
 		).toBe('Le niveau est 42. La date est le 8 mars 2031. Le responsable est Camille Durand.');
 	});
+
+	it('reduces parenthetical evidence inventory echoes to citation markers', () => {
+		expect(
+			enforceAnswerInvariants(
+				'Quel montant, quelle date et quelle adresse ?',
+				"La somme est de 526,07 $ (le montant [1] : Amount Due: $526.07), exigible le 12 août 2015 (la date [1] : Current Billing Due Date: 08/12/2015), pour 55 NO NAME DRIVE (l'adresse [1] : Service Address: 55 NO NAME DRIVE et [2] : DOE, JOHN & JANE)."
+			)
+		).toBe(
+			'La somme est de 526,07 $ [1], exigible le 12 août 2015 [1], pour 55 NO NAME DRIVE [1][2].'
+		);
+	});
+
+	it('removes a leaked answer protocol delimiter', () => {
+		expect(
+			enforceAnswerInvariants('Quel est le montant ?', 'Le montant est de 526,07 $ [1].\n</answer>')
+		).toBe('Le montant est de 526,07 $ [1].');
+	});
 });
 
 describe('buildEvidenceInventory', () => {
@@ -483,6 +572,29 @@ describe('buildEvidenceInventory', () => {
 		);
 		expect(inventory).toContain('Prénom et Nom : Camille Moreau');
 		expect(inventory).toContain('Date de naissance : 03/04/1991');
+	});
+
+	it('prefers resolved geometry over a contradictory raw-line neighbour', () => {
+		const prompt = buildCompactSynthesisPrompt(
+			'Quel montant est dû à quelle date et quelle est l’adresse de service ?',
+			[
+				{
+					...hit(1),
+					page: 1,
+					text: '55 NO NAME DRIVE\n08/12/2015 $526.07',
+					structuralContext:
+						'Service Address: 55 NO NAME DRIVE | Current Billing Due Date: 08/12/2015 | Amount Due: $526.07'
+				},
+				{
+					...hit(2),
+					page: 1,
+					text: 'DOE, JOHN & JANE PO BOX 123\nService Address\nBill Number'
+				}
+			],
+			['montant dû', 'date de paiement due', 'adresse de service']
+		);
+		expect(prompt).toContain('Service Address: 55 NO NAME DRIVE');
+		expect(prompt).not.toContain('PO BOX 123 Service Address');
 	});
 });
 
@@ -796,6 +908,40 @@ describe('isDegenerateAnswer — output that must never replace a draft', () => 
 });
 
 describe('verification grounding monotonicity', () => {
+	it('keeps a complete concise correction over a copied draft and rejects refusal regression', () => {
+		const question =
+			'Quel montant John et Jane Doe doivent-ils payer et à quelle date est-il dû et quelle est leur adresse de service ?';
+		const evidence = [
+			'Sample utility bill Customer Name DOE JOHN JANE Service Address 55 NO NAME DRIVE Current Billing Due Date 08/12/2015 Account Number 521036027 Total Amount Due $526.07 Keep this portion for your records.'
+		];
+		const copiedDraft = evidence[0];
+		const parts = ['John et Jane Doe', 'montant dû', 'date de paiement', 'adresse de service'];
+		const corrected =
+			'John et Jane Doe ont un montant dû de 526,07 $, avec une date de paiement au 08/12/2015 et une adresse de service au 55 NO NAME DRIVE.';
+
+		expect(verificationCanReplaceDraft(question, copiedDraft, corrected, evidence, parts)).toBe(
+			true
+		);
+		expect(
+			verificationCanReplaceDraft(
+				question,
+				copiedDraft,
+				"Je n'ai pas trouvé assez d'informations dans les documents joints pour répondre.",
+				evidence,
+				parts
+			)
+		).toBe(false);
+		expect(
+			verificationCanReplaceDraft(
+				question,
+				copiedDraft,
+				'John et Jane Doe ont un montant dû de 526,07 $ avec une date de paiement au 08/12/2015.',
+				evidence,
+				parts
+			)
+		).toBe(false);
+	});
+
 	it('does not replace a cited draft with an uncited output when evidence is sufficient', () => {
 		expect(verificationPreservesGrounding('Valeur étayée [2].', 'Sortie sans source.', true)).toBe(
 			false
@@ -827,6 +973,64 @@ describe('verification grounding monotonicity', () => {
 				question
 			)
 		).toBe(true);
+	});
+
+	it('accepts a citationless compact recovery only when it restores every semantic slot', () => {
+		const question =
+			'Quel montant John et Jane Doe doivent-ils payer et à quelle date est-il dû et quelle est leur adresse de service ?';
+		const evidence = [
+			'Customer Name: DOE, JOHN & JANE | Service Address: 55 NO NAME DRIVE | Current Billing Due Date: 08/12/2015 | Amount Due: $526.07'
+		];
+		const parts = [
+			'montant dû par John et Jane Doe',
+			'date de paiement due',
+			'adresse de service de John et Jane Doe'
+		];
+		const incomplete =
+			'La date de paiement due est le 12 août 2015 [1]. Leur adresse de service est 55 NO NAME DRIVE [1].';
+		const recovered =
+			'Le montant dû par John et Jane Doe est de 526,07 $, la date de paiement due est le 12 août 2015 et leur adresse de service est 55 NO NAME DRIVE.';
+		expect(recoveryCanReplaceDraft(question, incomplete, recovered, evidence, parts)).toBe(true);
+		expect(
+			recoveryCanReplaceDraft(
+				question,
+				incomplete,
+				'John et Jane Doe doivent payer 526,07 $.',
+				evidence,
+				parts
+			)
+		).toBe(false);
+	});
+
+	it('never lets cited verification erase semantic slots from an unpunctuated question', () => {
+		const question =
+			'Quel montant John et Jane Doe doivent-ils payer et à quelle date est-il dû et quelle est leur adresse de service ?';
+		const parts = [
+			'montant dû par John et Jane Doe',
+			'date de paiement due',
+			'adresse de service de John et Jane Doe'
+		];
+		const evidence = [
+			'Amount Due: $526.07 | Current Billing Due Date: 08/12/2015 | Service Address: 55 NO NAME DRIVE'
+		];
+		expect(
+			verificationCanReplaceDraft(
+				question,
+				'Le montant dû est de 526,07 $ et la date de paiement due est le 12 août 2015 [1].',
+				'Le montant dû est de 526,07 $ [1].',
+				evidence,
+				parts
+			)
+		).toBe(false);
+		expect(
+			recoveryCanReplaceDraft(
+				question,
+				'La date de paiement due est le 12 août 2015 [1].',
+				'Le montant dû est de 526,07 $ [1].',
+				evidence,
+				parts
+			)
+		).toBe(false);
 	});
 });
 

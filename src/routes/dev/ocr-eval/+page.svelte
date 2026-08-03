@@ -30,6 +30,7 @@
 	import { pageBlocks, parsePdf } from '$lib/pipeline/parse/pdf';
 	import { shouldRetryOcr } from '$lib/pipeline/ocr-quality';
 	import { OCR_PADDING_HORIZONTAL, OCR_PADDING_VERTICAL } from '$lib/pipeline/ocr-boxes';
+	import { OCR_DETECTION_MAX_SIDE } from '$lib/pipeline/ocr-model';
 
 	const OCR_DPI_SCALE = 300 / 72;
 
@@ -61,6 +62,7 @@
 			const service = new PaddleOcrService({
 				model: OCR_MODEL,
 				detection: {
+					maxSideLength: OCR_DETECTION_MAX_SIDE,
 					paddingVertical: OCR_PADDING_VERTICAL,
 					paddingHorizontal: OCR_PADDING_HORIZONTAL
 				}
@@ -156,7 +158,7 @@
 		status = 'parsing native text';
 		const parsed = await parsePdf(data);
 		const nativeByPage: Record<number, string[]> = {};
-		for (const block of parsed.blocks as ParsedBlock[]) {
+		for (const block of [...parsed.blocks, ...(parsed.ocrFallbackBlocks ?? [])] as ParsedBlock[]) {
 			if (block.page == null) continue;
 			(nativeByPage[block.page] ??= []).push(block.text);
 		}

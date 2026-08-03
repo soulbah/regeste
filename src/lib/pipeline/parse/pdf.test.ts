@@ -128,4 +128,21 @@ describe('PDF structural blocks', () => {
 		expect(chunks[2].searchText).toContain('Quand ça ?');
 		expect(chunks[2].text).toContain('14 juillet 2026 à 00:01');
 	});
+
+	it('never promotes a labelled form record to a section heading', () => {
+		const blocks = pageBlocks(
+			[
+				{
+					text: 'DOE, JOHN & JANE 55 NO NAME DRIVE',
+					retrievalContext: 'Customer Name: DOE, JOHN & JANE | Service Address: 55 NO NAME DRIVE'
+				},
+				{ text: 'Current billing details continue on the following lines.' }
+			],
+			1
+		);
+
+		expect(blocks[0].headingPath).toBeUndefined();
+		expect(blocks[1].headingPath).toBeUndefined();
+		expect(blocks[0].retrievalContext).toContain('Service Address: 55 NO NAME DRIVE');
+	});
 });

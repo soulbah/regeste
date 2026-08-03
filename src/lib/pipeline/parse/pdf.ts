@@ -52,7 +52,13 @@ export function pageBlocks(lines: ReconstructedLine[], page: number): ParsedBloc
 		const { text, retrievalContext, region } = lines[index];
 		// Chrome never makes a heading and never inherits one: a legal footer
 		// under the body's last section is not part of that section.
-		if (!region && isLikelyPdfSectionHeading(text, lines[index + 1]?.text ?? ''))
+		// Labelled table/form rows are records, never section titles. Promoting an
+		// all-capital value row here would pollute every inherited heading below it.
+		if (
+			!region &&
+			!retrievalContext &&
+			isLikelyPdfSectionHeading(text, lines[index + 1]?.text ?? '')
+		)
 			heading = text.trim();
 		blocks.push({
 			text,

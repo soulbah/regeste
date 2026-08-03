@@ -16,6 +16,25 @@ const hit = (chunkId: number, text: string, page = 1, seq = chunkId): SearchHit 
 });
 
 describe('deterministic extractive answers', () => {
+	it('leaves unpunctuated coordinated lookups to semantic decomposition', () => {
+		expect(
+			buildDeterministicExtractiveAnswer(
+				'Quel montant John et Jane Doe doivent-ils payer et à quelle date est-il dû et quelle est leur adresse de service ?',
+				[
+					hit(
+						1,
+						'Customer Name: DOE, JOHN & JANE | Service Address: 55 NO NAME DRIVE\nCurrent Billing Due Date 08/12/2015\nMeter reading 521036027\nTotal Amount Due $526.07'
+					)
+				],
+				[
+					'amount due for John and Jane Doe',
+					'due date for John and Jane Doe',
+					'service address for John and Jane Doe'
+				]
+			)
+		).toBeNull();
+	});
+
 	it('answers an exact-value reverse lookup from its shortest local clause', () => {
 		const evidence = [
 			hit(
@@ -292,6 +311,13 @@ describe('deterministic extractive answers', () => {
 					1
 				),
 				hit(2, '- Quelle est la taille combinée des dépendances : 18 m²', 66, 2)
+			],
+			[
+				'type de logement déclaré',
+				'surface du logement',
+				'période de construction du logement',
+				'matériau de construction du logement',
+				'dépendances déclarées'
 			]
 		);
 		expect(answer).toContain('Maison');
@@ -311,7 +337,8 @@ describe('deterministic extractive answers', () => {
 					'Identification du souscripteur :\nPrénom et Nom :\nCamille Moreau\nDate de naissance :\n03/04/1991\nLieu de naissance :\nBastia, France',
 					69
 				)
-			]
+			],
+			['nom du souscripteur', 'date de naissance du souscripteur', 'lieu de naissance']
 		);
 		expect(answer).toContain('Camille Moreau');
 		expect(answer).toContain('03/04/1991');
@@ -577,7 +604,8 @@ describe('deterministic extractive answers', () => {
 					"- Système d'alarme : Non\n- Caméras de sécurité : Non\n- Qui d'autre vit avec vous : votre partenaire\n- Objet supérieur à 5 000 € : Oui",
 					66
 				)
-			]
+			],
+			['dispositifs de sécurité déclarés', 'cohabitant déclaré', 'objet de valeur déclaré']
 		);
 		expect(answer).toContain("Système d'alarme");
 		expect(answer).toContain('partenaire');

@@ -17,8 +17,13 @@ import { adaptGenerationOptions, type GenerationOptions } from './generation';
 import type { GenerationResult } from './generation';
 import type { WebLlmClient } from './webllm-client';
 import { t } from '$lib/i18n/index.svelte';
+import { modelPreparationStatus, restoreModelPreparation } from './model-resume';
+import { withActivityTimeout } from './activity-timeout';
 
 const PREPARED_KEY = 'regeste:private-prepared-model';
+const CONSENTED_KEY = 'regeste:private-consented-model';
+const WLLAMA_CACHED_LOAD_IDLE_TIMEOUT_MS = 180_000;
+const WLLAMA_DOWNLOAD_IDLE_TIMEOUT_MS = 300_000;
 /**
  * Benchmark harness only: run a named tier instead of the one this machine is
  * offered. Comparing two models is only a comparison if the model is pinned,
@@ -77,6 +82,14 @@ export type PrivateStatus =
 // Both engines expose the same load/generate/abort surface.
 let webllmApi: WebLlmClient | null = null;
 let wllamaApi: Remote<WllamaApi> | null = null;
+let wllamaWorker: Worker | null = null;
+
+function resetWllamaWorker(): void {
+	wllamaWorker?.terminate();
+	wllamaWorker = null;
+	wllamaApi = null;
+}
+
 async function getWorker(engine: 'webllm' | 'wllama'): Promise<Remote<LlmApi> | WebLlmClient> {
 	if (engine === 'wllama') {
 		if (!wllamaApi) {
@@ -84,6 +97,7 @@ async function getWorker(engine: 'webllm' | 'wllama'): Promise<Remote<LlmApi> | 
 				type: 'module'
 			});
 			guardWorker(worker, 'privateAi');
+			wllamaWorker = worker;
 			wllamaApi = wrap<WllamaApi>(worker);
 		}
 		return wllamaApi as unknown as Remote<LlmApi>;
@@ -93,6 +107,8 @@ async function getWorker(engine: 'webllm' | 'wllama'): Promise<Remote<LlmApi> | 
 }
 
 class LlmStore {
+	private initPromise: Promise<void> | null = null;
+	private preparePromise: Promise<void> | null = null;
 	status = $state<PrivateStatus>('detecting');
 	progress = $state(0);
 	tier = $state<Tier | null>(null);
@@ -132,8 +148,19 @@ class LlmStore {
 		this.prepared = false;
 	}
 
-	async init(): Promise<void> {
-		if (this.status !== 'detecting') return;
+	init(): Promise<void> {
+		if (this.status !== 'detecting') return Promise.resolve();
+		if (this.initPromise) return this.initPromise;
+		const operation = Promise.resolve()
+			.then(() => this.initialize())
+			.finally(() => {
+				if (this.initPromise === operation) this.initPromise = null;
+			});
+		this.initPromise = operation;
+		return operation;
+	}
+
+	private async initialize(): Promise<void> {
 		try {
 			const saved = localStorage.getItem(METRICS_KEY);
 			if (saved) this.lastMetrics = JSON.parse(saved);
@@ -141,20 +168,28 @@ class LlmStore {
 			// A corrupt optional benchmark must never block Private mode.
 		}
 		const forced = forcedTier();
-		const tier = forced ?? (await detectTier());
+		const preparedModel = localStorage.getItem(PREPARED_KEY);
+		const consentedModel = localStorage.getItem(CONSENTED_KEY);
+		const restored = restoreModelPreparation(
+			forced ? null : await detectTier(),
+			TIERS,
+			preparedModel,
+			consentedModel,
+			forced
+		);
+		const tier = restored.tier;
 		if (!tier) {
 			this.status = 'unavailable';
 			return;
 		}
 		this.tier = tier;
-		this.prepared = localStorage.getItem(PREPARED_KEY) === tier.model;
+		this.prepared = restored.prepared;
 		this.status = 'needs-download';
-		// Consent was given on the first preparation. Later visits reconnect to
-		// the resident production worker or load weights from browser cache.
-		// Forcing a tier is itself the instruction to load it: the harness has no
-		// other way to reach this instance, and waiting for a click it will never
-		// receive is what left benchmark runs stalled on a disabled button.
-		if (this.prepared || forced) void this.prepare();
+		// WebLLM keeps downloaded shards in browser cache, not the async operation
+		// that was loading them. Resume that operation after a refresh once the
+		// person already consented; otherwise a partial download leaves a disabled
+		// composer with nothing running. A forced benchmark is consent by design.
+		if (restored.resume) void this.prepare({ force: !restored.prepared });
 	}
 
 	/** Take the rung offered once the app has stopped stepping down on its own.
@@ -174,7 +209,18 @@ class LlmStore {
 	 *
 	 * `force` skips the space warning, for someone who has read it and wants the
 	 * download anyway. */
-	async prepare(options: { force?: boolean } = {}): Promise<void> {
+	prepare(options: { force?: boolean } = {}): Promise<void> {
+		if (this.preparePromise) return this.preparePromise;
+		const operation = Promise.resolve()
+			.then(() => this.prepareOnce(options))
+			.finally(() => {
+				if (this.preparePromise === operation) this.preparePromise = null;
+			});
+		this.preparePromise = operation;
+		return operation;
+	}
+
+	private async prepareOnce(options: { force?: boolean } = {}): Promise<void> {
 		if (
 			!this.tier ||
 			this.status === 'downloading' ||
@@ -213,6 +259,7 @@ class LlmStore {
 		}
 		this.storageRisk = false;
 		this.steppedDownTo = null;
+		localStorage.setItem(CONSENTED_KEY, this.tier.model);
 
 		// Step down and retry rather than stop and ask.
 		//
@@ -242,6 +289,7 @@ class LlmStore {
 				this.tier = next;
 				this.steppedDownTo = next;
 				this.prepared = localStorage.getItem(PREPARED_KEY) === next.model;
+				localStorage.setItem(CONSENTED_KEY, next.model);
 				continue;
 			}
 			await this.reportFailure(failure, next);
@@ -256,16 +304,34 @@ class LlmStore {
 		this.progress = 0;
 		this.errorMessage = null;
 		try {
-			await (
-				await getWorker(this.tier.engine)
-			).load(
-				this.tier.model,
-				proxy((p: number) => {
-					this.progress = p;
-					if (this.prepared) return;
-					this.status = 'downloading';
-				})
-			);
+			const worker = await getWorker(this.tier.engine);
+			let previousProgress = 0;
+			let loading = this.prepared;
+			const progress = proxy((p: number) => {
+				if (!loading)
+					loading = modelPreparationStatus(this.prepared, previousProgress, p) === 'loading';
+				previousProgress = p;
+				this.progress = p;
+				this.status = loading ? 'loading' : 'downloading';
+			});
+			if (this.tier.engine === 'webllm') {
+				await (worker as WebLlmClient).load(this.tier.model, progress, {
+					prepared: this.prepared
+				});
+			} else {
+				await withActivityTimeout(
+					(activity) =>
+						(worker as Remote<LlmApi>).load(
+							this.tier!.model,
+							proxy((p: number) => {
+								activity();
+								progress(p);
+							})
+						),
+					this.prepared ? WLLAMA_CACHED_LOAD_IDLE_TIMEOUT_MS : WLLAMA_DOWNLOAD_IDLE_TIMEOUT_MS,
+					resetWllamaWorker
+				);
+			}
 			localStorage.setItem(PREPARED_KEY, this.tier.model);
 			this.prepared = true;
 			this.status = 'ready';
@@ -302,6 +368,10 @@ class LlmStore {
 	 * which is precisely when handing the choice over is worth doing: null means
 	 * there was nothing left to try, and inviting a third download would be a lie. */
 	private async reportFailure(failure: LoadFailure, offer: Tier | null): Promise<void> {
+		// A deterministic final failure must not restart itself on every refresh.
+		// The next attempt is explicit, via the recovery action shown below.
+		localStorage.removeItem(CONSENTED_KEY);
+		localStorage.removeItem(PREPARED_KEY);
 		this.status = 'error';
 		this.steppedDownTo = null;
 		this.smallerTier = offer;

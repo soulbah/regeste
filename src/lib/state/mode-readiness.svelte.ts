@@ -40,8 +40,11 @@ export function modeReadiness(mode: ChatMode, opts: { privateOnly?: boolean } = 
 			case 'detecting':
 				return { ...base, state: 'progress' };
 			case 'downloading':
-			case 'loading':
 				return { ...base, state: 'progress', pct: Math.round(llmStore.progress * 100) };
+			case 'loading':
+				// Memory placement has no trustworthy percentage. Every consumer gets
+				// zero so it renders an indeterminate state instead of a frozen bar.
+				return { ...base, state: 'progress' };
 			case 'needs-download':
 				return { ...base, state: 'setup' };
 			case 'unavailable':

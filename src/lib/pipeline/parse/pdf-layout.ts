@@ -150,6 +150,186 @@ const startsWithNumericValue = (text: string) =>
 	/^\s*(?:[<>≤≥~≈]\s*)?\d(?:[\d\s.,]*\d)?(?:\s|$)/u.test(text);
 
 /**
+ * A form value has a token shape, rather than a business vocabulary. Numbers
+ * cover dates, account identifiers and street numbers; an all-capital token
+ * covers the names and addresses that OCR/native PDF forms commonly print in
+ * capitals ("DOE, JOHN"), without treating ordinary mixed-case prose as a
+ * value. The shape is deliberately broad and is only used together with the
+ * two-column geometry below.
+ */
+function hasFormValueShape(text: string): boolean {
+	// Numeric fields are values when the token occupies the cell's leading
+	// position (dates, amounts, account IDs, street numbers). A number buried
+	// in an otherwise ordinary sentence is prose, not enough evidence to bind.
+	if (/^\s*(?:[<>≤≥~≈$€£¥]\s*)?\d(?:[\d\s.,/-]*\d)?(?:\s|$)/u.test(text)) return true;
+	const letters = text.match(/\p{L}/gu) ?? [];
+	if (letters.length < 2) return false;
+	const uppercase = letters.filter((letter) => /\p{Lu}/u.test(letter)).length;
+	return uppercase / letters.length >= 0.85;
+}
+
+interface SpatialCell {
+	items: PositionedPdfText[];
+	text: string;
+	start: number;
+	end: number;
+}
+
+function spatialCells(items: PositionedPdfText[]): SpatialCell[] {
+	return items.map((item) => ({
+		items: [item],
+		text: item.text.trim(),
+		start: item.x,
+		end: item.x + Math.max(item.width, 1)
+	}));
+}
+
+/**
+ * Equal item counts are the strongest table signal available at this stage:
+ * the OCR/native layer has already split one cell per item. Preserve that
+ * order instead of choosing the largest whitespace gap (which would merge a
+ * five-column bordered row into two arbitrary groups).
+ */
+function equallySpacedCells(
+	header: PdfLine,
+	row: PdfLine,
+	pageWidth: number
+): [SpatialCell[], SpatialCell[]] | null {
+	const headerItems = header.items
+		.filter((item) => item.text.trim())
+		.sort((left, right) => left.x - right.x);
+	const valueItems = row.items
+		.filter((item) => item.text.trim())
+		.sort((left, right) => left.x - right.x);
+	if (headerItems.length < 2 || headerItems.length !== valueItems.length) return null;
+	// Very wide repeated prose lines are not compact forms; keep this path for
+	// short rows while the established splitter handles other layouts.
+	if (headerItems.length > 8) return null;
+	const headerCells = spatialCells(headerItems);
+	const valueCells = spatialCells(valueItems);
+	const nonCrossing = (cells: SpatialCell[]) =>
+		cells.slice(1).every((cell, index) => {
+			const previous = cells[index];
+			return cell.start - previous.end >= -Math.max(2, pageWidth * 0.01);
+		});
+	if (!nonCrossing(headerCells) || !nonCrossing(valueCells)) return null;
+	const headerStart = headerCells[0].start;
+	const valueStart = valueCells[0].start;
+	const headerSpan = headerCells.at(-1)!.end - headerStart;
+	const valueSpan = valueCells.at(-1)!.end - valueStart;
+	if (!(headerSpan > 0) || !(valueSpan > 0)) return null;
+	const overlap =
+		Math.min(headerCells.at(-1)!.end, valueCells.at(-1)!.end) - Math.max(headerStart, valueStart);
+	if (overlap < Math.min(headerSpan, valueSpan) * 0.4) return null;
+	const maxNormalizedShift = Math.max(
+		...headerCells.map((cell, index) => {
+			const headerPosition = (cell.start - headerStart) / headerSpan;
+			const valuePosition = (valueCells[index].start - valueStart) / valueSpan;
+			return Math.abs(headerPosition - valuePosition);
+		})
+	);
+	return maxNormalizedShift <= 0.16 ? [headerCells, valueCells] : null;
+}
+
+/**
+ * Split one visual line into two cells at its strongest horizontal gap. PDF
+ * text and OCR boxes may expose either one item per cell or several words per
+ * cell, so item count alone cannot identify a form grid. A real inter-column
+ * gap is materially wider than word spacing; requiring that gap keeps prose
+ * lines with incidental whitespace out of the form path.
+ */
+function splitTwoColumnCells(line: PdfLine, pageWidth: number): [SpatialCell, SpatialCell] | null {
+	const items = line.items
+		.filter((item) => item.text.trim())
+		.sort((left, right) => left.x - right.x);
+	if (items.length < 2) return null;
+	let split = -1;
+	let largestGap = 0;
+	for (let index = 1; index < items.length; index++) {
+		const previous = items[index - 1];
+		const gap = items[index].x - (previous.x + Math.max(previous.width, 1));
+		if (gap > largestGap) {
+			largestGap = gap;
+			split = index;
+		}
+	}
+	// With exactly two OCR/native items the recognizer has already given us the
+	// two cells. Bordered forms commonly leave no ink gap at all between them;
+	// requiring a word-sized gap here would discard the utility-bill header.
+	if (
+		split < 1 ||
+		split >= items.length ||
+		(items.length > 2 && largestGap < Math.max(16, pageWidth * 0.05))
+	)
+		return null;
+	const cells = [items.slice(0, split), items.slice(split)] as [
+		PositionedPdfText[],
+		PositionedPdfText[]
+	];
+	return cells.map((cell) => ({
+		items: cell,
+		text: joinItems([...cell]),
+		start: Math.min(...cell.map((item) => item.x)),
+		end: Math.max(...cell.map((item) => item.x + Math.max(item.width, 1)))
+	})) as [SpatialCell, SpatialCell];
+}
+
+/**
+ * A compact two-column form row: labels on one baseline, values directly
+ * beneath them. This is intentionally narrower than the numeric table path:
+ * two aligned prose columns are common, while a form's short cells have a
+ * strong repeated x geometry and at least one value-shaped token.
+ */
+function formHeaderValuePairs(
+	header: PdfLine,
+	row: PdfLine,
+	pageWidth: number
+): Array<{ label: string; value: string }> | null {
+	const verticalGap = header.y - row.y;
+	if (verticalGap <= 0 || verticalGap > Math.max(18, pageWidth * 0.04)) return null;
+	const headerItemCount = header.items.filter((item) => item.text.trim()).length;
+	const valueItemCount = row.items.filter((item) => item.text.trim()).length;
+	const equallySpaced = equallySpacedCells(header, row, pageWidth);
+	// If the item counts differ, a largest-gap split would invent columns by
+	// merging unrelated table fields (for example a four-cell header with a
+	// three-cell data row). Only the explicit two-item form path is safe there.
+	if (!equallySpaced && (headerItemCount !== 2 || valueItemCount !== 2)) return null;
+	const splitHeader = equallySpaced ? null : splitTwoColumnCells(header, pageWidth);
+	const splitValues = equallySpaced ? null : splitTwoColumnCells(row, pageWidth);
+	const headerCells = equallySpaced?.[0] ?? (splitHeader ? [splitHeader[0], splitHeader[1]] : null);
+	const valueCells = equallySpaced?.[1] ?? (splitValues ? [splitValues[0], splitValues[1]] : null);
+	if (!headerCells || !valueCells || headerCells.length !== valueCells.length) return null;
+	const distinctLabels = new Set(headerCells.map((cell) => cell.text.toLocaleLowerCase()));
+	if (distinctLabels.size !== headerCells.length) return null;
+	if (
+		!headerCells.every(
+			(cell) =>
+				/\p{L}/u.test(cell.text) &&
+				!startsWithNumericValue(cell.text) &&
+				// Numeric shape means this row already carries data. It cannot name
+				// values on the next baseline.
+				!/\d/u.test(cell.text)
+		)
+	)
+		return null;
+	if (!valueCells.some((cell) => hasFormValueShape(cell.text))) return null;
+
+	// Keep a genuine two-column gap on both baselines. OCR boxes often pad or
+	// shift a value relative to its label, so pair by non-crossing column zones
+	// and left-to-right order rather than requiring identical left edges.
+	const minimumColumnGap = -Math.max(2, pageWidth * 0.01);
+	for (let index = 1; index < headerCells.length; index++) {
+		if (
+			headerCells[index].start - headerCells[index - 1].end < minimumColumnGap ||
+			valueCells[index].start - valueCells[index - 1].end < minimumColumnGap
+		)
+			return null;
+	}
+
+	return headerCells.map((cell, index) => ({ label: cell.text, value: valueCells[index].text }));
+}
+
+/**
  * Bind a compact header row to the numeric row immediately below it.
  *
  * Borderless comparison tables commonly sit above a two-column article. A
@@ -170,7 +350,22 @@ function alignedHeaderValueRows(
 	for (let index = 1; index < lines.length; index++) {
 		const header = lines[index - 1];
 		const row = lines[index];
+		// A form value can itself look like an all-caps header. Once a row has
+		// been bound, never let that value row become the next pair's header.
+		if (bound.has(header)) continue;
 		if (header.y - row.y > pageWidth * 0.08) continue;
+
+		const formPairs = formHeaderValuePairs(header, row, pageWidth);
+		if (formPairs) {
+			bound.set(row, {
+				text: joinItems([...row.items]),
+				retrievalContext: tableRowContext(
+					formPairs.map((pair) => pair.label),
+					formPairs.map((pair) => pair.value)
+				)
+			});
+			continue;
+		}
 
 		const labels = header.items.filter(
 			(item) => /\p{L}/u.test(item.text) && !startsWithNumericValue(item.text)

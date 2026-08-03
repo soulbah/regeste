@@ -9,10 +9,17 @@ import { proxiedAppConfig } from '$lib/private-ai/webllm-config';
 import { isShellCache, shellCacheName } from '$lib/pwa/cache-names';
 import { APP_SCOPE, isAppNavigation, isMarketingAsset } from '$lib/pwa/sw-routing';
 import type { GenerationOptions, GenerationResult } from '$lib/private-ai/generation';
+import { ModelLoadCoordinator } from '$lib/private-ai/model-load-coordinator';
 
 const sw = self as unknown as ServiceWorkerGlobalScope;
 let engine: MLCEngineInterface | null = null;
 let loadedModel: string | null = null;
+let loadGeneration = 0;
+interface ModelLoadProgress {
+	progress: number;
+	text: string;
+}
+const modelLoads = new ModelLoadCoordinator<ModelLoadProgress>();
 // A controller can stay stable while the browser kills and reboots its backing
 // Service Worker. The page heartbeats this per-boot id to detect that otherwise
 // invisible replacement and reject requests orphaned in the previous instance.
@@ -121,10 +128,15 @@ type RequestMessage =
 			messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>;
 			options: GenerationOptions;
 	  }
-	| { source: 'regeste-llm'; id: string; kind: 'abort' | 'ping' };
+	| { source: 'regeste-llm'; id: string; kind: 'abort' | 'ping' | 'unload' };
 
 function reply(client: Client | ServiceWorker | MessagePort | null, message: object): void {
-	client?.postMessage({ source: 'regeste-llm', ...message });
+	try {
+		client?.postMessage({ source: 'regeste-llm', ...message });
+	} catch {
+		// A refresh detaches the old Client while its event.waitUntil may still
+		// own model work. New clients subscribe to that work through modelLoads.
+	}
 }
 
 async function load(
@@ -132,22 +144,49 @@ async function load(
 	id: string,
 	model: string
 ): Promise<void> {
-	const onProgress = (report: { progress: number; text: string }) =>
-		reply(client, { id, kind: 'progress', progress: report.progress, text: report.text });
-	if (engine && loadedModel === model) {
-		onProgress({ progress: 1, text: 'Model already loaded' });
-		return;
-	}
-	if (!engine)
-		engine = await CreateMLCEngine(model, {
-			appConfig: proxiedAppConfig(sw.location.origin),
-			initProgressCallback: onProgress
-		});
-	else {
-		engine.setInitProgressCallback(onProgress);
-		await engine.reload(model);
-	}
-	loadedModel = model;
+	await modelLoads.run(
+		model,
+		(report) =>
+			reply(client, {
+				id,
+				kind: 'progress',
+				progress: report.progress,
+				text: report.text
+			}),
+		async (onProgress) => {
+			const generation = ++loadGeneration;
+			if (engine && loadedModel === model) {
+				onProgress({ progress: 1, text: 'Model already loaded' });
+				return;
+			}
+			if (!engine) {
+				const created = await CreateMLCEngine(model, {
+					appConfig: proxiedAppConfig(sw.location.origin),
+					initProgressCallback: onProgress
+				});
+				if (generation !== loadGeneration) {
+					await created.unload();
+					throw new Error('model load cancelled');
+				}
+				engine = created;
+			} else {
+				engine.setInitProgressCallback(onProgress);
+				await engine.reload(model);
+				if (generation !== loadGeneration) throw new Error('model load cancelled');
+			}
+			loadedModel = model;
+		}
+	);
+}
+
+async function unload(): Promise<void> {
+	loadGeneration++;
+	await modelLoads.runExclusive(async () => {
+		const current = engine;
+		engine = null;
+		loadedModel = null;
+		await current?.unload();
+	});
 }
 
 async function generate(
@@ -265,6 +304,7 @@ sw.addEventListener('message', (event: ExtendableMessageEvent) => {
 					reply(client, { id: message.id, kind: 'result', result });
 					return;
 				} else if (message.kind === 'abort') await engine?.interruptGenerate();
+				else if (message.kind === 'unload') await unload();
 				reply(client, { id: message.id, kind: 'result', result: null });
 			} catch (error) {
 				reply(client, {

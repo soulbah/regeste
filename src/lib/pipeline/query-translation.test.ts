@@ -71,6 +71,20 @@ describe('crossLingualQueryVariants', () => {
 		).toEqual(['options ajoutées non ajoutées']);
 	});
 
+	it('keeps up to four independent retrieval branches', () => {
+		expect(
+			cleanRetrievalQueryVariants(
+				'1. amount due for Jane Doe\n2. due date for Jane Doe\n3. service address for Jane Doe\n4. account holder Jane Doe\n5. unrelated fifth branch',
+				'Question composée'
+			)
+		).toEqual([
+			'amount due for Jane Doe',
+			'due date for Jane Doe',
+			'service address for Jane Doe',
+			'account holder Jane Doe'
+		]);
+	});
+
 	it('keeps search variants that merely contain the words "réponse"/"answer"', () => {
 		expect(
 			cleanRetrievalQueryVariants(
@@ -107,6 +121,42 @@ describe('crossLingualQueryVariants', () => {
 		expect(retrieve).toHaveBeenCalledOnce();
 		expect(retrieve).toHaveBeenCalledWith([]);
 		expect(rewrite).not.toHaveBeenCalled();
+	});
+
+	it('decomposes a semantic factual synthesis even when one broad hit looks sufficient', async () => {
+		const primary = [hit(1, 'DOE, JOHN & JANE 55 NO NAME DRIVE')];
+		const fallback = [
+			...primary,
+			hit(2, 'Current Billing Due Date 08/12/2015'),
+			hit(3, 'Total Amount Due $526.07')
+		];
+		const rewrite = vi
+			.fn()
+			.mockResolvedValue(
+				'amount due for John and Jane Doe\ndue date for John and Jane Doe\nservice address for John and Jane Doe'
+			);
+		const retrieve = vi.fn().mockResolvedValueOnce(primary).mockResolvedValueOnce(fallback);
+
+		await expect(
+			retrieveWithLocalQueryFallback({
+				query:
+					'Quel montant John et Jane Doe doivent-ils payer et à quelle date est-il dû et quelle est leur adresse de service ?',
+				documentLanguages: ['en'],
+				rewrite,
+				retrieve,
+				decompose: true
+			})
+		).resolves.toEqual({
+			hits: fallback,
+			alternateQueries: [
+				'amount due for John and Jane Doe',
+				'due date for John and Jane Doe',
+				'service address for John and Jane Doe'
+			]
+		});
+		expect(rewrite.mock.calls[0][0][0].content).toContain(
+			'one self-contained query per requested fact'
+		);
 	});
 
 	it('decomposes a multi-part French question over an English document', async () => {

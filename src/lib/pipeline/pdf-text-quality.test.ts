@@ -72,4 +72,30 @@ describe('native/OCR page arbitration', () => {
 		expect(merged[1].text).toContain('TexteNatifDégradé');
 		expect(merged[1].ocrConfidence).toBe(0);
 	});
+
+	it('keeps the spatially fused OCR order instead of prepending native fallback blocks', () => {
+		const hybrid: ParsedDoc = {
+			pages: 1,
+			blocks: [],
+			needsOcr: [1],
+			ocrFallbackBlocks: [
+				{
+					text: 'Sample utility bill — DOE, JOHN & JANE — Service address: 55 NO NAME DRIVE',
+					page: 1,
+					charStart: 0,
+					charEnd: 76
+				}
+			]
+		};
+		const fused = {
+			text: 'Customer: DOE, JOHN & JANE — Service address: 55 NO NAME DRIVE — Due: 08/12/2015 — Total: $526.07',
+			page: 1,
+			charStart: 0,
+			charEnd: 105,
+			ocrConfidence: 0.94
+		};
+		const merged = mergeParsedWithOcr(hybrid, [fused]);
+		expect(merged.map((block) => block.text)).toEqual([fused.text]);
+		expect(merged[0].ocrConfidence).toBe(0.94);
+	});
 });

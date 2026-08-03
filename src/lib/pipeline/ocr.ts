@@ -15,10 +15,11 @@ import type { ParsedBlock } from '$lib/types';
 import type { OcrWorkerApi } from './ocr-worker';
 import { yieldToMain } from './embed-batches';
 import { guardWorker } from '$lib/state/worker-health.svelte';
-import { positionedFromOcrLines } from './ocr-boxes';
+import { overlayNativePdfText, positionedFromOcrLines } from './ocr-boxes';
 import { orderPdfText } from './parse/pdf-layout';
-import { pageBlocks } from './parse/pdf';
+import { pageBlocks, positionedPageText } from './parse/pdf';
 import { splitByChrome, type LayoutRegion } from './layout-model';
+import { assessPdfTextLayer } from './pdf-text-quality';
 
 export interface OcrProgress {
 	page: number;
@@ -61,16 +62,33 @@ export function ocrPageBlocks(
 		imageWidth: number;
 		imageHeight: number;
 		lines: import('./ocr-boxes').OcrItem[][];
+		nativeItems?: Array<{ str: string; transform: number[]; width: number }>;
 	},
 	page: number,
 	regions: LayoutRegion[] = []
 ): ParsedBlock[] {
-	const positioned = positionedFromOcrLines(result.lines ?? [], {
+	const ocrPositioned = positionedFromOcrLines(result.lines ?? [], {
 		imageHeight: result.imageHeight,
 		scale: OCR_DPI_SCALE
 	});
 	const pageWidth = result.imageWidth / OCR_DPI_SCALE;
 	const pageHeight = result.imageHeight / OCR_DPI_SCALE;
+	const nativePositioned = positionedPageText(result.nativeItems ?? [], pageWidth);
+	const nativeText = orderPdfText(nativePositioned, pageWidth)
+		.map((line) => line.text)
+		.join('\n');
+	const nativeQuality = assessPdfTextLayer(nativeText);
+	// Sound digital runs win only where their coordinates overlap OCR. This is
+	// the same mixed-page strategy as mature OCR pipelines: preserve existing
+	// text and recognize missing image regions, without field vocabularies. A
+	// sparse layer can still hold exact fields; sparseness triggers OCR for the
+	// rest of the page but is not corruption. Joined or unmapped layers are.
+	const positioned =
+		nativePositioned.length &&
+		nativeQuality.reason !== 'joined' &&
+		nativeQuality.reason !== 'unmapped'
+			? overlayNativePdfText(ocrPositioned, nativePositioned, pageHeight)
+			: ocrPositioned;
 	// Same contract as a born-digital page (spec 034): chrome is split off by
 	// the detector's boxes before ordering, so a scanned letter's legal footer
 	// cannot glue to its signature either.

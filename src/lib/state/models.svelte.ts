@@ -89,6 +89,7 @@ class ModelsStore {
 		// Losing the weights invalidates the "already prepared" fast path.
 		if (model.key === 'engine') {
 			localStorage.removeItem('regeste:private-prepared-model');
+			localStorage.removeItem('regeste:private-consented-model');
 			llmStore.prepared = false;
 			if (llmStore.status === 'ready') location.reload();
 		}

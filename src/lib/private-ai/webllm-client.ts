@@ -1,4 +1,4 @@
-import { wrap, type Remote } from 'comlink';
+import { proxy, wrap, type Remote } from 'comlink';
 import { guardWorker } from '$lib/state/worker-health.svelte';
 import type { GenerationOptions, GenerationResult } from './generation';
 import type { LlmApi } from './llm-worker';
@@ -7,9 +7,22 @@ import {
 	ServiceWorkerLifecycle,
 	type ServiceRequest
 } from './service-worker-lifecycle';
+import { ActivityTimeoutError, withActivityTimeout } from './activity-timeout';
+
+const CACHED_LOAD_IDLE_TIMEOUT_MS = 60_000;
+const DOWNLOAD_IDLE_TIMEOUT_MS = 180_000;
+const GENERATION_IDLE_TIMEOUT_MS = 180_000;
+
+export interface WebLlmLoadOptions {
+	prepared?: boolean;
+}
 
 export interface WebLlmClient {
-	load(model: string, onProgress?: (progress: number, text: string) => void): Promise<void>;
+	load(
+		model: string,
+		onProgress?: (progress: number, text: string) => void,
+		options?: WebLlmLoadOptions
+	): Promise<void>;
 	generate(
 		messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
 		onDelta?: (delta: string) => void,
@@ -25,7 +38,10 @@ type WorkerResponse =
 	| { source: 'regeste-llm'; id: string; kind: 'error'; error: string };
 
 let dedicated: Remote<LlmApi> | null = null;
+let dedicatedWorker: Worker | null = null;
+let dedicatedModel: string | null = null;
 let serviceModel: string | null = null;
+let requestedModel: string | null = null;
 let listenerInstalled = false;
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 let heartbeatInFlight = false;
@@ -35,9 +51,43 @@ function dedicatedClient(): Remote<LlmApi> {
 	if (!dedicated) {
 		const worker = new Worker(new URL('./llm-worker.ts', import.meta.url), { type: 'module' });
 		guardWorker(worker, 'privateAi');
+		dedicatedWorker = worker;
 		dedicated = wrap<LlmApi>(worker);
 	}
 	return dedicated;
+}
+
+function resetDedicatedClient(): void {
+	dedicatedWorker?.terminate();
+	dedicatedWorker = null;
+	dedicated = null;
+	dedicatedModel = null;
+}
+
+function stopHeartbeat(): void {
+	if (heartbeatTimer) clearInterval(heartbeatTimer);
+	heartbeatTimer = null;
+	heartbeatInFlight = false;
+}
+
+function invalidateServiceClient(): void {
+	serviceModel = null;
+	stopHeartbeat();
+	serviceLifecycle.controllerChanged();
+}
+
+/** Best-effort cancellation for work already running inside the Service
+ * Worker. No response is tracked: invalidation below owns the page promise. */
+function controlService(kind: 'abort' | 'unload'): void {
+	try {
+		navigator.serviceWorker.controller?.postMessage({
+			source: 'regeste-llm',
+			id: crypto.randomUUID(),
+			kind
+		});
+	} catch {
+		// Controller replacement already makes the request obsolete.
+	}
 }
 
 function installListener(): void {
@@ -54,7 +104,7 @@ function installListener(): void {
 		else serviceLifecycle.reject(message.id, new Error(message.error));
 	});
 	navigator.serviceWorker.addEventListener('controllerchange', () => {
-		serviceLifecycle.controllerChanged();
+		invalidateServiceClient();
 	});
 }
 
@@ -70,7 +120,11 @@ function serviceRequest<T>(
 	const id = crypto.randomUUID();
 	return new Promise<T>((resolve, reject) => {
 		serviceLifecycle.add(id, { resolve, reject, ...callbacks }, timeoutMs);
-		controller.postMessage({ source: 'regeste-llm', id, kind, ...payload });
+		try {
+			controller.postMessage({ source: 'regeste-llm', id, kind, ...payload });
+		} catch (error) {
+			serviceLifecycle.reject(id, error instanceof Error ? error : new Error(String(error)));
+		}
 	});
 }
 
@@ -84,10 +138,12 @@ async function probeServiceInstance(timeoutMs = 30_000): Promise<void> {
 function startHeartbeat(): void {
 	if (heartbeatTimer) return;
 	heartbeatTimer = setInterval(() => {
-		if (heartbeatInFlight) return;
+		// Active loads/generations have their own activity watchdog. A ping queued
+		// behind GPU work can time out even while that work reports progress.
+		if (heartbeatInFlight || serviceLifecycle.size > 0) return;
 		heartbeatInFlight = true;
 		void probeServiceInstance()
-			.catch(() => serviceLifecycle.controllerChanged())
+			.catch(invalidateServiceClient)
 			.finally(() => {
 				heartbeatInFlight = false;
 			});
@@ -96,34 +152,123 @@ function startHeartbeat(): void {
 
 async function waitForController(timeoutMs = 2000): Promise<boolean> {
 	if (import.meta.env.DEV || !('serviceWorker' in navigator)) return false;
-	await navigator.serviceWorker.ready;
 	if (navigator.serviceWorker.controller) return true;
 	return new Promise((resolve) => {
-		const timeout = setTimeout(() => resolve(false), timeoutMs);
-		navigator.serviceWorker.addEventListener(
-			'controllerchange',
-			() => {
-				clearTimeout(timeout);
-				resolve(!!navigator.serviceWorker.controller);
-			},
-			{ once: true }
+		const finish = (available: boolean) => {
+			clearTimeout(timeout);
+			navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
+			resolve(available);
+		};
+		const onControllerChange = () => finish(!!navigator.serviceWorker.controller);
+		const timeout = setTimeout(() => finish(false), timeoutMs);
+		navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
+		// ServiceWorkerContainer.ready never rejects and may wait indefinitely.
+		// Keep it inside the same bounded handshake as controllerchange so model
+		// loading can fall back to a dedicated worker instead of freezing the UI.
+		void navigator.serviceWorker.ready.then(
+			() => finish(!!navigator.serviceWorker.controller),
+			() => finish(false)
 		);
 	});
 }
 
 async function loadService(
 	model: string,
-	onProgress?: (progress: number, text: string) => void
+	onProgress: ((progress: number, text: string) => void) | undefined,
+	idleTimeoutMs: number
 ): Promise<boolean> {
 	if (!(await waitForController())) return false;
 	// Establish worker identity before the long model load. The heartbeat then
 	// detects a browser killing this instance and booting another behind the
 	// same controller — the case controllerchange alone cannot see.
 	await probeServiceInstance(5_000);
-	startHeartbeat();
-	await serviceRequest<void>('load', { model }, { onProgress });
+	await withActivityTimeout(
+		(activity) =>
+			serviceRequest<void>(
+				'load',
+				{ model },
+				{
+					onProgress: (progress, text) => {
+						activity();
+						onProgress?.(progress, text);
+					}
+				}
+			),
+		idleTimeoutMs,
+		() => {
+			controlService('unload');
+			invalidateServiceClient();
+		}
+	);
 	serviceModel = model;
+	startHeartbeat();
 	return true;
+}
+
+async function loadDedicated(
+	model: string,
+	onProgress: ((progress: number, text: string) => void) | undefined,
+	idleTimeoutMs: number
+): Promise<void> {
+	await withActivityTimeout(
+		(activity) =>
+			dedicatedClient().load(
+				model,
+				proxy((progress: number, text: string) => {
+					activity();
+					onProgress?.(progress, text);
+				})
+			),
+		idleTimeoutMs,
+		resetDedicatedClient
+	);
+	dedicatedModel = model;
+	serviceModel = null;
+}
+
+async function generateDedicated(
+	messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
+	onDelta: ((delta: string) => void) | undefined,
+	options: GenerationOptions
+): Promise<GenerationResult> {
+	return withActivityTimeout(
+		(activity) =>
+			dedicatedClient().generate(
+				messages,
+				proxy((delta: string) => {
+					activity();
+					onDelta?.(delta);
+				}),
+				options
+			),
+		GENERATION_IDLE_TIMEOUT_MS,
+		resetDedicatedClient
+	);
+}
+
+function generateServiceRequest(
+	messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
+	onDelta: ((delta: string) => void) | undefined,
+	options: GenerationOptions
+): Promise<GenerationResult> {
+	return withActivityTimeout(
+		(activity) =>
+			serviceRequest<GenerationResult>(
+				'generate',
+				{ messages, options },
+				{
+					onDelta: (delta) => {
+						activity();
+						onDelta?.(delta);
+					}
+				}
+			),
+		GENERATION_IDLE_TIMEOUT_MS,
+		() => {
+			controlService('abort');
+			invalidateServiceClient();
+		}
+	);
 }
 
 async function generateService(
@@ -131,40 +276,59 @@ async function generateService(
 	onDelta: ((delta: string) => void) | undefined,
 	options: GenerationOptions
 ): Promise<GenerationResult> {
+	const model = serviceModel;
 	try {
-		return await serviceRequest<GenerationResult>('generate', { messages, options }, { onDelta });
+		return await generateServiceRequest(messages, onDelta, options);
 	} catch (error) {
 		const recoverable =
 			String(error).includes('not loaded') ||
 			String(error).includes(SERVICE_WORKER_RESTARTED) ||
-			String(error).includes('timed out');
-		if (!serviceModel || !recoverable) throw error;
-		await loadService(serviceModel);
-		return serviceRequest<GenerationResult>('generate', { messages, options }, { onDelta });
+			String(error).includes('timed out') ||
+			error instanceof ActivityTimeoutError;
+		if (!model || !recoverable) throw error;
+		if (!(await loadService(model, undefined, CACHED_LOAD_IDLE_TIMEOUT_MS))) throw error;
+		return generateServiceRequest(messages, onDelta, options);
 	}
 }
 
 export const webLlmClient: WebLlmClient = {
-	async load(model, onProgress) {
+	async load(model, onProgress, options = {}) {
+		const idleTimeoutMs = options.prepared ? CACHED_LOAD_IDLE_TIMEOUT_MS : DOWNLOAD_IDLE_TIMEOUT_MS;
+		requestedModel = model;
+		serviceModel = null;
+		stopHeartbeat();
+		resetDedicatedClient();
 		for (let attempt = 0; attempt < 2; attempt++) {
 			try {
-				if (await loadService(model, onProgress)) return;
+				if (await loadService(model, onProgress, idleTimeoutMs)) return;
 				break;
 			} catch (error) {
 				if (attempt === 0 && String(error).includes(SERVICE_WORKER_RESTARTED)) continue;
+				if (error instanceof ActivityTimeoutError || String(error).includes('timed out')) break;
 				throw error;
 			}
 		}
-		await dedicatedClient().load(model, onProgress);
+		serviceModel = null;
+		stopHeartbeat();
+		await loadDedicated(model, onProgress, idleTimeoutMs);
 	},
 
 	async generate(messages, onDelta, options = { reasoning: 'off', maxTokens: 320 }) {
 		if (serviceModel) return generateService(messages, onDelta, options);
-		return dedicatedClient().generate(messages, onDelta, options);
+		if (dedicatedModel) return generateDedicated(messages, onDelta, options);
+		if (!requestedModel) throw new Error('private engine not loaded');
+		try {
+			if (await loadService(requestedModel, undefined, CACHED_LOAD_IDLE_TIMEOUT_MS))
+				return generateService(messages, onDelta, options);
+		} catch {
+			// A replaced Service Worker recovers through a fresh dedicated worker.
+		}
+		await loadDedicated(requestedModel, undefined, CACHED_LOAD_IDLE_TIMEOUT_MS);
+		return generateDedicated(messages, onDelta, options);
 	},
 
 	async abort() {
 		if (serviceModel) await serviceRequest<void>('abort', {});
-		else await dedicatedClient().abort();
+		else if (dedicatedModel) await dedicatedClient().abort();
 	}
 };

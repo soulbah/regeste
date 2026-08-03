@@ -73,7 +73,8 @@ const rankingWorkers: Array<{
 	worker: Worker;
 	api: Remote<RetrievalRankingApi>;
 }> = [];
-const OCR_INDEX_VERSION = 2;
+// v8 also rejects numeric data rows as form headers.
+const OCR_INDEX_VERSION = 8;
 const OCR_INDEX_VERSION_KEY = 'regeste:ocr-index-version';
 const RERANK_CONSENT_KEY = 'regeste:rerank-consent';
 function getEmbedWorker(): Remote<EmbedApi> {

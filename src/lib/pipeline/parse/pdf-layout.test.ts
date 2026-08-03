@@ -135,6 +135,131 @@ describe('orderPdfText', () => {
 		expect(thrust?.retrievalContext).toContain('SLS Block 2 Cargo: 9.5 M lbs.');
 		expect(thrust?.text).toContain('8.8 M lbs. 8.8 M lbs. 8.9 M lbs. 8.9 M lbs. 9.5 M lbs.');
 	});
+
+	it('binds a short two-column form row to its labels', () => {
+		const items = [
+			// OCR boxes on the real utility bill are padded differently per line:
+			// values start 16–57pt left of their labels, while the two columns do
+			// not cross and their shared gap remains stable.
+			item('Customer Name', 125, 384, 112),
+			item('Service Address', 409, 384, 110),
+			item('DOE, JOHN & JANE', 109, 372, 160),
+			item('55 NO NAME DRIVE', 352, 372, 150)
+		];
+		const lines = orderPdfText(items, 612);
+		const values = lines.find((line) => line.text.startsWith('DOE, JOHN & JANE'));
+
+		expect(values?.text).toBe('DOE, JOHN & JANE 55 NO NAME DRIVE');
+		expect(values?.retrievalContext).toBe(
+			'Customer Name: DOE, JOHN & JANE | Service Address: 55 NO NAME DRIVE'
+		);
+	});
+
+	it('binds adjacent bordered cells when their ink has no horizontal gap', () => {
+		const items = [
+			item('Current Billing Due Date', 404, 600, 110),
+			item('Amount Due', 518, 600, 70),
+			item('08/12/2015', 430, 588, 75),
+			item('$526.07', 538, 588, 53)
+		];
+		const lines = orderPdfText(items, 612);
+		const values = lines.find((line) => line.text.startsWith('08/12/2015'));
+
+		expect(values?.text).toBe('08/12/2015 $526.07');
+		expect(values?.retrievalContext).toBe(
+			'Current Billing Due Date: 08/12/2015 | Amount Due: $526.07'
+		);
+	});
+
+	it('binds all aligned cells in the utility-bill remittance row', () => {
+		const items = [
+			item('Service Address', 77.5, 600, 69.4),
+			item('Bill Number', 199.7, 600, 52.1),
+			item('Account # - Customer #', 271.4, 600, 104.2),
+			item('Current Billing Due Date', 401, 600, 108.2),
+			item('Amount Due', 524, 600, 57.8),
+			item('55. NO NAME DRIVE', 57.8, 588, 97.2),
+			item('287', 214.6, 588, 19.9),
+			item(' - #', 285.6, 588, 73.4),
+			item('08/12/2015', 428.4, 588, 48.5),
+			item('$526.07', 543.8, 588, 37.2)
+		];
+		const lines = orderPdfText(items, 612);
+		const values = lines.find((line) => line.text.startsWith('55. NO NAME DRIVE'));
+
+		expect(values?.retrievalContext).toBe(
+			'Service Address: 55. NO NAME DRIVE | Bill Number: 287 | Account # - Customer #: - # | Current Billing Due Date: 08/12/2015 | Amount Due: $526.07'
+		);
+	});
+
+	it('does not cascade an all-caps value row into the next form header', () => {
+		const items = [
+			item('CUSTOMER NAME', 125, 420, 112),
+			item('SERVICE ADDRESS', 409, 420, 110),
+			item('DOE, JOHN & JANE', 109, 408, 160),
+			item('55 NO NAME DRIVE', 352, 408, 150),
+			item('ACCOUNT NUMBER', 125, 396, 112),
+			item('BILLING DATE', 409, 396, 110),
+			item('123456789', 109, 384, 160),
+			item('08/12/2015', 352, 384, 150)
+		];
+		const lines = orderPdfText(items, 612);
+		const firstValues = lines.find((line) => line.text === 'DOE, JOHN & JANE 55 NO NAME DRIVE');
+		const secondHeader = lines.find((line) => line.text === 'ACCOUNT NUMBER BILLING DATE');
+		const secondValues = lines.find((line) => line.text === '123456789 08/12/2015');
+
+		expect(firstValues?.retrievalContext).toBe(
+			'CUSTOMER NAME: DOE, JOHN & JANE | SERVICE ADDRESS: 55 NO NAME DRIVE'
+		);
+		expect(secondHeader?.retrievalContext).toBeUndefined();
+		expect(secondValues?.retrievalContext).toBe(
+			'ACCOUNT NUMBER: 123456789 | BILLING DATE: 08/12/2015'
+		);
+	});
+
+	it('does not use a numeric-bearing data row as form labels', () => {
+		const items = [
+			item('HISTORY BILLED', 20, 100, 126),
+			item('Total Current Billing 526.07', 410, 100, 174),
+			item('ELECTRIC USAGE 14', 20, 89, 126),
+			item('Previous Balance 00', 410, 89, 174)
+		];
+		const lines = orderPdfText(items, 612);
+		const data = lines.find((line) => line.text.includes('Previous Balance 00'));
+
+		expect(data?.text).toContain('ELECTRIC USAGE 14');
+		expect(data?.retrievalContext).toBeUndefined();
+	});
+
+	it('does not invent a two-column form from mismatched cell counts', () => {
+		const items = [
+			item('Bill Number', 40, 140, 90),
+			item('Bill Date', 160, 140, 70),
+			item('Account Number', 270, 140, 110),
+			item('Current Billing Due Date', 400, 140, 150),
+			item('287', 40, 128, 30),
+			item('07/29/2015', 160, 128, 80),
+			item('08/12/2015', 400, 128, 80)
+		];
+		const lines = orderPdfText(items, 612);
+		const values = lines.find((line) => line.text.startsWith('287'));
+
+		expect(values?.retrievalContext).toBeUndefined();
+	});
+
+	it('does not bind ordinary prose with the same two-column geometry', () => {
+		const items = [
+			item('A short introduction', 40, 500, 112),
+			item('A second introduction', 320, 500, 118),
+			item('continues on page 2 in ordinary prose', 40, 488, 180),
+			item('and carries on here', 320, 488, 126)
+		];
+		const lines = orderPdfText(items, 612);
+		const continuation = lines.find((line) => line.text.startsWith('continues on'));
+
+		expect(continuation?.text).toContain('ordinary prose');
+		expect(continuation?.retrievalContext).toBeUndefined();
+	});
 });
 
 it('keeps a devis/invoice section-subtotal row intact (label + amount, not sheared)', () => {

@@ -8,3 +8,10 @@ export const OCR_MODEL = {
 	recognition: '/models/ocr/latin_PP-OCRv5_mobile_rec_infer.onnx',
 	charactersDictionary: '/models/ocr/ppocrv5_latin_dict.txt'
 } as const;
+
+/** PaddleOCR's documented full-page detection size. ppu-paddle-ocr 6 defaults
+ * to 640, which shrinks a 300-DPI letter page to roughly 495 × 640 before text
+ * detection and drops small invoice/table cells before recognition can see
+ * their original high-resolution crops. 960 is the upstream document default,
+ * remains a multiple of 32, and measured best on the public invoice fixture. */
+export const OCR_DETECTION_MAX_SIDE = 960;
