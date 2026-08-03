@@ -27,6 +27,29 @@ export interface GenerationResult {
 	grammarPerTokenMs?: number | null;
 }
 
+/** Keep WebLLM decoding identical in the page worker and Service Worker.
+ * Otherwise production can silently lose repetition control or a decoding
+ * grammar even though local development exercises the requested options. */
+export function webLlmGenerationParameters(options: GenerationOptions): {
+	temperature: number;
+	frequency_penalty: number;
+	max_tokens: number;
+	extra_body: { enable_thinking: boolean };
+	response_format?: { type: 'grammar'; grammar: string };
+} {
+	return {
+		temperature: options.temperature ?? 0.2,
+		// Grounded QA commonly uses greedy decoding. A mild penalty breaks a
+		// repeated-line fixed point without changing the first answer.
+		frequency_penalty: 0.3,
+		max_tokens: options.maxTokens,
+		extra_body: { enable_thinking: options.reasoning === 'on' },
+		...(options.grammar
+			? { response_format: { type: 'grammar' as const, grammar: options.grammar } }
+			: {})
+	};
+}
+
 /** Only plain coordinated lookups can collapse to one sufficient passage.
  * Calculations need adjacent operands even when their final answer is a fact. */
 export function usesCompactFactualContext(

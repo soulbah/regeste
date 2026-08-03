@@ -8,7 +8,11 @@ import { MLCEngine, type MLCEngineInterface } from '@mlc-ai/web-llm';
 import { proxiedAppConfig } from '$lib/private-ai/webllm-config';
 import { isShellCache, shellCacheName } from '$lib/pwa/cache-names';
 import { APP_SCOPE, isAppNavigation, isMarketingAsset } from '$lib/pwa/sw-routing';
-import type { GenerationOptions, GenerationResult } from '$lib/private-ai/generation';
+import {
+	webLlmGenerationParameters,
+	type GenerationOptions,
+	type GenerationResult
+} from '$lib/private-ai/generation';
 import { ModelLoadCoordinator } from '$lib/private-ai/model-load-coordinator';
 
 const sw = self as unknown as ServiceWorkerGlobalScope;
@@ -237,13 +241,13 @@ async function generate(
 		const started = performance.now();
 		let firstTokenAt: number | null = null;
 		let completionTokens: number | null = null;
+		let grammarInitMs: number | null = null;
+		let grammarPerTokenMs: number | null = null;
 		let text = '';
 		const chunks = await current.chat.completions.create({
 			messages,
 			stream: true,
-			temperature: 0.2,
-			max_tokens: options.maxTokens,
-			extra_body: { enable_thinking: options.reasoning === 'on' },
+			...webLlmGenerationParameters(options),
 			stream_options: { include_usage: true }
 		});
 		for await (const chunk of chunks) {
@@ -254,6 +258,12 @@ async function generate(
 				onDelta(delta);
 			}
 			completionTokens = chunk.usage?.completion_tokens ?? completionTokens;
+			grammarInitMs = chunk.usage?.extra.grammar_init_s
+				? chunk.usage.extra.grammar_init_s * 1000
+				: grammarInitMs;
+			grammarPerTokenMs = chunk.usage?.extra.grammar_per_token_s
+				? chunk.usage.extra.grammar_per_token_s * 1000
+				: grammarPerTokenMs;
 		}
 		const finished = performance.now();
 		return {
@@ -263,7 +273,9 @@ async function generate(
 				completionTokens && firstTokenAt !== null && finished > firstTokenAt
 					? completionTokens / ((finished - firstTokenAt) / 1000)
 					: null,
-			completionTokens
+			completionTokens,
+			grammarInitMs,
+			grammarPerTokenMs
 		};
 	});
 }

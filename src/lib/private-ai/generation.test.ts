@@ -4,7 +4,8 @@ import {
 	generationOptionsFor,
 	requiresSemanticSlotSynthesis,
 	usesCompactFactualContext,
-	verificationOptionsFor
+	verificationOptionsFor,
+	webLlmGenerationParameters
 } from './generation';
 
 describe('generationOptionsFor', () => {
@@ -76,6 +77,23 @@ describe('generationOptionsFor', () => {
 			reasoning: 'off',
 			maxTokens: 120,
 			temperature: 0
+		});
+	});
+
+	it('builds one WebLLM decoding contract for both worker runtimes', () => {
+		expect(
+			webLlmGenerationParameters({
+				reasoning: 'off',
+				maxTokens: 160,
+				temperature: 0,
+				grammar: 'root ::= "answer"'
+			})
+		).toEqual({
+			temperature: 0,
+			frequency_penalty: 0.3,
+			max_tokens: 160,
+			extra_body: { enable_thinking: false },
+			response_format: { type: 'grammar', grammar: 'root ::= "answer"' }
 		});
 	});
 });

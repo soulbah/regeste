@@ -6,7 +6,11 @@
 import { expose } from 'comlink';
 import { CreateMLCEngine, type MLCEngineInterface, type InitProgressReport } from '@mlc-ai/web-llm';
 import { proxiedAppConfig } from './webllm-config';
-import type { GenerationOptions, GenerationResult } from './generation';
+import {
+	webLlmGenerationParameters,
+	type GenerationOptions,
+	type GenerationResult
+} from './generation';
 
 let engine: MLCEngineInterface | null = null;
 let loadedModel: string | null = null;
@@ -40,21 +44,7 @@ async function generate(
 	const chunks = await engine.chat.completions.create({
 		messages,
 		stream: true,
-		temperature: options.temperature ?? 0.2,
-		// Grounded QA runs at temperature 0, which is greedy decoding — the most
-		// loop-prone setting there is. Once a line's tokens are the likeliest
-		// continuation they stay the likeliest, and the model emits it again.
-		// Measured live: twelve identical rows, then the same two sentences
-		// twelve times, an answer that took 86 seconds and never terminated.
-		// A mild penalty breaks the fixed point without touching a first answer.
-		frequency_penalty: 0.3,
-		max_tokens: options.maxTokens,
-		extra_body: { enable_thinking: options.reasoning === 'on' },
-		// XGrammar compiles the string with `root` as its entry rule, the same
-		// name llama.cpp uses, so `answer-grammar.ts` emits one grammar for both.
-		...(options.grammar
-			? { response_format: { type: 'grammar' as const, grammar: options.grammar } }
-			: {}),
+		...webLlmGenerationParameters(options),
 		stream_options: { include_usage: true }
 	});
 	let full = '';
