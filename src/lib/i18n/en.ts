@@ -582,6 +582,8 @@ export const en = {
 	'menu.signIn': 'Sign in',
 	'work.model.downloading.title': 'Downloading the model',
 	'work.model.downloading.body': 'One download of {size}.',
+	'work.model.starting.title': 'Starting the download',
+	'work.model.starting.body': 'This can take a few seconds.',
 	'work.model.loading.title': 'Starting the model',
 	'work.model.loading.body': 'The file is downloaded, it is being placed in memory.',
 	'reindex.title': 'Rereading your documents',
@@ -680,6 +682,13 @@ export const en = {
 	'settings.wipe.erasing': 'Erasing…',
 	'settings.wipe.confirm': 'Yes, erase it all',
 	'settings.wipe.continue': 'Continue',
+	'settings.wipe.progress.title': 'Erasing local data',
+	'settings.wipe.progress.stopping': 'Stopping current work.',
+	'settings.wipe.progress.clearing': 'Removing documents, chats, indexes and downloads.',
+	'settings.wipe.progress.finishing': 'Finishing, this page will reload.',
+	'settings.wipe.progress.failed':
+		'The browser could not finish. Close other tabs, then try again.',
+	'settings.wipe.progress.retry': 'Try again',
 
 	// Privacy Report
 	'privacy.title': 'Privacy report',

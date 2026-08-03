@@ -3,12 +3,13 @@
 // Spec 015 adds the workspace export (R1) and the Assisted quota gauge (R5).
 
 import { zipSync, strToU8 } from 'fflate';
-import { resolve } from '$app/paths';
 import { getLocalDb } from '$lib/local-db/client';
 import { readOriginal } from '$lib/opfs';
 import { guardedFetch } from '$lib/net';
 import { DEFAULT_MODEL_KEY, type CloudModelKey } from '$lib/cloud-models';
 import { ASSISTED_ENABLED } from '$lib/flags';
+import { i18n } from '$lib/i18n/index.svelte';
+import { panicWipeUrl } from '$lib/panic-wipe';
 import { sessionStore } from './session.svelte';
 
 export interface StorageStatus {
@@ -194,54 +195,15 @@ class SettingsStore {
 		await db.setSetting('force_offline', on ? '1' : null);
 	}
 
-	/**
-	 * T1 — destroy everything local: SQLite pool files (via the worker, which
-	 * owns the OPFS handles), original documents, model caches. Then reload
-	 * into a factory-fresh app. Nothing here touches the network.
-	 */
-	async wipeEverything(): Promise<void> {
+	/** T1 — leave the live workspace before erasing it.
+	 *
+	 * Deleting SQLite first left every mounted store calling a closed database,
+	 * which produced the alarming "database unavailable" toast during the one
+	 * flow where its absence is expected. The isolated wipe boot opens no DB and
+	 * lets the browser terminate workers before storage disappears. */
+	wipeEverything(): void {
 		this.wiping = true;
-		try {
-			const { db } = await getLocalDb();
-			await db.wipeDatabase();
-		} catch {
-			// DB may be unopenable — keep wiping the rest.
-		}
-		try {
-			const root = await navigator.storage.getDirectory();
-			for await (const name of (root as unknown as { keys(): AsyncIterable<string> }).keys()) {
-				await root.removeEntry(name, { recursive: true }).catch(() => {});
-			}
-		} catch {
-			// OPFS unavailable — nothing stored there then.
-		}
-		try {
-			// Unregister first: deleting the shell cache under a live worker would
-			// leave the reload below running against a worker whose cache is gone.
-			if ('serviceWorker' in navigator) {
-				for (const registration of await navigator.serviceWorker.getRegistrations()) {
-					await registration.unregister().catch(() => {});
-				}
-			}
-		} catch {
-			// No service worker — nothing to unregister.
-		}
-		try {
-			for (const key of await caches.keys()) await caches.delete(key);
-		} catch {
-			// Cache API unavailable
-		}
-		localStorage.clear();
-		sessionStorage.clear();
-		// Back into the app, not out to the marketing page. Someone who has just
-		// erased their workspace is still using the thing; landing them on the sales
-		// pitch reads as being shown the door, and the first screen they want is the
-		// one that sets the app up again. A blank profile opens on exactly that.
-		//
-		// location, not goto: every store in memory still holds the state of a
-		// workspace that no longer exists, and a full document load is the only way
-		// to be sure none of it survives.
-		location.href = resolve('/chat');
+		location.replace(panicWipeUrl(i18n.locale));
 	}
 }
 

@@ -24,6 +24,7 @@ const PREPARED_KEY = 'regeste:private-prepared-model';
 const CONSENTED_KEY = 'regeste:private-consented-model';
 const WLLAMA_CACHED_LOAD_IDLE_TIMEOUT_MS = 180_000;
 const WLLAMA_DOWNLOAD_IDLE_TIMEOUT_MS = 300_000;
+const WLLAMA_DOWNLOAD_START_TIMEOUT_MS = 30_000;
 /**
  * Benchmark harness only: run a named tier instead of the one this machine is
  * offered. Comparing two models is only a comparison if the model is pinned,
@@ -329,7 +330,8 @@ class LlmStore {
 							})
 						),
 					this.prepared ? WLLAMA_CACHED_LOAD_IDLE_TIMEOUT_MS : WLLAMA_DOWNLOAD_IDLE_TIMEOUT_MS,
-					resetWllamaWorker
+					resetWllamaWorker,
+					this.prepared ? WLLAMA_CACHED_LOAD_IDLE_TIMEOUT_MS : WLLAMA_DOWNLOAD_START_TIMEOUT_MS
 				);
 			}
 			localStorage.setItem(PREPARED_KEY, this.tier.model);

@@ -11,7 +11,8 @@ export class ActivityTimeoutError extends Error {
 export function withActivityTimeout<T>(
 	run: (activity: () => void) => Promise<T>,
 	timeoutMs: number,
-	onTimeout: () => void
+	onTimeout: () => void,
+	initialTimeoutMs = timeoutMs
 ): Promise<T> {
 	return new Promise<T>((resolve, reject) => {
 		let settled = false;
@@ -22,18 +23,21 @@ export function withActivityTimeout<T>(
 			clearTimeout(timer);
 			callback();
 		};
-		const timeout = () =>
+		const timeout = (elapsedMs: number) =>
 			finish(() => {
 				onTimeout();
-				reject(new ActivityTimeoutError(timeoutMs));
+				reject(new ActivityTimeoutError(elapsedMs));
 			});
 		const activity = () => {
 			if (settled) return;
 			clearTimeout(timer);
-			timer = setTimeout(timeout, timeoutMs);
+			timer = setTimeout(() => timeout(timeoutMs), timeoutMs);
 		};
 
-		activity();
+		// Starting a request is not progress. A separate, shorter first deadline
+		// keeps a download from sitting at an unmoving 0% while the long inactivity
+		// window still protects a genuinely slow multi-gigabyte transfer.
+		timer = setTimeout(() => timeout(initialTimeoutMs), initialTimeoutMs);
 		Promise.resolve()
 			.then(() => run(activity))
 			.then(

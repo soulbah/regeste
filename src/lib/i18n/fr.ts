@@ -587,6 +587,8 @@ export const fr: Record<keyof typeof en, string> = {
 	'menu.signIn': 'Se connecter',
 	'work.model.downloading.title': 'Téléchargement du modèle',
 	'work.model.downloading.body': 'Un seul téléchargement de {size}.',
+	'work.model.starting.title': 'Démarrage du téléchargement',
+	'work.model.starting.body': 'Cela peut prendre quelques secondes.',
 	'work.model.loading.title': 'Démarrage du modèle',
 	'work.model.loading.body': 'Le fichier est téléchargé, il se met en mémoire.',
 	'reindex.title': 'Relecture de vos documents',
@@ -687,6 +689,14 @@ export const fr: Record<keyof typeof en, string> = {
 	'settings.wipe.erasing': 'Effacement…',
 	'settings.wipe.confirm': 'Oui, tout effacer',
 	'settings.wipe.continue': 'Continuer',
+	'settings.wipe.progress.title': 'Effacement des données locales',
+	'settings.wipe.progress.stopping': 'Arrêt des opérations en cours.',
+	'settings.wipe.progress.clearing':
+		'Suppression des documents, discussions, index et téléchargements.',
+	'settings.wipe.progress.finishing': 'Dernière étape, cette page va se recharger.',
+	'settings.wipe.progress.failed':
+		'Le navigateur n’a pas terminé. Fermez les autres onglets, puis réessayez.',
+	'settings.wipe.progress.retry': 'Réessayer',
 
 	// Privacy Report
 	'privacy.title': 'Rapport de confidentialité',

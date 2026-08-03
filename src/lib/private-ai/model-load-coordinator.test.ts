@@ -104,4 +104,36 @@ describe('ModelLoadCoordinator', () => {
 		await Promise.all([unload, second]);
 		expect(order).toEqual(['a:start', 'a:end', 'unload:start', 'unload:end', 'b:start']);
 	});
+
+	it('cancels an active load before waiting and keeps the next load behind cleanup', async () => {
+		const coordinator = new ModelLoadCoordinator<number>();
+		const cancelled = deferred();
+		const order: string[] = [];
+		const first = coordinator.run(
+			'model-a',
+			() => {},
+			async () => {
+				order.push('a:start');
+				await cancelled.promise;
+				order.push('a:cancelled');
+				throw new Error('cancelled');
+			}
+		);
+		await Promise.resolve();
+		const cancel = coordinator.cancelAndRunExclusive(async () => {
+			order.push('cancel:start');
+			cancelled.resolve();
+		});
+		const second = coordinator.run(
+			'model-b',
+			() => {},
+			async () => {
+				order.push('b:start');
+			}
+		);
+
+		await expect(first).rejects.toThrow('cancelled');
+		await Promise.all([cancel, second]);
+		expect(order).toEqual(['a:start', 'cancel:start', 'a:cancelled', 'b:start']);
+	});
 });

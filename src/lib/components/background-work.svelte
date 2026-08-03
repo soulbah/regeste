@@ -30,11 +30,17 @@
 	const jobs = $derived.by<Job[]>(() => {
 		const rows: Job[] = [];
 		if (llmStore.status === 'downloading') {
+			const started = llmStore.progress > 0;
 			rows.push({
 				id: 'model-download',
-				title: t('work.model.downloading.title'),
-				body: t('work.model.downloading.body', { size: llmStore.downloadLabel }),
-				percent: Math.round(llmStore.progress * 100)
+				title: t(started ? 'work.model.downloading.title' : 'work.model.starting.title'),
+				body: started
+					? t('work.model.downloading.body', { size: llmStore.downloadLabel })
+					: t('work.model.starting.body'),
+				// Before the first measured byte, 0% is not progress. A moving
+				// indicator tells the truth while the service worker and model manifest
+				// start; the numerical bar appears only when WebLLM reports a number.
+				percent: started ? Math.round(llmStore.progress * 100) : null
 			});
 		} else if (llmStore.status === 'loading') {
 			// No percentage here on purpose: the engine reports none for this

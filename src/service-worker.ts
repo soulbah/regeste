@@ -4,7 +4,7 @@
 /// <reference types="@sveltejs/kit" />
 
 import { build, files, version } from '$service-worker';
-import { CreateMLCEngine, type MLCEngineInterface } from '@mlc-ai/web-llm';
+import { MLCEngine, type MLCEngineInterface } from '@mlc-ai/web-llm';
 import { proxiedAppConfig } from '$lib/private-ai/webllm-config';
 import { isShellCache, shellCacheName } from '$lib/pwa/cache-names';
 import { APP_SCOPE, isAppNavigation, isMarketingAsset } from '$lib/pwa/sw-routing';
@@ -160,18 +160,30 @@ async function load(
 				return;
 			}
 			if (!engine) {
-				const created = await CreateMLCEngine(model, {
+				// Keep the engine handle before reload starts. MLCEngine.unload() aborts
+				// its reload controller, but CreateMLCEngine only returns the handle after
+				// every shard has arrived. The old shape made a panic wipe wait for a
+				// multi-gigabyte download it was trying to delete.
+				const created = new MLCEngine({
 					appConfig: proxiedAppConfig(sw.location.origin),
 					initProgressCallback: onProgress
 				});
+				engine = created;
+				try {
+					await created.reload(model);
+				} catch (error) {
+					if (engine === created) engine = null;
+					throw error;
+				}
 				if (generation !== loadGeneration) {
+					if (engine === created) engine = null;
 					await created.unload();
 					throw new Error('model load cancelled');
 				}
-				engine = created;
 			} else {
-				engine.setInitProgressCallback(onProgress);
-				await engine.reload(model);
+				const current = engine;
+				current.setInitProgressCallback(onProgress);
+				await current.reload(model);
 				if (generation !== loadGeneration) throw new Error('model load cancelled');
 			}
 			loadedModel = model;
@@ -181,10 +193,13 @@ async function load(
 
 async function unload(): Promise<void> {
 	loadGeneration++;
-	await modelLoads.runExclusive(async () => {
+	await modelLoads.cancelAndRunExclusive(async () => {
 		const current = engine;
 		engine = null;
 		loadedModel = null;
+		// This now aborts reload immediately because load() publishes the engine
+		// handle before the first fetch. The coordinator then drains the rejected
+		// flight before allowing another model to start.
 		await current?.unload();
 	});
 }

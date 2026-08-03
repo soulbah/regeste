@@ -89,4 +89,30 @@ export class ModelLoadCoordinator<T> {
 			return;
 		}
 	}
+
+	/** Block new loads, cancel the active one, then wait until its promise has
+	 * observed that cancellation. Unlike runExclusive(), cancellation must run
+	 * before draining: a multi-gigabyte fetch cannot finish merely so it may be
+	 * erased afterwards. */
+	async cancelAndRunExclusive(cancel: () => Promise<void>): Promise<void> {
+		for (;;) {
+			if (this.exclusiveGate) {
+				await this.exclusiveGate.catch(() => undefined);
+				continue;
+			}
+			let release!: () => void;
+			const gate = new Promise<void>((resolve) => {
+				release = resolve;
+			});
+			this.exclusiveGate = gate;
+			try {
+				await cancel();
+				await this.waitForIdle();
+			} finally {
+				if (this.exclusiveGate === gate) this.exclusiveGate = null;
+				release();
+			}
+			return;
+		}
+	}
 }

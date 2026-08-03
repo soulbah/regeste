@@ -11,6 +11,7 @@ import { ActivityTimeoutError, withActivityTimeout } from './activity-timeout';
 
 const CACHED_LOAD_IDLE_TIMEOUT_MS = 60_000;
 const DOWNLOAD_IDLE_TIMEOUT_MS = 180_000;
+const DOWNLOAD_START_TIMEOUT_MS = 30_000;
 const GENERATION_IDLE_TIMEOUT_MS = 180_000;
 
 export interface WebLlmLoadOptions {
@@ -29,6 +30,7 @@ export interface WebLlmClient {
 		options?: GenerationOptions
 	): Promise<GenerationResult>;
 	abort(): Promise<void>;
+	unload(): Promise<void>;
 }
 
 type WorkerResponse =
@@ -109,7 +111,7 @@ function installListener(): void {
 }
 
 function serviceRequest<T>(
-	kind: 'load' | 'generate' | 'abort' | 'ping',
+	kind: 'load' | 'generate' | 'abort' | 'ping' | 'unload',
 	payload: Record<string, unknown>,
 	callbacks: Pick<ServiceRequest<T>, 'onProgress' | 'onDelta'> = {},
 	timeoutMs?: number
@@ -175,7 +177,8 @@ async function waitForController(timeoutMs = 2000): Promise<boolean> {
 async function loadService(
 	model: string,
 	onProgress: ((progress: number, text: string) => void) | undefined,
-	idleTimeoutMs: number
+	idleTimeoutMs: number,
+	initialTimeoutMs = idleTimeoutMs
 ): Promise<boolean> {
 	if (!(await waitForController())) return false;
 	// Establish worker identity before the long model load. The heartbeat then
@@ -198,7 +201,8 @@ async function loadService(
 		() => {
 			controlService('unload');
 			invalidateServiceClient();
-		}
+		},
+		initialTimeoutMs
 	);
 	serviceModel = model;
 	startHeartbeat();
@@ -208,7 +212,8 @@ async function loadService(
 async function loadDedicated(
 	model: string,
 	onProgress: ((progress: number, text: string) => void) | undefined,
-	idleTimeoutMs: number
+	idleTimeoutMs: number,
+	initialTimeoutMs = idleTimeoutMs
 ): Promise<void> {
 	await withActivityTimeout(
 		(activity) =>
@@ -220,7 +225,8 @@ async function loadDedicated(
 				})
 			),
 		idleTimeoutMs,
-		resetDedicatedClient
+		resetDedicatedClient,
+		initialTimeoutMs
 	);
 	dedicatedModel = model;
 	serviceModel = null;
@@ -294,13 +300,16 @@ async function generateService(
 export const webLlmClient: WebLlmClient = {
 	async load(model, onProgress, options = {}) {
 		const idleTimeoutMs = options.prepared ? CACHED_LOAD_IDLE_TIMEOUT_MS : DOWNLOAD_IDLE_TIMEOUT_MS;
+		const initialTimeoutMs = options.prepared
+			? CACHED_LOAD_IDLE_TIMEOUT_MS
+			: DOWNLOAD_START_TIMEOUT_MS;
 		requestedModel = model;
 		serviceModel = null;
 		stopHeartbeat();
 		resetDedicatedClient();
 		for (let attempt = 0; attempt < 2; attempt++) {
 			try {
-				if (await loadService(model, onProgress, idleTimeoutMs)) return;
+				if (await loadService(model, onProgress, idleTimeoutMs, initialTimeoutMs)) return;
 				break;
 			} catch (error) {
 				if (attempt === 0 && String(error).includes(SERVICE_WORKER_RESTARTED)) continue;
@@ -310,7 +319,7 @@ export const webLlmClient: WebLlmClient = {
 		}
 		serviceModel = null;
 		stopHeartbeat();
-		await loadDedicated(model, onProgress, idleTimeoutMs);
+		await loadDedicated(model, onProgress, idleTimeoutMs, initialTimeoutMs);
 	},
 
 	async generate(messages, onDelta, options = { reasoning: 'off', maxTokens: 320 }) {
@@ -330,5 +339,18 @@ export const webLlmClient: WebLlmClient = {
 	async abort() {
 		if (serviceModel) await serviceRequest<void>('abort', {});
 		else if (dedicatedModel) await dedicatedClient().abort();
+	},
+
+	async unload() {
+		requestedModel = null;
+		serviceModel = null;
+		stopHeartbeat();
+		resetDedicatedClient();
+		if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) return;
+		try {
+			await serviceRequest<void>('unload', {}, {}, 10_000);
+		} finally {
+			invalidateServiceClient();
+		}
 	}
 };

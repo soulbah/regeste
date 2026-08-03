@@ -25,8 +25,15 @@
 	import { sessionStore } from '$lib/state/session.svelte';
 	import { settingsStore } from '$lib/state/settings.svelte';
 	import { viewerStore } from '$lib/state/viewer.svelte';
+	import PanicWipeScreen from '$lib/components/panic-wipe-screen.svelte';
+	import { panicWipeContext } from '$lib/panic-wipe';
 
 	let { children } = $props();
+	const wipeContext = browser
+		? panicWipeContext(new URL(window.location.href))
+		: { active: false, locale: 'en' as const };
+	const panicWipe = wipeContext.active;
+	if (panicWipe) i18n.locale = wipeContext.locale;
 
 	// On routes with a contextual panel (chat, documents), the viewer rides that
 	// panel. Elsewhere the right pane doesn't exist, so ⌘K document results open
@@ -45,7 +52,7 @@
 	// person, not only the console. Known failures have their own surfaces; this
 	// catches the ones nothing anticipated.
 	$effect(() => {
-		if (browser) installErrorFunnel();
+		if (browser && !panicWipe) installErrorFunnel();
 	});
 
 	// Two ways the local database can refuse to open, and they need different
@@ -93,6 +100,7 @@
 	// src/routes/(marketing), and they were booting the database to render prose.
 	let dbBooted = false;
 	$effect(() => {
+		if (panicWipe) return;
 		if (isMarketingPage(page.url.pathname)) {
 			// No language detection here: the marketing pages carry their language in the
 			// path and set it themselves before rendering. Guessing from navigator.language
@@ -116,6 +124,7 @@
 	// a persistent Service Worker, and any worker left over from a previous
 	// build on this localhost port is torn down below.
 	$effect(() => {
+		if (panicWipe) return;
 		if (!('serviceWorker' in navigator)) return;
 		if (dev) {
 			void (async () => {
@@ -153,7 +162,7 @@
 	// but not denials, so this is cheap, and calling too early races the
 	// installed-app registry and silently skips the installed-PWA grant path.
 	$effect(() => {
-		if (!browser) return;
+		if (!browser || panicWipe) return;
 		const timer = setTimeout(() => void pwaStore.ensurePersisted(), 3000);
 		return () => clearTimeout(timer);
 	});
@@ -163,6 +172,7 @@
 	// document is not part of the chat currently on screen).
 	const prevStatuses = new SvelteMap<string, string>();
 	$effect(() => {
+		if (panicWipe) return;
 		const visibleIds = new Set(chatsStore.chatDocuments.map((d) => d.id));
 		const onDocumentsPage = page.url.pathname === '/chat/documents';
 		for (const doc of documentsStore.documents) {
@@ -182,6 +192,7 @@
 
 	// Keep the active chat's document panel live while ingestion progresses.
 	$effect(() => {
+		if (panicWipe) return;
 		void documentsStore.documents;
 		chatsStore.refreshChatDocuments();
 	});
@@ -189,6 +200,7 @@
 
 <svelte:window
 	onkeydown={(e) => {
+		if (panicWipe) return;
 		if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
 			e.preventDefault();
 			searchStore.toggle();
@@ -217,8 +229,12 @@
      belong to the (app) group: a sign-in screen must not carry the chrome of
      the application it is the door to. -->
 <ModeWatcher defaultMode="system" />
-<ReportProblemDialog bind:open={uiStore.reportOpen} />
-<Toaster position="bottom-right" />
-<WorkerFailureNotice />
+{#if panicWipe}
+	<PanicWipeScreen />
+{:else}
+	<ReportProblemDialog bind:open={uiStore.reportOpen} />
+	<Toaster position="bottom-right" />
+	<WorkerFailureNotice />
 
-{@render children()}
+	{@render children()}
+{/if}
