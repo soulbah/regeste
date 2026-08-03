@@ -298,7 +298,11 @@ sw.addEventListener('fetch', (event: FetchEvent) => {
 sw.addEventListener('message', (event: ExtendableMessageEvent) => {
 	// Declared before the regeste-llm guard so the inference protocol is untouched.
 	if ((event.data as { source?: string } | null)?.source === 'regeste-pwa') {
-		if ((event.data as { kind?: string }).kind === 'skip-waiting') void sw.skipWaiting();
+		// Message handlers do not stay alive for an unobserved promise. Without
+		// waitUntil(), Chromium could terminate this waiting worker before activation,
+		// leaving the visible "Reload" action on the old shell indefinitely.
+		if ((event.data as { kind?: string }).kind === 'skip-waiting')
+			event.waitUntil(sw.skipWaiting());
 		return;
 	}
 	const message = event.data as RequestMessage;
