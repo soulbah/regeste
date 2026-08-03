@@ -1,3 +1,5 @@
+import { evidenceText } from '$lib/pipeline/evidence-text';
+
 export interface AssistedExcerpt {
 	text: string;
 	label: string;
@@ -15,6 +17,7 @@ export interface AssistedExcerpt {
 export function buildAssistedExcerpts(
 	hits: Array<{
 		text: string;
+		structuralContext?: string | null;
 		documentId: string;
 		page?: number | null;
 		headingPath?: string | null;
@@ -32,7 +35,7 @@ export function buildAssistedExcerpts(
 			: hit.headingPath
 				? ` · ${hit.headingPath}`
 				: '';
-		return { text: hit.text, label: `${name}${locator}` };
+		return { text: evidenceText(hit), label: `${name}${locator}` };
 	});
 }
 

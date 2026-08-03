@@ -62,7 +62,7 @@ const FOOTER_BAND = 0.14;
  *  a detector pass for its page numbers. */
 const FOOTER_BAND_MIN_CHARS = 120;
 /** An amount, as a token shape (see .claude/rules/nlp.md: shapes stay). */
-const AMOUNT_SHAPE = /\d[\d\s.,]*\s*(?:€|%)|\b(?:gratuit|offert|n[ée]ant)\b/iu;
+const AMOUNT_SHAPE = /\d[\d\s.,]*\s*(?:€|%)/u;
 const AMOUNT_MIN_COUNT = 4;
 
 /**

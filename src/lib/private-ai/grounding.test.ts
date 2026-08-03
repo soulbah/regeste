@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { canonicalNumbers, numericValues } from '$lib/numbers';
 import { checkNumericGrounding } from './grounding';
 
 describe('checkNumericGrounding', () => {
@@ -78,6 +79,15 @@ describe('checkNumericGrounding', () => {
 		expect(
 			checkNumericGrounding('La différence est de 2 700 € (3 000 € - 300 €).', ceilings).grounded
 		).toBe(true);
+	});
+
+	it('accepts a derived percentage change over grouped table integers', () => {
+		const evidence = ['Total assets 6,420,536 6,887,265'];
+		expect(canonicalNumbers(evidence[0])).toEqual(['6420536', '6887265']);
+		expect(numericValues(evidence[0])).toEqual([6420536, 6887265]);
+		const answer =
+			'Le total passe de 6,887,265 à 6,420,536 : l’écart est de −466 729, soit −6,78 %.';
+		expect(checkNumericGrounding(answer, evidence)).toEqual({ unsupported: [], grounded: true });
 	});
 
 	it('refuses arithmetic that does not come out', () => {

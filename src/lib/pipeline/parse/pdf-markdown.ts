@@ -17,9 +17,10 @@
 // So the markdown is kept per page, only where it is doing the thing it wins
 // at: binding values to labels.
 
-/** Amounts, percentages, and the words a French tariff uses instead of a number. */
-const VALUE_CELL =
-	/^\s*(?:[*_`]*\s*)?(?:\d{1,3}(?:[\u00a0\u202f\u2009 ]\d{3})*(?:,\d{1,2})?\s?(?:€|%)|gratuit|offert|n[ée]ant|inclus|nous consulter|frais r[ée]els)/i;
+/** A typed numeric cell: amounts, dates, percentages, measurements and table
+ * quantities all start with a number. Units stay open-ended so routing never
+ * needs a document- or language-specific vocabulary. */
+const VALUE_CELL = /^\s*(?:[*_`]*\s*)?(?:[<>≤≥~≈]\s*)?\d(?:[\d\s.,]*\d)?(?:\s|$)/u;
 
 function cellsOf(line: string): string[] {
 	return line
@@ -47,7 +48,7 @@ export function bindsAValue(line: string): boolean {
 export function shouldUseMarkdown(markdown: string): boolean {
 	const rows = markdown.split('\n').filter((line) => line.includes('|'));
 	if (!rows.length) return false;
-	return rows.filter(bindsAValue).length * 4 >= rows.length;
+	return rows.filter(bindsAValue).length * 5 >= rows.length;
 }
 
 /**

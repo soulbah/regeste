@@ -28,6 +28,7 @@ export const NUMBER_RUN = new RegExp(
 	[
 		String.raw`\d{1,4}[./-]\d{1,2}[./-]\d{2,4}`, // 05.11.2025, 12/03/1994
 		String.raw`\d{1,2}[:h]\d{2}`, // 09:30, 9h30
+		String.raw`\d{1,3}(?:,\d{3}){2,}`, // 6,420,536 (unambiguous grouped integer)
 		String.raw`\d{1,3}(?:${THOUSANDS_SEPARATOR}\d{3})*[.,]\d+`, // 14 949,07 and 69,39
 		String.raw`\d{1,4}(?:${THOUSANDS_SEPARATOR}\d{3})+`, // 0801 840 506 and 15 000
 		String.raw`\d+`
@@ -53,6 +54,7 @@ export function isDateOrTime(run: string): boolean {
  */
 export function canonicalNumber(run: string): string {
 	if (DATE_OR_TIME.test(run)) return run.replace(/\D/gu, '');
+	if (/^\d{1,3}(?:,\d{3}){2,}$/u.test(run)) return run.replace(/\D/gu, '');
 	const decimal = /^(.*)[.,](\d+)$/u.exec(run);
 	if (!decimal) return run.replace(/\D/gu, '');
 	const fraction = decimal[2].replace(/0+$/u, '');

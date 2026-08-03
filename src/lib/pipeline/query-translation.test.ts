@@ -55,6 +55,10 @@ describe('crossLingualQueryVariants', () => {
 		await expect(
 			localRetrievalQueryVariants('Quand commence la couverture ?', ['fr', 'en'], rewrite)
 		).resolves.toEqual(['prise effet garanties date heure', 'policy effective date time']);
+		expect(rewrite.mock.calls[0][0][0].content).toContain(
+			'first query must be a faithful English translation of the whole question'
+		);
+		expect(rewrite.mock.calls[0][0][0].content).toContain('queries in English');
 		expect(rewrite).toHaveBeenCalledOnce();
 	});
 
@@ -103,6 +107,75 @@ describe('crossLingualQueryVariants', () => {
 		expect(retrieve).toHaveBeenCalledOnce();
 		expect(retrieve).toHaveBeenCalledWith([]);
 		expect(rewrite).not.toHaveBeenCalled();
+	});
+
+	it('decomposes a multi-part French question over an English document', async () => {
+		const primary = [hit(1, 'Maximum Thrust | SLS Block 2: 9.5 M lbs.')];
+		const fallback = [
+			...primary,
+			hit(
+				2,
+				'The final SLS configuration, Block 2, will provide 9.4 million lbs. of launch thrust.'
+			)
+		];
+		const retrieve = vi.fn().mockResolvedValueOnce(primary).mockResolvedValueOnce(fallback);
+		const rewrite = vi
+			.fn()
+			.mockResolvedValue(
+				'Block 2 maximum thrust in narrative text\nBlock 2 maximum thrust comparison table'
+			);
+
+		await expect(
+			retrieveWithLocalQueryFallback({
+				query:
+					'Le document donne-t-il une seule valeur pour le Block 2 ? Compare le texte et le tableau.',
+				documentLanguages: ['en'],
+				rewrite,
+				retrieve
+			})
+		).resolves.toEqual({
+			hits: fallback,
+			alternateQueries: [
+				'Block 2 maximum thrust in narrative text',
+				'Block 2 maximum thrust comparison table'
+			]
+		});
+		expect(rewrite).toHaveBeenCalledOnce();
+	});
+
+	it('falls back to dedicated translation when broad rewriting returns nothing', async () => {
+		const primary = [hit(1, 'Maximum Thrust | SLS Block 2: 9.5 M lbs.')];
+		const fallback = [
+			...primary,
+			hit(
+				2,
+				'The final SLS configuration, Block 2, will provide 9.4 million lbs. of launch thrust.'
+			)
+		];
+		const question =
+			'Le document donne-t-il une seule valeur pour le Block 2 ? Compare le texte et le tableau.';
+		const rewrite = vi
+			.fn()
+			.mockResolvedValueOnce(question)
+			.mockResolvedValueOnce(
+				'Does the document give only one value for Block 2? Compare the narrative text and the table.'
+			);
+		const retrieve = vi.fn().mockResolvedValueOnce(primary).mockResolvedValueOnce(fallback);
+
+		await expect(
+			retrieveWithLocalQueryFallback({
+				query: question,
+				documentLanguages: ['en'],
+				rewrite,
+				retrieve
+			})
+		).resolves.toEqual({
+			hits: fallback,
+			alternateQueries: [
+				'Does the document give only one value for Block 2? Compare the narrative text and the table.'
+			]
+		});
+		expect(rewrite).toHaveBeenCalledTimes(2);
 	});
 
 	it('requires direct concept evidence for each substantive multi-part clause', () => {

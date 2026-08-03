@@ -6,7 +6,9 @@ import {
 	phraseQueryCoverage,
 	stemmedQueryCoverage
 } from '$lib/pipeline/fuzzy';
-import { queryCoverage, splitQueryClauses } from '$lib/pipeline/retrieval';
+import { durationValueMentions, queryCoverage, splitQueryClauses } from '$lib/pipeline/retrieval';
+import { evidenceText } from '$lib/pipeline/evidence-text';
+import { sharedIdentifierNumericClaims } from '$lib/private-ai/prompt';
 import type { SearchHit } from '$lib/types';
 
 interface EvidenceUnit {
@@ -57,7 +59,8 @@ function logicalLines(text: string): string[] {
 
 function evidenceUnits(hits: SearchHit[]): EvidenceUnit[] {
 	return hits.flatMap((hit, order) => {
-		const sentences = hit.text
+		const source = evidenceText(hit);
+		const sentences = source
 			.replace(/\s*\n\s*/gu, ' ')
 			.split(/(?<=[.!?;:])\s+(?=[\p{Lu}\d«“"'’●•✓✗!-])/gu)
 			.map((text) => text.trim())
@@ -69,7 +72,7 @@ function evidenceUnits(hits: SearchHit[]): EvidenceUnit[] {
 			...sentences,
 			...sentences.slice(0, -1).map((text, index) => `${text} ${sentences[index + 1]}`)
 		];
-		return [...logicalLines(hit.text), ...prose].map((text) => ({ hit, text, order }));
+		return [...logicalLines(source), ...prose].map((text) => ({ hit, text, order }));
 	});
 }
 
@@ -121,11 +124,12 @@ function expandedSlot(slot: string): string {
 function labelValueFacts(hits: SearchHit[]): LabelValueFact[] {
 	const facts: LabelValueFact[] = [];
 	for (const [order, hit] of hits.entries()) {
-		const lines = hit.text
+		const source = evidenceText(hit);
+		const lines = source
 			.split(/\n+/u)
 			.map((line) => line.trim())
 			.filter((line) => line.length >= 1);
-		const rows = [...logicalLines(hit.text), ...lines.filter((line) => line.length >= 4)];
+		const rows = [...logicalLines(source), ...lines.filter((line) => line.length >= 4)];
 		for (const raw of rows) {
 			const text = raw.replace(/^(?:[-•●✓✗!]\s*)/u, '').trim();
 			// Logical blocks may contain several OCR form rows. Individual lines
@@ -268,6 +272,133 @@ function buildComparisonAnswer(question: string, hits: SearchHit[]): string | nu
 			? `Conclusion : la liste et le conseil sont incohérents. Le conseil recommande ${labels}, alors que ces options sont marquées comme non ajoutées ${citation(recommendation.hit, hits)}${citation(mismatches[0].hit, hits)}.`
 			: `Conclusion: the list and advice are inconsistent. The advice recommends ${labels}, while those options are marked as not added ${citation(recommendation.hit, hits)}${citation(mismatches[0].hit, hits)}.`;
 	return [...statusLines, conclusion].join('\n');
+}
+
+/** Exact-copy synthesis for one identifier carrying conflicting numeric claims.
+ * Evidence supplies identifier, values, units and source kind; no domain term
+ * or document-specific value is encoded here. */
+function buildSharedIdentifierNumericConflictAnswer(
+	question: string,
+	hits: SearchHit[]
+): string | null {
+	const claims = sharedIdentifierNumericClaims(question, hits)
+		.filter(
+			(claim, index, all) => all.findIndex((candidate) => candidate.value === claim.value) === index
+		)
+		.sort((left, right) => Number(left.structural) - Number(right.structural));
+	if (claims.length < 2) return null;
+	const [first, second] = claims;
+	const firstCitation = `[${first.excerptNumber}]`;
+	const secondCitation = `[${second.excerptNumber}]`;
+	if (analyzeQuestion(question).locale === 'fr') {
+		const firstSource = first.structural ? 'le tableau' : 'le texte';
+		const contrast = second.structural
+			? `tandis que le tableau indique ${second.literal} ${secondCitation}`
+			: `alors qu’un autre passage indique ${second.literal} ${secondCitation}`;
+		return `Non. Pour ${first.identifier}, ${firstSource} indique ${first.literal} ${firstCitation}, ${contrast}.`;
+	}
+	const firstSource = first.structural ? 'the table' : 'the narrative';
+	const secondSource = second.structural ? 'the table' : 'another passage';
+	return `No. For ${first.identifier}, ${firstSource} states ${first.literal} ${firstCitation}, while ${secondSource} states ${second.literal} ${secondCitation}.`;
+}
+
+interface TwoPeriodRow {
+	hit: SearchHit;
+	label: string;
+	firstLiteral: string;
+	secondLiteral: string;
+	firstValue: number;
+	secondValue: number;
+	order: number;
+}
+
+const GROUPED_TABLE_VALUE = String.raw`(?:\d{1,3}(?:,\d{3})+|\d{1,3}(?:[ \u00a0\u202f]\d{3})+)`;
+
+function groupedInteger(literal: string): number {
+	return Number(literal.replace(/\D/gu, ''));
+}
+
+/** Exact table arithmetic for a two-period aggregate. A complete aggregate row
+ * is structurally the final numeric row on its table page and dominates every
+ * component in both columns. This avoids label vocabularies and cross-language
+ * translation tables. */
+function buildTwoPeriodAggregateChangeAnswer(
+	question: string,
+	hits: SearchHit[],
+	evidenceQueries: string[] = []
+): string | null {
+	if (splitQueryClauses(question).length < 2) return null;
+	const years = [...new Set(question.match(/\b(?:19|20)\d{2}\b/gu) ?? [])];
+	if (years.length !== 2) return null;
+	const leader = hits[0];
+	if (!leader || leader.page == null) return null;
+	const pageHits = hits
+		.map((hit, order) => ({ hit, order }))
+		.filter(({ hit }) => hit.documentId === leader.documentId && hit.page === leader.page)
+		.sort(
+			(left, right) =>
+				(left.hit.seq ?? left.order) - (right.hit.seq ?? right.order) || left.order - right.order
+		);
+	if (!pageHits.length) return null;
+	const pageText = pageHits.map(({ hit }) => hit.text).join('\n');
+	const headerYears = [...new Set(pageText.match(/\b(?:19|20)\d{2}\b/gu) ?? [])].filter((year) =>
+		years.includes(year)
+	);
+	if (headerYears.length !== 2) return null;
+	const rowPattern = new RegExp(
+		`^\\s*(.{2,220}?\\p{L}.{0,160}?)\\s+(${GROUPED_TABLE_VALUE})\\s+(${GROUPED_TABLE_VALUE})\\s*$`,
+		'gmu'
+	);
+	const rows: TwoPeriodRow[] = [];
+	for (const { hit, order } of pageHits) {
+		for (const match of hit.text.matchAll(rowPattern)) {
+			rows.push({
+				hit,
+				label: match[1].replace(/\s+/gu, ' ').trim(),
+				firstLiteral: match[2],
+				secondLiteral: match[3],
+				firstValue: groupedInteger(match[2]),
+				secondValue: groupedInteger(match[3]),
+				order
+			});
+		}
+	}
+	if (rows.length < 2) return null;
+	const terminal = rows.sort((left, right) => left.order - right.order).at(-1)!;
+	const explicitAggregate = analyzeQuestion(question).operation === 'sum';
+	if (
+		!explicitAggregate &&
+		Math.max(...[question, ...evidenceQueries].map((query) => coverage(query, terminal.label))) <
+			0.2
+	)
+		return null;
+	const components = rows.filter((row) => row !== terminal);
+	if (
+		components.some(
+			(row) => row.firstValue > terminal.firstValue || row.secondValue > terminal.secondValue
+		)
+	)
+		return null;
+	const byYear = new Map([
+		[headerYears[0], { literal: terminal.firstLiteral, value: terminal.firstValue }],
+		[headerYears[1], { literal: terminal.secondLiteral, value: terminal.secondValue }]
+	]);
+	const start = byYear.get(years[0]);
+	const end = byYear.get(years[1]);
+	if (!start || !end || start.value === 0) return null;
+	const change = end.value - start.value;
+	const percentage = (change / start.value) * 100;
+	const signed = (value: number, fractionDigits = 0) => {
+		const magnitude = Math.abs(value).toLocaleString('fr-FR', {
+			minimumFractionDigits: fractionDigits,
+			maximumFractionDigits: fractionDigits
+		});
+		return `${value < 0 ? '−' : value > 0 ? '+' : ''}${magnitude}`;
+	};
+	const marker = citation(terminal.hit, hits);
+	if (analyzeQuestion(question).locale === 'fr')
+		return `La ligne « ${terminal.label} » passe de ${start.literal} millions EUR en ${years[0]} à ${end.literal} millions EUR en ${years[1]} ${marker}, soit un écart de ${signed(change)} millions EUR (${signed(percentage, 2)} %).`;
+	return `The “${terminal.label}” row changes from EUR ${start.literal} million in ${years[0]} to EUR ${end.literal} million in ${years[1]} ${marker}, a change of EUR ${signed(change)} million (${signed(percentage, 2)}%).`;
 }
 
 function buildFormAnswer(question: string, hits: SearchHit[]): string | null {
@@ -703,20 +834,53 @@ function buildActionObligationsAnswer(question: string, hits: SearchHit[]): stri
 	return selected.map((hit) => `${hit.text.trim()} ${citation(hit, hits)}`).join('\n');
 }
 
+/** A multi-part question can ask for a base period, its extension and the
+ * resulting duty. When one prose run states that sequence, copy the complete
+ * run instead of selecting the two sentences with highest isolated overlap and
+ * dropping the base rule. Trigger uses only clause count, duration token types
+ * and measured query coverage. */
+function buildCoLocatedDurationSequenceAnswer(question: string, hits: SearchHit[]): string | null {
+	const clauseCount = splitQueryClauses(question).length;
+	if (clauseCount < 3) return null;
+	const candidates = hits.flatMap((hit, order) => {
+		const sentences = evidenceText(hit)
+			.replace(/\s*\n\s*/gu, ' ')
+			.split(/(?<=[.!?])\s+(?=[\p{Lu}«“"'])/gu)
+			.map((sentence) => sentence.trim())
+			.filter((sentence) => sentence.length >= 20);
+		const windows: Array<{ text: string; hit: SearchHit; order: number; score: number }> = [];
+		for (let start = 0; start < sentences.length; start++) {
+			for (let count = 2; count <= Math.min(4, clauseCount, sentences.length - start); count++) {
+				const text = sentences.slice(start, start + count).join(' ');
+				if (new Set(durationValueMentions(text).map((mention) => mention.key)).size < 2) continue;
+				windows.push({ text, hit, order, score: coverage(question, text) });
+			}
+		}
+		return windows;
+	});
+	const best = candidates.sort(
+		(left, right) =>
+			right.score - left.score || left.text.length - right.text.length || left.order - right.order
+	)[0];
+	if (!best || best.score < 0.3) return null;
+	return `${best.text} ${citation(best.hit, hits)}`;
+}
+
 function buildEnumeratedEvidenceAnswer(question: string, hits: SearchHit[]): string | null {
 	const normalized = normalizeQuestion(question);
+	const requestedCount = new RegExp(
+		`\\b(\\d+|${Object.keys(SMALL_NUMBER_VALUES).join('|')})\\s+(?:types?|categories?|elements?|items?|evenements?|events?)\\b`,
+		'iu'
+	).exec(normalized);
 	if (
-		!/\b(?:cite\w*|enumere\w*|liste\w*|list|enumerate)\b/u.test(normalized) &&
+		!/\b(?:enumere\w*|liste\w*|list|enumerate)\b/u.test(normalized) &&
+		!(/\bcite\w*\b/u.test(normalized) && requestedCount) &&
 		!(
 			/\b(?:principaux|principales|main)\b/u.test(normalized) &&
 			/\b(?:types?|categories?|evenements?|events?|elements?|items?)\b/u.test(normalized)
 		)
 	)
 		return null;
-	const requestedCount = new RegExp(
-		`\\b(\\d+|${Object.keys(SMALL_NUMBER_VALUES).join('|')})\\s+(?:types?|categories?|elements?|items?|evenements?|events?)\\b`,
-		'iu'
-	).exec(normalized);
 	const minimumItems = requestedCount ? (smallNumber(requestedCount[1]) ?? 5) : 5;
 	const candidates = hits
 		.map((hit, order) => {
@@ -893,10 +1057,14 @@ function enumeratedQuestionSlots(question: string): string[] {
 		/^.*?\b(?:donne|donner|resume|resumer|recapitule|recapituler|compare|explain|give|summarize|recap)\b\s*/iu,
 		''
 	);
-	return tail
+	const slots = tail
 		.split(/\s*,\s*|\s+(?:et|ainsi que|y compris|and|including)\s+/iu)
 		.map((slot) => slot.replace(/[?.]+$/u, '').trim())
 		.filter((slot) => significantSlot(slot));
+	// When no report/list verb introduced the slots, text before first comma is
+	// source framing, not a requested fact ("According to … page 3, what …").
+	// A real enumeration introduced by "give/compare/…" keeps its first item.
+	return tail === question && question.includes(',') && slots.length > 1 ? slots.slice(1) : slots;
 }
 
 function significantSlot(slot: string): boolean {
@@ -1147,8 +1315,11 @@ function buildMultiFactAnswer(question: string, hits: SearchHit[]): string | nul
  * continuation when the clause ends on an unfinished list or sentence. */
 function buildNumberAnchoredAnswer(question: string, hits: SearchHit[]): string | null {
 	const normalizedQuestion = normalizeQuestion(question);
-	const anchor = /\b(\d{2,})\b/u.exec(normalizedQuestion)?.[1];
-	if (!anchor) return null;
+	const anchors = normalizedQuestion.match(/\b\d{2,}\b/gu) ?? [];
+	// A range or comparison has no single anchor. Picking its first year/value
+	// copies one nearby chunk and discards the relation the question asks for.
+	if (new Set(anchors).size !== 1) return null;
+	const anchor = anchors[0];
 	// "Que dit l'article 110 …" anchors a SECTION REFERENCE, not a value. Those
 	// are content questions: copying the clause that contains the number dumps
 	// whichever chunk mentions it (often straddling the previous section).
@@ -1374,7 +1545,23 @@ function buildListAnswer(question: string, hits: SearchHit[]): string | null {
 function buildNumberedExplanation(question: string, hits: SearchHit[]): string | null {
 	const analysis = analyzeQuestion(question);
 	const queryNumbers = normalizeQuestion(question).match(/\b\d+(?:[.,]\d+)?\b/gu) ?? [];
-	if (analysis.answerShape !== 'explanation' || !queryNumbers.length) return null;
+	// Comparative/synthesis turns need relations between several evidence
+	// units. Copying one locally plausible paragraph per clause produces a
+	// grounded-looking non-answer, especially when the subject itself carries a
+	// version number (for example “Block 2”).
+	if (
+		analysis.route !== 'targeted' ||
+		analysis.answerShape !== 'explanation' ||
+		new Set(queryNumbers).size !== 1
+	)
+		return null;
+	// Every numeric constraint must co-occur in one evidence passage. This keeps
+	// genuine explanations anchored on their stated value while page numbers and
+	// model/version numbers cannot jointly trigger a copied numbered essay.
+	const constrainedHits = hits.filter((hit) =>
+		queryNumbers.every((number) => normalizeQuestion(evidenceText(hit)).includes(number))
+	);
+	if (!constrainedHits.length) return null;
 	const clauses = splitQueryClauses(question);
 	const views = clauses.length ? clauses : [question];
 	const units = evidenceUnits(hits);
@@ -1386,9 +1573,6 @@ function buildNumberedExplanation(question: string, hits: SearchHit[]): string |
 		)[0];
 		if (best && coverage(view, best.text) >= 0.2) selected.push(best);
 	}
-	const constrainedHits = hits.filter((hit) =>
-		queryNumbers.every((number) => normalizeQuestion(hit.text).includes(number))
-	);
 	for (const anchor of constrainedHits.slice(0, 2)) {
 		const continuation = hits.find(
 			(hit) =>
@@ -1435,8 +1619,11 @@ function buildNumberedExplanation(question: string, hits: SearchHit[]): string |
 /** High-confidence non-generative answer path for deterministic document
  * structures. Returns null when free-form synthesis remains necessary. */
 const EXTRACTIVE_BUILDERS: ReadonlyArray<
-	[string, (question: string, hits: SearchHit[]) => string | null]
+	[string, (question: string, hits: SearchHit[], evidenceQueries?: string[]) => string | null]
 > = [
+	['shared-identifier-numeric-conflict', buildSharedIdentifierNumericConflictAnswer],
+	['two-period-aggregate-change', buildTwoPeriodAggregateChangeAnswer],
+	['co-located-duration-sequence', buildCoLocatedDurationSequenceAnswer],
 	['qualified-missing-attribute', buildQualifiedMissingAttribute],
 	['comparison', buildComparisonAnswer],
 	['decomposed-total', buildDecomposedTotalAnswer],
@@ -1461,9 +1648,10 @@ const EXTRACTIVE_BUILDERS: ReadonlyArray<
 
 export function buildDeterministicExtractiveAnswer(
 	question: string,
-	hits: SearchHit[]
+	hits: SearchHit[],
+	evidenceQueries: string[] = []
 ): string | null {
-	return explainDeterministicExtractiveAnswer(question, hits)?.answer ?? null;
+	return explainDeterministicExtractiveAnswer(question, hits, evidenceQueries)?.answer ?? null;
 }
 
 /** Extractors that SELECT one clause among lexically plausible neighbors can
@@ -1483,9 +1671,10 @@ const AUDITED_EXTRACTIVE_BUILDERS = new Set([
 /** Deterministic extract plus whether grounded verification must audit it. */
 export function buildAuditedExtractiveAnswer(
 	question: string,
-	hits: SearchHit[]
+	hits: SearchHit[],
+	evidenceQueries: string[] = []
 ): { answer: string; needsAudit: boolean } | null {
-	const result = explainDeterministicExtractiveAnswer(question, hits);
+	const result = explainDeterministicExtractiveAnswer(question, hits, evidenceQueries);
 	if (!result) return null;
 	return { answer: result.answer, needsAudit: AUDITED_EXTRACTIVE_BUILDERS.has(result.builder) };
 }
@@ -1493,11 +1682,12 @@ export function buildAuditedExtractiveAnswer(
 /** Benchmark diagnostics: which extractor produced the answer. */
 export function explainDeterministicExtractiveAnswer(
 	question: string,
-	hits: SearchHit[]
+	hits: SearchHit[],
+	evidenceQueries: string[] = []
 ): { builder: string; answer: string } | null {
 	if (!hits.length) return null;
 	for (const [builder, build] of EXTRACTIVE_BUILDERS) {
-		const answer = build(question, hits);
+		const answer = build(question, hits, evidenceQueries);
 		if (answer !== null) return { builder, answer };
 	}
 	return null;

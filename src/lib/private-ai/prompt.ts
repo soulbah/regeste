@@ -9,12 +9,14 @@ import {
 	extractIdentifiers,
 	fuzzyQueryCoverage,
 	phraseQueryCoverage,
+	significantQueryTokens,
 	stemmedQueryCoverage
 } from '$lib/pipeline/fuzzy';
 import { normalizeQuestion } from '$lib/nlu/semantic-frame';
 import { isIdentityQuestion } from '$lib/pipeline/identity-evidence';
 import { isContestation } from '$lib/retrieval-context';
-import { canonicalNumbers } from '$lib/numbers';
+import { NUMBER_RUN, canonicalNumber, canonicalNumbers } from '$lib/numbers';
+import { evidenceText } from '$lib/pipeline/evidence-text';
 
 // A genuine directional change: "de 2018 à 2019", not the ubiquitous French
 // "de … à …" span (normalizeQuestion folds "à"→"a", which is also the verb).
@@ -146,11 +148,14 @@ function logicalEvidenceLines(text: string): string[] {
 export function buildEvidenceInventory(
 	question: string,
 	hits: SearchHit[],
-	citationNumbers: ReadonlyMap<number, number> | null = null
+	citationNumbers: ReadonlyMap<number, number> | null = null,
+	evidenceQueries: string[] = []
 ): string {
 	if (!hits.length) return '';
 	const parts = answerableClauses(question);
-	const queryViews = parts.length ? [question, ...parts] : [question];
+	const queryViews = parts.length
+		? [question, ...parts, ...evidenceQueries]
+		: [question, ...evidenceQueries];
 	const items: EvidenceInventoryItem[] = [];
 	const score = (text: string) =>
 		Math.max(
@@ -335,7 +340,7 @@ export function buildEvidenceInventory(
 			.join('');
 		return `- ${item.text} ${citations}`;
 	});
-	return `Structured evidence inventory (exact extractive facts; preserve labels and citations):\n${rows.join('\n')}`;
+	return `Internal evidence facts — use them silently; never reproduce this heading or list:\n${rows.join('\n')}`;
 }
 
 export const SYSTEM_PROMPT = `You are a careful assistant answering questions strictly from the numbered document excerpts provided.
@@ -353,7 +358,7 @@ Rules:
 - When asked what is covered, list covered events only; do not mix exclusions, causes that are not covered, or unrelated assistance services into the answer.
 - For a yes/no question about coverage, eligibility or permission, state the decisive limitation and any explicitly named option or condition that changes the answer. Never present an optional protection as part of the base coverage.
 - For requested actions or obligations, include every distinct relevant action in the excerpts, including required notices, evidence and deadlines.
-- When asked for a difference or comparison, state the concrete values and the numeric difference when it can be computed. Do not answer only "higher", "lower", or "consistent".
+- For a comparison, state each concrete value and the conclusion. Calculate a difference, percentage or formula only when the user asks for that calculation.
 - Use ONLY the excerpts. If they do not contain enough information, reply exactly: "I couldn't find enough information in the attached documents to answer this." (translated to the question's language) and nothing else.
 - Cite every factual statement with the excerpt number in square brackets, e.g. [1] or [2][3].
 - The bracketed numbers labeling each excerpt are reference labels added when assembling the excerpts. They are not part of any document: never report them as numbers, identifiers or values from the documents.
@@ -504,6 +509,8 @@ export function fitEvidenceToContext(
  */
 const CHECKLIST_SCAFFOLD =
 	/^[-*\s]*(?:requested subject|sujet demand|exact adjacent source label|libell[ée] (?:source )?adjacent|value|valeur|unit[ée]?|condition|exception|citation)\s*:/imu;
+const INTERNAL_EVIDENCE_SCAFFOLD =
+	/^\s*(?:Structured evidence inventory|Internal evidence facts)[^:\n]*:/iu;
 
 /** Lines an answer repeats verbatim. A model that loops emits the same row over
  * and over; genuine prose repeats a whole line essentially never. */
@@ -565,6 +572,7 @@ export function isDegenerateAnswer(text: string): boolean {
 	const visible = text.trim();
 	if (visible.length < 40 && !/\[\d{1,2}\]/.test(visible)) return true;
 	if (CHECKLIST_SCAFFOLD.test(visible)) return true;
+	if (INTERNAL_EVIDENCE_SCAFFOLD.test(visible)) return true;
 	return repeatedLineRatio(visible) >= 0.5;
 }
 
@@ -574,11 +582,38 @@ export function isDegenerateAnswer(text: string): boolean {
 export function verificationPreservesGrounding(
 	draft: string,
 	verified: string,
-	evidenceSufficient: boolean
+	evidenceSufficient: boolean,
+	question = ''
 ): boolean {
 	if (!evidenceSufficient) return true;
 	const citation = /\[\d{1,2}\]/u;
-	return !citation.test(draft) || citation.test(verified);
+	if (citation.test(draft) && !citation.test(verified)) return false;
+	if (!question) return true;
+	const normalizedDraft = normalizeQuestion(draft).replaceAll(' ', '');
+	const normalizedVerified = normalizeQuestion(verified).replaceAll(' ', '');
+	const typedIdentifiers = [
+		...extractIdentifiers(question),
+		...(question.match(/\b[A-Z][\p{L}-]{1,}\s+\d+[\p{L}]?\b/gu) ?? [])
+	];
+	if (
+		typedIdentifiers.some((identifier) => {
+			const normalizedIdentifier = normalizeQuestion(identifier).replaceAll(' ', '');
+			return (
+				normalizedDraft.includes(normalizedIdentifier) &&
+				!normalizedVerified.includes(normalizedIdentifier)
+			);
+		})
+	)
+		return false;
+	const clauses = answerableClauses(question).filter(
+		(clause) => significantQueryTokens(clause, 3).length >= 4
+	);
+	const coveredParts = (answer: string) =>
+		clauses.filter((clause) => citationGroundingCoverage(clause, answer) >= 0.25).length;
+	if (coveredParts(verified) < coveredParts(draft)) return false;
+	const draftCoverage = citationGroundingCoverage(question, draft);
+	const verifiedCoverage = citationGroundingCoverage(question, verified);
+	return draftCoverage < 0.2 || verifiedCoverage + 0.08 >= draftCoverage * 0.7;
 }
 
 /** Stop a direct factual stream once it already covers every coordinated
@@ -589,6 +624,20 @@ export function verificationPreservesGrounding(
  * from the same evidence after generation. */
 export function hasCompleteFactualAnswer(question: string, draft: string): boolean {
 	return completeFactualAnswerPrefix(question, draft) !== null;
+}
+
+/** Fraction of independently requested clauses that a draft addresses. Pure
+ * semantic/lexical coverage: used to make a selector abstain when it copied a
+ * relevant table but omitted a requested result. */
+export function answerClauseCoverageRatio(question: string, draft: string): number {
+	const clauses = answerableClauses(question).filter(
+		(clause) => significantQueryTokens(clause, 2).length >= 2
+	);
+	if (clauses.length < 2) return 1;
+	const covered = clauses.filter(
+		(clause) => citationGroundingCoverage(clause, draft) >= 0.15
+	).length;
+	return covered / clauses.length;
 }
 
 /** Reader-facing prefix proven complete even when one decoder delta already
@@ -764,7 +813,7 @@ export function buildVerificationPrompt(
 	const coverageContract = buildAnswerCoverageContract(question);
 	return `Audit and correct the draft against the excerpts. Return only the corrected answer in the question's language, with citations.
 Treat the draft as untrusted. Re-solve the question from the excerpts before comparing it with the draft. Output the corrected answer only: prose for the reader, no checklist, no headings, no field labels, no notes about your own process.
-Check every requested part, exact form/output identifiers, strict bounds and comparisons, start-to-end direction, operands, units and arithmetic. Bind each value to its exact adjacent source label and requested subject; when two similar labels exist, keep both labels distinct rather than silently choosing one. Reject document creation/signature/print timestamps when the question asks for a contract effective date, and reject values from neighboring categories. A duration cannot be replaced by a price, deductible or retention period for another subject. For every deadline, copy the exact starting event after "from"/"à compter de". For lists, rights, obligations, consequences and selected/excluded options, compare the draft item by item with every relevant bullet, continuation, or following subsection; restore omissions. When asked how a payment, entitlement or remedy works, include supported prerequisites, deadlines and proof requirements from adjacent excerpts. When asked what is covered, use the clause matching the exact scenario and remove unrelated exclusions or assistance services. For coverage questions, preserve the decisive limitation and any explicitly offered option. For requested actions, include relevant notices, evidence and deadlines. If a requested value is absent but a related status or condition is present, return a qualified answer containing both the known status and the explicit absence; do not give a generic refusal. If the premise is disproved by the excerpts, state the contradiction and the useful supported fact instead of giving a generic refusal. Check contradictions instead of smoothing them over. Never add unsupported facts.
+Check every requested part, exact form/output identifiers, strict bounds and comparisons, start-to-end direction, units and any arithmetic the user requested. Never add an unrequested formula or percentage. Bind each value to its exact adjacent source label and requested subject; when two similar labels exist, keep both labels distinct rather than silently choosing one. Reject document creation/signature/print timestamps when the question asks for a contract effective date, and reject values from neighboring categories. A duration cannot be replaced by a price, deductible or retention period for another subject. For every deadline, copy the exact starting event after "from"/"à compter de". For lists, rights, obligations, consequences and selected/excluded options, compare the draft item by item with every relevant bullet, continuation, or following subsection; restore omissions. When asked how a payment, entitlement or remedy works, include supported prerequisites, deadlines and proof requirements from adjacent excerpts. When asked what is covered, use the clause matching the exact scenario and remove unrelated exclusions or assistance services. For coverage questions, preserve the decisive limitation and any explicitly offered option. For requested actions, include relevant notices, evidence and deadlines. If a requested value is absent but a related status or condition is present, return a qualified answer containing both the known status and the explicit absence; do not give a generic refusal. If the premise is disproved by the excerpts, state the contradiction and the useful supported fact instead of giving a generic refusal. Check contradictions instead of smoothing them over. Never add unsupported facts.
 If two compared values are unequal or the computed difference is non-zero, the yes/no conclusion must be "no", never "yes".
 
 ${coverageContract}
@@ -786,7 +835,9 @@ export function enforceAnswerInvariants(question: string, text: string): string 
 	// small model copies the evidence scaffold after finishing its answer, keep
 	// only reader-facing prose. Stream completion normally stops before this;
 	// trimming is a last-resort boundary guard.
-	const leakedInventory = corrected.search(/\n+\s*Structured evidence inventory\s*:/iu);
+	const leakedInventory = corrected.search(
+		/(?:^|\n+)\s*(?:Structured evidence inventory|Internal evidence facts)[^:\n]*:/iu
+	);
 	if (leakedInventory >= 0) corrected = corrected.slice(0, leakedInventory).trimEnd();
 	// Some small decoders finish a natural answer, emit its citation, then start
 	// a field-style appendix (`[1]: value…`) copied from their own internal
@@ -916,19 +967,127 @@ export function withoutRepeatedSentences(text: string, seen: Set<string>): strin
 	return (kept.length ? kept : sentences.slice(0, 1)).join(' ').trim();
 }
 
+export interface SharedIdentifierNumericClaim {
+	identifier: string;
+	excerptNumber: number;
+	segment: string;
+	value: string;
+	literal: string;
+	structural: boolean;
+}
+
+function numericLiteral(segment: string, value: string): string {
+	for (const match of segment.matchAll(new RegExp(NUMBER_RUN.source, 'gu'))) {
+		if (canonicalNumber(match[0]) !== value) continue;
+		const suffix = segment
+			.slice((match.index ?? 0) + match[0].length)
+			.match(/^[\s-]*(?:[%€$£¥]|\p{L}[\p{L}.]*(?:[\s-]+\p{L}[\p{L}.]*){0,4})/u)?.[0];
+		return `${match[0]}${suffix ?? ''}`.trim().replace(/[.,;:]$/u, '');
+	}
+	return value;
+}
+
+/**
+ * Distinct numeric claims attached to the same identifier in separate excerpts.
+ *
+ * This is a token-type guard, not a vocabulary classifier: the identifier comes
+ * from the question, and the value is the first numeric token after that exact
+ * identifier within the same structural row or short prose span. It makes a
+ * real source contradiction explicit to a small decoder instead of letting it
+ * smooth two nearby figures into one.
+ */
+export function sharedIdentifierNumericClaims(
+	question: string,
+	hits: SearchHit[]
+): SharedIdentifierNumericClaim[] {
+	const identifiers = [
+		...extractIdentifiers(question),
+		...(question.match(/\b[A-Z][\p{L}-]{1,}\s+\d+[\p{L}]?\b/gu) ?? [])
+	].filter((identifier, index, all) => all.indexOf(identifier) === index);
+	for (const identifier of identifiers) {
+		const identifierValues = new Set(canonicalNumbers(identifier));
+		const claims: SharedIdentifierNumericClaim[] = [];
+		for (const [hitIndex, hit] of hits.entries()) {
+			const text = evidenceText(hit);
+			const upperText = text.toUpperCase();
+			const upperIdentifier = identifier.toUpperCase();
+			let offset = upperText.indexOf(upperIdentifier);
+			while (offset >= 0) {
+				const tail = text.slice(offset, offset + 180);
+				const segment = tail
+					.split(/[|\n;]/u, 1)[0]
+					.replace(/\s+/gu, ' ')
+					.trim();
+				const value = canonicalNumbers(segment).find(
+					(candidate) => !identifierValues.has(candidate)
+				);
+				if (value) {
+					claims.push({
+						identifier,
+						excerptNumber: hitIndex + 1,
+						segment,
+						value,
+						literal: numericLiteral(segment, value),
+						structural: Boolean(hit.structuralContext)
+					});
+					break;
+				}
+				offset = upperText.indexOf(upperIdentifier, offset + upperIdentifier.length);
+			}
+		}
+		const distinctValues = new Set(claims.map((claim) => claim.value));
+		if (
+			claims.length >= 2 &&
+			distinctValues.size >= 2 &&
+			claims.some((claim) => claim.structural) &&
+			claims.some((claim) => !claim.structural)
+		)
+			return claims;
+	}
+	return [];
+}
+
+function buildNumericConflictConstraint(
+	question: string,
+	hits: SearchHit[],
+	citationNumbers: ReadonlyMap<number, number> | null
+): string {
+	const claims = sharedIdentifierNumericClaims(question, hits);
+	if (!claims.length) return '';
+	const rows = claims
+		.filter(
+			(claim, index, all) =>
+				all.findIndex(
+					(candidate) =>
+						candidate.excerptNumber === claim.excerptNumber && candidate.value === claim.value
+				) === index
+		)
+		.slice(0, 6)
+		.map((claim) => {
+			const hit = hits[claim.excerptNumber - 1];
+			const citation = citationNumbers?.get(hit.chunkId) ?? claim.excerptNumber;
+			return `- ${claim.segment} [${citation}]`;
+		})
+		.join('\n');
+	return `Numeric source conflict (internal; never reproduce this heading):
+The same identifier has distinct values in the excerpts. Preserve every value below, attribute each to its own excerpt, and do not call them equal:
+${rows}`;
+}
+
 export function buildUserPrompt(
 	question: string,
 	hits: SearchHit[],
 	conversationContext: string | null = null,
 	citationNumbers: ReadonlyMap<number, number> | null = null,
-	inventoryHits: SearchHit[] | null = null
+	inventoryHits: SearchHit[] | null = null,
+	evidenceQueries: string[] = []
 ): string {
 	const seen = new Set<string>();
 	const excerpts = hits
 		.map((h, i) => {
 			const locator = h.page ? `page ${h.page}` : (h.headingPath ?? '');
 			const citationNumber = citationNumbers?.get(h.chunkId) ?? i + 1;
-			return `[${citationNumber}] (${h.documentName}${locator ? ` · ${locator}` : ''})\n${withoutRepeatedSentences(h.text, seen)}`;
+			return `[${citationNumber}] (${h.documentName}${locator ? ` · ${locator}` : ''})\n${withoutRepeatedSentences(evidenceText(h), seen)}`;
 		})
 		.join('\n\n');
 	const context = conversationContext
@@ -972,7 +1131,7 @@ export function buildUserPrompt(
 		: '';
 	const parts = answerableClauses(question);
 	const multiPartConstraint = parts.length
-		? `Facts the answer must cover (combine them into natural prose; do not repeat or label these prompts):\n${parts.map((part, index) => `${index + 1}. ${part}`).join('\n')}\nUse only the excerpts relevant to each part. Never mix numbers between parts or documents. For each calculation, write its operands and formula before the result.\n\n`
+		? `Facts the answer must cover (combine them into natural prose; do not repeat or label these prompts):\n${parts.map((part, index) => `${index + 1}. ${part}`).join('\n')}\nUse only the excerpts relevant to each part. Never mix numbers between parts or documents. Only when the user explicitly requests a calculation, write its operands and formula before the result.\n\n`
 		: '';
 	// multiPartConstraint already carries these slots. Repeating the same
 	// checklist increases prefill and encourages checklist-shaped output.
@@ -984,8 +1143,10 @@ export function buildUserPrompt(
 	const compactFactualLookup = parts.length > 1 && analyzeQuestion(question).answerShape === 'fact';
 	const inventory = compactFactualLookup
 		? ''
-		: buildEvidenceInventory(question, inventoryHits ?? hits, citationNumbers);
+		: buildEvidenceInventory(question, inventoryHits ?? hits, citationNumbers, evidenceQueries);
 	const inventoryConstraint = inventory ? `${inventory}\n\n` : '';
+	const numericConflict = buildNumericConflictConstraint(question, hits, citationNumbers);
+	const numericConflictConstraint = numericConflict ? `${numericConflict}\n\n` : '';
 	// Order follows the U-shaped attention curve measured for long contexts
 	// (Liu et al., "Lost in the Middle"): a model uses the head and the tail of
 	// its context well and loses the middle, and instructions work best close to
@@ -994,18 +1155,26 @@ export function buildUserPrompt(
 	// question — the worst position available. They now sit between the passages
 	// and the question, which is the tail. Conversation context stays at the
 	// head: it is reference material for resolving pronouns, not an instruction.
-	const constraints = `${contestedConstraint}${roleConstraint}${structuralConstraint}${directionalConstraint}${referenceHint}${multiPartConstraint}${coverageConstraint}${inventoryConstraint}`;
+	const constraints = `${contestedConstraint}${roleConstraint}${structuralConstraint}${directionalConstraint}${referenceHint}${multiPartConstraint}${coverageConstraint}${inventoryConstraint}${numericConflictConstraint}`;
 	return `${context}Excerpts:\n\n${excerpts}\n\n${constraints}Question: ${question}`;
 }
 
 export function buildVerificationUserPrompt(
 	question: string,
 	hits: SearchHit[],
-	conversationContext: string | null = null
+	conversationContext: string | null = null,
+	evidenceQueries: string[] = []
 ): string {
 	const selected = selectVerificationHits(question, hits);
 	const citationNumbers = new Map(hits.map((hit, index) => [hit.chunkId, index + 1]));
-	return buildUserPrompt(question, selected, conversationContext, citationNumbers, hits);
+	return buildUserPrompt(
+		question,
+		selected,
+		conversationContext,
+		citationNumbers,
+		hits,
+		evidenceQueries
+	);
 }
 
 /**

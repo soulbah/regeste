@@ -145,6 +145,77 @@ function cellsByColumn(line: PdfLine, columns: number[]): string[] {
 	return cells.map((items) => joinItems(items));
 }
 
+/** A value cell begins with a number, independent of language or unit. */
+const startsWithNumericValue = (text: string) =>
+	/^\s*(?:[<>≤≥~≈]\s*)?\d(?:[\d\s.,]*\d)?(?:\s|$)/u.test(text);
+
+/**
+ * Bind a compact header row to the numeric row immediately below it.
+ *
+ * Borderless comparison tables commonly sit above a two-column article. A
+ * page-level two-column split then shears their left and right halves apart,
+ * even though every value is almost perfectly centred below its header. This
+ * is the same text-alignment signal used by stream/network PDF table parsers:
+ * baselines make rows, repeated x alignment makes columns.
+ *
+ * Only retrieval context is added. Source text stays byte-for-byte the PDF's
+ * text, and an incomplete or ambiguous alignment produces no structure.
+ */
+function alignedHeaderValueRows(
+	lines: PdfLine[],
+	pageWidth: number
+): Map<PdfLine, ReconstructedLine> {
+	const bound = new Map<PdfLine, ReconstructedLine>();
+	const tolerance = Math.max(8, pageWidth * 0.04);
+	for (let index = 1; index < lines.length; index++) {
+		const header = lines[index - 1];
+		const row = lines[index];
+		if (header.y - row.y > pageWidth * 0.08) continue;
+
+		const labels = header.items.filter(
+			(item) => /\p{L}/u.test(item.text) && !startsWithNumericValue(item.text)
+		);
+		const values = row.items.filter((item) => startsWithNumericValue(item.text));
+		if (labels.length < 3 || values.length < 3 || labels.length < values.length) continue;
+
+		const used = new Set<number>();
+		const pairs: Array<{ label: string; value: string }> = [];
+		let valid = true;
+		for (const value of [...values].sort((left, right) => left.x - right.x)) {
+			let nearest = -1;
+			let distance = Number.POSITIVE_INFINITY;
+			for (let labelIndex = 0; labelIndex < labels.length; labelIndex++) {
+				if (used.has(labelIndex)) continue;
+				const candidate = Math.abs(itemCentre(value) - itemCentre(labels[labelIndex]));
+				if (candidate < distance) {
+					nearest = labelIndex;
+					distance = candidate;
+				}
+			}
+			if (nearest < 0 || distance > tolerance) {
+				valid = false;
+				break;
+			}
+			used.add(nearest);
+			pairs.push({ label: labels[nearest].text.trim(), value: value.text.trim() });
+		}
+		if (!valid) continue;
+
+		const rowLabel = joinItems(row.items.filter((item) => !startsWithNumericValue(item.text)));
+		const context = [
+			rowLabel,
+			tableRowContext(
+				pairs.map((pair) => pair.label),
+				pairs.map((pair) => pair.value)
+			)
+		]
+			.filter(Boolean)
+			.join(' | ');
+		bound.set(row, { text: joinItems([...row.items]), retrievalContext: context });
+	}
+	return bound;
+}
+
 /**
  * Bind a data table's header to each of its rows, for the row-ordered paths.
  *
@@ -393,7 +464,7 @@ export function orderPdfText(items: PositionedPdfText[], pageWidth: number): Rec
  *  `isAmountCell`, which asks where the amount sits; here only its presence
  *  matters. */
 function holdsAnAmount(cell: string): boolean {
-	return /\d[\d\s.,]*\s*(?:€|%)|\b(?:gratuit|offert|n[ée]ant)\b/iu.test(cell);
+	return /\d[\d\s.,]*\s*(?:€|%)/u.test(cell);
 }
 
 /** At most this share of a page's amounts may sit on the poorer side before the
@@ -507,6 +578,7 @@ function emitPricedRows(lines: PdfLine[], gutter: number): ReconstructedLine[] {
 /** Original single-gutter path: split left/right only when a central gutter
  * recurs at nearly the same position on many lines; otherwise line order. */
 function orderLinesWithSingleGutter(lines: PdfLine[], pageWidth: number): ReconstructedLine[] {
+	const alignedRows = alignedHeaderValueRows(lines, pageWidth);
 	// Data-table guard, same reasoning as in emitColumnRegions: a page whose
 	// lines are rows of three-plus bare values (numbers, amounts, dates) is a
 	// schedule, and the two-column article split would shear every record in
@@ -553,17 +625,21 @@ function orderLinesWithSingleGutter(lines: PdfLine[], pageWidth: number): Recons
 			? []
 			: splitCandidates.filter((candidate) => Math.abs(candidate - median) <= pageWidth * 0.08);
 	const twoColumns = consistent.length >= Math.max(8, Math.ceil(lines.length * 0.2));
-	if (!twoColumns) return asLines(lines.map((line) => joinItems([...line.items])).filter(Boolean));
+	if (!twoColumns)
+		return lines
+			.map((line) => alignedRows.get(line) ?? { text: joinItems([...line.items]) })
+			.filter((line) => line.text.length > 0);
 
 	const gutter = [...consistent].sort((left, right) => left - right)[
 		Math.floor(consistent.length / 2)
 	];
-	const left = lines
+	const remaining = lines.filter((line) => !alignedRows.has(line));
+	const left = remaining
 		.map((line) => joinItems(line.items.filter((item) => item.x < gutter)))
 		.filter(Boolean);
-	const right = lines
+	const right = remaining
 		.map((line) => joinItems(line.items.filter((item) => item.x >= gutter)))
 		.filter(Boolean);
 	if (isPricedColumn(left, right)) return emitPricedRows(lines, gutter);
-	return asLines([...left, ...right]);
+	return [...alignedRows.values(), ...asLines([...left, ...right])];
 }

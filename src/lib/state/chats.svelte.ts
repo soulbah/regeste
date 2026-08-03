@@ -29,6 +29,7 @@ import {
 	missingDurationCarrier,
 	ordinalScheduleValue,
 	personRoleCarrier,
+	referencedDocumentIds,
 	splitQueryClauses
 } from '$lib/pipeline/retrieval';
 import { assistedPayloadBytes, buildAssistedExcerpts } from '$lib/assisted-payload';
@@ -51,8 +52,10 @@ import { retrieveWithLocalQueryFallback } from '$lib/pipeline/query-translation'
 import { buildAuditedExtractiveAnswer } from '$lib/private-ai/extractive-answer';
 import { generateWithContextFit } from '$lib/private-ai/context-fit';
 import { answerGrammarEnabled, buildAnswerGrammar } from '$lib/private-ai/answer-grammar';
+import { evidenceText } from '$lib/pipeline/evidence-text';
 import {
 	SYSTEM_PROMPT,
+	answerClauseCoverageRatio,
 	buildAmountValuePrompt,
 	buildContactValuePrompt,
 	completeFactualAnswerPrefix,
@@ -297,8 +300,13 @@ class ChatsStore {
 		route: QuestionRoute,
 		onInspect?: () => void
 	): Promise<{ hits: SearchHit[]; alternateQueries: string[] }> {
+		const referencedIds = new Set(referencedDocumentIds(refinementQuery, documents));
+		const retrievalDocuments = referencedIds.size
+			? documents.filter((document) => referencedIds.has(document.id))
+			: documents;
 		const clauses = splitQueryClauses(refinementQuery);
-		if (clauses.length > 1) {
+		const decompositionQueries = clauses.length > 1 ? clauses : [];
+		if (clauses.length > 1 && retrievalDocuments.length > 1 && referencedIds.size === 0) {
 			// Published multi-hop pattern: resolve broad subject first, then search
 			// elliptical sub-questions inside that evidence scope. Global searches
 			// for “on what date?” or “who signed?” drift to unrelated attachments.
@@ -307,7 +315,7 @@ class ChatsStore {
 					right.split(/\s+/u).length - left.split(/\s+/u).length ||
 					clauses.indexOf(left) - clauses.indexOf(right)
 			)[0];
-			const documentIds = documents.map((document) => document.id);
+			const documentIds = retrievalDocuments.map((document) => document.id);
 			const anchorHits = await documentsStore.retrieve(
 				anchor,
 				documentIds,
@@ -343,22 +351,49 @@ class ChatsStore {
 				return { hits, alternateQueries: clauses };
 			}
 		}
-		const retrieve = (alternateQueries: string[]) =>
-			documentsStore.retrieve(
+		const retrieve = async (alternateQueries: string[]) => {
+			const documentIds = retrievalDocuments.map((document) => document.id);
+			const primary = await documentsStore.retrieve(
 				query,
-				documents.map((document) => document.id),
+				documentIds,
 				refinementQuery,
 				onInspect,
 				route,
-				alternateQueries
+				decompositionQueries
 			);
+			if (!alternateQueries.length) return primary;
+			// Each model-written view gets its own evidence ranking. Folding English
+			// candidates into a French refinement query recalls the right passage,
+			// then immediately buries it again. Preserve one result per branch, as in
+			// question-decomposition RAG, before ordinary downstream evidence packing.
+			const branches = await documentsStore.retrieveMany(
+				alternateQueries.map((alternate) => ({
+					query: alternate,
+					documentIds,
+					refinementQuery: alternate,
+					route: 'targeted' as const
+				}))
+			);
+			const hits: SearchHit[] = [];
+			const seen = new SvelteSet<number>();
+			for (let rank = 0; rank < 16 && hits.length < 16; rank++) {
+				for (const list of [primary, ...branches]) {
+					const hit = list[rank];
+					if (!hit || seen.has(hit.chunkId)) continue;
+					seen.add(hit.chunkId);
+					hits.push(hit);
+					if (hits.length === 16) break;
+				}
+			}
+			return hits;
+		};
 		if (mode !== 'private' || llmStore.status !== 'ready') {
-			return { hits: await retrieve([]), alternateQueries: [] };
+			return { hits: await retrieve([]), alternateQueries: decompositionQueries };
 		}
 		return retrieveWithLocalQueryFallback({
 			query,
 			refinementQuery,
-			documentLanguages: documents.map((document) => document.language),
+			documentLanguages: retrievalDocuments.map((document) => document.language),
 			rewrite: (messages) =>
 				llmStore.generate(messages, () => {}, {
 					reasoning: 'off',
@@ -536,7 +571,7 @@ class ChatsStore {
 			chunkId: h.chunkId,
 			sent: sent && !excludedIds.has(h.chunkId),
 			excluded: excludedIds.has(h.chunkId),
-			snippet: h.text.slice(0, 240),
+			snippet: evidenceText(h).slice(0, 240),
 			documentName: h.documentName,
 			locator: h.page ? `page ${h.page}` : (h.headingPath ?? null)
 		}));
@@ -685,7 +720,9 @@ class ChatsStore {
 				versionGroup,
 				route,
 				context?.promptContext ?? null,
-				context?.resolvedQuestion ?? question
+				context?.resolvedQuestion ?? question,
+				[],
+				retrieved.alternateQueries
 			);
 			await db.touchChat(chatId);
 			this.messages = await db.listMessages(chatId);
@@ -860,6 +897,7 @@ class ChatsStore {
 				await this.generateColumnAnswer(chatId, columnAnswer, frame.locale);
 			} else {
 				let hits: SearchHit[] = [];
+				let evidenceQueries: string[] = [];
 				if (enabledDocs.length) {
 					const retrieved = await this.retrieveWithSearchFallback(
 						context?.searchQuery ?? question,
@@ -870,6 +908,7 @@ class ChatsStore {
 						() => this.advanceWork('inspect')
 					);
 					hits = retrieved.hits;
+					evidenceQueries = retrieved.alternateQueries;
 					const finalClarification = this.clarificationAfterRetrieval(clarification);
 					if (finalClarification) {
 						await this.insertClarification(chatId, finalClarification, frame.locale);
@@ -890,7 +929,9 @@ class ChatsStore {
 					null,
 					route,
 					context?.promptContext ?? null,
-					context?.resolvedQuestion ?? question
+					context?.resolvedQuestion ?? question,
+					[],
+					evidenceQueries
 				);
 			}
 			await db.touchChat(chatId);
@@ -916,7 +957,9 @@ class ChatsStore {
 		conversationContext: string | null = null,
 		extractiveQuestion = question,
 		/** Retrieved but judged too weak to answer from — shown with the refusal. */
-		rejected: SearchHit[] = []
+		rejected: SearchHit[] = [],
+		/** Multilingual/decomposed views that successfully retrieved this evidence. */
+		evidenceQueries: string[] = []
 	): Promise<void> {
 		const { db } = await getLocalDb();
 		const chat = this.chats.find((c) => c.id === chatId);
@@ -959,7 +1002,8 @@ class ChatsStore {
 				versionGroup,
 				route,
 				conversationContext,
-				extractiveQuestion
+				extractiveQuestion,
+				evidenceQueries
 			);
 		} else if (
 			chat?.mode === 'myai' &&
@@ -1039,7 +1083,8 @@ class ChatsStore {
 		versionGroup: string | null = null,
 		route: QuestionRoute = 'targeted',
 		conversationContext: string | null = null,
-		extractiveQuestion = question
+		extractiveQuestion = question,
+		evidenceQueries: string[] = []
 	): Promise<void> {
 		const { db } = await getLocalDb();
 		this.streamingText = '';
@@ -1069,7 +1114,9 @@ class ChatsStore {
 		// Trim BEFORE anything numbers the excerpts: prompt, citations and the
 		// what-AI-saw record must all see the same list (see fitEvidenceToContext).
 		if (grounded) hits = fitEvidenceToContext(question, hits, conversationContext);
-		let groundedPrompt = grounded ? buildUserPrompt(question, hits, conversationContext) : '';
+		let groundedPrompt = grounded
+			? buildUserPrompt(question, hits, conversationContext, null, null, evidenceQueries)
+			: '';
 		const buildMessages = (state: { hits: SearchHit[]; conversationContext: string | null }) => {
 			if (!grounded)
 				return [
@@ -1080,7 +1127,14 @@ class ChatsStore {
 					},
 					{ role: 'user' as const, content: question }
 				];
-			groundedPrompt = buildUserPrompt(question, state.hits, state.conversationContext);
+			groundedPrompt = buildUserPrompt(
+				question,
+				state.hits,
+				state.conversationContext,
+				null,
+				null,
+				evidenceQueries
+			);
 			return [
 				{ role: 'system' as const, content: SYSTEM_PROMPT },
 				{ role: 'user' as const, content: groundedPrompt }
@@ -1100,8 +1154,17 @@ class ChatsStore {
 		// A contested turn re-weighs evidence; a deterministic extract would just
 		// repeat whichever clause matches and cannot concede or confirm.
 		const contested = conversationContext !== null && isContestation(question);
-		const extractive =
-			grounded && !contested ? buildAuditedExtractiveAnswer(extractiveQuestion, hits) : null;
+		let extractive =
+			grounded && !contested
+				? buildAuditedExtractiveAnswer(extractiveQuestion, hits, evidenceQueries)
+				: null;
+		// Selection extractors are allowed to abstain. A copied table can be
+		// relevant yet omit one requested result (for example operands but no
+		// computed change). In that case use grounded generation instead of showing
+		// the incomplete table as an answer. Coverage is clause-based and carries no
+		// document vocabulary.
+		if (extractive?.needsAudit && answerClauseCoverageRatio(question, extractive.answer) < 0.6)
+			extractive = null;
 		this.advanceWork('write');
 		if (extractive) {
 			raw = extractive.answer;
@@ -1275,7 +1338,7 @@ class ChatsStore {
 								role: 'user',
 								content: buildVerificationPrompt(
 									question,
-									buildVerificationUserPrompt(question, hits, conversationContext),
+									buildVerificationUserPrompt(question, hits, conversationContext, evidenceQueries),
 									raw
 								)
 							}
@@ -1292,7 +1355,7 @@ class ChatsStore {
 				if (
 					verified.trim() &&
 					!isDegenerateAnswer(verified) &&
-					verificationPreservesGrounding(raw, verified, hits.length > 0)
+					verificationPreservesGrounding(raw, verified, hits.length > 0, question)
 				) {
 					raw = verified;
 					this.streamingText = raw;
@@ -1321,7 +1384,7 @@ class ChatsStore {
 		// position is its citation number and the correction can point at it.
 		const carrierIndex =
 			grounded && raw.trim() && contactAnswerEvidenceCoverage(question, raw) === 0
-				? hits.findIndex((hit) => contactAnswerEvidenceCoverage(question, hit.text) > 0)
+				? hits.findIndex((hit) => contactAnswerEvidenceCoverage(question, evidenceText(hit)) > 0)
 				: -1;
 		if (carrierIndex >= 0 && !this.stopRequested && (!extractive || extractive.needsAudit)) {
 			try {
@@ -1392,7 +1455,10 @@ class ChatsStore {
 			grounded && raw.trim() && !this.stopRequested && (!extractive || extractive.needsAudit)
 				? hits
 						.slice(0, 3)
-						.map((hit, index) => ({ index, value: ordinalScheduleValue(question, hit.text) }))
+						.map((hit, index) => ({
+							index,
+							value: ordinalScheduleValue(question, evidenceText(hit))
+						}))
 						.find((entry) => entry.value !== null)
 				: undefined;
 		if (scheduleCell && !raw.includes(scheduleCell.value!.literal)) {
@@ -1432,7 +1498,7 @@ class ChatsStore {
 		const personCarrier =
 			grounded && raw.trim() && !this.stopRequested
 				? hits
-						.map((hit, index) => ({ index, name: personRoleCarrier(question, hit.text) }))
+						.map((hit, index) => ({ index, name: personRoleCarrier(question, evidenceText(hit)) }))
 						.find((entry) => entry.name !== null && !raw.includes(entry.name))
 				: undefined;
 		if (personCarrier) {
@@ -1476,7 +1542,10 @@ class ChatsStore {
 		const amountCarrier =
 			grounded && raw.trim() && !this.stopRequested
 				? hits
-						.map((hit, index) => ({ index, value: labelledAmountCarrier(question, hit.text) }))
+						.map((hit, index) => ({
+							index,
+							value: labelledAmountCarrier(question, evidenceText(hit))
+						}))
 						.find((entry) => entry.value !== null && !statesTheValue(raw, entry.value.literal))
 				: undefined;
 		if (amountCarrier) {
@@ -1510,11 +1579,7 @@ class ChatsStore {
 		// clean-looking citation: measured across three unrelated documents, a
 		// local model will state a subtotal that is off by three thousand, or
 		// invent a whole series, and both read as authoritative.
-		raw = groundedOrRefused(
-			raw,
-			hits.map((hit) => hit.text),
-			groundedRefusal(question)
-		).text;
+		raw = groundedOrRefused(raw, hits.map(evidenceText), groundedRefusal(question)).text;
 		// Aborted or failed with nothing produced → an honest system notice.
 		const stopped = !raw.trim();
 
@@ -1788,7 +1853,7 @@ class ChatsStore {
 		// else's model and has no more claim to state an unsupported figure.
 		const checked = groundedOrRefused(
 			raw.trim(),
-			hits.map((hit) => hit.text),
+			hits.map(evidenceText),
 			groundedRefusal(question)
 		).text;
 		const { text: cleaned, citations } = isNotice
@@ -2064,7 +2129,7 @@ class ChatsStore {
 				? ''
 				: groundedOrRefused(
 						stripThink(raw).trim(),
-						selected.map((hit) => hit.text),
+						selected.map(evidenceText),
 						groundedRefusal(question)
 					).text;
 			const { text: cleaned, citations } = failed

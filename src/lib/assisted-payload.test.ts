@@ -39,4 +39,18 @@ describe('buildAssistedExcerpts', () => {
 		]);
 		expect(JSON.stringify(excerpts)).not.toContain('doc-a');
 	});
+
+	it('sends reconstructed table labels beside their source row', () => {
+		const [excerpt] = buildAssistedExcerpts([
+			{
+				text: 'Maximum Thrust 8.8 M lbs. 9.5 M lbs.',
+				structuralContext: 'SLS Block 1: 8.8 M lbs. | SLS Block 2: 9.5 M lbs.',
+				documentId: 'doc-a',
+				page: 3,
+				headingPath: null
+			}
+		]);
+		expect(excerpt.text).toContain('SLS Block 2: 9.5 M lbs.');
+		expect(excerpt.text).toContain('Maximum Thrust 8.8 M lbs. 9.5 M lbs.');
+	});
 });

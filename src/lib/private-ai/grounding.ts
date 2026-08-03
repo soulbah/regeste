@@ -28,14 +28,17 @@ const STRUCTURAL_NUMBER = /^(?:[0-9]|1[0-9]|20)$/u;
  * are field names a document carries, so a fabricated total would license
  * itself.
  */
-const DERIVATION_MARK = /[×÷*=]|\b(?:diff[ée]rence|[ée]cart|gap)\b/iu;
+const DERIVATION_MARK = /[×÷*=]|(?:^|[^\p{L}])(?:diff[ée]rence|[ée]cart|gap)(?=$|[^\p{L}])/iu;
 
 /** Arithmetic an answer may do in one step over two figures it was shown. */
 const OPERATIONS: ReadonlyArray<(left: number, right: number) => number> = [
 	(left, right) => left + right,
 	(left, right) => left - right,
 	(left, right) => left * right,
-	(left, right) => (right === 0 ? Number.NaN : left / right)
+	(left, right) => (right === 0 ? Number.NaN : left / right),
+	// A percentage change is a ratio expressed per hundred. Once the absolute
+	// gap has been admitted, this remains one arithmetic step over shown values.
+	(left, right) => (right === 0 ? Number.NaN : (left / right) * 100)
 ];
 
 /** Money rounds to the cent, so a derived value has to land within half of one. */

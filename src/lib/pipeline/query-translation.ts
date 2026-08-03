@@ -6,6 +6,7 @@ import {
 } from '$lib/pipeline/fuzzy';
 import { hasAnswerBearingEvidence, isWeakMatch } from '$lib/pipeline/relevance';
 import { splitQueryClauses } from '$lib/pipeline/retrieval';
+import { evidenceText } from '$lib/pipeline/evidence-text';
 import type { SearchHit } from '$lib/types';
 
 export type QueryTranslator = (
@@ -84,7 +85,9 @@ export function hasClauseLevelLexicalEvidence(query: string, hits: SearchHit[]):
 		if (!concepts.length) return true;
 		return hits.some((hit) => {
 			const available = new Set(
-				normalizeForFuzzy(`${hit.documentName}\n${hit.headingPath ?? ''}\n${hit.text}`).split(' ')
+				normalizeForFuzzy(
+					`${hit.documentName}\n${hit.headingPath ?? ''}\n${evidenceText(hit)}`
+				).split(' ')
 			);
 			const matched = concepts.filter((term) =>
 				[...available].some(
@@ -108,7 +111,7 @@ export function hasDistinctiveLexicalEvidence(query: string, hits: SearchHit[]):
 	return (
 		stemmedQueryCoverage(
 			query,
-			hits.map((hit) => `${hit.headingPath ?? ''}\n${hit.text}`).join('\n')
+			hits.map((hit) => `${hit.headingPath ?? ''}\n${evidenceText(hit)}`).join('\n')
 		) >= 0.85
 	);
 }
@@ -174,9 +177,9 @@ export async function localRetrievalQueryVariants(
 	const raw = await rewrite([
 		{
 			role: 'system',
-			content: `Rewrite the user's question into up to two concise document-search queries in ${locale === 'fr' ? 'French' : 'English'}.
+			content: `Rewrite the user's question into up to two concise document-search queries in ${needsEnglish ? 'English' : locale === 'fr' ? 'French' : 'English'}.
 Use likely form labels, formal contract vocabulary and close synonyms for every sub-question. Do not write a hypothetical answer or source sentence and do not add facts.
-Silently correct misspellings. Preserve every user-supplied name, identifier, number, negation, strict comparison and scope.${followUp ? ' Rewrite only the final question; use the earlier conversation lines solely to resolve pronouns and references into the named entity or subject.' : ''}${needsEnglish ? ' One query may be an English translation when useful.' : ''} Output search queries only, one per line.`
+Silently correct misspellings. Preserve every user-supplied name, identifier, number, negation, strict comparison and scope.${followUp ? ' Rewrite only the final question; use the earlier conversation lines solely to resolve pronouns and references into the named entity or subject.' : ''}${needsEnglish ? ' The first query must be a faithful English translation of the whole question, preserving every requested side; a second query may use likely document labels.' : ''} Output search queries only, one per line.`
 		},
 		{
 			role: 'user',
@@ -205,8 +208,13 @@ export async function retrieveWithLocalQueryFallback(input: {
 	const contextualFollowUp =
 		input.refinementQuery !== undefined && input.refinementQuery.trim() !== input.query.trim();
 	const contextAlreadyScoped = contextualFollowUp && input.documentLanguages.length === 1;
+	const requiresCrossLingualDecomposition =
+		questionLocale(question) === 'fr' &&
+		input.documentLanguages.includes('en') &&
+		splitQueryClauses(question).length > 1;
 	const primaryHits = await input.retrieve([]);
 	if (
+		!requiresCrossLingualDecomposition &&
 		(!contextualFollowUp || contextAlreadyScoped) &&
 		!isWeakMatch(primaryHits) &&
 		hasAnswerBearingEvidence(question, primaryHits) &&
@@ -218,15 +226,30 @@ export async function retrieveWithLocalQueryFallback(input: {
 
 	// The rewrite still sees the composed query: a pronoun question needs the
 	// referenced entity to produce useful search views.
-	const alternateQueries = await localRetrievalQueryVariants(
+	let alternateQueries = await localRetrievalQueryVariants(
 		input.query,
 		input.documentLanguages,
 		input.rewrite,
 		question
 	);
+	if (requiresCrossLingualDecomposition && !alternateQueries.length) {
+		alternateQueries = await crossLingualQueryVariants(
+			question,
+			input.documentLanguages,
+			input.rewrite
+		);
+	}
 	if (!alternateQueries.length) return { hits: primaryHits, alternateQueries: [] };
 
 	const fallbackHits = await input.retrieve(alternateQueries);
+	if (
+		requiresCrossLingualDecomposition &&
+		!isWeakMatch(fallbackHits) &&
+		(hasAnswerBearingEvidence(question, fallbackHits, alternateQueries) ||
+			fallbackHits.length > primaryHits.length)
+	) {
+		return { hits: fallbackHits, alternateQueries };
+	}
 	if (
 		isWeakMatch(fallbackHits) ||
 		!hasAnswerBearingEvidence(question, fallbackHits, alternateQueries) ||
@@ -250,7 +273,7 @@ export async function retrieveWithLocalQueryFallback(input: {
 		Number(hasDistinctiveLexicalEvidence(question, hits)) +
 		stemmedQueryCoverage(
 			question,
-			hits.map((hit) => `${hit.headingPath ?? ''}\n${hit.text}`).join('\n')
+			hits.map((hit) => `${hit.headingPath ?? ''}\n${evidenceText(hit)}`).join('\n')
 		);
 	if (evidenceScore(primaryHits, []) >= evidenceScore(fallbackHits, alternateQueries)) {
 		return { hits: primaryHits, alternateQueries: [] };
@@ -276,5 +299,5 @@ export async function crossLingualQueryVariants(
 		{ role: 'user', content: query }
 	]);
 	const translated = cleanTranslatedQuery(raw, query);
-	return translated ? [translated] : [];
+	return translated && preservesQueryConstraints(query, translated) ? [translated] : [];
 }

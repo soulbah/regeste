@@ -26,9 +26,14 @@ describe('bindsAValue', () => {
 		expect(bindsAValue('| Tenue de compte | 4,85 €/trimestre |')).toBe(true);
 	});
 
-	it('accepts the words a tariff uses instead of a number', () => {
-		expect(bindsAValue('| Virement par internet | Gratuit |')).toBe(true);
-		expect(bindsAValue('| Convention séquestre | Nous consulter |')).toBe(true);
+	it('does not classify categorical prose with a hand-written vocabulary', () => {
+		expect(bindsAValue('| Virement par internet | Gratuit |')).toBe(false);
+		expect(bindsAValue('| Convention séquestre | Nous consulter |')).toBe(false);
+	});
+
+	it('accepts numeric measurements without enumerating units', () => {
+		expect(bindsAValue('| Maximum thrust | 9.5 M lbs. |')).toBe(true);
+		expect(bindsAValue('| Payload to the Moon | > 46 t (101.4k lbs.) |')).toBe(true);
 	});
 
 	it('reads through the emphasis liteparse puts on a price', () => {

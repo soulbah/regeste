@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	SYSTEM_PROMPT,
+	answerClauseCoverageRatio,
 	buildUserPrompt,
 	buildAnswerCoverageContract,
 	buildEvidenceInventory,
@@ -22,6 +23,7 @@ import {
 	needsGroundedVerification,
 	resolveCitations,
 	resolveTargetedCitations,
+	sharedIdentifierNumericClaims,
 	verificationPreservesGrounding
 } from './prompt';
 import type { SearchHit } from '$lib/types';
@@ -44,6 +46,41 @@ describe('buildUserPrompt', () => {
 		expect(p.endsWith('Question: Q?')).toBe(true);
 	});
 
+	it('gives reconstructed table labels to the answer model without UI scaffolding', () => {
+		const table = {
+			...hit(1),
+			text: 'Maximum Thrust 8.8 M lbs. 9.5 M lbs.',
+			structuralContext: 'SLS Block 1 Crew: 8.8 M lbs. | SLS Block 2 Crew: 9.5 M lbs.'
+		};
+		const prompt = buildUserPrompt('Compare Block 1 et Block 2.', [table]);
+		expect(prompt).toContain('SLS Block 2 Crew: 9.5 M lbs.');
+		expect(prompt).not.toContain('Structured evidence inventory');
+	});
+
+	it('surfaces distinct numeric claims for the same identifier without document vocabulary', () => {
+		const narrative = {
+			...hit(1),
+			text: 'The final SLS configuration, Block 2, will provide 9.4 million pounds of thrust.'
+		};
+		const table = {
+			...hit(2),
+			text: 'Maximum Thrust 8.8 M lbs. 9.5 M lbs.',
+			structuralContext:
+				'Maximum Thrust | SLS Block 1 Crew: 8.8 M lbs. | SLS Block 2 Crew: 9.5 M lbs.'
+		};
+		const question =
+			'Le document donne-t-il une seule valeur pour Block 2 ? Compare le texte et le tableau.';
+
+		expect(
+			sharedIdentifierNumericClaims(question, [narrative, table]).map((claim) => claim.value)
+		).toEqual(['9.4', '9.5']);
+		const prompt = buildUserPrompt(question, [narrative, table]);
+		expect(prompt).toContain('Numeric source conflict');
+		expect(prompt).toContain('Block 2, will provide 9.4 million pounds');
+		expect(prompt).toContain('SLS Block 2 Crew: 9.5 M lbs.');
+		expect(prompt).toContain('do not call them equal');
+	});
+
 	it('stops a coordinated factual stream after natural complete prose', () => {
 		expect(
 			hasCompleteFactualAnswer(
@@ -63,6 +100,17 @@ describe('buildUserPrompt', () => {
 				'Le dossier appartient à Camille Moreau. Son numéro est 12345. Structured'
 			)
 		).toBe('Le dossier appartient à Camille Moreau. Son numéro est 12345.');
+	});
+
+	it('detects a relevant table dump that omits requested outputs', () => {
+		const question =
+			'De combien les actifs ont-ils diminué entre 2023 et 2024, en millions d’euros et en pourcentage ? Donne les deux valeurs de départ.';
+		const incomplete =
+			'Assets (EUR millions) 2024 2023 Gold 872,156 649,110 Securities 4,532,962 4,898,730.';
+		const complete =
+			'Les actifs passent de 6 887 265 millions d’euros en 2023 à 6 420 536 en 2024, soit une baisse de 466 729 millions ou 6,78 %.';
+		expect(answerClauseCoverageRatio(question, incomplete)).toBeLessThan(0.6);
+		expect(answerClauseCoverageRatio(question, complete)).toBeGreaterThanOrEqual(0.6);
 	});
 
 	it('labels prior conversation as context rather than evidence', () => {
@@ -393,6 +441,21 @@ describe('buildUserPrompt', () => {
 });
 
 describe('buildEvidenceInventory', () => {
+	it('uses successful multilingual retrieval views to select evidence facts', () => {
+		const total = {
+			...hit(1),
+			text: 'Total assets 6,420,536 6,887,265',
+			page: 1
+		};
+		const inventory = buildEvidenceInventory(
+			'De combien les actifs totaux ont-ils diminué entre 2023 et 2024 ?',
+			[total],
+			null,
+			['By how much did total assets decrease between 2023 and 2024?']
+		);
+		expect(inventory).toContain('Total assets 6,420,536 6,887,265');
+	});
+
 	it('rebinds a form label split from its value across visual lines', async () => {
 		const { buildEvidenceInventory } = await import('./prompt');
 		const inventory = buildEvidenceInventory(
@@ -696,6 +759,14 @@ describe('isDegenerateAnswer — output that must never replace a draft', () => 
 		).toBe(true);
 	});
 
+	it('rejects internal evidence notes emitted as the answer', () => {
+		expect(
+			isDegenerateAnswer(
+				'Internal evidence facts — use them silently; never reproduce this heading or list:\n- Block 2: 9.5 M lbs. [1]'
+			)
+		).toBe(true);
+	});
+
 	it('keeps a real multi-line answer', () => {
 		const answer = [
 			'Le RAPO est facturé 1100 € HT [1].',
@@ -725,6 +796,24 @@ describe('verification grounding monotonicity', () => {
 		expect(verificationPreservesGrounding('Valeur supposée [2].', 'Aucune preuve.', false)).toBe(
 			true
 		);
+	});
+
+	it('rejects a verifier that drops requested comparison parts', () => {
+		const question =
+			'Does the document give only one maximum-thrust value for Block 2? Compare the narrative text with the table and cite both pages.';
+		const draft =
+			'No. For Block 2, the narrative gives 9.4 million lbs. on page 2 [2], while the table gives 9.5 M lbs. on page 3 [1].';
+		const degraded =
+			'Block 1B is 177 feet tall and produces a maximum of 3.6 million pounds of thrust [3].';
+		expect(verificationPreservesGrounding(draft, degraded, true, question)).toBe(false);
+		expect(
+			verificationPreservesGrounding(
+				draft,
+				'No. For Block 2, the narrative states 9.4 million lbs. [2], but the table states 9.5 M lbs. [1].',
+				true,
+				question
+			)
+		).toBe(true);
 	});
 });
 

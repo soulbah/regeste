@@ -40,6 +40,7 @@ import {
 	retrievalQueryVariants,
 	selectWithNeighbors
 } from '$lib/pipeline/retrieval';
+import { evidenceText } from '$lib/pipeline/evidence-text';
 import { RETRIEVAL_VERSION } from '$lib/pipeline/retrieval-version';
 import { guardWorker } from '$lib/state/worker-health.svelte';
 import { embeddingPhaseProgress } from '$lib/ingest-readiness';
@@ -839,10 +840,7 @@ class DocumentsStore {
 			return await Promise.all(
 				sets.map(async (hits, index) => {
 					if (hits.length < 2) return hits;
-					const scores = await api.score(
-						queries[index],
-						hits.map((hit) => hit.text)
-					);
+					const scores = await api.score(queries[index], hits.map(evidenceText));
 					if (scores.length !== hits.length) return hits;
 					this.rerankReady = true;
 					return hits

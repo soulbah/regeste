@@ -28,6 +28,7 @@ import {
 	multiClauseEvidenceCoverage,
 	labelledAmountCarrier,
 	personRoleCarrier,
+	referencedDocumentIds,
 	requestedDurationCount
 } from './retrieval';
 import { chunkBlocks } from './chunk';
@@ -149,6 +150,73 @@ describe('fuzzy and multi-document safety', () => {
 		expect(refineCandidates([], [], 'Quelle section définit GET ?', 2, [put, get])[0].chunkId).toBe(
 			1
 		);
+	});
+
+	it('uses reconstructed table context during reranking', () => {
+		const table = {
+			...hit(1, 'nasa', -2),
+			text: 'Maximum Thrust 8.8 M lbs. 8.8 M lbs. 8.9 M lbs. 8.9 M lbs. 9.5 M lbs.',
+			structuralContext:
+				'SLS Block 1 Crew: 8.8 M lbs. | SLS Block 2 Crew: 9.5 M lbs. | SLS Block 2 Cargo: 9.5 M lbs.'
+		};
+		const prose = {
+			...hit(2, 'nasa', -1),
+			text: 'Block 2 will provide 9.4 million lbs. of launch thrust.'
+		};
+		expect(
+			refineCandidates([], [prose, table], 'Maximum thrust for SLS Block 2 Crew?', 2)[0].chunkId
+		).toBe(1);
+	});
+
+	it('reserves a final evidence slot for a question-covering structured row', () => {
+		const table = {
+			...hit(1, 'nasa', 0.05),
+			seq: 1,
+			text: 'Maximum Thrust 8.8 M lbs. 9.5 M lbs.',
+			structuralContext:
+				'SLS Block 1 Crew: 8.8 M lbs. | SLS Block 2 Crew: 9.5 M lbs. | SLS Block 2 Cargo: 9.5 M lbs.'
+		};
+		const distractors = Array.from({ length: 8 }, (_, index) => ({
+			...hit(index + 2, 'nasa', 0.8 - index * 0.02),
+			seq: index + 2,
+			text: `SLS Block 2 narrative passage ${index} about launch systems.`
+		}));
+		const selected = selectWithNeighbors(
+			[...distractors, table],
+			[],
+			'Maximum Thrust for SLS Block 2 Crew and SLS Block 2 Cargo?',
+			4,
+			'synthesis'
+		);
+		expect(selected[0].chunkId).toBe(1);
+	});
+
+	it('keeps prose numeric evidence beside a structured row for synthesis', () => {
+		const table = {
+			...hit(1, 'launch-system', 0.9),
+			seq: 20,
+			text: 'Maximum Thrust 8.8 M lbs. 9.5 M lbs.',
+			structuralContext:
+				'SLS Block 1 Crew: 8.8 M lbs. | SLS Block 2 Crew: 9.5 M lbs. | SLS Block 2 Cargo: 9.5 M lbs.'
+		};
+		const prose = {
+			...hit(2, 'launch-system', 0.05),
+			seq: 5,
+			text: 'The final SLS configuration, Block 2, will provide 9.4 million lbs. of maximum thrust.'
+		};
+		const distractors = Array.from({ length: 8 }, (_, index) => ({
+			...hit(index + 3, 'launch-system', 0.8 - index * 0.02),
+			seq: index + 30,
+			text: `A different propulsion component produces ${index + 1}.6 million lbs. of thrust.`
+		}));
+		const selected = selectWithNeighbors(
+			[table, ...distractors, prose],
+			[],
+			'Le document donne-t-il une seule valeur pour la poussée maximale du Block 2 ? Compare le texte et le tableau.',
+			4,
+			'synthesis'
+		);
+		expect(selected.slice(0, 2).map((item) => item.chunkId)).toEqual([1, 2]);
 	});
 
 	it('lets a discriminating fuzzy candidate beat unrelated two-channel agreement', () => {
@@ -747,6 +815,27 @@ describe('retrieval refinement', () => {
 			'à quelle date',
 			"qui l'a signé ?"
 		]);
+	});
+
+	it('scopes an explicit source name without a domain vocabulary', () => {
+		const documents = [
+			{ id: 'privacy', name: 'cnil-recruitment-guide.pdf' },
+			{ id: 'rocket', name: 'nasa-sls-fact-sheet.pdf' },
+			{ id: 'finance', name: 'ecb-balance-sheet-2024.pdf' }
+		];
+		expect(
+			referencedDocumentIds(
+				'Le document NASA donne-t-il la même valeur dans le texte et le tableau ?',
+				documents
+			)
+		).toEqual(['rocket']);
+		expect(referencedDocumentIds('Compare NASA avec le bilan ECB.', documents)).toEqual([
+			'rocket',
+			'finance'
+		]);
+		expect(referencedDocumentIds('Compare tous les documents sélectionnés.', documents)).toEqual(
+			[]
+		);
 	});
 
 	it('shares substantial clause decomposition with answer generation', () => {

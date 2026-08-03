@@ -61,6 +61,39 @@ describe('deterministic extractive answers', () => {
 		).toBeNull();
 	});
 
+	it('answers a cross-passage numeric contradiction without smoothing it over', () => {
+		const table = {
+			...hit(1, 'Maximum Thrust 8.8 M lbs. 9.5 M lbs.', 3),
+			structuralContext:
+				'Maximum Thrust | SLS Block 1 Crew: 8.8 M lbs. | SLS Block 2 Crew: 9.5 M lbs. | SLS Block 2 Cargo: 9.5 M lbs.'
+		};
+		const narrative = hit(
+			2,
+			'The final SLS configuration, Block 2, will provide 9.4 million lbs. of launch thrust, compared to the Block 1’s 8.8 million lbs.',
+			2
+		);
+		const nearby = hit(
+			3,
+			'Block 1B is 177 feet tall, weighs 1.6 million pounds, and produces a maximum of 3.6 million pounds of thrust during launch.',
+			4
+		);
+
+		const additional = [
+			hit(4, 'SLS Block 1 8.8 million lbs. of maximum thrust, 15% more thrust than Saturn V.', 2),
+			hit(5, 'Every SLS configuration uses the core stage with four RS-25 engines.', 1),
+			hit(6, 'Artemis I and II pave the way for landing astronauts on the Moon.', 2),
+			hit(7, 'The core stage flight computers control the rocket during flight.', 3),
+			hit(8, 'The SLS Program began test firing heritage space shuttle engines in 2016.', 3)
+		];
+		const answer = buildDeterministicExtractiveAnswer(
+			'Does the document give only one maximum-thrust value for Block 2? Compare the narrative text with the table and cite both pages.',
+			[table, narrative, ...additional, nearby]
+		);
+		expect(answer).toBe(
+			'No. For Block 2, the narrative states 9.4 million lbs. of launch thrust [2], while the table states 9.5 M lbs [1].'
+		);
+	});
+
 	it('reconstructs a split printed total from a generic multi-item decomposition', () => {
 		const total = hit(1, ['Total du lot :', '3 0 00 € HT.'].join('\n'), 10, 20);
 		const decomposition = hit(
@@ -109,6 +142,108 @@ describe('deterministic extractive answers', () => {
 					1,
 					"Mention est portée en marge de l'acte de mariage. Arțicle 110 : Célébration du mariage A l'expiration du délai d'un mois, l'officier de l'état civil procède à la célébration du mariage."
 				)
+			]
+		);
+		expect(answer).toBeNull();
+	});
+
+	it('answers numbered comparative questions from identifier-bound values', () => {
+		const answer = buildDeterministicExtractiveAnswer(
+			'Le document donne-t-il une seule valeur pour la poussée maximale du Block 2 ? Compare le texte et le tableau.',
+			[
+				hit(1, 'The final Block 2 configuration will provide 9.4 million lbs. of thrust.', 2),
+				{
+					...hit(2, 'Maximum Thrust 9.5 M lbs.', 3),
+					structuralContext: 'Maximum Thrust | SLS Block 2 Crew: 9.5 M lbs.'
+				},
+				hit(3, 'The upper stage produces 97,000 lbs. of thrust.', 4)
+			]
+		);
+		expect(answer).toBe(
+			'Non. Pour Block 2, le texte indique 9.4 million lbs. of thrust [1], tandis que le tableau indique 9.5 M lbs [2].'
+		);
+	});
+
+	it('keeps the base period before its extension and resulting duty', () => {
+		const answer = buildDeterministicExtractiveAnswer(
+			'Quel est le délai normal de réponse, jusqu’à combien peut-il être prolongé, et que doit faire l’organisme pendant cette prolongation ?',
+			[
+				hit(
+					1,
+					'L’organisme répond au plus tard dans un délai d’un mois. Ce délai peut être prolongé de deux mois en raison de la complexité ou du nombre des demandes. Dans ce cas, il informe la personne des raisons de la prolongation dans le délai d’un mois.',
+					36
+				)
+			]
+		);
+		expect(answer).toContain('au plus tard dans un délai d’un mois');
+		expect(answer).toContain('prolongé de deux mois');
+		expect(answer).toContain('informe la personne');
+		expect(answer).toContain('[1]');
+	});
+
+	it('does not treat page and model numbers as numbered-clause anchors', () => {
+		const answer = buildDeterministicExtractiveAnswer(
+			'According to the comparison table on page 3, what is Maximum Thrust for SLS Block 2 Crew and SLS Block 2 Cargo?',
+			[
+				hit(
+					1,
+					'Block 2 will provide 9.4 million lbs. of launch thrust and lift 46 t to deep space.',
+					2
+				),
+				hit(2, 'SLS Block 1 produces 8.8 million lbs. of maximum thrust.', 2),
+				hit(3, 'SLS Block 1B Cargo SLS Block 2 Crew SLS Block 2 Cargo 512,000 lbs. of thrust.', 3)
+			]
+		);
+		expect(answer).toBeNull();
+	});
+
+	it('does not collapse a two-period calculation onto its first year', () => {
+		const answer = buildDeterministicExtractiveAnswer(
+			'De combien le total a-t-il diminué entre 2023 et 2024, en valeur et en pourcentage ?',
+			[
+				hit(1, 'Tableau 2024 2023\nPoste A 872,156 649,110\nPoste B 4,532,962 4,898,730', 1),
+				hit(2, 'Total 6,420,536 6,887,265', 1)
+			],
+			['By how much did the total decrease between 2023 and 2024?']
+		);
+		expect(answer).toContain('6,887,265 millions EUR en 2023');
+		expect(answer).toContain('6,420,536 millions EUR en 2024');
+		expect(answer).toContain('−466 729 millions EUR');
+	});
+
+	it('computes a two-period aggregate from the terminal dominating table row', () => {
+		const answer = buildDeterministicExtractiveAnswer(
+			'De combien les actifs totaux ont-ils diminué entre 2023 et 2024, en millions d’euros et en pourcentage ?',
+			[
+				hit(
+					1,
+					'Assets (EUR millions)\n31 December 2024 31 December 2023\nGold 872,156 649,110\nSecurities 4,532,962 4,898,730',
+					1,
+					10
+				),
+				hit(2, 'Other assets 365,924 345,688\nTotal assets 6,420,536 6,887,265', 1, 11)
+			],
+			['By how much did total assets decrease between 2023 and 2024?']
+		);
+		expect(answer).toContain('« Total assets »');
+		expect(answer).toContain('6,887,265 millions EUR en 2023');
+		expect(answer).toContain('6,420,536 millions EUR en 2024');
+		expect(answer).toContain('−466 729 millions EUR');
+		expect(answer).toContain('−6,78 %');
+		expect(answer).toContain('[2]');
+	});
+
+	it('does not replace a component-row calculation with the table aggregate', () => {
+		const answer = buildDeterministicExtractiveAnswer(
+			'De combien la ligne Gold a-t-elle diminué entre 2023 et 2024, en valeur et en pourcentage ?',
+			[
+				hit(
+					1,
+					'Assets (EUR millions)\n31 December 2024 31 December 2023\nGold 872,156 649,110',
+					1,
+					10
+				),
+				hit(2, 'Other assets 365,924 345,688\nTotal assets 6,420,536 6,887,265', 1, 11)
 			]
 		);
 		expect(answer).toBeNull();

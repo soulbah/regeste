@@ -32,7 +32,7 @@ describe('layoutUncertain — which born-digital pages pay for a detector pass',
 	});
 
 	it('fires on a tariff page by amount count', () => {
-		const tariff = ['2,60 €', '4,85 €', '8,00 €', 'Gratuit'].map((t, i) =>
+		const tariff = ['2,60 €', '4,85 €', '8,00 €', '0,00 €'].map((t, i) =>
 			item(t, 400, 700 - i * 20)
 		);
 		expect(layoutUncertain([item('Extrait des tarifs', 90, 760), ...tariff], H)).toBe(true);

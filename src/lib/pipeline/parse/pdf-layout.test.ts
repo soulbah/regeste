@@ -108,6 +108,33 @@ describe('orderPdfText', () => {
 		expect(lines.slice(0, 12).every((line) => line.text.startsWith('gauche'))).toBe(true);
 		expect(lines.slice(12).every((line) => line.text.startsWith('droite'))).toBe(true);
 	});
+
+	it('binds a borderless comparison row before a two-column article can shear it', () => {
+		const items = [
+			item('SLS Block 1 Crew', 154, 458, 50),
+			item('SLS Block 1 Cargo', 222, 458, 53),
+			item('SLS Block 1B Crew', 292, 458, 54),
+			item('SLS Block 1B Cargo', 361, 458, 57),
+			item('SLS Block 2 Crew', 436, 458, 50),
+			item('SLS Block 2 Cargo', 506, 458, 52),
+			item('Maximum Thrust', 44, 441, 56),
+			item('8.8 M lbs.', 165, 441, 27),
+			item('8.8 M lbs.', 235, 441, 27),
+			item('8.9 M lbs.', 306, 441, 27),
+			item('8.9 M lbs.', 376, 441, 27),
+			item('9.5 M lbs.', 447, 441, 27),
+			item('9.5 M lbs.', 519, 441, 27),
+			...Array.from({ length: 10 }, (_, row) => [
+				item(`left article line ${row}`, 40, 400 - row * 14, 230),
+				item(`right article line ${row}`, 330, 400 - row * 14, 230)
+			]).flat()
+		];
+		const lines = orderPdfText(items, 612);
+		const thrust = lines.find((line) => line.text.startsWith('Maximum Thrust'));
+		expect(thrust?.retrievalContext).toContain('SLS Block 2 Crew: 9.5 M lbs.');
+		expect(thrust?.retrievalContext).toContain('SLS Block 2 Cargo: 9.5 M lbs.');
+		expect(thrust?.text).toContain('8.8 M lbs. 8.8 M lbs. 8.9 M lbs. 8.9 M lbs. 9.5 M lbs.');
+	});
 });
 
 it('keeps a devis/invoice section-subtotal row intact (label + amount, not sheared)', () => {

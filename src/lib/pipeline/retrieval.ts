@@ -11,13 +11,15 @@ import {
 } from '$lib/pipeline/fuzzy';
 import { partyIdentityCoverage } from '$lib/pipeline/identity-evidence';
 import { identityEvidenceCoverage, temporalEvidenceCoverage } from '$lib/pipeline/relevance';
+import { evidenceText } from '$lib/pipeline/evidence-text';
+import { canonicalNumbers } from '$lib/numbers';
 
 const RRF_K = 60;
 const RERANK_CANDIDATE_LIMIT = 96;
 export const MAX_EVIDENCE_CHARS = 10000;
 /** Query/ranking behavior fingerprint. Unlike RETRIEVAL_VERSION this does not
  * require re-indexing documents; it invalidates benchmark/result caches only. */
-export const RETRIEVAL_PIPELINE_VERSION = 48;
+export const RETRIEVAL_PIPELINE_VERSION = 50;
 
 /** A batched DB read may return the union of several requests' neighbors.
  * Restore per-request isolation before ranking so batching cannot change a
@@ -111,7 +113,7 @@ export function expandChannelCandidatesWithNeighbors(
 		const contextual = [anchor.seq - 1, anchor.seq + 1]
 			.flatMap((seq) => byLocation.get(`${anchor.documentId}:${seq}`) ?? [])
 			.map((neighbor) => {
-				const candidate = `${neighbor.headingPath ?? ''}\n${neighbor.text}`;
+				const candidate = `${neighbor.headingPath ?? ''}\n${evidenceText(neighbor)}`;
 				const utility = Math.max(
 					queryCoverage(query, candidate),
 					fuzzyQueryCoverage(query, candidate),
@@ -218,6 +220,42 @@ export function splitQueryClauses(query: string): string[] {
 		.map((clause) => clause.trim())
 		.filter((clause) => terms(clause).length >= 1);
 	return clauses.length > 1 ? clauses : [];
+}
+
+function documentMetadataTokens(value: string): string[] {
+	return (
+		value
+			.normalize('NFKD')
+			.replace(/\p{M}/gu, '')
+			.toLocaleLowerCase()
+			.match(/[\p{L}\p{N}]+/gu) ?? []
+	).filter((token) => token.length >= 3 && !/^\d+$/u.test(token));
+}
+
+/** Resolve explicit attachment references before passage retrieval. Tokens
+ * must occur in the question and be unique among selected filenames, so this
+ * is metadata linking rather than a document-domain vocabulary. Mentioning
+ * several filenames keeps every referenced document in scope. */
+export function referencedDocumentIds(
+	query: string,
+	documents: ReadonlyArray<{ id: string; name: string }>
+): string[] {
+	if (documents.length < 2) return [];
+	const queryTokens = new Set(documentMetadataTokens(query));
+	const tokensByDocument = documents.map(
+		(document) => [document.id, new Set(documentMetadataTokens(document.name))] as const
+	);
+	const documentFrequency = new Map<string, number>();
+	for (const [, tokens] of tokensByDocument) {
+		for (const token of tokens) {
+			documentFrequency.set(token, (documentFrequency.get(token) ?? 0) + 1);
+		}
+	}
+	return tokensByDocument
+		.filter(([, tokens]) =>
+			[...tokens].some((token) => queryTokens.has(token) && documentFrequency.get(token) === 1)
+		)
+		.map(([documentId]) => documentId);
 }
 
 /** Keep only clauses with enough independent lexical mass for global search.
@@ -645,7 +683,7 @@ export function missingDurationCarrier(
 			(mention) => !stated.has(mention.key)
 		);
 		if (!missing.length) continue;
-		const candidate = `${hits[index].headingPath ?? ''}\n${hits[index].text}`;
+		const candidate = `${hits[index].headingPath ?? ''}\n${evidenceText(hits[index])}`;
 		const coverage = Math.max(
 			queryCoverage(query, candidate),
 			fuzzyQueryCoverage(query, candidate),
@@ -1027,6 +1065,27 @@ function textSimilarity(a: string, b: string): number {
 	return overlap / Math.min(left.size, right.size);
 }
 
+/** Near-duplicate prose with different figures is not duplicate evidence. */
+function carriesDifferentNumericClaims(left: string, right: string): boolean {
+	// Small integers are usually list positions, model names or page furniture.
+	// Fractions and 3+ digit values are the quantities whose disagreement can
+	// change a synthesis answer.
+	const materialNumbers = (text: string) =>
+		new Set(
+			canonicalNumbers(text).filter(
+				(number) => number.includes('.') || Math.abs(Number(number)) >= 100
+			)
+		);
+	const leftNumbers = materialNumbers(left);
+	const rightNumbers = materialNumbers(right);
+	return (
+		leftNumbers.size > 0 &&
+		rightNumbers.size > 0 &&
+		(leftNumbers.size !== rightNumbers.size ||
+			[...leftNumbers].some((number) => !rightNumbers.has(number)))
+	);
+}
+
 /** Fuse already-scoped candidates while preserving raw component scores. */
 export function fuseCandidates(
 	semantic: SearchHit[],
@@ -1070,7 +1129,7 @@ export function refineCandidates(
 ): SearchHit[] {
 	const fused = fuseCandidates(semantic, lexical, Math.max(RERANK_CANDIDATE_LIMIT, topK), fuzzy);
 	const scopeCoverageFor = (hit: SearchHit) => {
-		const candidate = `${hit.documentName}\n${hit.headingPath ?? ''}\n${hit.text}`;
+		const candidate = `${hit.documentName}\n${hit.headingPath ?? ''}\n${evidenceText(hit)}`;
 		return Math.max(
 			queryCoverage(query, candidate),
 			fuzzyQueryCoverage(query, candidate),
@@ -1079,18 +1138,18 @@ export function refineCandidates(
 	};
 	const scored = fused
 		.map((hit) => {
-			const candidate = `${hit.documentName}\n${hit.headingPath ?? ''}\n${hit.text}`;
+			const candidate = `${hit.documentName}\n${hit.headingPath ?? ''}\n${evidenceText(hit)}`;
 			const exactCoverage = queryCoverage(query, candidate);
 			const approximateCoverage = fuzzyQueryCoverage(query, candidate);
 			const phraseCoverage = phraseQueryCoverage(query, candidate);
 			const scopeCoverage = scopeCoverageFor(hit);
 			const headingCoverage = hit.headingPath ? queryCoverage(query, hit.headingPath) : 0;
 			const identityCoverage = partyIdentityCoverage(query, candidate);
-			const openIdentityCoverage = identityEvidenceCoverage(query, hit.text);
+			const openIdentityCoverage = identityEvidenceCoverage(query, evidenceText(hit));
 			const entityCoverage = properNameCoverage(query, candidate);
-			const temporalCoverage = temporalEvidenceCoverage(query, hit.text);
-			const enumerationCoverage = enumerationEvidenceCoverage(query, hit.text);
-			const numericCoverage = numericAnswerEvidenceCoverage(query, hit.text);
+			const temporalCoverage = temporalEvidenceCoverage(query, evidenceText(hit));
+			const enumerationCoverage = enumerationEvidenceCoverage(query, evidenceText(hit));
+			const numericCoverage = numericAnswerEvidenceCoverage(query, evidenceText(hit));
 			const numericLabelCoverage = numericLabelEvidenceCoverage(query, candidate);
 			const numericRelationCoverage = numericLabelValueProximityCoverage(query, candidate);
 			const constraintCoverage = numericConstraintEvidenceCoverage(query, candidate);
@@ -1237,7 +1296,7 @@ export function expandStructuralParents(
 	for (const child of children) {
 		const parent = child.parentChunkId === undefined ? undefined : parents.get(child.parentChunkId);
 		if (!parent) continue;
-		const candidate = `${child.headingPath ?? ''}\n${child.text}`;
+		const candidate = `${child.headingPath ?? ''}\n${evidenceText(child)}`;
 		const promoted = {
 			...child,
 			score:
@@ -1298,7 +1357,7 @@ export function selectWithNeighbors(
 	);
 	const analysisByChunk = new Map(
 		sorted.map((hit) => {
-			const candidate = `${hit.headingPath ?? ''}\n${hit.text}`;
+			const candidate = `${hit.headingPath ?? ''}\n${evidenceText(hit)}`;
 			return [
 				hit.chunkId,
 				{
@@ -1363,7 +1422,7 @@ export function selectWithNeighbors(
 	const coherentCandidates = sorted.filter((hit) => analysisByChunk.get(hit.chunkId)!.coherent);
 	const answerShape = analyzeQuestion(query).answerShape;
 	const contextUtility = (hit: SearchHit) => {
-		const candidate = `${hit.headingPath ?? ''}\n${hit.text}`;
+		const candidate = `${hit.headingPath ?? ''}\n${evidenceText(hit)}`;
 		const analysis = analysisByChunk.get(hit.chunkId)!;
 		return (
 			Math.max(
@@ -1397,7 +1456,7 @@ export function selectWithNeighbors(
 			)
 			.sort((left, right) => Math.abs(left.seq! - anchor.seq!) - Math.abs(right.seq! - anchor.seq!))
 			.slice(0, 12);
-		const text = window.map((hit) => `${hit.headingPath ?? ''}\n${hit.text}`).join('\n');
+		const text = window.map((hit) => `${hit.headingPath ?? ''}\n${evidenceText(hit)}`).join('\n');
 		return (
 			Math.max(
 				queryCoverage(query, text),
@@ -1427,6 +1486,16 @@ export function selectWithNeighbors(
 	const scopedEvidenceCandidates = [...sorted]
 		.sort((left, right) => contextUtility(right) - contextUtility(left) || right.score - left.score)
 		.slice(0, 2);
+	// Geometry-bound table rows are complete records even when their citable
+	// text is a bare run of values. If reconstructed labels cover the question,
+	// reserve a slot before nearby prose can separate those values again.
+	const structuralEvidenceCandidates = sorted
+		.filter((hit) => !!hit.structuralContext)
+		.map((hit) => ({ hit, utility: contextUtility(hit) }))
+		.filter(({ utility }) => utility >= 0.2)
+		.sort((left, right) => right.utility - left.utility || right.hit.score - left.hit.score)
+		.slice(0, 3)
+		.map(({ hit }) => hit);
 	// Explanations often span a lead passage and a following condition. Preserve a
 	// small, substantial window around the best passage before numeric lookalikes
 	// consume the generator's bounded context.
@@ -1526,21 +1595,21 @@ export function selectWithNeighbors(
 	const clauseLeaders = clauses.flatMap((clause) => {
 		const leaders = [...sorted]
 			.map((hit) => {
-				const candidate = `${hit.headingPath ?? ''}\n${hit.text}`;
+				const candidate = `${hit.headingPath ?? ''}\n${evidenceText(hit)}`;
 				const coverage = Math.max(
-					queryCoverage(clause, `${hit.headingPath ?? ''}\n${hit.text}`),
-					fuzzyQueryCoverage(clause, `${hit.headingPath ?? ''}\n${hit.text}`),
-					stemmedQueryCoverage(clause, `${hit.headingPath ?? ''}\n${hit.text}`)
+					queryCoverage(clause, candidate),
+					fuzzyQueryCoverage(clause, candidate),
+					stemmedQueryCoverage(clause, candidate)
 				);
 				const typedEvidence = Math.max(
-					temporalEvidenceCoverage(clause, hit.text) * Math.max(coverage, 0.25),
-					numericAnswerEvidenceCoverage(clause, hit.text) *
+					temporalEvidenceCoverage(clause, evidenceText(hit)) * Math.max(coverage, 0.25),
+					numericAnswerEvidenceCoverage(clause, evidenceText(hit)) *
 						Math.max(
 							numericScopeCoverage(clause, candidate),
-							numericLabelValueProximityCoverage(clause, hit.text),
+							numericLabelValueProximityCoverage(clause, evidenceText(hit)),
 							0.25
 						),
-					identityEvidenceCoverage(clause, hit.text) * Math.max(coverage, 0.25)
+					identityEvidenceCoverage(clause, evidenceText(hit)) * Math.max(coverage, 0.25)
 				);
 				return { hit, coverage, typedEvidence, utility: coverage + typedEvidence * 0.75 };
 			})
@@ -1633,6 +1702,7 @@ export function selectWithNeighbors(
 			? [
 					...contactEvidenceCandidates,
 					...ordinalSeriesCandidates,
+					...structuralEvidenceCandidates,
 					...contextualWindowCandidates,
 					...synthesisContinuationCandidates,
 					// A composed question is only answerable when every substantial
@@ -1657,6 +1727,7 @@ export function selectWithNeighbors(
 			: [
 					...contactEvidenceCandidates,
 					...ordinalSeriesCandidates,
+					...structuralEvidenceCandidates,
 					...coherentCandidates,
 					// For coverage/permission scenarios, exact scoped leaders must claim
 					// the small per-page budget before a broader same-page window.
@@ -1687,6 +1758,7 @@ export function selectWithNeighbors(
 				documentLeaders,
 				synthesisContinuationCandidates,
 				ordinalSeriesCandidates,
+				structuralEvidenceCandidates,
 				scopedEvidenceCandidates,
 				scenarioScopedEvidenceCandidates,
 				gapContinuationCandidates,
@@ -1701,6 +1773,8 @@ export function selectWithNeighbors(
 		if (
 			selected.some((kept) => {
 				if (kept.documentId !== hit.documentId || textSimilarity(kept.text, hit.text) < 0.85)
+					return false;
+				if (route === 'synthesis' && carriesDifferentNumericClaims(kept.text, hit.text))
 					return false;
 				if (!preserveRecordPages) return true;
 				return kept.page === hit.page && kept.headingPath === hit.headingPath;
