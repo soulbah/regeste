@@ -25,8 +25,9 @@ import {
 import {
 	contactAnswerEvidenceCoverage,
 	contactAnswerValues,
+	costQuestionTerms,
 	durationValueMentions,
-	labelledAmountCarrier,
+	labelledAmountCarriers,
 	missingDurationCarrier,
 	ordinalScheduleValue,
 	personRoleCarrier,
@@ -45,7 +46,7 @@ import {
 } from '$lib/nlu/semantic-frame';
 import { formatAggregateResult } from '$lib/analysis/format-aggregate';
 import { formatColumnAnswer } from '$lib/analysis/format-column';
-import { groundedOrRefused } from '$lib/private-ai/grounding';
+import { checkNumericGrounding, groundedOrRefused } from '$lib/private-ai/grounding';
 import { answerRecordColumn, type ColumnAnswer } from '$lib/analysis/record-columns';
 import { parseRelatedQuestions } from '$lib/related-questions';
 import { hasAnswerBearingEvidence } from '$lib/pipeline/relevance';
@@ -58,7 +59,7 @@ import {
 	COMPACT_SYNTHESIS_SYSTEM_PROMPT,
 	SYSTEM_PROMPT,
 	answerClauseCoverageRatio,
-	buildAmountValuePrompt,
+	buildAmountsValuePrompt,
 	buildCompactSynthesisPrompt,
 	buildContactValuePrompt,
 	completeFactualAnswerPrefix,
@@ -1345,10 +1346,21 @@ class ChatsStore {
 		let copiedEvidence = isCopiedEvidenceAnswer(question, raw, hits.map(evidenceText));
 		let incompleteDecomposedAnswer =
 			evidenceQueries.length > 1 && answerClauseCoverageRatio(question, raw, evidenceQueries) < 0.8;
-		// A source transcription or a missing semantic slot is an observable
-		// diagnosis. A compact second stage synthesises the ranked fact plan; it is
-		// adopted only when it stops copying and covers every requested part.
-		if ((copiedEvidence || incompleteDecomposedAnswer) && !this.stopRequested) {
+		// A source transcription, a missing semantic slot, or a refusal after
+		// retrieval found answer-bearing evidence are observable diagnoses. A
+		// compact second stage synthesises the ranked fact plan; it is adopted
+		// only when it stops copying, covers every requested part, and never
+		// replaces a real answer with a refusal. The refusal case is the one the
+		// old verification-only chain lost: the model's own reasoning pass often
+		// holds every value while the final sentence refuses, and a second full
+		// audit on the same prompt reproduces the same refusal.
+		const recoveryRefusal = isPureRefusalLike(raw);
+		if (
+			(copiedEvidence ||
+				incompleteDecomposedAnswer ||
+				(recoveryRefusal && evidenceQueries.length > 1)) &&
+			!this.stopRequested
+		) {
 			try {
 				this.ensureVerifyStep();
 				const recoveryPrompt = buildCompactSynthesisPrompt(question, hits, evidenceQueries);
@@ -1365,13 +1377,26 @@ class ChatsStore {
 						)
 						.finally(() => window.clearTimeout(recoveryTimeout));
 					const recovered = stripThink(recoveredRaw).trim();
-					const recoveryAccepted = recoveryCanReplaceDraft(
-						question,
-						raw,
+					// Synthesis runs on the same failure modes as the draft: a small
+					// model can restate a broken OCR literal ("20 00 € HT") as a
+					// plausible wrong figure ("20 000 € HT"). A recovered draft is
+					// never accepted when its numbers are not grounded in the very
+					// evidence it was told to use — the final refusal gate would
+					// catch it anyway, but only after the pipeline already swapped
+					// the honest draft for the hallucination.
+					const recoveredGrounded = checkNumericGrounding(
 						recovered,
-						hits.map(evidenceText),
-						evidenceQueries
-					);
+						hits.map(evidenceText)
+					).grounded;
+					const recoveryAccepted =
+						recoveredGrounded &&
+						recoveryCanReplaceDraft(
+							question,
+							raw,
+							recovered,
+							hits.map(evidenceText),
+							evidenceQueries
+						);
 					if (recoveryAccepted) {
 						raw = recovered;
 						this.streamingText = raw;
@@ -1605,11 +1630,14 @@ class ChatsStore {
 				console.error('[regeste] person-value retry failed:', err);
 			}
 		}
-		// An amount the excerpts bind to the exact thing the question names, which
-		// the draft does not state. A lowercase acronym inside a fee table
+		// Every amount the excerpts bind to a term the question names, which the
+		// draft does not state. A lowercase acronym inside a fee table
 		// ("(RAPO) : 1100 € HT") is retrieved, ranked and highlighted, then read as
 		// absent — the reader sees their answer on screen under a sentence saying
-		// it is not there, which is the worst shape a wrong answer can take.
+		// it is not there, which is the worst shape a wrong answer can take. A
+		// coordinated cost question ("référé + recours") needs every carrier: the
+		// single-value retry could only fix one amount per pass and left the rest
+		// unanswered.
 		//
 		// The trigger is the evidence alone. It used to also require the draft to
 		// look like a refusal or like the model offering to answer, which meant
@@ -1617,23 +1645,86 @@ class ChatsStore {
 		// were both incomplete on the day they were written. Whether the draft
 		// refused, misread or wrote a paragraph about how it could help, an answer
 		// missing a value the evidence proves is the same defect.
-		const amountCarrier =
+		//
+		// The top passages are the only evidence a retry may quote, and a
+		// coordinated cost question ("référé + recours") can leave one term's
+		// value just below the retrieval cutoff: the term has no carrier in the
+		// hits, so no correction can state it and the final gate refuses. Probe
+		// each uncovered term with one targeted retrieval (per-sub-question
+		// evidence, the same shape the retrieval stage already uses for
+		// decomposed queries) and keep the first passage that binds an amount to
+		// it. The passage is appended to the turn's hits, so its citation,
+		// grounding evidence and source list all resolve.
+		const amountTerms = costQuestionTerms(question);
+		const coveredAmountTerms = new SvelteSet(
 			grounded && raw.trim() && !this.stopRequested
 				? hits
-						.map((hit, index) => ({
-							index,
-							value: labelledAmountCarrier(question, evidenceText(hit))
-						}))
-						.find((entry) => entry.value !== null && !statesTheValue(raw, entry.value.literal))
-				: undefined;
-		if (amountCarrier) {
+						.flatMap((hit) => labelledAmountCarriers(question, evidenceText(hit)))
+						.map((carrier) => carrier.term)
+				: []
+		);
+		const uncoveredAmountTerms = amountTerms.filter((term) => !coveredAmountTerms.has(term));
+		if (uncoveredAmountTerms.length) {
+			try {
+				const documentIds = [...new Set(hits.map((hit) => hit.documentId))];
+				const probed = documentIds.length
+					? await documentsStore.retrieveMany(
+							uncoveredAmountTerms.map((term) => ({
+								query: term,
+								documentIds,
+								refinementQuery: term,
+								route: 'targeted' as const
+							}))
+						)
+					: [];
+				const seenChunks = new SvelteSet(hits.map((hit) => hit.chunkId));
+				probed.forEach((list, index) => {
+					const term = uncoveredAmountTerms[index];
+					const passage = list.find(
+						(hit) =>
+							!seenChunks.has(hit.chunkId) &&
+							labelledAmountCarriers(question, evidenceText(hit)).some(
+								(carrier) => carrier.term === term
+							)
+					);
+					if (passage) {
+						seenChunks.add(passage.chunkId);
+						hits.push(passage);
+					}
+				});
+			} catch (err) {
+				console.error('[regeste] amount-evidence probe failed:', err);
+			}
+		}
+		const amountCarriers =
+			grounded && raw.trim() && !this.stopRequested
+				? hits
+						.flatMap((hit, index) =>
+							labelledAmountCarriers(question, evidenceText(hit)).map((carrier) => ({
+								...carrier,
+								excerptNumber: index + 1,
+								excerpt: evidenceText(hit).slice(0, 220)
+							}))
+						)
+						.filter(
+							(carrier, index, all) =>
+								all.findIndex((candidate) => candidate.literal === carrier.literal) === index
+						)
+				: [];
+		const missingAmountCarriers = amountCarriers.filter(
+			(carrier) => !statesTheValue(raw, carrier.literal)
+		);
+		if (missingAmountCarriers.length) {
 			try {
 				const retriedRaw = await llmStore.generate(
 					[
 						{ role: 'system' as const, content: SYSTEM_PROMPT },
 						{
 							role: 'user' as const,
-							content: `${groundedPrompt}\n\n${buildAmountValuePrompt(question, amountCarrier.value!.literal, amountCarrier.index + 1)}`
+							content: `${groundedPrompt}\n\n${buildAmountsValuePrompt(
+								question,
+								missingAmountCarriers.slice(0, 4)
+							)}`
 						}
 					],
 					() => {},
@@ -1643,7 +1734,7 @@ class ChatsStore {
 				if (
 					retried.trim() &&
 					!isDegenerateAnswer(retried) &&
-					statesTheValue(retried, amountCarrier.value!.literal)
+					missingAmountCarriers.every((carrier) => statesTheValue(retried, carrier.literal))
 				) {
 					raw = retried;
 					this.streamingText = raw;

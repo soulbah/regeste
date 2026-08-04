@@ -3,6 +3,8 @@ import {
 	COMPACT_SYNTHESIS_SYSTEM_PROMPT,
 	SYSTEM_PROMPT,
 	answerClauseCoverageRatio,
+	buildAmountValuePrompt,
+	buildAmountsValuePrompt,
 	buildCompactSynthesisPrompt,
 	buildUserPrompt,
 	buildAnswerCoverageContract,
@@ -1002,6 +1004,29 @@ describe('verification grounding monotonicity', () => {
 		).toBe(false);
 	});
 
+	it('replaces a refusal draft with compact recovery that restores every slot', () => {
+		// The live regression: retrieval found every value, the model reasoned
+		// through all of them, then ended with the exact refusal. A second full
+		// audit on the same prompt reproduced the refusal; the compact recovery
+		// over the ranked fact plan is the pass that can still win.
+		const question =
+			'Quel montant John et Jane Doe doivent-ils payer et à quelle date est-il dû et quelle est leur adresse de service ?';
+		const parts = [
+			'montant dû par John et Jane Doe',
+			'date de paiement due',
+			'adresse de service de John et Jane Doe'
+		];
+		const evidence = [
+			'Customer Name: DOE, JOHN & JANE | Service Address: 55 NO NAME DRIVE | Current Billing Due Date: 08/12/2015 | Amount Due: $526.07'
+		];
+		const refusal =
+			"Je n'ai pas trouvé assez d'informations dans les documents joints pour répondre.";
+		const recovered =
+			'Le montant dû par John et Jane Doe est de 526,07 $, la date de paiement due est le 12 août 2015 et leur adresse de service est 55 NO NAME DRIVE.';
+		expect(recoveryCanReplaceDraft(question, refusal, recovered, evidence, parts)).toBe(true);
+		expect(recoveryCanReplaceDraft(question, refusal, refusal, evidence, parts)).toBe(false);
+	});
+
 	it('never lets cited verification erase semantic slots from an unpunctuated question', () => {
 		const question =
 			'Quel montant John et Jane Doe doivent-ils payer et à quelle date est-il dû et quelle est leur adresse de service ?';
@@ -1172,6 +1197,37 @@ describe('statesTheValue — the evidence check that replaced the refusal vocabu
 		expect(statesTheValue('Votre conseiller est Paul Vasseur [1].', 'Paul Vasseur')).toBe(true);
 		expect(statesTheValue('Votre conseiller est nommé dans le document.', 'Paul Vasseur')).toBe(
 			false
+		);
+	});
+
+	it('names every carrier with its excerpt in the coordinated amount prompt', () => {
+		const prompt = buildAmountsValuePrompt('Combien coute un référé + un recours ?', [
+			{ literal: '800 € HT', excerptNumber: 3, term: 'refere' },
+			{ literal: '1100 € HT', excerptNumber: 1, term: 'recours' }
+		]);
+		expect(prompt).toContain('Excerpt [3] states the amount "800 € HT"');
+		expect(prompt).toContain('Excerpt [1] states the amount "1100 € HT"');
+		expect(prompt).toContain('stating each amount with its excerpt citation');
+	});
+
+	it('shows an OCR-split amount in its canonical form in retry prompts', () => {
+		// Measured live: the fee agreement prints "20 00 € HT" (space inside the
+		// thousands group) and the model misread the verbatim literal as
+		// "20 000 € HT". The retry prompt must display the canonical value while
+		// the raw document spelling stays available as context.
+		const prompt = buildAmountsValuePrompt('Combien coute un référé + un recours ?', [
+			{
+				literal: '20 00 € HT',
+				excerptNumber: 6,
+				term: 'recours',
+				excerpt: '…20 00 € HT, pour un recours…'
+			}
+		]);
+		expect(prompt).toContain('states the amount "2000 € HT"');
+		expect(prompt).not.toContain('states the amount "20 00 € HT"');
+		expect(prompt).toContain('Document text: "…20 00 € HT, pour un recours…"');
+		expect(buildAmountValuePrompt('Combien coute un recours ?', '20 00 € HT', 6)).toContain(
+			'states the amount "2000 € HT"'
 		);
 	});
 });

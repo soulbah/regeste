@@ -12,7 +12,14 @@
 // the same on a quote, a loan offer and a payment schedule.
 
 import { numberTokens } from './prompt';
-import { NUMBER_RUN, calendarDateMentions, canonicalNumber, numericValues } from '$lib/numbers';
+import {
+	MONEY_AMOUNT,
+	NUMBER_RUN,
+	calendarDateMentions,
+	canonicalAmounts,
+	canonicalNumber,
+	numericValues
+} from '$lib/numbers';
 
 /** Numbers that carry no claim about the document: list markers, citation
  * markers, and the small ordinals answers use to enumerate ("1.", "2)"). */
@@ -200,8 +207,16 @@ export interface GroundingVerdict {
  */
 export function checkNumericGrounding(answer: string, evidence: string[]): GroundingVerdict {
 	const text = maskSupportedCalendarDates(answer.replace(/\[\d{1,2}\]/gu, ' '), evidence);
-	const stated = numberTokens(text);
-	const supported = new Set(evidence.flatMap((passage) => numberTokens(passage)));
+	// Money runs are one value even when OCR split a thousands group
+	// ("20 00 € HT" = 2000): inside an amount every digit belongs to the same
+	// figure. Both sides are canonicalised the same way, so a clean rewrite
+	// still grounds and an invented figure is still refused.
+	const moneyValues = (passage: string) =>
+		[...passage.matchAll(MONEY_AMOUNT)].flatMap((match) => canonicalAmounts(match[0]));
+	const stated = new Set([...numberTokens(text), ...moneyValues(text)]);
+	const supported = new Set(
+		evidence.flatMap((passage) => [...numberTokens(passage), ...moneyValues(passage)])
+	);
 	const computing = DERIVATION_MARK.test(text);
 	const pool = computing ? evidence.flatMap((passage) => numericValues(passage)) : [];
 	// An expression the answer writes out is checked as written, before the pair

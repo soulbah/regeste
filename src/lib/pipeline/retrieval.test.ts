@@ -26,7 +26,9 @@ import {
 	ordinalPaymentDirection,
 	ordinalScheduleValue,
 	multiClauseEvidenceCoverage,
+	labelledAmountCarriers,
 	labelledAmountCarrier,
+	costQuestionTerms,
 	personRoleCarrier,
 	enrichRepeatedPageLeadContext,
 	referencedDocumentIds,
@@ -1744,6 +1746,51 @@ describe('an amount the excerpts bind to the term the question names', () => {
 		expect(labelledAmountCarrier('Combien coûte la saisine du tribunal ?', fees)?.literal).toBe(
 			'1800 € HT'
 		);
+	});
+
+	it('ignores a modifier the document never prints and binds the named term', () => {
+		// "un rapo complet" has no clause containing "complet"; the correction
+		// must not require every distinctive term to appear in one clause or it
+		// goes silent on the exact question it exists for.
+		expect(labelledAmountCarrier('Combien coute un rapo complet ?', fees)?.literal).toBe(
+			'1100 € HT'
+		);
+	});
+
+	it('returns one carrier per amount bound to a named term across clauses', () => {
+		const combined = [
+			'- la préparation d’une procédure de référé suspension : 800 € HT.',
+			'- la phase administrative du recours (RAPO) : 1100 € HT.'
+		].join('\n');
+		expect(
+			labelledAmountCarriers('Combien coute un référé + un recours ?', combined).map(
+				(carrier) => carrier.literal
+			)
+		).toEqual(['800 € HT', '1100 € HT']);
+	});
+
+	it('exposes the cost terms so uncovered slots can be probed', () => {
+		// The amount correction probes a term whose value sat below the retrieval
+		// cutoff; the term list must be exactly the question's own distinctive
+		// words, one per amount it can ask for.
+		expect(costQuestionTerms('Combien coute un référé + un recours ?')).toEqual([
+			'refere',
+			'recours'
+		]);
+		expect(costQuestionTerms('Combien coute un rapo complet ?')).toEqual(['rapo', 'complet']);
+		expect(costQuestionTerms('Quel est le délai de recours ?')).toEqual([]);
+	});
+
+	it('binds each amount to its own clause and not to the other row', () => {
+		const combined = [
+			'- la phase administrative du recours (RAPO) : 1100 € HT.',
+			'- la saisine du tribunal administratif : 1800 € HT.'
+		].join('\n');
+		expect(
+			labelledAmountCarriers('Quels sont les honoraires pour un RAPO ?', combined).map(
+				(carrier) => carrier.literal
+			)
+		).toEqual(['1100 € HT']);
 	});
 
 	it.each([

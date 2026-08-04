@@ -15,7 +15,7 @@ import {
 import { normalizeQuestion } from '$lib/nlu/semantic-frame';
 import { isIdentityQuestion } from '$lib/pipeline/identity-evidence';
 import { isContestation } from '$lib/retrieval-context';
-import { NUMBER_RUN, canonicalNumber, canonicalNumbers } from '$lib/numbers';
+import { NUMBER_RUN, canonicalAmounts, canonicalNumber, canonicalNumbers } from '$lib/numbers';
 import { evidenceText } from '$lib/pipeline/evidence-text';
 
 // A genuine directional change: "de 2018 à 2019", not the ubiquitous French
@@ -476,6 +476,18 @@ Each part of this question asks for its own time limit. Excerpt [${excerptNumber
  * did not state. Same contract as the other value corrections: the proof is in
  * the document (amount and term in one clause), the draft is never quoted back,
  * and the retry is adopted only if it states the literal. */
+/** The amount a retry prompt must show, in a form the model can read back.
+ * The document may print "20 00 € HT" with a space inside the thousands group;
+ * quoting that verbatim makes small models misread it as "20 000 €". The
+ * canonical digits with the literal's own currency suffix keep the value exact
+ * ("2000 € HT") while the document spelling stays available as context. */
+export function amountPromptDisplay(literal: string): string {
+	const canonical = canonicalAmounts(literal)[0];
+	if (!canonical) return literal;
+	const suffix = literal.replace(/^[\d\s.,]+/u, '').trim();
+	return suffix ? `${canonical} ${suffix}` : canonical;
+}
+
 export function buildAmountValuePrompt(
 	question: string,
 	value: string,
@@ -483,9 +495,34 @@ export function buildAmountValuePrompt(
 ): string {
 	return `Question: ${question}
 
-Excerpt [${excerptNumber}] states the amount "${value}" for exactly what this question asks about. Answer from excerpt [${excerptNumber}], stating "${value}" and citing [${excerptNumber}]. Answer in the language of the question and return only the answer.`;
+Excerpt [${excerptNumber}] states the amount "${amountPromptDisplay(value)}" for exactly what this question asks about. Answer from excerpt [${excerptNumber}], stating "${amountPromptDisplay(value)}" and citing [${excerptNumber}]. Answer in the language of the question and return only the answer.`;
 }
 
+/** Several amounts the excerpts bind to terms the question names, which the
+ * draft does not state. Same evidence-first contract as the single-value
+ * correction, applied to coordinated cost questions: each carrier is bound to
+ * its own clause and excerpt, and the retry is adopted only when the draft
+ * states every literal. A carrier recovered below the retrieval cutoff carries
+ * its document text so the model sees the passage it is asked to cite. */
+export function buildAmountsValuePrompt(
+	question: string,
+	carriers: Array<{ literal: string; excerptNumber: number; term: string; excerpt?: string }>
+): string {
+	const rows = carriers
+		.map(
+			(carrier) =>
+				`- Excerpt [${carrier.excerptNumber}] states the amount "${amountPromptDisplay(
+					carrier.literal
+				)}" for "${carrier.term}".${carrier.excerpt ? ` Document text: "${carrier.excerpt}"` : ''}`
+		)
+		.join('\n');
+	return `Question: ${question}
+
+The excerpts state the following amounts, each answering a part of this question:
+${rows}
+
+Answer every part of the question, stating each amount with its excerpt citation, in natural prose. Answer in the language of the question and return only the answer.`;
+}
 /**
  * Does the draft state the value this literal carries, however it spells it?
  *
@@ -502,10 +539,14 @@ Excerpt [${excerptNumber}] states the amount "${value}" for exactly what this qu
  * a check on a token type, which is what survives `.claude/rules/nlp.md`.
  */
 export function statesTheValue(draft: string, literal: string): boolean {
-	const wanted = canonicalNumbers(literal);
-	if (!wanted.length) return draft.includes(literal);
+	// An amount the parser read with a broken thousands group ("20 00 € HT")
+	// must still match a draft writing the same value cleanly ("2000 € HT"):
+	// every digit inside a money literal denotes one value.
+	const wanted = canonicalAmounts(literal);
+	const wantedValues = wanted.length ? wanted : canonicalNumbers(literal);
+	if (!wantedValues.length) return draft.includes(literal);
 	const stated = new Set(canonicalNumbers(draft));
-	return wanted.every((value) => stated.has(value));
+	return wantedValues.every((value) => stated.has(value));
 }
 
 /** A schedule row reads `rank date balance installment amortized interest`,
@@ -1626,6 +1667,7 @@ export function resolveTargetedCitations(
 	// correct multi-source answer into a misleading single citation.
 	if (
 		/\b(et|ainsi que|and|as well as)\b/i.test(question) ||
+		/[+]/.test(question) ||
 		/\b(?:cependant|toutefois|however|nevertheless)\b/iu.test(text) ||
 		/[;\n]/.test(text)
 	) {

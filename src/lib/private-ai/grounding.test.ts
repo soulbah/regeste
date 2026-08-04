@@ -37,6 +37,20 @@ describe('checkNumericGrounding', () => {
 		expect(checkNumericGrounding('Le prêt court sur 300 mois [1].', evidence).grounded).toBe(true);
 	});
 
+	it('reads one amount where OCR split a thousands group', () => {
+		// Measured on the fee agreement: the PDF prints "20 00 € HT" with a space
+		// inside the thousands group. The old digit grammar read two values, "20"
+		// and "00", so a correct answer stating 2000 € was refused.
+		const evidence = ['par un montant forfaitaire global correspondant à : 20 00 € HT'];
+		expect(checkNumericGrounding('Le montant global est de 2000 € HT [1].', evidence)).toEqual({
+			unsupported: [],
+			grounded: true
+		});
+		expect(
+			checkNumericGrounding('Le montant global est de 3000 € HT [1].', evidence).unsupported
+		).toEqual(['3000']);
+	});
+
 	it('accepts a supported calendar date reformatted in natural language', () => {
 		const evidence = ['Current Billing Due Date: 08/12/2015'];
 		expect(checkNumericGrounding('La date de paiement est le 12 août 2015.', evidence)).toEqual({
@@ -73,6 +87,19 @@ describe('checkNumericGrounding', () => {
 		expect(
 			checkNumericGrounding('Les frais de dossier sont de 18 000 euros [1].', evidence).unsupported
 		).toEqual(['18000']);
+	});
+
+	it('never lets a line break merge two money cells', () => {
+		// Same flattened table, but with a currency mark on the last cell: the
+		// amount grammar must not cross the newline, or "180,00\n200,00 €" would
+		// read as one phantom figure of eighteen million euros.
+		const evidence = ['Frais de dossier\nFIXE\n180,00\n200,00 €'];
+		expect(
+			checkNumericGrounding('Les frais de dossier sont de 180,00 € [1].', evidence).grounded
+		).toBe(true);
+		expect(
+			checkNumericGrounding('Les frais de dossier sont de 18 000 200 € [1].', evidence).unsupported
+		).toEqual(['18000200']);
 	});
 
 	it('accepts arithmetic the answer shows over figures it was shown', () => {

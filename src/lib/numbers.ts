@@ -76,6 +76,43 @@ export function numericValues(text: string): number[] {
 		.filter((value) => Number.isFinite(value));
 }
 
+/** A money amount as a document prints it: digits, thousands separators, and a
+ * currency mark. Spaces and tabs may separate a thousands group ("20 00 € HT"),
+ * but a line break never joins two cells: a flattened table row ends where the
+ * currency mark is. Token shape, not vocabulary: the currency list is a closed
+ * set of symbols. */
+export const MONEY_AMOUNT =
+	/(?:\d[\d \t.,]*[ \t]*(?:€|eur\b|euros?\b|usd\b|dollars?\b))(?:[ \t]*(?:ht|ttc))?/giu;
+
+/**
+ * The one value an amount literal denotes, canonicalised.
+ *
+ * `NUMBER_RUN` deliberately reads "20 00" as two runs: a two-digit group is
+ * not a thousands group, and table rows must not collapse into one number.
+ * But inside an amount the grammar already proved is money ("20 00 € HT"),
+ * every digit belongs to the same value, so the canonical form joins them:
+ * "20 00 € HT" and "2000 € HT" are the same amount. The last separator is a
+ * decimal point; earlier ones are grouping.
+ */
+export function canonicalAmounts(literal: string): string[] {
+	const match = /\d[\d\s.,]*/u.exec(literal);
+	if (!match) return [];
+	const raw = match[0].trim();
+	const decimalAt = Math.max(raw.lastIndexOf('.'), raw.lastIndexOf(','));
+	let normalized: string;
+	if (decimalAt >= 0) {
+		const whole = raw.slice(0, decimalAt).replace(/[\s.,]/gu, '');
+		const fraction = raw.slice(decimalAt + 1).replace(/[\s.,]/gu, '');
+		// A fractional part of all zeros is the same value as the whole part:
+		// "190,00 €" and "190 €" denote the same amount.
+		normalized = /\d*[1-9]\d*/u.test(fraction) ? `${whole}.${fraction}` : whole;
+	} else {
+		normalized = raw.replace(/[\s.,]/gu, '');
+	}
+	if (normalized.includes('.')) normalized = normalized.replace(/0+$/u, '');
+	return normalized ? [normalized] : [];
+}
+
 export interface CalendarDateMention {
 	start: number;
 	end: number;

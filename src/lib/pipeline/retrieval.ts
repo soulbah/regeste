@@ -12,7 +12,7 @@ import {
 import { partyIdentityCoverage } from '$lib/pipeline/identity-evidence';
 import { identityEvidenceCoverage, temporalEvidenceCoverage } from '$lib/pipeline/relevance';
 import { evidenceText } from '$lib/pipeline/evidence-text';
-import { canonicalNumbers } from '$lib/numbers';
+import { canonicalNumbers, MONEY_AMOUNT } from '$lib/numbers';
 
 const RRF_K = 60;
 const RERANK_CANDIDATE_LIMIT = 96;
@@ -465,9 +465,6 @@ export function numericLabelValueProximityCoverage(query: string, text: string):
  * this and the model missed it" from "the evidence is silent", and it is the
  * same standard as the other value corrections.
  */
-const AMOUNT_IN_TEXT =
-	/(?:\d[\d\s.,]*\s*(?:€|eur\b|euros?\b|usd\b|dollars?\b))(?:\s*(?:ht|ttc))?/giu;
-
 /** Question words that prove nothing about a document. */
 const QUESTION_VOCABULARY =
 	/^(?:combien|coute|couter|cout|prix|montant|quel|quelle|quels|quelles|est|sont|le|la|les|un|une|des|du|de|pour|par|dans|avec|sur|mon|ma|mes|votre|vos|how|much|many|what|is|are|the|a|an|of|for|in|with|my|your|cost|costs|price|amount|does)$/iu;
@@ -497,20 +494,73 @@ function distinctiveQueryTerms(query: string): string[] {
 		);
 }
 
-export function labelledAmountCarrier(query: string, text: string): { literal: string } | null {
-	if (!ASKS_A_COST.test(normalizeForFuzzy(query))) return null;
+/** The distinctive terms a cost question names, one per amount it can ask for.
+ * Token-shaped like the carrier grammar itself: no vocabulary beyond the
+ * question's own words. Used by the amount correction to detect a term whose
+ * value sat below the retrieval cutoff. */
+export function costQuestionTerms(query: string): string[] {
+	if (!ASKS_A_COST.test(normalizeForFuzzy(query))) return [];
+	return distinctiveQueryTerms(query);
+}
+
+export interface LabelledAmountCarrier {
+	literal: string;
+	/** The distinctive question term bound to this amount, as found in the clause. */
+	term: string;
+}
+
+/**
+ * Every amount a passage binds to a term the question names.
+ *
+ * The single-carrier version only fired when ALL distinctive terms sat in one
+ * clause, which silently disabled the correction on coordinated cost questions
+ * ("Combien coûte un référé + un recours" binds one amount per clause) and on
+ * questions carrying a modifier the document never prints ("un rapo complet"
+ * has no clause containing "complet"). This version binds each amount to its
+ * nearest distinctive term in the same clause, then keeps ONE amount per term:
+ * the closest binding. A fee page that prints a global forfait and its phases
+ * ("recours 2000 € HT, dont RAPO 1100 et TA 900") must yield the global price
+ * for the term "recours", not all three amounts — otherwise the correction
+ * asks the model to state redundant figures it then fails to reproduce.
+ * A clause that shares no term with the question still stays silent.
+ */
+export function labelledAmountCarriers(query: string, text: string): LabelledAmountCarrier[] {
+	if (!ASKS_A_COST.test(normalizeForFuzzy(query))) return [];
 	const terms = distinctiveQueryTerms(query);
-	if (!terms.length) return null;
-	for (const match of text.matchAll(AMOUNT_IN_TEXT)) {
+	if (!terms.length) return [];
+	const byTerm = new Map<string, LabelledAmountCarrier & { distance: number }>();
+	for (const match of text.matchAll(MONEY_AMOUNT)) {
 		const index = match.index ?? 0;
 		// The clause around the amount, not the chunk: a fee table lists several
 		// amounts and only the one in the same clause is bound to the term.
 		const start = Math.max(0, text.lastIndexOf('\n', index) + 1);
 		const end = text.indexOf('\n', index);
-		const clause = normalizeForFuzzy(text.slice(start, end === -1 ? text.length : end));
-		if (terms.every((term) => clause.includes(term))) return { literal: match[0].trim() };
+		const clause = text.slice(start, end === -1 ? text.length : end);
+		const normalizedClause = normalizeForFuzzy(clause);
+		const amountAt = index - start;
+		let bestTerm: string | null = null;
+		let bestDistance = Number.POSITIVE_INFINITY;
+		for (const term of terms) {
+			const termAt = normalizedClause.indexOf(term);
+			if (termAt < 0) continue;
+			const distance = Math.abs(termAt - amountAt);
+			if (distance < bestDistance) {
+				bestDistance = distance;
+				bestTerm = term;
+			}
+		}
+		if (!bestTerm) continue;
+		const literal = match[0].trim();
+		const previous = byTerm.get(bestTerm);
+		if (!previous || bestDistance < previous.distance)
+			byTerm.set(bestTerm, { literal, term: bestTerm, distance: bestDistance });
 	}
-	return null;
+	return [...byTerm.values()].map((entry) => ({ literal: entry.literal, term: entry.term }));
+}
+
+/** Backward-compatible single carrier for call sites that only need one. */
+export function labelledAmountCarrier(query: string, text: string): { literal: string } | null {
+	return labelledAmountCarriers(query, text)[0] ?? null;
 }
 
 // A question asking for a way to reach someone wants a literal identifier, and
