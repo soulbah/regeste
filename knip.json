@@ -32,6 +32,12 @@
 		"sqlite-vec-wasm-demo",
 		"formsnap",
 		"sveltekit-superforms",
-		"zod"
+		"zod",
+		// Referenced from .releaserc.json; knip's semantic-release analysis
+		// resolves some plugins but not these four.
+		"@semantic-release/commit-analyzer",
+		"@semantic-release/release-notes-generator",
+		"@semantic-release/npm",
+		"@semantic-release/github"
 	]
 }

@@ -1,11 +1,12 @@
 name: Deploy
 
-# Production deploy: every merge to main ships to Cloudflare. The verify job
-# is the gate — branch protection is not available on this private repo (free
-# plan), so deploy runs the full gate itself instead of trusting the CI run.
+# Production deploy: a published GitHub release (vX.Y.Z, created by the
+# Release workflow) ships to Cloudflare. The verify job is the gate — branch
+# protection is not available on this private repo (free plan), so deploy runs
+# the full gate itself instead of trusting the CI run.
 on:
-  push:
-    branches: [main]
+  release:
+    types: [published]
   workflow_dispatch:
 
 # One deploy at a time; never cancel a running deploy for a newer commit.
@@ -22,11 +23,14 @@ jobs:
 
   deploy:
     needs: verify
-    # Manual dispatches run on any branch; production is main only.
-    if: github.ref == 'refs/heads/main'
+    # Manual dispatches are allowed from release tags only; release events
+    # always carry the tag ref.
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     environment: production
     timeout-minutes: 20
+    env:
+      APP_VERSION: ${{ github.ref_name }}
     steps:
       # Pinned by commit SHA (OpenSSF Scorecard): tags move, history does not.
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
