@@ -97,6 +97,18 @@ export const handle: Handle = async ({ event, resolve }) => {
 	// locally while production served them fine. Leaving early makes dev tell the
 	// truth about what runs.
 	if (event.route.id?.startsWith('/(marketing)')) return resolve(event);
+	// The app shell is client-rendered: its server output is a static list of
+	// script tags, and none of it needs a session. better-auth's per-request setup
+	// cost ~400 ms of TTFB on every app page load; skipping it for GET pages keeps
+	// the security headers and leaves auth to the /api/* routes that actually use
+	// it. (cdn/* proxies model files, /dev pages and /sitemap.xml are all
+	// session-free GETs too.)
+	// event.route.id is null for better-auth's own endpoints (/api/auth/*) —
+	// those must keep flowing into svelteKitHandler below.
+	if (event.request.method === 'GET' && event.route.id && !event.route.id.startsWith('/api/')) {
+		const response = await resolve(event);
+		return withSecurityHeaders(event, response);
+	}
 	// The locale rides along so a sign-in code reaches someone in the language
 	// they are reading the app in.
 	const auth = createAuth(
@@ -106,6 +118,11 @@ export const handle: Handle = async ({ event, resolve }) => {
 	);
 	event.locals.auth = auth;
 	const response = await svelteKitHandler({ event, resolve, auth, building });
+	return withSecurityHeaders(event, response);
+};
+
+/** Headers every Worker-served response carries (spec 018 + header hygiene). */
+function withSecurityHeaders(event: Parameters<Handle>[0]['event'], response: Response): Response {
 	// Cross-origin isolation (spec 018): unlocks SharedArrayBuffer, which the
 	// wllama CPU fallback needs for multithreading. `credentialless` keeps
 	// cross-origin model downloads (CORS-served CDNs) working. Auth is

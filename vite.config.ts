@@ -133,6 +133,28 @@ export default defineConfig({
 	worker: {
 		format: 'es'
 	},
+	build: {
+		rollupOptions: {
+			output: {
+				// Perf (2026-08-04): the default per-module splitting ships 70+
+				// small chunks, and every chunk is a round trip on a real network
+				// (Cloudflare edge latency dominates the first load). Merge the
+				// small runtime/UI libraries into a handful of stable chunks;
+				// heavy lazy dependencies (onnx, transformers, pdfjs, WebLLM,
+				// better-auth) keep their own granularity so on-demand features do
+				// not pull the whole vendor tree.
+				manualChunks(id) {
+					if (!id.includes('node_modules')) return undefined;
+					if (id.includes('lucide')) return 'icons';
+					if (id.includes('bits-ui') || id.includes('mode-watcher') || id.includes('tw-animate'))
+						return 'ui';
+					if (id.includes('comlink') || id.includes('fflate')) return 'util';
+					if (id.includes('svelte')) return 'svelte';
+					return undefined;
+				}
+			}
+		}
+	},
 	server: {
 		// Nested agent worktrees live under .claude/worktrees INSIDE this tree.
 		// Their svelte-kit sync rewrites a tsconfig on every agent turn, which
