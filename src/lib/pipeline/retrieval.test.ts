@@ -1541,7 +1541,7 @@ describe('ordinal payment-series partition', () => {
 		// qualify, even when the page mentions "euros" elsewhere.
 		expect(
 			extremeSeriesDate(
-				'BANQUE POPULAIRE 13.10.2025\nA ARCHIVER\nEchéancier de remboursement (en euros)\nIBAN FR76 1234 5678 9012',
+				'Banque Populaire 13.10.2025\nA ARCHIVER\nEchéancier de remboursement (en euros)\nIBAN FR76 1234 5678 9012',
 				'first'
 			)
 		).toBeNull();

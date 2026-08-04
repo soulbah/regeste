@@ -18,11 +18,7 @@ function item(text: string, x: number, y: number, width = 60): PositionedPdfText
 describe('layoutUncertain — which born-digital pages pay for a detector pass', () => {
 	it('fires on a letter with a legal footer, stays quiet on a page number', () => {
 		const legalFooter = [
-			item(
-				'Caisse Régionale de Banque Populaire Mutuel Grand Ouest Société coopérative',
-				100,
-				60
-			),
+			item('Caisse Régionale de Banque Populaire Mutuel Grand Ouest Société coopérative', 100, 60),
 			item('agréé en tant qu’établissement de crédit, siège social 10 avenue Foch LILLE', 100, 48)
 		];
 		expect(layoutUncertain([item('Corps du texte.', 100, 600), ...legalFooter], H)).toBe(true);

@@ -297,9 +297,9 @@ describe('crossLingualQueryVariants', () => {
 		// used to satisfy every gate, so the rewrite never ran and the actual
 		// question went unserved.
 		const composed =
-			"Comment s'appelle la demandeuse ?\nLa demandeuse s'appelle Aminata Keita\nQuel est son métier ?";
+			"Comment s'appelle la demandeuse ?\nLa demandeuse s'appelle AMINA DIALLO\nQuel est son métier ?";
 		const primary = [
-			hit(1, 'La demandeuse Aminata Keita réside à BAMAKO, adresse électronique, téléphone.')
+			hit(1, 'La demandeuse AMINA DIALLO réside à DAKAR, adresse électronique, téléphone.')
 		];
 		const fallback = [
 			hit(2, '21. Activité professionnelle actuelle Employé 22. Employeur (Nom, adresse)')
@@ -325,9 +325,7 @@ describe('crossLingualQueryVariants', () => {
 		const unrelatedNumber = [
 			hit(1, 'Martine Duval — numéro SIRET 987 654 321 — conditions particulières.')
 		];
-		const accountNumber = [
-			hit(2, 'Compte n° 60012345678 ouvert au nom de KARIM TRAORE.')
-		];
+		const accountNumber = [hit(2, 'Compte n° 60012345678 ouvert au nom de KARIM TRAORE.')];
 		const rewrite = vi.fn().mockResolvedValue('numéro du compte de KARIM TRAORE');
 		const retrieve = vi
 			.fn()

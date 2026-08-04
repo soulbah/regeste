@@ -27,7 +27,7 @@ export function isLikelyPdfSectionHeading(line: string, nextLine = ''): boolean 
 		nextLine.trim().length < 20 ||
 		/[.;,]$/u.test(text) ||
 		/(?:https?:\/\/|www\.|@)/iu.test(text) ||
-		// A form field ("Nom * KEITA", "Prénom * AMINATA KEITA") is a
+		// A form field ("Nom * KEITA", "Prénom * AMINA DIALLO") is a
 		// label-and-value pair, not a section title — the asterisk field marker
 		// with a value after it disqualifies it. Without this, an ALL-CAPS value
 		// pushes the uppercase ratio over the bar and the value becomes the
@@ -163,7 +163,7 @@ export function positionedPageText(
  * signature block cannot glue to it, because they are never in the same
  * sequence to begin with.
  */
-export async function positionLines(
+async function positionLines(
 	items: PositionedTextItem[],
 	pageWidth: number,
 	pageHeight: number,

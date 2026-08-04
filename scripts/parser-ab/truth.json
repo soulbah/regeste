@@ -56,7 +56,7 @@
 			"page": 2,
 			"layout": "bordered table, prices inline mid-row, sub-bullets",
 			"pairs": [
-				["cranque populaire en ligne vision", "gratuit"],
+				["Banque Populaire en ligne vision", "gratuit"],
 				["alerte solde disponible", "0,32"],
 				["tenue de compte", "1,50"],
 				["avec releve papier", "2,50"],
@@ -73,7 +73,7 @@
 			"page": 6,
 			"layout": "shaded (unruled) rows, alternating prices",
 			"pairs": [
-				["cranque populaire en ligne vision+", "gratuit"],
+				["Banque Populaire en ligne vision+", "gratuit"],
 				["moins de 12 ordres par an", "99,30"],
 				["service d'agregation de comptes", "gratuit"],
 				["alerte ecopage", "0,32"],

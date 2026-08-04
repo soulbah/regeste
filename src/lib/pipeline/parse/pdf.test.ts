@@ -91,9 +91,9 @@ describe('PDF structural blocks', () => {
 		// A form field is a label+value pair, not a section title — even when the
 		// value is ALL-CAPS (which would otherwise pass the uppercase-ratio test).
 		expect(
-			isLikelyPdfSectionHeading('Prénom * AMINATA KEITA', 'Motif du transfert * Assistance')
+			isLikelyPdfSectionHeading('Prénom * AMINA DIALLO', 'Motif du transfert * Assistance')
 		).toBe(false);
-		expect(isLikelyPdfSectionHeading('Nom * KEITA', 'Prénom * AMINATA KEITA')).toBe(false);
+		expect(isLikelyPdfSectionHeading('Nom * KEITA', 'Prénom * AMINA DIALLO')).toBe(false);
 		// A real section label still wins, so the beneficiary name inherits it.
 		expect(isLikelyPdfSectionHeading('Bénéficiaire', 'N° mobile +224 620 12 34 56')).toBe(true);
 	});

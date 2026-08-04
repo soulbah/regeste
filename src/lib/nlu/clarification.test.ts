@@ -138,6 +138,6 @@ describe('scope clarification only when the question names nothing', () => {
 	});
 
 	it('treats any named thing as an answer, not only an acronym', () => {
-		expect(ask('Quelle est la somme des primes pour Sécuriplus ?')).toBeNull();
+		expect(ask('Quelle est la somme des primes pour Previssima ?')).toBeNull();
 	});
 });

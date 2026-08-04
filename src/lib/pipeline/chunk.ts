@@ -13,8 +13,8 @@ import { extractAliases, fuzzyHeadingIndexText, fuzzyIndexText } from '$lib/pipe
 // dense pages from compressing several unrelated facts into one embedding.
 export const CHUNK_TARGET_CHARS = 650;
 export const STRUCTURED_CHUNK_TARGET_CHARS = 450;
-export const CHUNK_OVERLAP_CHARS = 80;
-export const PARENT_CHUNK_MIN_CHARS = 900;
+const CHUNK_OVERLAP_CHARS = 80;
+const PARENT_CHUNK_MIN_CHARS = 900;
 export const PARENT_CHUNK_MAX_CHARS = 1500;
 
 interface Piece {
@@ -36,7 +36,7 @@ interface Piece {
 const SECTION_MARKER = /\b(?:ar\p{L}icle|art\.)\s*\d{1,4}[a-z]?\s*(?::|[–—]|-\s)/giu;
 
 /** Split a block's text before each clause marker, keeping offsets. */
-export function splitAtSectionMarkers(
+function splitAtSectionMarkers(
 	text: string,
 	offset: number
 ): Array<{ text: string; start: number; end: number; opensSection: boolean }> {
@@ -123,7 +123,7 @@ export function chunkTargetForBlock(text: string): number {
 /** Compact page/section parent used for multi-field retrieval. Children remain
  * the precise citation units; the parent lets one embedding represent fields
  * that would otherwise be split across several unrelated vectors. */
-export function parentSectionText(text: string): string {
+function parentSectionText(text: string): string {
 	if (text.length <= PARENT_CHUNK_MAX_CHARS) return text;
 	const informative = text
 		.split(/\r?\n/)

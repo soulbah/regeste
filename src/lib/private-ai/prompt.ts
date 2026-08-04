@@ -30,7 +30,7 @@ const LEADING_FRAMING =
 	/^(?:d['’ ]?apres|selon|a mon avis|en general|par ailleurs|d['’ ]?ailleurs|non|no|oui|yes|ok|d['’ ]?accord|merci|thanks|bonjour|hello)\b/u;
 
 export const GROUNDED_VERIFICATION_VERSION = 7;
-export const MAX_VERIFICATION_EVIDENCE_CHARS = 4800;
+const MAX_VERIFICATION_EVIDENCE_CHARS = 4800;
 const MAX_EVIDENCE_INVENTORY_CHARS = 2600;
 
 /** Clauses a multi-part answer must cover, dropping a leading framing clause. */
@@ -481,7 +481,7 @@ Each part of this question asks for its own time limit. Excerpt [${excerptNumber
  * quoting that verbatim makes small models misread it as "20 000 €". The
  * canonical digits with the literal's own currency suffix keep the value exact
  * ("2000 € HT") while the document spelling stays available as context. */
-export function amountPromptDisplay(literal: string): string {
+function amountPromptDisplay(literal: string): string {
 	const canonical = canonicalAmounts(literal)[0];
 	if (!canonical) return literal;
 	const suffix = literal.replace(/^[\d\s.,]+/u, '').trim();

@@ -16,7 +16,7 @@ import { canonicalNumbers, MONEY_AMOUNT } from '$lib/numbers';
 
 const RRF_K = 60;
 const RERANK_CANDIDATE_LIMIT = 96;
-export const MAX_EVIDENCE_CHARS = 10000;
+const MAX_EVIDENCE_CHARS = 10000;
 /** Query/ranking behavior fingerprint. Unlike RETRIEVAL_VERSION this does not
  * require re-indexing documents; it invalidates benchmark/result caches only. */
 export const RETRIEVAL_PIPELINE_VERSION = 51;

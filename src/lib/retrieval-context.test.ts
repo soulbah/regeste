@@ -244,7 +244,7 @@ describe('buildRetrievalContext', () => {
 		const context = buildRetrievalContext(
 			[
 				message('user', "Comment s'appelle la demandeuse ?"),
-				message('assistant', "La demandeuse s'appelle Aminata Keita [1]."),
+				message('assistant', "La demandeuse s'appelle AMINA DIALLO [1]."),
 				message('user', current)
 			],
 			current
@@ -258,7 +258,7 @@ describe('buildRetrievalContext', () => {
 		const context = buildRetrievalContext(
 			[
 				message('user', "Comment s'appelle la demandeuse ?", null, 'u1'),
-				message('assistant', "La demandeuse s'appelle Aminata Keita.", 'private', 'a1'),
+				message('assistant', "La demandeuse s'appelle AMINA DIALLO.", 'private', 'a1'),
 				message('user', current, null, 'u2'),
 				message('assistant', 'À quelle partie faut-il répondre en premier ?', 'private', 'a2'),
 				message('user', current, null, 'u3')
@@ -267,7 +267,7 @@ describe('buildRetrievalContext', () => {
 			false,
 			new Set(['a2'])
 		);
-		expect(context?.previousAnswer).toContain('Aminata');
+		expect(context?.previousAnswer).toContain('AMINA DIALLO');
 		expect(context?.previousQuestion).toContain('demandeuse');
 	});
 

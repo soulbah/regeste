@@ -740,12 +740,7 @@ describe('deterministic extractive answers', () => {
 	it('does not mistake several search rewrites for several requested facts', () => {
 		const answer = buildDeterministicExtractiveAnswer(
 			'Et quel est le numéro du compte ?',
-			[
-				hit(
-					1,
-					'Nous certifions que le compte n° 60012345678 ouvert au nom de KARIM TRAORE.'
-				)
-			],
+			[hit(1, 'Nous certifions que le compte n° 60012345678 ouvert au nom de KARIM TRAORE.')],
 			['numéro du compte', 'identifiant bancaire du compte']
 		);
 

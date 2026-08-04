@@ -6,7 +6,7 @@ export interface ClarificationContext {
 }
 
 /** Does the question name a specific thing, rather than only an operation?
- *  Capitalised tokens away from the opening word: RAPO, TA, Sécuriplus, Nantes. */
+ *  Capitalised tokens away from the opening word: RAPO, TA, Previssima, Nantes. */
 function namesItsSubject(question: string): boolean {
 	const tokens = question.split(/\s+/u).filter(Boolean);
 	return tokens
