@@ -113,6 +113,32 @@ export function canonicalAmounts(literal: string): string[] {
 	return normalized ? [normalized] : [];
 }
 
+/** Money literals as a model should read them. A document may print
+ * "20 00 € HT" — a space inside the thousands group, where a standard French
+ * grouping would be "2 000" — and a small model reading that verbatim states
+ * "20 000 € HT". Only non-standard integer groupings are joined: "20 00" is a
+ * digit-group token shape that cannot denote a printed French amount, while
+ * "40 000 €" and "5 000 €" are standard and stay exactly as printed, so
+ * extractive answers keep the document's own formatting. The decimal fraction
+ * is never touched. */
+export function normalizeAmountsForModel(text: string): string {
+	return text.replace(MONEY_AMOUNT, (literal) => {
+		const digits = /\d[\d\s.,]*/u.exec(literal)?.[0].trim() ?? '';
+		const decimalAt = Math.max(digits.lastIndexOf('.'), digits.lastIndexOf(','));
+		const integer = decimalAt >= 0 ? digits.slice(0, decimalAt) : digits;
+		const fraction = decimalAt >= 0 ? digits.slice(decimalAt) : '';
+		const suffix = literal.replace(/^[\d\s.,]+/u, '').trim();
+		const groups = integer.split(/[\s.]/u).filter(Boolean);
+		const standardGrouping =
+			groups.length > 1 &&
+			groups[groups.length - 1].length === 3 &&
+			groups[0].length <= 3 &&
+			groups.slice(1, -1).every((group) => group.length === 3);
+		const joined = standardGrouping ? integer : integer.replace(/[\s.]/gu, '');
+		return `${joined}${fraction} ${suffix}`.trim();
+	});
+}
+
 export interface CalendarDateMention {
 	start: number;
 	end: number;
