@@ -2,6 +2,10 @@
 
 **Chat with sensitive documents. Your files stay local. You choose what the AI can see.**
 
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/soulbah/regeste/ci.yml?branch=develop&label=CI&logo=github)](https://github.com/soulbah/regeste/actions/workflows/ci.yml)
+[![Bun](https://img.shields.io/badge/runtime-Bun%201.2-f9f1e2.svg?logo=bun)](https://bun.sh)
+
 Regeste is an open-source, privacy-first document chat. Parsing, chunking, embeddings, vector search and chat history all run **in your browser** — documents never leave your device. For each answer you pick a trust boundary:
 
 - **Private** — an LLM runs on your device (WebGPU/WASM). Nothing is sent anywhere.
@@ -31,7 +35,26 @@ This repo is developed with AI coding agents; the agent harness lives in `AGENTS
 ## Documentation
 
 - [docs/constitution.md](docs/constitution.md) — non-negotiable principles
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — how the pieces fit together
 - [PROGRESS.md](PROGRESS.md) — current state and roadmap
+- [CONTRIBUTING.md](CONTRIBUTING.md) — how to contribute (DCO, AI-assisted rules)
+- [SECURITY.md](SECURITY.md) — reporting a vulnerability
+- [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) — licenses of vendored components
+
+## Contributing
+
+Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md)
+first: it covers the DCO, the verification gate and the rules for AI-assisted
+contributions. All community interactions follow the
+[Code of Conduct](CODE_OF_CONDUCT.md). Looking for a place to start? Issues
+labelled `good first issue` are a good entry point.
+
+## Support
+
+- **Bugs and feature requests**: open a GitHub issue (templates are provided —
+  please never paste document content or personal data into an issue).
+- **Security**: report privately via GitHub Security Advisories, see
+  [SECURITY.md](SECURITY.md).
 
 ## License
 

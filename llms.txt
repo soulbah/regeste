@@ -1,0 +1,31 @@
+# Regeste
+
+> Chat with sensitive documents. Your files stay local. You choose what the AI can see.
+
+Regeste is an open-source, privacy-first "chat with your documents" web app.
+Parsing, chunking, embeddings, vector search and chat history all run in the
+browser; documents never leave the device. The only backend is a Cloudflare
+Worker handling auth, quotas and the optional Assisted endpoint (Workers AI).
+
+## Docs
+
+- [README](README.md) — what the app is, the three trust boundaries, stack, development setup
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — how the browser pipeline, the local database and the Worker fit together
+- [docs/constitution.md](docs/constitution.md) — the non-negotiable principles (privacy invariants)
+- [CONTRIBUTING.md](CONTRIBUTING.md) — how to contribute, DCO, AI-assisted contribution rules
+- [SECURITY.md](SECURITY.md) — security policy and how to report vulnerabilities
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — community standards
+- [LICENSE](LICENSE) — AGPL-3.0-only
+
+## Key facts
+
+- Every document-related operation (parsing, OCR, chunking, embeddings, vector
+  index, chats, citations) runs in the browser and stays on the user's device.
+- Three answer modes: Private (on-device LLM, WebGPU/WASM), Assisted (retrieved
+  excerpts only, sent transiently to a Cloudflare Worker, never stored), My AI
+  (bring your own OpenAI-compatible endpoint).
+- Private and My AI need no server; Assisted is off by default and appears only
+  when a deployment sets PUBLIC_ASSISTED_ENABLED=true.
+- Stack: SvelteKit (Svelte 5), Tailwind CSS v4, shadcn-svelte, Cloudflare
+  Workers + D1 + Workers AI, better-auth, drizzle, valibot, SQLite WASM +
+  sqlite-vec in the browser.

@@ -1,0 +1,11 @@
+# Every change needs the maintainer's review — the project is a one-person
+# show and the privacy invariants in docs/constitution.md are non-negotiable.
+* @soulbah
+
+# Sensitive paths get the same owner explicitly, so a partial CODEOWNERS
+# change can never silently drop them from review.
+/docs/constitution.md @soulbah
+/SECURITY.md @soulbah
+/src/lib/server/ @soulbah
+/src/routes/api/ @soulbah
+/migrations/ @soulbah

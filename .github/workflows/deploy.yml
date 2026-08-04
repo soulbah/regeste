@@ -1,0 +1,38 @@
+name: Deploy
+
+# Production deploy: every merge to main ships to Cloudflare. Secrets come
+# from GitHub repository secrets: CLOUDFLARE_API_TOKEN (a token scoped to the
+# regeste Worker) and CLOUDFLARE_ACCOUNT_ID.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # Pinned by commit SHA (OpenSSF Scorecard): tags move, history does not.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.2.22
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+      - run: bun install --frozen-lockfile
+      # Deploy runs the same build gate as CI before touching production.
+      - run: bun run verify
+      - uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd # v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy
+
+      # Runtime secrets (BETTER_AUTH_SECRET, email credentials…) are managed in
+      # Cloudflare itself (`wrangler secret put`) and are never re-created by
+      # this workflow. D1 migrations are applied by the maintainer on purpose
+      # (`bun run db:migrate:remote`), not automatically on deploy.

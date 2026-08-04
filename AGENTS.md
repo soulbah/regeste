@@ -89,4 +89,4 @@ docs/                  # constitution (public); internal/ = PRD, features, resea
 ## Git & deploys
 
 - Work on `develop` in small, frequent commits (owner decision, 2026-07-18) — the owner reviews diffs, so commit after each verified task, never batch a day of work into one commit. Conventional Commits. `main` stays stable; it advances only when the owner asks for a merge from `develop`.
-- Dev phase: deploys are run locally by the agent (`bun run deploy`) when the owner asks. CI has no automatic triggers for now (manual `workflow_dispatch` only); Workers Builds + PR flow come with the open-source launch.
+- CI runs on every push/PR (`.github/workflows/ci.yml`): `bun run verify` + knip on Linux. Production deploys are automated from `main` (`.github/workflows/deploy.yml`) with `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` from GitHub secrets; a merge to `main` ships. Local deploys stay available for pre-merge checks (`bun run deploy`) when the owner asks. D1 migrations are applied manually on purpose (`bun run db:migrate:remote`), never by CI.
