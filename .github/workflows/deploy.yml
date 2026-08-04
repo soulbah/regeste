@@ -1,19 +1,32 @@
 name: Deploy
 
-# Production deploy: every merge to main ships to Cloudflare. Secrets come
-# from GitHub repository secrets: CLOUDFLARE_API_TOKEN (a token scoped to the
-# regeste Worker) and CLOUDFLARE_ACCOUNT_ID.
+# Production deploy: every merge to main ships to Cloudflare. The verify job
+# is the gate — branch protection is not available on this private repo (free
+# plan), so deploy runs the full gate itself instead of trusting the CI run.
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
+# One deploy at a time; never cancel a running deploy for a newer commit.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
 permissions:
   contents: read
 
 jobs:
+  verify:
+    uses: ./.github/workflows/verify.yml
+
   deploy:
+    needs: verify
+    # Manual dispatches run on any branch; production is main only.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 20
     steps:
       # Pinned by commit SHA (OpenSSF Scorecard): tags move, history does not.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -24,15 +37,24 @@ jobs:
         with:
           node-version-file: .nvmrc
       - run: bun install --frozen-lockfile
-      # Deploy runs the same build gate as CI before touching production.
-      - run: bun run verify
+      # The verify job already ran check + lint + test + build. We rebuild here
+      # so the deployed artifact comes from this run, not from a cache.
+      - run: bun run build
+      # Preflight: validate the exact artifact that would ship, without
+      # touching production. Wrangler is pinned: 4.107.1 hangs on deploy and
+      # the 4.107.x series cannot boot miniflare (PROGRESS.md, 2026-07-09/30).
       - uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd # v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: '4.115.0'
+          command: deploy --dry-run --outdir .verification
+      - uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd # v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: '4.115.0'
           command: deploy
 
-      # Runtime secrets (BETTER_AUTH_SECRET, email credentials…) are managed in
-      # Cloudflare itself (`wrangler secret put`) and are never re-created by
-      # this workflow. D1 migrations are applied by the maintainer on purpose
-      # (`bun run db:migrate:remote`), not automatically on deploy.
+      # Secrets and D1 migrations are managed manually on purpose:
+      # `wrangler secret put` and `bun run db:migrate:remote`.
