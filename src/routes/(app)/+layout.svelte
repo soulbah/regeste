@@ -227,10 +227,10 @@
 	<PanicWipeScreen />
 {:else}
 	{#if Palette}
-		<svelte:component this={Palette} />
+		<Palette />
 	{/if}
 	{#if Settings}
-		<svelte:component this={Settings} />
+		<Settings />
 	{/if}
 
 	{#if Viewer}
@@ -242,7 +242,7 @@
 				<!-- This sheet portals outside Sidebar.Provider (the app's Tooltip
 				     provider); the panel header's tooltips need their own. -->
 				<Tooltip.Provider delayDuration={300}>
-					<svelte:component this={Viewer} />
+					<Viewer />
 				</Tooltip.Provider>
 			</Sheet.Content>
 		</Sheet.Root>
@@ -264,7 +264,7 @@
 	</Sidebar.Provider>
 
 	{#if StorageRisk}
-		<svelte:component this={StorageRisk} />
+		<StorageRisk />
 	{/if}
 	<ReportProblemDialog bind:open={uiStore.reportOpen} />
 	<Toaster position="bottom-right" />

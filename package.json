@@ -27,7 +27,7 @@
 		"db:generate": "drizzle-kit generate",
 		"db:migrate:local": "wrangler d1 migrations apply regeste-db --local",
 		"db:migrate:remote": "wrangler d1 migrations apply regeste-db --remote",
-		"cf:types": "wrangler types && sed -i '' 's#typeof import(\"./.svelte-kit/cloudflare/_worker\")#unknown#' worker-configuration.d.ts",
+		"cf:types": "wrangler types && sed -i '' -e 's#typeof import(\"./.svelte-kit/cloudflare/_worker\")#unknown#' -e 's# // eslint-disable-line##' worker-configuration.d.ts",
 		"deploy": "bun run build && wrangler deploy",
 		"knip": "knip",
 		"vendor": "mkdir -p static/vendor/sqlite && cp node_modules/sqlite-vec-wasm-demo/sqlite3.mjs node_modules/sqlite-vec-wasm-demo/sqlite3.wasm static/vendor/sqlite/ && bash scripts/vendor-ocr-models.sh"

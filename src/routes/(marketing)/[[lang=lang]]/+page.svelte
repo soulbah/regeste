@@ -145,7 +145,7 @@
 
 	<div class="land-rise mt-14 sm:mt-20" style="--rise-delay: 260ms">
 		{#if Demo}
-			<svelte:component this={Demo} />
+			<Demo />
 		{:else}
 			<div class="h-[600px] p-3 lg:h-[720px]" aria-hidden="true"></div>
 		{/if}
@@ -244,7 +244,7 @@
 <!-- ——— [ 03 — the dossier. Two moments of one question, stacked. ——— -->
 <section class="lazy-render mx-auto max-w-7xl px-6 pt-32 sm:pt-40" use:reveal>
 	{#if Dossier}
-		<svelte:component this={Dossier} />
+		<Dossier />
 	{:else}
 		<div class="min-h-[680px] lg:min-h-[760px]" aria-hidden="true"></div>
 	{/if}

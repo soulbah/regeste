@@ -38,9 +38,12 @@
 	// whatever its URL said. The body runs at the top of the render and Svelte's SSR
 	// render has no await inside it, so a request cannot be interleaved with another
 	// of a different language even though the dictionary is one module instance.
-	i18n.locale = data.locale;
+	// Read from page.data rather than the data prop: the prop read is flagged
+	// as a local-only capture by the compiler, and the value is identical here
+	// (this layout is the only loader on the route tree).
+	i18n.locale = page.data.locale;
 	$effect(() => {
-		i18n.locale = data.locale;
+		i18n.locale = page.data.locale;
 	});
 
 	// This page at its French address. Every branch goes through resolve(), so the
