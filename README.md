@@ -16,6 +16,16 @@ Private and My AI need **no server** — the app is a static client. Assisted is
 
 > Don't trust us. Inspect the code, self-host it, or keep everything local.
 
+## Demo
+
+**Try the hosted app: [regeste.com](https://regeste.com).**
+
+A 17-second walkthrough of the app, captured in the browser:
+
+<video src="https://github.com/soulbah/regeste/raw/main/static/landing/demo-en.mp4" controls muted loop playsinline poster="https://github.com/soulbah/regeste/raw/main/static/og.png"></video>
+
+English demo. The [French version](https://github.com/soulbah/regeste/raw/main/static/landing/demo-fr.mp4) is also in the repo.
+
 ## Stack
 
 SvelteKit (Svelte 5) · Tailwind CSS v4 · shadcn-svelte · Cloudflare Workers + D1 + Workers AI · better-auth · drizzle · valibot · SQLite WASM + sqlite-vec in the browser.
