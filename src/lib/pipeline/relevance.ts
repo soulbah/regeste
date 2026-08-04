@@ -11,7 +11,7 @@ import {
 	requestedPartyRoles
 } from '$lib/pipeline/identity-evidence';
 
-export const WEAK_SCORE_THRESHOLD = 0.018;
+const WEAK_SCORE_THRESHOLD = 0.018;
 const MAX_REFINED_SCORE = 2 / 61 + 0.008;
 
 /**

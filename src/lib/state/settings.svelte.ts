@@ -12,7 +12,7 @@ import { i18n } from '$lib/i18n/index.svelte';
 import { panicWipeUrl } from '$lib/panic-wipe';
 import { sessionStore } from './session.svelte';
 
-export interface StorageStatus {
+interface StorageStatus {
 	usage: number;
 	quota: number;
 	persisted: boolean;

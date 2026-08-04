@@ -2,7 +2,7 @@
 // panic wipe all agree on it. Versioned by the SvelteKit build `version`, so a
 // deploy starts a fresh cache and the old one is dropped on activate.
 
-export const SHELL_CACHE_PREFIX = 'regeste-shell-';
+const SHELL_CACHE_PREFIX = 'regeste-shell-';
 
 export function shellCacheName(version: string): string {
 	return `${SHELL_CACHE_PREFIX}${version}`;

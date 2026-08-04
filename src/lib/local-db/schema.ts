@@ -5,7 +5,7 @@
 // Privacy invariant: this schema exists in the user's browser only. It is the
 // ONLY place where documents, chats, chunks and embeddings are ever stored.
 
-export const EMBEDDING_DIMS = 384;
+const EMBEDDING_DIMS = 384;
 
 export const MIGRATIONS: string[] = [
 	// v1 — initial schema

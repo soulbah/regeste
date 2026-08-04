@@ -1,6 +1,6 @@
 {
 	"name": "regeste",
-	"private": true,
+	"private": false,
 	"version": "0.1.0",
 	"type": "module",
 	"license": "AGPL-3.0-only",
@@ -33,7 +33,6 @@
 		"vendor": "mkdir -p static/vendor/sqlite && cp node_modules/sqlite-vec-wasm-demo/sqlite3.mjs node_modules/sqlite-vec-wasm-demo/sqlite3.wasm static/vendor/sqlite/ && bash scripts/vendor-ocr-models.sh"
 	},
 	"devDependencies": {
-		"@cloudflare/vitest-pool-workers": "^0.18.2",
 		"@eslint/js": "^10.0.1",
 		"@fontsource-variable/geist": "^5.2.9",
 		"@fontsource-variable/geist-mono": "^5.2.8",

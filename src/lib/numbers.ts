@@ -40,7 +40,7 @@ const DATE_OR_TIME = /^\d{1,4}[./-]\d{1,2}[./-]\d{2,4}$|^\d{1,2}[:h]\d{2}$/u;
 
 /** A run whose separators are not decimal points, so its digits denote a
  * calendar position rather than a quantity you can do arithmetic with. */
-export function isDateOrTime(run: string): boolean {
+function isDateOrTime(run: string): boolean {
 	return DATE_OR_TIME.test(run);
 }
 

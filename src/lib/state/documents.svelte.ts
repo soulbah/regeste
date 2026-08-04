@@ -150,7 +150,7 @@ async function storeOriginal(hash: string, data: ArrayBuffer): Promise<void> {
 
 let originalNotKeptToldOnce = false;
 
-export interface IngestState {
+interface IngestState {
 	status: LocalDocument['status'];
 	phaseProgress: number;
 	error?: IngestErrorCode;
@@ -158,7 +158,7 @@ export interface IngestState {
 	dedup?: boolean;
 }
 
-export interface RetrievalRequest {
+interface RetrievalRequest {
 	query: string;
 	documentIds?: string[] | null;
 	refinementQuery?: string;

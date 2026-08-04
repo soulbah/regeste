@@ -15,14 +15,14 @@ export interface ViewerChunk {
 	charEnd: number;
 }
 
-export interface ViewerTarget {
+interface ViewerTarget {
 	document: LocalDocument;
 	/** Passage to highlight; null when browsing the document from its start. */
 	chunk: ViewerChunk | null;
 }
 
 /** Citation snapshot shown when the chunk/document no longer exists locally. */
-export interface ViewerSnapshot {
+interface ViewerSnapshot {
 	documentName: string;
 	locator: string | null;
 	snippet: string;

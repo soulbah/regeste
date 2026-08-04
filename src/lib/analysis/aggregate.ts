@@ -1,7 +1,7 @@
 import { extractFinancialRecords, type FinancialRecordFact } from './financial-records';
 import type { MoneyKind } from './money';
 import { analyzeQuestion, type AggregateOperation, type TemporalScope } from './query-router';
-import type { QuestionRoute, SearchHit } from '$lib/types';
+import type { SearchHit } from '$lib/types';
 
 export const FACT_EXTRACTOR_VERSION = 'money-v4-schedule';
 
@@ -141,8 +141,4 @@ export function aggregateMoneyFacts(
 		recordsMatched: byRecord.size,
 		count: facts.length
 	};
-}
-
-export function isAggregateRoute(route: QuestionRoute): route is 'aggregate' {
-	return route === 'aggregate';
 }

@@ -11,9 +11,8 @@ import type { DbApi, DbInfo } from './worker';
 export type LocalDb = Remote<DbApi>;
 
 let dbPromise: Promise<{ db: LocalDb; info: DbInfo }> | null = null;
-let lockRelease: (() => void) | null = null;
 
-export class DbLockedError extends Error {
+class DbLockedError extends Error {
 	constructor() {
 		super('The local database is open in another tab.');
 	}
@@ -36,7 +35,7 @@ async function acquire(): Promise<{ db: LocalDb; info: DbInfo }> {
 			}
 			resolve(true);
 			// Hold the lock until the tab closes.
-			await new Promise<void>((release) => (lockRelease = release));
+			await new Promise<void>(() => {});
 		});
 	});
 	if (!granted) throw new DbLockedError();
@@ -53,9 +52,4 @@ async function acquire(): Promise<{ db: LocalDb; info: DbInfo }> {
 	const db = wrap<DbApi>(worker);
 	const info = await db.init();
 	return { db, info };
-}
-
-export function releaseDbLock(): void {
-	lockRelease?.();
-	lockRelease = null;
 }

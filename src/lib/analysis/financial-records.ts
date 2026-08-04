@@ -49,7 +49,7 @@ export interface FinancialRecord {
 
 /** Split "Intérêts: 18,46 | Capital amorti: 50,93" back into named cells.
  * Cells the layout stage could not name carry no colon and are skipped. */
-export function parseLabelledCells(context: string): Array<{ label: string; value: string }> {
+function parseLabelledCells(context: string): Array<{ label: string; value: string }> {
 	return context.split('|').flatMap((cell) => {
 		const match = /^\s*([^:]{1,60}?)\s*:\s*(\S.*?)\s*$/u.exec(cell);
 		return match ? [{ label: match[1], value: match[2] }] : [];
@@ -95,7 +95,7 @@ function validIso(day: number, month: number, year: number): string | null {
 	return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
-export function extractRecordDate(text: string): string | null {
+function extractRecordDate(text: string): string | null {
 	const q = normalizeQuestion(text);
 	const numeric = /\b(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})\b/.exec(q);
 	if (numeric) return validIso(Number(numeric[1]), Number(numeric[2]), Number(numeric[3]));
@@ -106,7 +106,7 @@ export function extractRecordDate(text: string): string | null {
 	return null;
 }
 
-export function extractRecordId(text: string): string | null {
+function extractRecordId(text: string): string | null {
 	const labeled =
 		/\b(?:n[°o]|no|numero|reference|ref|id)\s*[:#-]?\s*([A-Z]{0,5}-[A-Z0-9-]{4,})\b/i.exec(
 			text

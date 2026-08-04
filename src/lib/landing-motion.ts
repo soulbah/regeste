@@ -46,23 +46,3 @@ export function reveal(node: HTMLElement, opts: { delay?: number } = {}) {
 	});
 	return { destroy: stop };
 }
-
-/** Direct children rise one after the other. */
-export function revealStagger(node: HTMLElement, opts: { step?: number } = {}) {
-	if (reduced()) return;
-	const children = [...node.children] as HTMLElement[];
-	for (const child of children) {
-		child.style.opacity = '0';
-		child.style.transform = 'translateY(12px)';
-	}
-	const stop = onceInView(node, 0.2, () => {
-		children.forEach((child, i) => {
-			animate(
-				child,
-				{ opacity: 1, transform: 'translateY(0px)' },
-				{ duration: 0.5, delay: i * (opts.step ?? 0.08), ease: EASE }
-			);
-		});
-	});
-	return { destroy: stop };
-}

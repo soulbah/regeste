@@ -22,15 +22,15 @@ import { SvelteSet } from 'svelte/reactivity';
 
 /** Higher wins. Deliberately coarse: a scale with ten steps invites arguing about
  * step seven instead of deciding whether a thing is worth saying at all. */
-export type AdvisoryLevel = 'notice' | 'degraded' | 'blocked';
+type AdvisoryLevel = 'notice' | 'degraded' | 'blocked';
 
-export const LEVEL_RANK: Record<AdvisoryLevel, number> = {
+const LEVEL_RANK: Record<AdvisoryLevel, number> = {
 	notice: 1,
 	degraded: 2,
 	blocked: 3
 };
 
-export interface Advisory {
+interface Advisory {
 	/** Stable, because dismissal is remembered by it. */
 	id: string;
 	level: AdvisoryLevel;

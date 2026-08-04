@@ -13,10 +13,10 @@ import { quotaUsage } from './db/schema';
  *
  * Content never touches this table: it holds a neuron total and a count.
  */
-export const DAILY_NEURONS = 3000;
+const DAILY_NEURONS = 3000;
 
 /** UTC day, matching the platform's own 00:00 UTC reset. */
-export function currentDay(): string {
+function currentDay(): string {
 	return new Date().toISOString().slice(0, 10);
 }
 

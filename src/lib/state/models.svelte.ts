@@ -4,7 +4,7 @@
 import { llmStore } from '$lib/private-ai/llm.svelte';
 import { isShellCache } from '$lib/pwa/cache-names';
 
-export interface CachedModel {
+interface CachedModel {
 	/** Groups the several caches one model spans. */
 	key: string;
 	/** i18n key, or the raw cache name for anything unrecognised. */
@@ -14,7 +14,7 @@ export interface CachedModel {
 	entries: number;
 }
 
-export interface BenchmarkResult {
+interface BenchmarkResult {
 	tokensPerSecond: number;
 	recommendPrivate: boolean;
 }

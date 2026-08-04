@@ -24,7 +24,7 @@ type CspDirectives = NonNullable<NonNullable<NonNullable<Config['kit']>['csp']>[
  * paint. SvelteKit hashes what it generates and this is not one of those, and the
  * prerendered pages cannot carry a nonce because their HTML is a static file shared
  * by every reader. `scripts/check-csp.mjs` fails the build if this stops matching. */
-export const THEME_SCRIPT_HASH = 'sha256-Cr3r+iKjDTUxJaxM3r/Iq0ow6clOB9AqoT6j0wMFMIM=';
+const THEME_SCRIPT_HASH = 'sha256-Cr3r+iKjDTUxJaxM3r/Iq0ow6clOB9AqoT6j0wMFMIM=';
 
 export const CSP_DIRECTIVES: CspDirectives = {
 	'default-src': ['self'],

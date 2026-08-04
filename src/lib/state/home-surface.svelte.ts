@@ -17,7 +17,7 @@ import { settingsStore } from '$lib/state/settings.svelte';
 import { modeReadiness } from '$lib/state/mode-readiness.svelte';
 import type { ChatMode } from '$lib/types';
 
-export type HomeSurface =
+type HomeSurface =
 	/** No mode has ever been chosen: nothing can answer, so nothing else matters. */
 	| 'choose-engine'
 	/** Nothing in the library yet. Explain, offer the sample, one way in. */

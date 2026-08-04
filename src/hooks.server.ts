@@ -147,4 +147,4 @@ function withSecurityHeaders(event: Parameters<Handle>[0]['event'], response: Re
 		response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
 	}
 	return response;
-};
+}

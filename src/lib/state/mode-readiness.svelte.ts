@@ -10,7 +10,7 @@ import { t, type MessageKey } from '$lib/i18n/index.svelte';
 import { modelProgressDisplay } from '$lib/private-ai/model-progress';
 import type { ChatMode } from '$lib/types';
 
-export type ReadinessState = 'ready' | 'setup' | 'progress' | 'blocked';
+type ReadinessState = 'ready' | 'setup' | 'progress' | 'blocked';
 
 export interface ModeReadiness {
 	state: ReadinessState;

@@ -10,9 +10,6 @@
 // v2 reranker is cc-by-nc-4.0 and cannot ship in an AGPL product.
 export const RERANK_MODEL = 'onnx-community/bge-reranker-v2-m3-ONNX';
 
-/** Bytes the user is asked to accept before the first reranked search. */
-export const RERANK_DOWNLOAD_BYTES = 544 * 1024 * 1024;
-
 export interface RerankProfile {
 	model: string;
 	device: 'webgpu' | 'wasm';

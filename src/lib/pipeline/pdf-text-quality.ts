@@ -9,7 +9,7 @@ const CJK_LETTER = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Scri
 // eslint-disable-next-line no-control-regex
 const UNMAPPED_CHARACTER = /[\u0000\uFFFD]/u;
 
-export type PdfTextQualityReason = 'sparse' | 'unmapped' | 'joined' | null;
+type PdfTextQualityReason = 'sparse' | 'unmapped' | 'joined' | null;
 
 export interface PdfTextQuality {
 	reason: PdfTextQualityReason;

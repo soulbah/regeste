@@ -45,7 +45,7 @@ export interface LayoutRegion {
  * purpose — measured on the tariff corpus they carry the conditions the prices
  * refer to, which is content.
  */
-export const CHROME_LABELS: ReadonlySet<string> = new Set([
+const CHROME_LABELS: ReadonlySet<string> = new Set([
 	'header',
 	'header_image',
 	'footer',

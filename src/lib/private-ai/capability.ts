@@ -5,9 +5,9 @@
 // must arrive as null so the tier logic can treat it as unknown. Reading it as
 // zero is what pinned every Firefox and Safari user to the smallest model.
 
-import { pickTier, eligibleTiers, type DeviceSignals, type Tier } from './tiers';
+import { pickTier, type DeviceSignals, type Tier } from './tiers';
 
-export async function detectSignals(): Promise<DeviceSignals> {
+async function detectSignals(): Promise<DeviceSignals> {
 	let hasWebGpu: boolean;
 	let hasF16 = false;
 	let maxBufferBytes: number | null = null;
@@ -61,9 +61,4 @@ export async function detectSignals(): Promise<DeviceSignals> {
 
 export async function detectTier(): Promise<Tier | null> {
 	return pickTier(await detectSignals());
-}
-
-/** Every tier this machine could attempt, best first, for the download choice. */
-export async function detectEligibleTiers(): Promise<Tier[]> {
-	return eligibleTiers(await detectSignals());
 }

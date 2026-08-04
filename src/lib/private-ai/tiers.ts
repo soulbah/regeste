@@ -188,7 +188,7 @@ export function grantedBufferMB(signals: DeviceSignals): number {
 /** A little headroom so the weights do not crowd out the user's own library. */
 export const STORAGE_HEADROOM = 1.15;
 
-export function fitsIn(tier: Tier, freeBytes: number): boolean {
+function fitsIn(tier: Tier, freeBytes: number): boolean {
 	return tier.downloadBytes * STORAGE_HEADROOM <= freeBytes;
 }
 

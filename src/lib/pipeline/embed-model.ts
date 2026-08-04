@@ -4,8 +4,6 @@
 
 export const E5_EMBEDDING_MODEL = 'Xenova/multilingual-e5-small';
 export const GEMMA_EMBEDDING_MODEL = 'onnx-community/embeddinggemma-300m-ONNX';
-// Kept for UI/storage imports that need a stable quality-tier label.
-export const EMBEDDING_MODEL = GEMMA_EMBEDDING_MODEL;
 
 export interface EmbeddingProfile {
 	model: string;

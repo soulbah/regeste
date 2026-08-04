@@ -1759,7 +1759,7 @@ export function buildAuditedExtractiveAnswer(
 }
 
 /** Benchmark diagnostics: which extractor produced the answer. */
-export function explainDeterministicExtractiveAnswer(
+function explainDeterministicExtractiveAnswer(
 	question: string,
 	hits: SearchHit[],
 	evidenceQueries: string[] = []

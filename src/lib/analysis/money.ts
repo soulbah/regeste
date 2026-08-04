@@ -29,7 +29,7 @@ const MONEY = new RegExp(
 	'giu'
 );
 
-export function currencyFractionDigits(currency: string): number {
+function currencyFractionDigits(currency: string): number {
 	return currency === 'GNF' ? 0 : 2;
 }
 

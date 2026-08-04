@@ -12,9 +12,6 @@
 // 005 to escape a reasoning model that took two minutes per answer, never
 // because it won on quality, so there is nothing to defend by keeping it.
 
-/** Cloudflare bills $0.011 per 1,000 neurons. */
-export const NEURONS_PER_DOLLAR = 1000 / 0.011;
-
 export interface CloudModel {
 	id: string;
 	/** Stable key used in the API contract and the local setting. */
@@ -80,8 +77,8 @@ export function modelFor(key: string | null | undefined): CloudModel {
  * citations. Measured across the benchmark corpus, that lands near 2,000 input
  * and 300 output tokens, which is what the picker's estimate is built on.
  */
-export const TYPICAL_INPUT_TOKENS = 2000;
-export const TYPICAL_OUTPUT_TOKENS = 300;
+const TYPICAL_INPUT_TOKENS = 2000;
+const TYPICAL_OUTPUT_TOKENS = 300;
 
 export function neuronsFor(model: CloudModel, inputTokens: number, outputTokens: number): number {
 	return Math.ceil(
@@ -115,7 +112,7 @@ export function answersLeft(remainingNeurons: number, model: CloudModel): number
  * day for the whole account, so this figure decides how many people that
  * covers before the account starts paying $0.011 per 1,000.
  */
-export const DAILY_NEURONS = 3000;
+const DAILY_NEURONS = 3000;
 
 /** The full daily allowance expressed in answers on this model. */
 export function answersPerDay(model: CloudModel): number {

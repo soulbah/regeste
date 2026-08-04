@@ -58,7 +58,7 @@ export function shouldUseMarkdown(markdown: string): boolean {
  * liteparse's own syntax is removed, never content. Cells are joined with a
  * space because that is how the row reads on the page.
  */
-export function markdownLineToText(line: string): string {
+function markdownLineToText(line: string): string {
 	if (line.includes('|')) return cellsOf(line).join(' ');
 	return line
 		.replace(/^#{1,6}\s+/, '')

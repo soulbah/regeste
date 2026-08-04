@@ -35,8 +35,6 @@ export interface SemanticFrame {
 	evidence: string[];
 }
 
-export type QuestionAnalysis = SemanticFrame;
-
 const MONTHS: Record<string, number> = {
 	janvier: 1,
 	jan: 1,
@@ -258,7 +256,7 @@ function parseNumericDate(value: string): string | null {
 }
 
 /** Parse bounded calendar scopes only. Relative dates would be wrong for old documents. */
-export function parseTemporalScope(question: string): TemporalScope | null {
+function parseTemporalScope(question: string): TemporalScope | null {
 	const q = normalizeQuestion(question);
 	const range =
 		/(?:du|from)\s+(\d{1,2}[/.-]\d{1,2}[/.-]\d{4})\s+(?:au|to)\s+(\d{1,2}[/.-]\d{1,2}[/.-]\d{4})/.exec(

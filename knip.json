@@ -1,26 +1,37 @@
 {
 	"$schema": "https://unpkg.com/knip@6/schema.json",
+	// Developer-only tooling (benchmark harnesses, parser A/B rig, spike
+	// prototypes) is intentionally excluded: it is not shipped and its
+	// exports are consumed by ad-hoc scripts, not by the app.
 	"ignore": [
+		"scripts/parser-ab/**",
+		"scripts/*.mjs",
+		"scripts/bench-*.mjs",
+		"scripts/bench-ingest.mjs",
+		"scripts/bench-retrieval.mjs",
+		"scripts/compare-private-runs.ts",
+		"scripts/doclayout-probe.ts",
+		"scripts/dump-parsed-document.ts",
+		"scripts/intent-calibration.ts",
+		"scripts/private-run-scoring.ts",
+		"scripts/rescore-private-run.ts",
+		"scripts/retrieval-metrics-report.ts",
+		"scripts/build-og-image.mjs",
+		"spike-litert/**",
+		"src/lib/benchmark/**",
+		"src/lib/nlu/intent-prototypes.ts",
+		// Consumed by the dev pipeline route via dynamic type imports that
+		// knip's Svelte analysis does not resolve.
+		"src/lib/state/documents.svelte.ts",
 		"src/lib/components/ui/**",
-		"src/lib/hooks/**",
-		"src/lib/utils.ts",
-		"src/lib/index.ts",
-		"src/lib/auth-client.ts"
+		"src/lib/index.ts"
 	],
 	"ignoreDependencies": [
-		"@cloudflare/vitest-pool-workers",
-		"@internationalized/date",
-		"@lucide/svelte",
-		"bits-ui",
-		"clsx",
+		// Consumed by the install-time vendor script (copies the sqlite wasm
+		// build into static/vendor), not by app code — knip cannot see it.
+		"sqlite-vec-wasm-demo",
 		"formsnap",
-		"mode-watcher",
-		"paneforge",
-		"svelte-sonner",
 		"sveltekit-superforms",
-		"tailwind-merge",
-		"tailwind-variants",
-		"valibot",
 		"zod"
 	]
 }
