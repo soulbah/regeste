@@ -63,6 +63,9 @@
 		data-resizing={sidebar.resizing ? '' : undefined}
 		role="separator"
 		aria-orientation="vertical"
+		aria-valuenow={sidebar.width}
+		aria-valuemin={SIDEBAR_WIDTH_MIN_PX}
+		aria-valuemax={SIDEBAR_WIDTH_MAX_PX}
 		aria-label={ariaLabel}
 		tabindex={0}
 		{onpointerdown}

@@ -86,6 +86,11 @@ export default defineConfig({
 			// 404'd on any sub-route refresh. Absolute paths make one shell valid
 			// everywhere; the app is always served from the origin root.
 			paths: { relative: false },
+			// Perf (2026-08-04): inline stylesheets below this size into the HTML
+			// document instead of fetching them as render-blocking requests. The
+			// whole app stylesheet is ~26 KiB, so this inlines everything and the
+			// first paint no longer waits on a CSS round trip.
+			inlineStyleThreshold: 30000,
 			compilerOptions: {
 				// Force runes mode for the project, except for libraries. Can be removed in svelte 6.
 				runes: ({ filename }) =>

@@ -567,6 +567,7 @@ export const en = {
 	'app.workerFailed.title': "This page didn't finish loading",
 	'app.workerFailed.body': 'Reload to continue.',
 	'app.workerFailed.cta': 'Reload',
+	'app.meta.description': 'Chat with your documents. Everything runs locally in your browser.',
 	'app.workerFailed.dismiss': 'Dismiss',
 	'app.workerFailed.search': 'Document search stopped working.',
 	'app.workerFailed.ocr': 'Text recognition stopped working.',

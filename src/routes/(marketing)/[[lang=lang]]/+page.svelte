@@ -31,12 +31,28 @@
 	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
 	import { Button } from '$lib/components/ui/button';
 	import GithubIcon from '$lib/components/github-icon.svelte';
-	import LandingDemo from '$lib/components/landing-demo.svelte';
 	import LandingModes from '$lib/components/landing-modes.svelte';
-	import LandingDossier from '$lib/components/landing-dossier.svelte';
 	import { t, i18n } from '$lib/i18n/index.svelte';
 	import { reveal } from '$lib/landing-motion';
 	import { CANONICAL_ORIGIN, GITHUB } from '$lib/links';
+	import { onMount } from 'svelte';
+	import type { Component } from 'svelte';
+
+	// The demo and the dossier run the real product UI, which pulls the chat
+	// pipeline (stores, WebLLM, retrieval) into the module graph. They only
+	// animate after first paint, so they are mounted lazily: the landing's
+	// first paint no longer waits for code it does not use yet. Placeholders
+	// carry the exact heights so nothing shifts when they arrive.
+	let Demo: Component | undefined = $state();
+	let Dossier: Component | undefined = $state();
+	onMount(async () => {
+		const [demo, dossier] = await Promise.all([
+			import('$lib/components/landing-demo.svelte'),
+			import('$lib/components/landing-dossier.svelte')
+		]);
+		Demo = demo.default;
+		Dossier = dossier.default;
+	});
 
 	const CITE_NOTES = ['landing.cite.f1', 'landing.cite.f2'] as const;
 
@@ -128,7 +144,11 @@
 	</div>
 
 	<div class="land-rise mt-14 sm:mt-20" style="--rise-delay: 260ms">
-		<LandingDemo />
+		{#if Demo}
+			<svelte:component this={Demo} />
+		{:else}
+			<div class="h-[600px] p-3 lg:h-[720px]" aria-hidden="true"></div>
+		{/if}
 	</div>
 </section>
 
@@ -139,8 +159,8 @@
 	     becomes the card surface between two hairlines instead. -->
 <section
 	class={scheme === 'light'
-		? 'dark bg-background text-foreground mt-24 py-20 sm:mt-32 sm:py-28'
-		: 'bg-card border-border mt-24 border-y py-20 sm:mt-32 sm:py-28'}
+		? 'dark bg-background text-foreground lazy-render mt-24 py-20 sm:mt-32 sm:py-28'
+		: 'bg-card border-border lazy-render mt-24 border-y py-20 sm:mt-32 sm:py-28'}
 >
 	<div class="mx-auto max-w-7xl px-6">
 		<div class="grid items-end gap-x-12 gap-y-4 lg:grid-cols-2" use:reveal>
@@ -166,7 +186,7 @@
 	     the symmetric band above. The footnotes move into the text column, because
 	     a two-across row of footnotes under every picture is a third of why the
 	     page read as a template. -->
-<section class="overflow-x-clip pt-24 sm:pt-28">
+<section class="lazy-render overflow-x-clip pt-24 sm:pt-28">
 	<div
 		class="mx-auto grid max-w-7xl items-center gap-y-10 px-6 lg:grid-cols-[20rem_minmax(0,1fr)] lg:gap-x-14 xl:grid-cols-[26rem_minmax(0,1fr)]"
 	>
@@ -222,8 +242,12 @@
 </section>
 
 <!-- ——— [ 03 — the dossier. Two moments of one question, stacked. ——— -->
-<section class="mx-auto max-w-7xl px-6 pt-32 sm:pt-40" use:reveal>
-	<LandingDossier />
+<section class="lazy-render mx-auto max-w-7xl px-6 pt-32 sm:pt-40" use:reveal>
+	{#if Dossier}
+		<svelte:component this={Dossier} />
+	{:else}
+		<div class="min-h-[680px] lg:min-h-[760px]" aria-hidden="true"></div>
+	{/if}
 </section>
 
 <style>
@@ -231,6 +255,14 @@
 	.land-rise {
 		animation: land-rise 640ms cubic-bezier(0.16, 1, 0.3, 1) both;
 		animation-delay: var(--rise-delay, 0ms);
+	}
+
+	/* Chapters below the fold: skip their render work until the user scrolls
+	   near them (Chrome/Edge/Firefox/Safari 18+). The intrinsic-size hint keeps
+	   the scrollbar from jumping while they are skipped. */
+	.lazy-render {
+		content-visibility: auto;
+		contain-intrinsic-size: auto 800px;
 	}
 
 	@keyframes land-rise {

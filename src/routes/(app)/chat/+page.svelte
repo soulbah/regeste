@@ -145,7 +145,13 @@
 	let fileInput = $state<HTMLInputElement | null>(null);
 </script>
 
-<svelte:head><title>Regeste</title></svelte:head>
+<svelte:head>
+	<title>Regeste</title>
+	<!-- SEO for the app shell: the chat is the page people land on from the CTA.
+	     It must still carry a description even though its content is
+	     client-rendered. -->
+	<meta name="description" content={t('app.meta.description')} />
+</svelte:head>
 
 <div
 	class="relative flex h-full flex-col {dragging ? 'bg-muted/50' : ''}"

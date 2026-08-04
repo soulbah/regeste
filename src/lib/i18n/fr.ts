@@ -572,6 +572,8 @@ export const fr: Record<keyof typeof en, string> = {
 	'app.workerFailed.title': "Cette page n'a pas fini de se charger",
 	'app.workerFailed.body': 'Rechargez pour continuer.',
 	'app.workerFailed.cta': 'Recharger',
+	'app.meta.description':
+		'Discutez avec vos documents. Tout se passe localement dans votre navigateur.',
 	'app.workerFailed.dismiss': 'Masquer',
 	'app.workerFailed.search': 'La recherche dans vos documents ne fonctionne plus.',
 	'app.workerFailed.ocr': 'La reconnaissance de texte ne fonctionne plus.',
