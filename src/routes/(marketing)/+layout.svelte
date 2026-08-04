@@ -94,7 +94,7 @@
 <svelte:head>
 	{#if WEB_ANALYTICS_TOKEN}
 		<script
-			defer
+			type="module"
 			src="https://static.cloudflareinsights.com/beacon.min.js"
 			data-cf-beacon={`{"token": "${WEB_ANALYTICS_TOKEN}"}`}
 		></script>
