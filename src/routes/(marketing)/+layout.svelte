@@ -30,6 +30,7 @@
 	import { reveal } from '$lib/landing-motion';
 	import { GITHUB, LICENSE_DOC } from '$lib/links';
 	import { NEW_TAB } from '$lib/external-page';
+	import { WEB_ANALYTICS_TOKEN } from '$lib/analytics';
 
 	let { children, data } = $props();
 
@@ -89,6 +90,16 @@
 		return () => window.removeEventListener('scroll', on);
 	});
 </script>
+
+<svelte:head>
+	{#if WEB_ANALYTICS_TOKEN}
+		<script
+			defer
+			src="https://static.cloudflareinsights.com/beacon.min.js"
+			data-cf-beacon={`{"token": "${WEB_ANALYTICS_TOKEN}"}`}
+		></script>
+	{/if}
+</svelte:head>
 
 <!-- overflow-x-clip, not auto: the chapters mount the app's own 448px panels and
      the trust boundary runs a rule to both viewport edges, so on a narrow phone

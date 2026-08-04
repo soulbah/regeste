@@ -802,9 +802,9 @@ export const en = {
 	'policy.models.body':
 		'Answering on your device needs a model file, which is downloaded once and kept in this browser. It is fetched through this domain from a public model host, because the isolation the browser needs for that mode blocks the direct route. Only public model files travel that path.',
 
-	'policy.tracking.title': 'No analytics',
+	'policy.tracking.title': 'Anonymous visit counts',
 	'policy.tracking.body':
-		'There is no analytics service, no tracking script and no third-party code in this app. The emails carry no images, so nothing reports when you open one. The only cookie is the one that keeps you signed in.',
+		'The public pages count visits anonymously with Cloudflare Web Analytics, a cookieless service: no personal data, no persistent identifier, nothing that identifies you. The app itself (documents, chats, answers) never sends anything to any analytics service. The emails carry no images, so nothing reports when you open one, and the only cookie is the one that keeps you signed in.',
 
 	'policy.delete.title': 'Deleting your data',
 	'policy.delete.body':

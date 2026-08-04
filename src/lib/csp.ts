@@ -30,7 +30,15 @@ export const CSP_DIRECTIVES: CspDirectives = {
 	'default-src': ['self'],
 	// wasm-unsafe-eval compiles the WebAssembly this app is built on: the SQLite
 	// build, the embedding runtime, OCR and the local model. Without it nothing runs.
-	'script-src': ['self', 'wasm-unsafe-eval', THEME_SCRIPT_HASH],
+	// static.cloudflareinsights.com serves the Cloudflare Web Analytics beacon,
+	// loaded by the public marketing pages only when a site token is configured
+	// (src/lib/analytics.ts); the app shell never includes it.
+	'script-src': [
+		'self',
+		'wasm-unsafe-eval',
+		THEME_SCRIPT_HASH,
+		'https://static.cloudflareinsights.com'
+	],
 	// Two of the runtimes we depend on instantiate their workers from blob URLs.
 	'worker-src': ['self', 'blob:'],
 	// Inline style attributes carry computed geometry in a few places: the flow

@@ -806,9 +806,9 @@ export const fr: Record<keyof typeof en, string> = {
 	'policy.models.body':
 		'Répondre sur votre appareil demande un fichier de modèle, téléchargé une fois et conservé dans ce navigateur. Il passe par ce domaine depuis un hébergeur public de modèles, parce que l’isolation dont le navigateur a besoin pour ce mode bloque la route directe. Seuls des fichiers de modèles publics empruntent ce chemin.',
 
-	'policy.tracking.title': 'Aucune mesure d’audience',
+	'policy.tracking.title': 'Fréquentation anonyme',
 	'policy.tracking.body':
-		'Il n’y a aucun outil de mesure d’audience, aucun script de traçage et aucun code tiers ici. Les emails ne contiennent aucune image, donc rien ne signale que vous en ouvrez un. Le seul cookie est celui qui vous garde connecté.',
+		'Les pages publiques comptent les visites de façon anonyme avec Cloudflare Web Analytics, un service sans cookie : aucune donnée personnelle, aucun identifiant persistant, rien qui puisse vous identifier. L’application elle-même (documents, discussions, réponses) n’envoie jamais rien à un service de mesure d’audience. Les emails ne contiennent aucune image, donc rien ne signale que vous en ouvrez un, et le seul cookie est celui qui vous garde connecté.',
 
 	'policy.delete.title': 'Supprimer vos données',
 	'policy.delete.body':
