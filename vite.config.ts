@@ -101,7 +101,24 @@ export default defineConfig({
 			// parameter, which is English at the root; an optional parameter has no
 			// value for a crawler to discover, so the French roots are named and the
 			// topics under /fr/help are found from that index.
-			prerender: { entries: ['*', '/fr', '/fr/how-it-works', '/fr/help', '/fr/privacy'] },
+			// The app shell is client-rendered (ssr=false in the (app) layout), so
+			// its server output is a static script-tag list. Prerendering the main
+			// entry points moves them onto the asset store: ~100 ms TTFB at the
+			// edge instead of a Worker cold start (~400 ms) on every visit.
+			// /chat/[id] and /auth stay worker-rendered (dynamic deep links, and
+			// auth needs per-deployment provider config).
+			prerender: {
+				entries: [
+					'*',
+					'/fr',
+					'/fr/how-it-works',
+					'/fr/help',
+					'/fr/privacy',
+					'/chat',
+					'/chat/documents',
+					'/chat/privacy'
+				]
+			},
 
 			// A content policy on a product whose promise is that documents do not
 			// leave the device. The value here is not theoretical: an injected script
