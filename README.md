@@ -6,13 +6,13 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/soulbah/regeste/ci.yml?branch=develop&label=CI&logo=github)](https://github.com/soulbah/regeste/actions/workflows/ci.yml)
 [![Bun](https://img.shields.io/badge/runtime-Bun%201.2-f9f1e2.svg?logo=bun)](https://bun.sh)
 
-Regeste is an open-source, privacy-first document chat. Parsing, chunking, embeddings, vector search and chat history all run **in your browser** — documents never leave your device. For each answer you pick a trust boundary:
+Regeste is an open-source, privacy-first document chat. Parsing, chunking, embeddings, vector search and chat history all run **in your browser**, so documents never leave your device. For each answer you pick a trust boundary:
 
-- **Private** — an LLM runs on your device (WebGPU/WASM). Nothing is sent anywhere.
-- **Assisted** — only the retrieved excerpts are sent to a Cloudflare Worker (Workers AI), transiently, never stored. You see exactly what was sent ("What AI saw").
-- **My AI** — bring your own endpoint (Ollama, LM Studio, vLLM, any OpenAI-compatible API).
+- **Private**: an LLM runs on your device (WebGPU/WASM). Nothing is sent anywhere.
+- **Assisted**: only the retrieved excerpts are sent to a Cloudflare Worker (Workers AI), transiently, never stored. You see exactly what was sent ("What AI saw").
+- **My AI**: bring your own endpoint (Ollama, LM Studio, vLLM, any OpenAI-compatible API).
 
-Private and My AI need **no server** — the app is a static client. Assisted is the one mode with a backend (auth, quotas, the Workers AI call); it is **off by default** and only appears when a deployment sets `PUBLIC_ASSISTED_ENABLED=true`. Self-hosting Private + My AI needs none of the auth/database setup below.
+Private and My AI need **no server**: the app is a static client. Assisted is the one mode with a backend (auth, quotas, the Workers AI call); it is **off by default** and only appears when a deployment sets `PUBLIC_ASSISTED_ENABLED=true`. Self-hosting Private + My AI needs none of the auth/database setup below.
 
 > Don't trust us. Inspect the code, self-host it, or keep everything local.
 
@@ -40,16 +40,22 @@ bun run dev                           # vite dev with emulated Cloudflare bindin
 bun run verify                        # typecheck + lint + test + build
 ```
 
-This repo is developed with AI coding agents; the agent harness lives in `AGENTS.md`, `.agents/skills/` and `.claude/`. Humans and agents follow the same rules — see [CONTRIBUTING.md](CONTRIBUTING.md).
+This repo is developed with AI coding agents; the agent harness lives in `AGENTS.md`, `.agents/skills/` and `.claude/`. Humans and agents follow the same rules. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Documentation
 
-- [docs/constitution.md](docs/constitution.md) — non-negotiable principles
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — how the pieces fit together
-- [PROGRESS.md](PROGRESS.md) — current state and roadmap
-- [CONTRIBUTING.md](CONTRIBUTING.md) — how to contribute (DCO, AI-assisted rules)
-- [SECURITY.md](SECURITY.md) — reporting a vulnerability
-- [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) — licenses of vendored components
+- [docs/constitution.md](docs/constitution.md): non-negotiable principles
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): how the pieces fit together
+- [PROGRESS.md](PROGRESS.md): current state and roadmap
+- [CONTRIBUTING.md](CONTRIBUTING.md): how to contribute (DCO, AI-assisted rules)
+- [SECURITY.md](SECURITY.md): reporting a vulnerability
+- [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md): licenses of vendored components
+
+## Releases
+
+Versions are cut automatically from `main` with semantic-release (Conventional Commits): a tag `vX.Y.Z` and a GitHub Release are created on every merge, the changelog is generated from the commit history, and the hosted app is deployed from each release. The version string is visible in the app, in the sidebar footer.
+
+The project is currently on a pre-1.0 cadence (`0.x`). Breaking changes bump the minor version; graduating to `1.0.0` is an explicit maintainer decision.
 
 ## Contributing
 
@@ -61,8 +67,7 @@ labelled `good first issue` are a good entry point.
 
 ## Support
 
-- **Bugs and feature requests**: open a GitHub issue (templates are provided —
-  please never paste document content or personal data into an issue).
+- **Bugs and feature requests**: open a GitHub issue (templates are provided; please never paste document content or personal data into an issue).
 - **Security**: report privately via GitHub Security Advisories, see
   [SECURITY.md](SECURITY.md).
 
