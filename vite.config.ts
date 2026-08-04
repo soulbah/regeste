@@ -4,6 +4,7 @@ import tailwindcss from '@tailwindcss/vite';
 import adapter from '@sveltejs/adapter-cloudflare';
 import { CSP_DIRECTIVES } from './src/lib/csp';
 import { sveltekit } from '@sveltejs/kit/vite';
+import { execSync } from 'node:child_process';
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -22,6 +23,20 @@ const privateFixtureDirectory = resolve(import.meta.dirname, '.benchmark-corpus/
 const parserAbDirectory = resolve(import.meta.dirname, '.benchmark-corpus/parser-ab');
 const ownerDirectory = resolve(import.meta.dirname, '.benchmark-corpus/owner');
 const fuzzyFixtureNames = new Set(fuzzyManifest.files.map((file) => file.name));
+
+/** The app version baked into every build (SvelteKit's kit.version.name, read
+ * at runtime from $app/environment). Deploys set APP_VERSION from the release
+ * tag (v1.2.3); everything else gets the commit hash. Both are deterministic,
+ * which SvelteKit requires — the version string also drives version.json and
+ * the service worker's update detection. */
+function appVersion(): string {
+	if (process.env.APP_VERSION) return process.env.APP_VERSION;
+	try {
+		return execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim();
+	} catch {
+		return 'dev';
+	}
+}
 
 /** Public research fixtures are dev inputs, not deployable application assets.
  * Serve them from the ignored benchmark cache only while Vite is running.
@@ -80,6 +95,7 @@ export default defineConfig({
 			// Inference Service Worker is production-only. Manual registration in
 			// +layout keeps Vite HMR free from persistent worker lifecycle state.
 			serviceWorker: { register: false },
+			version: { name: appVersion() },
 			// Absolute asset URLs (spec 030). SvelteKit defaults to relative ones,
 			// which resolve against the CURRENT path — so the single cached app
 			// shell, served for every navigation, asked for /chat/<id>/_app/… and

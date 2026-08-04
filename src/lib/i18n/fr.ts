@@ -50,6 +50,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'sidebar.resizeAria': 'Redimensionner la barre latérale',
 	'sidebar.guest': 'Invité',
 	'sidebar.localWorkspace': 'Espace de travail local',
+	'sidebar.versionLabel': 'Version de l’application',
 
 	// Command palette
 	'palette.placeholder': 'Rechercher discussions, documents, commandes…',

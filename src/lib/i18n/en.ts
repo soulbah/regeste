@@ -47,6 +47,7 @@ export const en = {
 	'sidebar.resizeAria': 'Resize the sidebar',
 	'sidebar.guest': 'Guest',
 	'sidebar.localWorkspace': 'Local workspace',
+	'sidebar.versionLabel': 'App version',
 
 	// Command palette
 	'palette.placeholder': 'Search chats, documents, commands…',
