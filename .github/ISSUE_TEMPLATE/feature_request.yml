@@ -30,3 +30,5 @@ body:
       options:
         - label: I have not included any document content or personal data in this request.
           required: true
+        - label: I searched for an existing issue covering this.
+          required: true

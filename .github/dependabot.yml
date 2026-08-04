@@ -5,6 +5,13 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    # Major bumps are reviewed manually after the release window (typescript,
+    # vitest, svelte…). sqlite-vec-wasm-demo also needs a manual vendor pass,
+    # so it is ignored entirely here.
+    ignore:
+      - dependency-name: 'sqlite-vec-wasm-demo'
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
     groups:
       svelte:
         patterns:
@@ -15,3 +22,6 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
