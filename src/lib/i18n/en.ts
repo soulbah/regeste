@@ -47,7 +47,6 @@ export const en = {
 	'sidebar.resizeAria': 'Resize the sidebar',
 	'sidebar.guest': 'Guest',
 	'sidebar.localWorkspace': 'Local workspace',
-	'sidebar.versionLabel': 'App version',
 
 	// Command palette
 	'palette.placeholder': 'Search chats, documents, commands…',
@@ -417,6 +416,7 @@ export const en = {
 	// Settings
 	'settings.title': 'Settings',
 	'settings.subtitle': 'Storage · privacy · offline',
+	'settings.versionLabel': 'App version',
 	'advisory.eviction':
 		'This browser may clear your documents to reclaim space. Ask it to keep them from Settings, or export your workspace.',
 	'update.ready': 'A new version is ready.',

@@ -779,7 +779,7 @@ describe('deterministic extractive answers', () => {
 	it('does not confuse another labelled identifier with the requested one', () => {
 		expect(
 			buildDeterministicExtractiveAnswer('Quel est le numéro du compte ?', [
-				hit(1, 'SIRET n° 987654321 — conditions particulières du cabinet.')
+				hit(1, 'SIRET n° 123456789 — conditions particulières du cabinet.')
 			])
 		).toBeNull();
 	});

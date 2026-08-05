@@ -17,7 +17,6 @@
 		"scripts/rescore-private-run.ts",
 		"scripts/retrieval-metrics-report.ts",
 		"scripts/build-og-image.mjs",
-		"spike-litert/**",
 		"src/lib/benchmark/**",
 		"src/lib/nlu/intent-prototypes.ts",
 		// Consumed by the dev pipeline route via dynamic type imports that
@@ -30,8 +29,10 @@
 		// Consumed by the install-time vendor script (copies the sqlite wasm
 		// build into static/vendor), not by app code — knip cannot see it.
 		"sqlite-vec-wasm-demo",
-		"formsnap",
-		"sveltekit-superforms",
+		// Not imported anywhere: better-auth, drizzle and superforms all peer-
+		// depend on zod, and bun hoists whichever range it resolves first. The
+		// direct dependency pins one v4 copy for all of them (PROGRESS
+		// 2026-07-08: a v3/v4 split broke better-auth at runtime).
 		"zod",
 		// Referenced from .releaserc.json; knip's semantic-release analysis
 		// resolves some plugins but not these four.

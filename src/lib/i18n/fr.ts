@@ -50,7 +50,6 @@ export const fr: Record<keyof typeof en, string> = {
 	'sidebar.resizeAria': 'Redimensionner la barre latérale',
 	'sidebar.guest': 'Invité',
 	'sidebar.localWorkspace': 'Espace de travail local',
-	'sidebar.versionLabel': 'Version de l’application',
 
 	// Command palette
 	'palette.placeholder': 'Rechercher discussions, documents, commandes…',
@@ -414,6 +413,7 @@ export const fr: Record<keyof typeof en, string> = {
 	// Settings
 	'settings.title': 'Réglages',
 	'settings.subtitle': 'Stockage · confidentialité · hors ligne',
+	'settings.versionLabel': 'Version de l’application',
 	'advisory.eviction':
 		'Ce navigateur peut effacer vos documents pour récupérer de la place. Demandez-lui de les conserver depuis les réglages, ou exportez votre espace de travail.',
 	'update.ready': 'Une nouvelle version est prête.',

@@ -36,8 +36,11 @@ static/ort/
 # Stray miniflare/workerd config debug dump (MINIFLARE_WORKERD_CONFIG_DEBUG)
 /1
 
-# Downloaded public benchmark documents (manifest + hashes are committed)
-/.benchmark-corpus/
+# Downloaded public benchmark documents (manifest + hashes are committed).
+# No trailing slash: this path is a symlink to a sibling checkout on the
+# owner's machine, and a trailing slash only matches a real directory — so the
+# symlink itself stayed visible to git and was committed by accident.
+/.benchmark-corpus
 /static/dev/fuzzy-public/
 
 # Local benchmark scratch data and downloaded third-party corpora

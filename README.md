@@ -8,7 +8,7 @@
 
 Regeste is an open-source, privacy-first document chat. Parsing, chunking, embeddings, vector search and chat history all run **in your browser**, so documents never leave your device. For each answer you pick a trust boundary:
 
-- **Private**: an LLM runs on your device (WebGPU/WASM). Nothing is sent anywhere.
+- **Private**: an LLM runs on your device (WebGPU/WASM). Your documents and questions are never sent anywhere; the model weights are public files, downloaded once through this origin (so cross-origin isolation does not break the download) and cached by your browser.
 - **Assisted**: only the retrieved excerpts are sent to a Cloudflare Worker (Workers AI), transiently, never stored. You see exactly what was sent ("What AI saw").
 - **My AI**: bring your own endpoint (Ollama, LM Studio, vLLM, any OpenAI-compatible API).
 
@@ -20,10 +20,11 @@ Private and My AI need **no server**: the app is a static client. Assisted is th
 
 **Try the hosted app: [regeste.com](https://regeste.com).**
 
-A 17-second walkthrough of the app, captured in the browser:
-[English](docs/demo-en.mp4) · [French](docs/demo-fr.mp4).
+![A 17-second walkthrough: two lease PDFs are attached, questions get answers with cited passages, and nothing leaves the device](docs/demo.gif)
 
-Both files live in `docs/`, so they play from a clone and are not shipped as
+The same walkthrough as video: [English](docs/demo-en.mp4) · [French](docs/demo-fr.mp4).
+
+All three files live in `docs/`, so they play from a clone and are not shipped as
 deployed assets.
 
 ## Stack

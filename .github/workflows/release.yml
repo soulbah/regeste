@@ -45,8 +45,12 @@ jobs:
           # It can unshallow a depth-1 clone itself, but only as a fallback;
           # asking for the full history keeps that off the critical path.
           fetch-depth: 0
-          # semantic-release pushes the version-bump commit back to main.
-          persist-credentials: true
+          # semantic-release pushes the version-bump commit back to main, and
+          # the main ruleset refuses pushes that do not come from the release
+          # deploy key (its one bypass actor). Checking out with the key
+          # rewrites origin to SSH, so the push authenticates as that actor;
+          # GITHUB_TOKEN below stays for the GitHub Release API only.
+          ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: 1.2.22
@@ -80,7 +84,8 @@ jobs:
   # without this step `develop` drifts one commit behind on every release and
   # the next merge re-proposes the same changelog. The merge carries no code:
   # it was verified on main before the release, so it does not need CI again
-  # (and a GITHUB_TOKEN push would not start one anyway).
+  # — hence [skip ci] below, because a deploy-key push (unlike GITHUB_TOKEN)
+  # would otherwise start one.
   backmerge:
     needs: release
     if: needs.release.outputs.tag != ''
@@ -94,7 +99,9 @@ jobs:
         with:
           ref: develop
           fetch-depth: 0
-          persist-credentials: true
+          # Same bypass as the release job: the develop ruleset refuses direct
+          # pushes except from the release deploy key.
+          ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
       - name: Merge the release commit back into develop
         run: |
           git config user.name 'github-actions[bot]'
@@ -102,7 +109,7 @@ jobs:
           # A conflict here means main and develop disagree about a file the
           # release touched. Stop rather than guess: a failed job on an already
           # shipped release is the honest signal that a manual merge is due.
-          if ! git merge --no-ff origin/main -m 'chore: back-merge the release commit into develop'; then
+          if ! git merge --no-ff origin/main -m 'chore: back-merge the release commit into develop [skip ci]'; then
             echo "::error::Back-merge conflicted. Resolve it locally: git checkout develop && git merge origin/main"
             exit 1
           fi

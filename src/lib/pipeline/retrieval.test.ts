@@ -877,12 +877,12 @@ describe('retrieval refinement', () => {
 			{
 				...hit(2, 'morel', 0.029),
 				page: 3,
-				text: 'PRIX DE LA VENTE montant CENT CINQUANTE MILLE EUROS 146.000,00 €'
+				text: 'PRIX DE LA VENTE montant CENT CINQUANTE-DEUX MILLE EUROS 152.000,00 €'
 			},
 			{
 				...hit(3, 'morel', 0.029),
 				page: 19,
-				text: 'FINANCEMENT Montant du prêt 146.000,00 €'
+				text: 'FINANCEMENT Montant du prêt 152.000,00 €'
 			},
 			{
 				...hit(4, 'morel', 0.029),
