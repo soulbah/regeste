@@ -26,19 +26,29 @@ type CspDirectives = NonNullable<NonNullable<NonNullable<Config['kit']>['csp']>[
  * by every reader. `scripts/check-csp.mjs` fails the build if this stops matching. */
 const THEME_SCRIPT_HASH = 'sha256-Cr3r+iKjDTUxJaxM3r/Iq0ow6clOB9AqoT6j0wMFMIM=';
 
+/** The analytics beacon's origin, allow-listed only when this build actually
+ * ships a beacon.
+ *
+ * SvelteKit applies one policy to the whole app — `kit.csp` has no per-route
+ * form — so the origin cannot be granted to the marketing pages alone while
+ * /chat, which holds every document, is denied it. What can be avoided is
+ * granting it to builds that never load the beacon at all: a self-hosted build,
+ * or any build made without a site token, gets a policy with no third-party
+ * script origin in it. The hosted build still carries the permission app-wide,
+ * which is the residual SvelteKit forces on us; 'self' and the script hashes
+ * remain the actual defence. */
+const ANALYTICS_ORIGINS: NonNullable<CspDirectives['script-src']> = process.env
+	.PUBLIC_CF_WEB_ANALYTICS_TOKEN
+	? ['https://static.cloudflareinsights.com']
+	: [];
+
 export const CSP_DIRECTIVES: CspDirectives = {
 	'default-src': ['self'],
 	// wasm-unsafe-eval compiles the WebAssembly this app is built on: the SQLite
 	// build, the embedding runtime, OCR and the local model. Without it nothing runs.
-	// static.cloudflareinsights.com serves the Cloudflare Web Analytics beacon,
-	// loaded by the public marketing pages only when a site token is configured
-	// (src/lib/analytics.ts); the app shell never includes it.
-	'script-src': [
-		'self',
-		'wasm-unsafe-eval',
-		THEME_SCRIPT_HASH,
-		'https://static.cloudflareinsights.com'
-	],
+	// The analytics origin is present only in a build that ships the beacon
+	// (see ANALYTICS_ORIGINS above); the app shell never loads it either way.
+	'script-src': ['self', 'wasm-unsafe-eval', THEME_SCRIPT_HASH, ...ANALYTICS_ORIGINS],
 	// Two of the runtimes we depend on instantiate their workers from blob URLs.
 	'worker-src': ['self', 'blob:'],
 	// Inline style attributes carry computed geometry in a few places: the flow
