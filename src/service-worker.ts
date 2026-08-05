@@ -19,6 +19,13 @@ const sw = self as unknown as ServiceWorkerGlobalScope;
 let engine: MLCEngineInterface | null = null;
 let loadedModel: string | null = null;
 let loadGeneration = 0;
+// WebLLM is imported statically, and it has to be: `import()` throws
+// "import() is disallowed on ServiceWorkerGlobalScope by the HTML
+// specification" (w3c/ServiceWorker#1356) — verified in this worker's own
+// scope, not assumed. Loading the engine on demand is therefore impossible
+// here, so this script carries the whole runtime and every boot parses it.
+// That cost is real; it is paid down by keeping the top level free of work
+// (see the install handler) rather than by splitting the bundle.
 interface ModelLoadProgress {
 	progress: number;
 	text: string;
@@ -68,11 +75,20 @@ async function precache(): Promise<void> {
 	const cache = await caches.open(SHELL_CACHE);
 
 	// The navigation shell must be a FETCHED response: it carries COOP/COEP from
-	// hooks.server.ts, and the Cache API preserves stored headers. A synthesised
-	// Response would strip them, cross-origin isolation would drop on the cached
-	// path only, and SharedArrayBuffer (so the wllama CPU tier) would die
-	// offline while every dev test still passed. Fail install loudly instead.
-	const shell = await fetch(SHELL_KEY, { cache: 'reload' });
+	// hooks.server.ts (or the _headers file, for the prerendered pages), and the
+	// Cache API preserves stored headers. A synthesised Response would strip
+	// them, cross-origin isolation would drop on the cached path only, and
+	// SharedArrayBuffer (so the wllama CPU tier) would die offline while every
+	// dev test still passed. Fail install loudly instead.
+	//
+	// Plain fetch, deliberately NOT cache:'reload'. The asset store serves /chat
+	// with `Cache-Control: public, max-age=0, must-revalidate` and an ETag, so
+	// the browser revalidates a stale copy and the install never blocks on a
+	// full origin round trip. Forcing reload used to re-fetch every eager asset
+	// from origin on every install; on a cold Cloudflare edge those requests
+	// took ~20 s each (measured), installs took minutes or died, and the worker
+	// never activated.
+	const shell = await fetch(SHELL_KEY);
 	if (!shell.ok) throw new Error(`shell fetch failed: ${shell.status}`);
 	// A redirected response replayed for a navigation throws
 	// "Response served by service worker has redirected". SHELL_KEY has no
@@ -92,9 +108,11 @@ async function precache(): Promise<void> {
 		...build.filter((url) => isEagerBuildAsset(new URL(url, sw.location.origin).pathname)),
 		...EAGER_EXTRA
 	];
+	// The eager assets are content-addressed (`/immutable/`), so a cached copy
+	// is the copy, forever: no revalidation is ever needed, and none is forced.
 	await Promise.allSettled(
 		assets.map(async (url) => {
-			const response = await fetch(url, { cache: 'reload' });
+			const response = await fetch(url);
 			// Cache.put stores a 404 as readily as a 200, and a stored failure is
 			// permanent for the life of this cache version — nothing ever refetches
 			// an entry that is already there. Drop it instead and let the runtime

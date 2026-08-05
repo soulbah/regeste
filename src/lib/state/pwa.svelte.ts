@@ -62,6 +62,11 @@ class PwaStore {
 			worker.addEventListener('statechange', check);
 		};
 		consider(registration.waiting);
+		// An update the browser found during the navigation is already
+		// mid-install by the time this page calls register(): its `updatefound`
+		// event fired before watch() attached, so it would otherwise never be
+		// observed and the "new version" notice would silently never appear.
+		consider(registration.installing);
 		registration.addEventListener('updatefound', () => consider(registration.installing));
 		// Reload only when an update swapped the worker out from under a page that
 		// already had one. On a first-ever visit `clients.claim()` also fires this,
