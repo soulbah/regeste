@@ -17,6 +17,7 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write .",
+		"lint:commits": "commitlint --from origin/main --to HEAD",
 		"test:unit": "vitest",
 		"test": "vitest run",
 		"verify": "bun run check && bun run lint && bun run test && bun run build",
@@ -34,6 +35,8 @@
 		"vendor": "mkdir -p static/vendor/sqlite && cp node_modules/sqlite-vec-wasm-demo/sqlite3.mjs node_modules/sqlite-vec-wasm-demo/sqlite3.wasm static/vendor/sqlite/ && bash scripts/vendor-ocr-models.sh"
 	},
 	"devDependencies": {
+		"@commitlint/cli": "^21.2.1",
+		"@commitlint/config-conventional": "^21.2.0",
 		"@eslint/js": "^10.0.1",
 		"@fontsource-variable/geist": "^5.2.9",
 		"@fontsource-variable/geist-mono": "^5.2.8",

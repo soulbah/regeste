@@ -19,3 +19,28 @@ permissions:
 jobs:
   verify:
     uses: ./.github/workflows/verify.yml
+
+  # semantic-release derives the next version from commit subjects, so a
+  # malformed one does not just read badly: it drops the change from the
+  # changelog, or ships a release nobody asked for. Only the commits the pull
+  # request adds are linted — rewriting published history to satisfy a linter
+  # is worse than the typo it would fix.
+  commits:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Pinned by commit SHA (OpenSSF Scorecard): tags move, history does not.
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          # The base..head range has to exist locally for commitlint to walk it.
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.2.22
+      - run: bun install --frozen-lockfile
+      - name: Lint the commits this pull request adds
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: bunx commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
