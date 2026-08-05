@@ -2,7 +2,7 @@
 
 > The harness itself is not in the working tree: it was a throwaway plain-Vite
 > project (`spike-litert/`) removed once the verdict was recorded. It is still
-> in the history — `git show 1fb6756` — and the reproduction steps below are
+> in the history — `git show 9d7995e` — and the reproduction steps below are
 > written against that checkout.
 
 **Verdict: NO-GO.** LiteRT.js (`@litertjs/core` 2.5.3, released 2026-07-09) was evaluated as a
@@ -43,7 +43,7 @@ runtime works exactly as documented — the blocker is model economics, not API 
 ## Reproduce
 
 ```bash
-git worktree add /tmp/litert-spike 1fb6756   # the spike lived at spike-litert/
+git worktree add /tmp/litert-spike 9d7995e   # the spike lived at spike-litert/
 cd /tmp/litert-spike/spike-litert && bun install
 # model (170.8 MB): official litert-community/embeddinggemma-300m is HF-gated (Gemma licence);
 # spike used the ungated byte-identical filename mirror Arjuu/EmbeddingGemma.tflite:
