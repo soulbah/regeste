@@ -55,7 +55,16 @@ This repo is developed with AI coding agents; the agent harness lives in `AGENTS
 
 Versions are cut automatically from `main` with semantic-release (Conventional Commits): a merge carrying a `feat:` or `fix:` commit produces a `vX.Y.Z` tag and a GitHub Release, the changelog is generated from the commit history, and that release is deployed to production. A docs-only merge ships no release. The version string is visible in the app, in the sidebar footer.
 
-The project is currently on a pre-1.0 cadence (`0.x`). Breaking changes bump the minor version; graduating to `1.0.0` is an explicit maintainer decision.
+The tag is the version: nothing is ever tagged by hand, and `package.json` only
+records what the last release decided. `v0.1.0` is the single exception, set as
+the starting point before the pipeline existed.
+
+The project is on a pre-1.0 cadence (`0.x`), which SemVer reserves for
+"anything may change at any time". A `fix:` bumps the patch (`0.2.1`), a
+`feat:` bumps the minor (`0.3.0`), and a breaking change also bumps the minor
+rather than jumping to `1.0.0`. Graduating to `1.0.0` is an explicit maintainer
+decision, taken when the API and the on-device schema are considered stable,
+not a side effect of a commit message.
 
 ## Contributing
 

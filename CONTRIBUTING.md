@@ -7,7 +7,10 @@ Thanks for considering a contribution. Regeste is maintained by a small team wor
 - Read `AGENTS.md` first — commands, conventions, definition of done. It applies to human contributors too.
 - Every PR must pass `bun run verify` (typecheck + lint + test + build) locally and in CI.
 - Work against a spec: significant changes start from a `specs/NNN-*` folder (see `specs/000-template`). Small fixes can go straight to PR.
-- Conventional Commits for messages (`feat:`, `fix:`, `docs:`, `chore:`…).
+- Conventional Commits for messages (`feat:`, `fix:`, `docs:`, `chore:`…). This
+  is not cosmetic: semantic-release reads these subjects to decide the next
+  version number and to write the changelog. CI lints the commits a pull
+  request adds (`bun run lint:commits` runs the same check locally).
 - Privacy invariants in `docs/constitution.md` are non-negotiable — a PR that sends user content server-side or adds content tables to D1 will be rejected regardless of quality.
 
 ## AI-assisted contributions
