@@ -35,6 +35,8 @@ jobs:
     needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
     steps:
       # Pinned by commit SHA (OpenSSF Scorecard): tags move, history does not.
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
@@ -73,3 +75,35 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh workflow run deploy.yml --ref "${{ steps.release.outputs.tag }}"
+
+  # semantic-release writes CHANGELOG.md and package.json on `main` only, so
+  # without this step `develop` drifts one commit behind on every release and
+  # the next merge re-proposes the same changelog. The merge carries no code:
+  # it was verified on main before the release, so it does not need CI again
+  # (and a GITHUB_TOKEN push would not start one anyway).
+  backmerge:
+    needs: release
+    if: needs.release.outputs.tag != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      # Pinned by commit SHA (OpenSSF Scorecard): tags move, history does not.
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: develop
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Merge the release commit back into develop
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          # A conflict here means main and develop disagree about a file the
+          # release touched. Stop rather than guess: a failed job on an already
+          # shipped release is the honest signal that a manual merge is due.
+          if ! git merge --no-ff origin/main -m 'chore: back-merge the release commit into develop'; then
+            echo "::error::Back-merge conflicted. Resolve it locally: git checkout develop && git merge origin/main"
+            exit 1
+          fi
+          git push origin develop
