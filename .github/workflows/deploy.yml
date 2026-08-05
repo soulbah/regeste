@@ -1,13 +1,16 @@
 name: Deploy
 
-# Production deploy: a published GitHub release (vX.Y.Z, created by the
-# Release workflow) ships to Cloudflare. The verify job is the gate — branch
-# protection is not available on this private repo (free plan), so deploy runs
-# the full gate itself instead of trusting the CI run.
+# Production deploy: a release tag (vX.Y.Z) ships to Cloudflare. Dispatched by
+# the Release workflow once semantic-release has published the tag, and
+# available manually for a re-deploy of an existing release. Deploy runs the
+# full verify gate itself rather than trusting an earlier CI run.
 on:
-  release:
-    types: [published]
   workflow_dispatch:
+    inputs:
+      ref:
+        description: Release tag to deploy (vX.Y.Z). Defaults to the dispatched ref.
+        required: false
+        type: string
 
 # One deploy at a time; never cancel a running deploy for a newer commit.
 concurrency:
@@ -18,23 +21,48 @@ permissions:
   contents: read
 
 jobs:
+  # The tag to build, resolved once so the gate and the deploy cannot disagree
+  # about what is shipping.
+  target:
+    runs-on: ubuntu-latest
+    outputs:
+      ref: ${{ steps.resolve.outputs.ref }}
+    steps:
+      - id: resolve
+        env:
+          INPUT_REF: ${{ inputs.ref }}
+          DISPATCH_REF: ${{ github.ref_name }}
+        run: |
+          ref="${INPUT_REF:-$DISPATCH_REF}"
+          case "$ref" in
+            v[0-9]*) ;;
+            *) echo "Refusing to deploy '$ref': production ships release tags only." >&2; exit 1 ;;
+          esac
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
   verify:
+    needs: target
     uses: ./.github/workflows/verify.yml
+    with:
+      ref: ${{ needs.target.outputs.ref }}
 
   deploy:
-    needs: verify
-    # Manual dispatches are allowed from release tags only; release events
-    # always carry the tag ref.
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [target, verify]
     runs-on: ubuntu-latest
     environment: production
     timeout-minutes: 20
     env:
-      APP_VERSION: ${{ github.ref_name }}
+      APP_VERSION: ${{ needs.target.outputs.ref }}
       PUBLIC_CF_WEB_ANALYTICS_TOKEN: ${{ secrets.CF_WEB_ANALYTICS_TOKEN }}
+      # Pinned once, used by both wrangler steps: 4.107.1 hangs on deploy and
+      # the 4.107.x series cannot boot miniflare (PROGRESS.md, 2026-07-09/30).
+      # Keep in step with the exact pin in package.json.
+      WRANGLER_VERSION: '4.115.0'
     steps:
       # Pinned by commit SHA (OpenSSF Scorecard): tags move, history does not.
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ needs.target.outputs.ref }}
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: 1.2.22
@@ -46,19 +74,18 @@ jobs:
       # so the deployed artifact comes from this run, not from a cache.
       - run: bun run build
       # Preflight: validate the exact artifact that would ship, without
-      # touching production. Wrangler is pinned: 4.107.1 hangs on deploy and
-      # the 4.107.x series cannot boot miniflare (PROGRESS.md, 2026-07-09/30).
+      # touching production.
       - uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd # v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          wranglerVersion: '4.115.0'
+          wranglerVersion: ${{ env.WRANGLER_VERSION }}
           command: deploy --dry-run --outdir .verification
       - uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd # v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          wranglerVersion: '4.115.0'
+          wranglerVersion: ${{ env.WRANGLER_VERSION }}
           command: deploy
 
       # Secrets and D1 migrations are managed manually on purpose:

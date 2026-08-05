@@ -13,6 +13,11 @@ bun.lockb
 migrations/meta/
 worker-configuration.d.ts
 bun.lock
+# Written by @semantic-release/changelog on every release, in conventional-
+# changelog's own style (`*` bullets, blank line runs). prettier --check fails
+# on it, and since lint gates verify and verify gates release, the first
+# release would have locked every release after it.
+CHANGELOG.md
 
 # Agent scratch space: session worktrees are checkouts of this same repo nested
 # inside it, so linting them double-reports every file and fails on generated

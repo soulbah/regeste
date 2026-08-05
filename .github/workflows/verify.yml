@@ -2,6 +2,11 @@ name: Verify
 
 on:
   workflow_call:
+    inputs:
+      ref:
+        description: Commit, branch or tag to verify. Defaults to the caller's ref.
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -13,6 +18,10 @@ jobs:
     steps:
       # Pinned by commit SHA (OpenSSF Scorecard): tags move, history does not.
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          # Empty means "the ref that triggered this run", which is what every
+          # caller but the release deploy wants.
+          ref: ${{ inputs.ref }}
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: 1.2.22
@@ -25,6 +34,10 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          # Without a fallback every lockfile change re-downloads Chromium from
+          # scratch; a stale browser build is still a valid starting point.
+          restore-keys: |
+            playwright-${{ runner.os }}-
       # The vitest browser project drives a real Chromium.
       - run: bunx playwright install chromium --with-deps
       # check + lint + test + build (asset size and CSP checks are part of build).

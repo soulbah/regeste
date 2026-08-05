@@ -2,7 +2,10 @@ name: CI
 
 on:
   push:
-    branches: [develop, main]
+    # `main` is covered by the Release workflow, which runs the same reusable
+    # verify job before releasing. Listing it here too ran the whole gate twice
+    # per merge, in two concurrency groups that could not cancel each other.
+    branches: [develop]
   pull_request:
 
 # One run per branch/PR at a time; a newer commit cancels the stale one.

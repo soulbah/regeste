@@ -30,7 +30,9 @@ const fuzzyFixtureNames = new Set(fuzzyManifest.files.map((file) => file.name));
  * which SvelteKit requires — the version string also drives version.json and
  * the service worker's update detection. */
 function appVersion(): string {
-	if (process.env.APP_VERSION) return process.env.APP_VERSION;
+	// The tag is `v1.2.3` and the sidebar renders `v{version}`, so the `v` is
+	// stripped here rather than shipping `vv1.2.3`.
+	if (process.env.APP_VERSION) return process.env.APP_VERSION.replace(/^v/, '');
 	try {
 		return execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim();
 	} catch {

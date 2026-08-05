@@ -1,8 +1,16 @@
 name: Release
 
 # semantic-release: analyze commits since the last tag, bump the version,
-# write CHANGELOG.md, tag vX.Y.Z and publish the GitHub Release. The version
-# bump commit carries [skip ci] so it does not re-trigger this workflow.
+# write CHANGELOG.md, tag vX.Y.Z and publish the GitHub Release, then hand the
+# new tag to the Deploy workflow. The version bump commit carries [skip ci] so
+# it does not re-trigger this workflow.
+#
+# Deploy is dispatched from here rather than listening for `release: published`.
+# A release published with GITHUB_TOKEN raises no event that can start another
+# workflow, so `on: release` never fired and nothing ever shipped (verified: a
+# single Deploy run exists, and it was manual). workflow_dispatch is the one
+# trigger GitHub exempts from that rule, so this is the path that works without
+# introducing a second set of credentials.
 on:
   push:
     branches: [main]
@@ -16,6 +24,8 @@ permissions:
   contents: write
   issues: write
   pull-requests: write
+  # Required to dispatch the Deploy workflow below.
+  actions: write
 
 jobs:
   verify:
@@ -29,6 +39,10 @@ jobs:
       # Pinned by commit SHA (OpenSSF Scorecard): tags move, history does not.
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
+          # semantic-release reads the tag history to decide the next version.
+          # It can unshallow a depth-1 clone itself, but only as a fallback;
+          # asking for the full history keeps that off the critical path.
+          fetch-depth: 0
           # semantic-release pushes the version-bump commit back to main.
           persist-credentials: true
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
@@ -38,6 +52,24 @@ jobs:
         with:
           node-version-file: .nvmrc
       - run: bun install --frozen-lockfile
-      - run: bun run release
+      - id: release
+        name: Run semantic-release
+        run: |
+          before="$(git tag --list 'v*' --sort=-v:refname | head -n 1)"
+          bun run release
+          after="$(git tag --list 'v*' --sort=-v:refname | head -n 1)"
+          if [ "$before" != "$after" ] && [ -n "$after" ]; then
+            echo "tag=$after" >> "$GITHUB_OUTPUT"
+            echo "Released $after"
+          else
+            echo "No release produced (no qualifying commits)."
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Only when a new tag exists. A docs-only merge releases nothing and must
+      # not redeploy production.
+      - if: steps.release.outputs.tag != ''
+        name: Deploy the new release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run deploy.yml --ref "${{ steps.release.outputs.tag }}"
