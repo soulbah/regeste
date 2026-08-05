@@ -1,0 +1,47 @@
+# Gitleaks configuration. CI runs this over the full history on every push and
+# pull request (the `gitleaks` job in ci.yml, required by the rulesets). The
+# custom rules cover the leak classes a pre-public audit actually found in the
+# repository's private-phase history — personal-provider emails, French IBANs,
+# SIREN/RCS identifiers, Guinean phone numbers, personal machine paths — so
+# they cannot come back. Fixture data must be invented; the allowlists below
+# name the fictional values the test corpus uses on purpose.
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "personal-provider-email"
+description = "Personal email address (consumer providers have no place in this repo)"
+regex = '''(?i)[a-z0-9._%+-]+@(?:gmail|googlemail|yahoo|hotmail|outlook|proton|protonmail|icloud|laposte|orange|free|sfr|wanadoo)\.(?:com|fr|net|me|ch)'''
+
+[[rules]]
+id = "french-iban"
+description = "French IBAN or bank account fragment"
+regex = '''\bFR\d{2}(?:[ ]?\d{4}){2,6}(?:[ ]?\d{1,4})?\b'''
+
+[[rules.allowlists]]
+regexes = ['''FR76[ ]?1234[ ]?5678[ ]?9012''']
+
+[[rules]]
+id = "guinea-phone"
+description = "Guinean phone number"
+regex = '''\+224[ ]?\d{3}(?:[ ]?\d{2}){3}'''
+
+[[rules.allowlists]]
+regexes = ['''\+224[ ]?620[ ]?12[ ]?34[ ]?56''']
+
+[[rules]]
+id = "french-siren-rcs"
+description = "SIREN with an RCS registry mention"
+regex = '''\b\d{3}[ ]?\d{3}[ ]?\d{3}[ ]?(?:RCS|R\.C\.S\.)'''
+
+[[rules.allowlists]]
+regexes = ['''987[ ]?654[ ]?321[ ]?RCS''']
+
+[[rules]]
+id = "personal-home-path"
+description = "Absolute path to a personal home directory"
+regex = '''/Users/[A-Za-z0-9._-]+/'''
+
+[[rules.allowlists]]
+regexes = ['''(?i)/Users/(?:you|yourname|dev)/''']

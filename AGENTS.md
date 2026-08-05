@@ -61,6 +61,7 @@ Never batch-check tasks you did not verify. Never claim done with a failing or s
 - **NLP: no hand-maintained vocabularies.** A regex that enumerates words is a classifier with a hand-written weight vector, and it is a task failure. Patterns over token _types_ (an amount, a date, an honorific) stay; word lists become prototype embeddings, and answer shape becomes a decoding grammar. Details in `.claude/rules/nlp.md`.
 - **Validated edges**: every API endpoint validates input with valibot before use. No `any` at boundaries.
 - **Secrets**: never write `.env*` / `.dev.vars` (hook-enforced); use `wrangler secret put`.
+- **Fixtures are fiction.** Any name, address, email, phone number, IBAN, account or file reference, or amount in test data, corpus fixtures, docs or commit messages must be invented — never copied from a real document, not even "anonymized" fragments. CI scans the full history with gitleaks (`.gitleaks.toml`); a hit blocks the merge.
 - **Migrations**: never edit an applied migration — create a new one (use the `db-migration` skill).
 - **Simplicity**: smallest change that satisfies the spec. No speculative abstractions, no extra deps without need.
 - **Tests: no sugar tests.** A test must protect real logic or a real regression; ceremony coverage is a task failure. When unsure whether a test is necessary, it isn't.

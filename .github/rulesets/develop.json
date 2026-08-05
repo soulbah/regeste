@@ -36,7 +36,8 @@
 				"required_status_checks": [
 					{ "context": "verify / verify", "integration_id": 15368 },
 					{ "context": "commits", "integration_id": 15368 },
-					{ "context": "pr-title", "integration_id": 15368 }
+					{ "context": "pr-title", "integration_id": 15368 },
+					{ "context": "gitleaks", "integration_id": 15368 }
 				]
 			}
 		}

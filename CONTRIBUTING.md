@@ -16,6 +16,7 @@ Thanks for considering a contribution. Regeste is maintained by a small team wor
   and the title becomes the commit subject on `develop` — it is the line
   semantic-release will eventually read. CI lints it.
 - Privacy invariants in `docs/constitution.md` are non-negotiable — a PR that sends user content server-side or adds content tables to D1 will be rejected regardless of quality.
+- Fixtures and examples use invented data only — no real names, contact details, bank or file references, even partial. CI runs gitleaks over the full history with repo-specific PII rules (`.gitleaks.toml`) and fails on a hit.
 
 ## AI-assisted contributions
 
