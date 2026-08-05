@@ -12,6 +12,7 @@
 // host allowlist keeps this from being an open proxy.
 
 import { error } from '@sveltejs/kit';
+import * as v from 'valibot';
 import type { RequestHandler } from './$types';
 
 // Hosts that legitimately serve the model weights we load. Suffix matches cover
@@ -23,13 +24,33 @@ function hostAllowed(host: string): boolean {
 	return ALLOWED_EXACT.has(host) || ALLOWED_SUFFIX.some((suffix) => host.endsWith(suffix));
 }
 
-export const GET: RequestHandler = async ({ params, url, request, fetch }) => {
-	const path = params.path; // e.g. "huggingface.co/Xenova/model/resolve/main/config.json"
-	const slash = path.indexOf('/');
-	const host = slash === -1 ? path : path.slice(0, slash);
-	if (!hostAllowed(host)) throw error(403, 'host not allowed');
+// The catch-all param is attacker-controlled input. Splitting it on the first
+// slash and re-concatenating into a URL let `example.com#.hf.co` pass the
+// allowlist while fetch contacted example.com: the checked host and the
+// fetched host diverged on `#`, `?` and `@`. Validate the shape first, then
+// parse with the URL parser and check the host the fetch will actually see.
+const PathSchema = v.pipe(
+	v.string(),
+	// One host segment then a path; no userinfo, query, fragment or backslash
+	// anywhere — model files need none of them.
+	v.regex(/^[a-z0-9.-]+\/[^?#@\\]*$/i, 'malformed proxy path')
+);
 
-	const target = `https://${path}${url.search}`;
+export const GET: RequestHandler = async ({ params, url, request, fetch }) => {
+	// e.g. "huggingface.co/Xenova/model/resolve/main/config.json"
+	const parsed = v.safeParse(PathSchema, params.path);
+	if (!parsed.success) throw error(400, 'malformed proxy path');
+
+	let target: URL;
+	try {
+		target = new URL(`https://${parsed.output}${url.search}`);
+	} catch {
+		throw error(400, 'malformed proxy path');
+	}
+	// Check the host the URL parser resolved — the one fetch will contact —
+	// not a substring of the raw param.
+	if (!hostAllowed(target.hostname)) throw error(403, 'host not allowed');
+
 	// Forward only Range (large shards) and conditional headers; never cookies.
 	const forwardHeaders = new Headers();
 	for (const name of ['range', 'if-none-match', 'if-modified-since', 'accept']) {
