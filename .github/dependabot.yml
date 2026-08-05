@@ -22,6 +22,7 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
-    ignore:
-      - dependency-name: '*'
-        update-types: ['version-update:semver-major']
+    # Major bumps are NOT ignored here, unlike npm. A GitHub Action's major
+    # version is how it ships its runner migrations: wrangler-action stayed on
+    # `using: node20` until v4.0.0, so ignoring majors left the deploy running
+    # on a runtime GitHub had already deprecated, with no PR to say so.
