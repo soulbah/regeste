@@ -20,10 +20,11 @@ Private and My AI need **no server**: the app is a static client. Assisted is th
 
 **Try the hosted app: [regeste.com](https://regeste.com).**
 
-A 17-second walkthrough of the app, captured in the browser:
-[English](docs/demo-en.mp4) · [French](docs/demo-fr.mp4).
+![A 17-second walkthrough: two lease PDFs are attached, questions get answers with cited passages, and nothing leaves the device](docs/demo.gif)
 
-Both files live in `docs/`, so they play from a clone and are not shipped as
+The same walkthrough as video: [English](docs/demo-en.mp4) · [French](docs/demo-fr.mp4).
+
+All three files live in `docs/`, so they play from a clone and are not shipped as
 deployed assets.
 
 ## Stack
