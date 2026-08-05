@@ -323,7 +323,7 @@ describe('crossLingualQueryVariants', () => {
 		const composed =
 			'À qui appartient le compte ?\nLe compte appartient à KARIM TRAORE\nQuel est son numéro ?';
 		const unrelatedNumber = [
-			hit(1, 'Martine Duval — numéro SIRET 987 654 321 — conditions particulières.')
+			hit(1, 'Serge Lavigne — numéro SIRET 123 456 789 — conditions particulières.')
 		];
 		const accountNumber = [hit(2, 'Compte n° 60012345678 ouvert au nom de KARIM TRAORE.')];
 		const rewrite = vi.fn().mockResolvedValue('numéro du compte de KARIM TRAORE');

@@ -252,7 +252,7 @@ describe('retrieval relevance', () => {
 	it('treats a natural cost question as evidence for a stated sale price', () => {
 		expect(
 			hasAnswerBearingEvidence('Combien coute la maison ?', [
-				evidenceHit('PRIX DE LA VENTE de la maison : 146.000,00 €')
+				evidenceHit('PRIX DE LA VENTE de la maison : 152.000,00 €')
 			])
 		).toBe(true);
 	});
@@ -365,8 +365,8 @@ describe('retrieval relevance', () => {
 
 	it('accepts typoed and bilingual attribute evidence', () => {
 		expect(
-			hasAnswerBearingEvidence('Quel est le prxi de vnete exct du bien Cpelle ?', [
-				evidenceHit('Le prix de vente exact du bien Morel est 146.000,00 €.')
+			hasAnswerBearingEvidence('Quel est le prxi de vnete exct du bien Morle ?', [
+				evidenceHit('Le prix de vente exact du bien Morel est 152.000,00 €.')
 			])
 		).toBe(true);
 		expect(
