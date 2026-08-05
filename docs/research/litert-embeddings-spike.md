@@ -1,4 +1,9 @@
-# spike-litert — LiteRT.js embeddings GO/NO-GO (2026-07-17)
+# LiteRT.js embeddings — GO/NO-GO (2026-07-17)
+
+> The harness itself is not in the working tree: it was a throwaway plain-Vite
+> project (`spike-litert/`) removed once the verdict was recorded. It is still
+> in the history — `git show 1fb6756` — and the reproduction steps below are
+> written against that checkout.
 
 **Verdict: NO-GO.** LiteRT.js (`@litertjs/core` 2.5.3, released 2026-07-09) was evaluated as a
 replacement for transformers.js on the embedding path (EmbeddingGemma WebGPU + E5 WASM fallback).
@@ -38,7 +43,8 @@ runtime works exactly as documented — the blocker is model economics, not API 
 ## Reproduce
 
 ```bash
-cd spike-litert && bun install
+git worktree add /tmp/litert-spike 1fb6756   # the spike lived at spike-litert/
+cd /tmp/litert-spike/spike-litert && bun install
 # model (170.8 MB): official litert-community/embeddinggemma-300m is HF-gated (Gemma licence);
 # spike used the ungated byte-identical filename mirror Arjuu/EmbeddingGemma.tflite:
 curl -L -o models/embeddinggemma-300M_seq512_mixed-precision.tflite \
