@@ -1,3 +1,10 @@
+## [0.2.1](https://github.com/soulbah/regeste/compare/v0.2.0...v0.2.1) (2026-08-05)
+
+
+### Bug Fixes
+
+* **cdn:** close the host-confusion bypass in the model proxy ([#15](https://github.com/soulbah/regeste/issues/15)) ([344ad1d](https://github.com/soulbah/regeste/commit/344ad1dc34b0a413090c88eeed0997bab46ff998))
+
 # [0.2.0](https://github.com/soulbah/regeste/compare/v0.1.0...v0.2.0) (2026-08-05)
 
 
