@@ -21,10 +21,10 @@ Private and My AI need **no server**: the app is a static client. Assisted is th
 **Try the hosted app: [regeste.com](https://regeste.com).**
 
 A 17-second walkthrough of the app, captured in the browser:
+[English](docs/demo-en.mp4) · [French](docs/demo-fr.mp4).
 
-<video src="https://github.com/soulbah/regeste/raw/main/docs/demo-en.mp4" controls muted loop playsinline poster="https://github.com/soulbah/regeste/raw/main/static/og.png"></video>
-
-English demo. The [French version](https://github.com/soulbah/regeste/raw/main/docs/demo-fr.mp4) is also in the repo.
+Both files live in `docs/`, so they play from a clone and are not shipped as
+deployed assets.
 
 ## Stack
 
@@ -36,7 +36,7 @@ SvelteKit (Svelte 5) · Tailwind CSS v4 · shadcn-svelte · Cloudflare Workers +
 bun install                        # Bun 1.2 + Node 22 (.nvmrc)
 cp .dev.vars.example .dev.vars
 bun run db:migrate:local
-bun run dev                           # vite dev with emulated Cloudflare bindings
+bun run dev                           # vite dev with emulated Cloudflare bindings (enables Assisted locally)
 bun run verify                        # typecheck + lint + test + build
 ```
 
@@ -53,7 +53,7 @@ This repo is developed with AI coding agents; the agent harness lives in `AGENTS
 
 ## Releases
 
-Versions are cut automatically from `main` with semantic-release (Conventional Commits): a tag `vX.Y.Z` and a GitHub Release are created on every merge, the changelog is generated from the commit history, and the hosted app is deployed from each release. The version string is visible in the app, in the sidebar footer.
+Versions are cut automatically from `main` with semantic-release (Conventional Commits): a merge carrying a `feat:` or `fix:` commit produces a `vX.Y.Z` tag and a GitHub Release, the changelog is generated from the commit history, and that release is deployed to production. A docs-only merge ships no release. The version string is visible in the app, in the sidebar footer.
 
 The project is currently on a pre-1.0 cadence (`0.x`). Breaking changes bump the minor version; graduating to `1.0.0` is an explicit maintainer decision.
 

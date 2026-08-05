@@ -251,12 +251,17 @@
 	<Sidebar.Footer class="mt-4">
 		<SessionAdvisory />
 		<NavUser />
-		<p
-			class="px-2 pb-1 text-center font-mono text-[10px] leading-tight text-muted-foreground/60"
-			title={t('sidebar.versionLabel')}
-		>
-			v{version}
-		</p>
+		<!-- Tooltip, not a native `title`: that attribute is unreachable by
+		     keyboard and never appears on touch, so the label explaining what the
+		     number is would only exist for a mouse. -->
+		<Tooltip.Root>
+			<Tooltip.Trigger
+				class="px-2 pb-1 text-center font-mono text-[10px] leading-tight text-muted-foreground"
+			>
+				v{version}
+			</Tooltip.Trigger>
+			<Tooltip.Content>{t('sidebar.versionLabel')}</Tooltip.Content>
+		</Tooltip.Root>
 	</Sidebar.Footer>
 	<Sidebar.ResizeHandle aria-label={t('sidebar.resizeAria')} />
 </Sidebar.Root>

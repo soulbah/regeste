@@ -32,7 +32,7 @@
 	import { NEW_TAB } from '$lib/external-page';
 	import { WEB_ANALYTICS_TOKEN } from '$lib/analytics';
 
-	let { children, data } = $props();
+	let { children } = $props();
 
 	// Synchronously, in the script body, not in an $effect: an effect never runs on
 	// the server, which is exactly how every page came to be rendered in English
@@ -73,7 +73,7 @@
 	// prerendered, served straight off the asset store, and no server sees the
 	// request to read its Accept-Language.
 	$effect(() => {
-		if (data.locale === 'fr') return;
+		if (page.data.locale === 'fr') return;
 		if (page.url.searchParams.get('lang') !== 'fr' && browserLocale() !== 'fr') return;
 		location.replace(frHref);
 	});

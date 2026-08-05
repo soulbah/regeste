@@ -23,8 +23,8 @@ describe('service worker scope', () => {
 	});
 
 	it('keeps landing media and dev fixtures out of the app cache', () => {
-		expect(isMarketingAsset('/landing/film-fr-light.mp4')).toBe(true);
-		expect(isMarketingAsset('/landing/hero-fr-light.webp')).toBe(true);
+		expect(isMarketingAsset('/landing/cite-fr-light.webp')).toBe(true);
+		expect(isMarketingAsset('/landing/formats/pdf.svg')).toBe(true);
 		expect(isMarketingAsset('/dev/landing/bail-location-meublee.pdf')).toBe(true);
 		expect(isMarketingAsset('/vendor/sqlite/sqlite3.wasm')).toBe(false);
 		expect(isMarketingAsset('/icons/icon-192.png')).toBe(false);
