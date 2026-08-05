@@ -57,7 +57,7 @@ jobs:
       # Pinned once, used by both wrangler steps: 4.107.1 hangs on deploy and
       # the 4.107.x series cannot boot miniflare (PROGRESS.md, 2026-07-09/30).
       # Keep in step with the exact pin in package.json.
-      WRANGLER_VERSION: '4.115.0'
+      WRANGLER_VERSION: '4.118.0'
     steps:
       # Pinned by commit SHA (OpenSSF Scorecard): tags move, history does not.
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
