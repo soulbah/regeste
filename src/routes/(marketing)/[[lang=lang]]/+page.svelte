@@ -224,12 +224,31 @@
 			<div
 				class="border-border bg-card/40 overflow-hidden rounded-l-2xl border-y border-l shadow-xl shadow-black/5 max-lg:rounded-2xl max-lg:border-r"
 			>
+				<!-- Both variants are in the markup and CSS picks one, because the
+				     scheme is not known while the HTML is generated. A `src` derived
+				     from the theme is written light on the server, and Svelte keeps
+				     the server value when hydration finds a different one — so a dark
+				     visitor was served the light screenshot for good. CSS runs before
+				     the first paint and has no such disagreement to resolve.
+				     Only the shown one is fetched: a `display: none` image with
+				     `loading="lazy"` never enters the viewport, verified on Chromium,
+				     WebKit and Firefox. `display: none` also drops the hidden one from
+				     the accessibility tree, so the duplicated alt is announced once. -->
 				<img
-					src={`/landing/cite-${i18n.locale}-${scheme}.webp`}
+					src={`/landing/cite-${i18n.locale}-light.webp`}
 					alt={t('landing.cite.title')}
 					width="3720"
 					height="1800"
-					class="block h-auto w-full lg:w-[52rem] lg:max-w-none xl:w-[68rem]"
+					class="block h-auto w-full lg:w-[52rem] lg:max-w-none xl:w-[68rem] dark:hidden"
+					loading="lazy"
+					decoding="async"
+				/>
+				<img
+					src={`/landing/cite-${i18n.locale}-dark.webp`}
+					alt={t('landing.cite.title')}
+					width="3720"
+					height="1800"
+					class="hidden h-auto w-full lg:w-[52rem] lg:max-w-none xl:w-[68rem] dark:block"
 					loading="lazy"
 					decoding="async"
 				/>
