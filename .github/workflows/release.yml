@@ -39,7 +39,7 @@ jobs:
       tag: ${{ steps.release.outputs.tag }}
     steps:
       # Pinned by commit SHA (OpenSSF Scorecard): tags move, history does not.
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # semantic-release reads the tag history to decide the next version.
           # It can unshallow a depth-1 clone itself, but only as a fallback;
@@ -95,7 +95,7 @@ jobs:
       contents: write
     steps:
       # Pinned by commit SHA (OpenSSF Scorecard): tags move, history does not.
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: develop
           fetch-depth: 0
