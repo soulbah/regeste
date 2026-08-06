@@ -90,7 +90,7 @@
 	},
 	"dependencies": {
 		"@huggingface/transformers": "4.2.0",
-		"@llamaindex/liteparse-wasm": "2.10.1",
+		"@llamaindex/liteparse-wasm": "2.11.0",
 		"@mlc-ai/web-llm": "^0.2.84",
 		"@orama/stemmers": "^3.1.18",
 		"@wllama/wllama": "^3.5.1",
