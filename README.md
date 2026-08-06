@@ -54,7 +54,7 @@ This repo is developed with AI coding agents; the agent harness lives in `AGENTS
 
 ## Releases
 
-Versions are cut automatically from `main` with semantic-release (Conventional Commits): a merge carrying a `feat:` or `fix:` commit produces a `vX.Y.Z` tag and a GitHub Release, the changelog is generated from the commit history, and that release is deployed to production. A docs-only merge ships no release. The version string is visible in the app, in the sidebar footer.
+Versions are cut automatically from `main` with semantic-release (Conventional Commits): a merge carrying a `feat:` or `fix:` commit produces a `vX.Y.Z` tag and a GitHub Release, the changelog is generated from the commit history, and that release is deployed to production. A docs-only merge ships no release. The version string is visible in the app, at the foot of the settings panel.
 
 The tag is the version: nothing is ever tagged by hand, and `package.json` only
 records what the last release decided. `v0.1.0` is the single exception, set as
