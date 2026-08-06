@@ -180,17 +180,32 @@ export interface OrderScore {
 }
 
 export function htmlToText(html: string): string {
-	return html
-		.replace(/<script[\s\S]*?<\/script>/gi, ' ')
-		.replace(/<style[\s\S]*?<\/style>/gi, ' ')
-		.replace(/<[^>]+>/g, ' ')
-		.replace(/&nbsp;/g, ' ')
-		.replace(/&amp;/g, '&')
-		.replace(/&lt;/g, '<')
-		.replace(/&gt;/g, '>')
-		.replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
-		.replace(/&[a-z]+;/gi, ' ')
-		.replace(/\s+/g, ' ');
+	return (
+		html
+			// `</script >` is a valid end tag: HTML allows whitespace before the
+			// closing bracket. A pattern that demands `</script>` exactly leaves the
+			// script body in the text, and the tag stripper below then turns code
+			// into words the benchmark scores as document content.
+			.replace(/<script[\s\S]*?<\/script\s*>/gi, ' ')
+			.replace(/<style[\s\S]*?<\/style\s*>/gi, ' ')
+			.replace(/<[^>]+>/g, ' ')
+			// One pass over every entity, so a decoded `&` can never be re-read as
+			// the start of another entity: `&amp;lt;` is the literal text "&lt;",
+			// and decoding in sequence turned it into "<".
+			.replace(/&(?:nbsp|amp|lt|gt|quot|apos|#(\d+)|[a-z]+);/gi, (entity, code) => {
+				if (code) return String.fromCharCode(Number(code));
+				const named: Record<string, string> = {
+					'&nbsp;': ' ',
+					'&amp;': '&',
+					'&lt;': '<',
+					'&gt;': '>',
+					'&quot;': '"',
+					'&apos;': "'"
+				};
+				return named[entity.toLowerCase()] ?? ' ';
+			})
+			.replace(/\s+/g, ' ')
+	);
 }
 
 /** Sentence-ish runs long enough that finding one is meaningful. */

@@ -63,7 +63,12 @@ for (const root of ROOTS) {
 		// A document the worker renders carries a nonce instead of hashes. A script
 		// bearing that nonce is allowed, and only a script without it needs a hash.
 		const nonces = new Set((policy.match(/'nonce-([^']+)'/g) ?? []).map((m) => m.slice(7, -1)));
-		for (const [, attrs, body] of html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/gi)) {
+		// `</script >` is a valid end tag — HTML allows whitespace before the
+		// closing bracket. Demanding `</script>` exactly would end the match at
+		// the NEXT end tag, so an inline script closed that way would be hashed
+		// with the wrong body, and this check would pass a script the browser
+		// refuses to run.
+		for (const [, attrs, body] of html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script\s*>/gi)) {
 			if (/\ssrc=/i.test(attrs)) continue;
 			const type = (attrs.match(/type=["']([^"']*)["']/i)?.[1] ?? '').toLowerCase();
 			if (!EXECUTABLE.has(type)) continue;
