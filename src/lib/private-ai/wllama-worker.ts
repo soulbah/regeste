@@ -6,12 +6,18 @@
 // download, cached by wllama — never user content.
 
 import { expose } from 'comlink';
+import { installStreamAsyncIterator } from '$lib/compat/stream-async-iterator';
 // The package ships no "exports"/"types" fields; the deep ESM path resolves
 // to the built js + adjacent .d.ts (importing the root pulls its raw src/*.ts
 // into svelte-check).
 import { Wllama } from '@wllama/wllama/esm/index.js';
 import wllamaWasmUrl from '@wllama/wllama/esm/wasm/wllama.wasm?url';
 import type { GenerationOptions, GenerationResult } from './generation';
+
+// Streamed generation below uses `for await`, which WebKit cannot do on a
+// ReadableStream (see the polyfill). Worker globals are separate from the
+// page's, so this has to be installed here too.
+installStreamAsyncIterator();
 
 // wllama resolves asset paths with `new URL(path, document.baseURI)` and
 // workers have no `document` — shim just what it reads. Worker-local, so it
