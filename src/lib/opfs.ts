@@ -9,7 +9,9 @@ export async function readOriginal(hash: string): Promise<ArrayBuffer | null> {
 		const file = await fh.getFile();
 		return await file.arrayBuffer();
 	} catch {
-		// Missing file or unsupported API (Safari write limitation at ingest time).
+		// Missing entry, or a storage API that refused the write at ingest time.
+		// Callers must treat null as "the source copy is gone", not as a parse
+		// failure: the indexed document itself is untouched and still answers.
 		return null;
 	}
 }

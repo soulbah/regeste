@@ -118,7 +118,17 @@
 
 		<div class="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4">
 			<!-- Keep named phases, while mapping scanned-page work to Reading. -->
-			{#if live.status === 'error'}
+			{#if live.status === 'error' && (ingest?.error ?? live.error) === 'original_missing'}
+				<!-- Not the failure box: this document still answers. Only the page
+				     view is unavailable, and the fix is the file, not a re-import. -->
+				<div class="space-y-1 rounded-lg border p-3 text-sm">
+					<div class="flex items-center gap-2">
+						<TriangleAlertIcon class="text-muted-foreground size-4 shrink-0" />
+						<span>{t('sheet.originalMissing')}</span>
+					</div>
+					<p class="text-muted-foreground text-xs">{t('sheet.originalMissingHint')}</p>
+				</div>
+			{:else if live.status === 'error'}
 				<div class="border-destructive/40 flex items-center gap-2 rounded-lg border p-3 text-sm">
 					<TriangleAlertIcon class="text-destructive size-4 shrink-0" />
 					<span class="text-destructive">{t('sheet.indexFailed')}</span>

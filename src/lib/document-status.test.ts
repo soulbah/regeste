@@ -15,4 +15,11 @@ describe('documentStatusKey', () => {
 		expect(documentStatusKey('ready')).toBe('status.ready');
 		expect(documentStatusKey('error', 'scanned_pdf')).toBe('status.failed');
 	});
+
+	it('does not call a missing original a failure', () => {
+		// The index is intact and still answers; only the source copy is gone.
+		// Saying "Failed" sends people to re-import a document that works.
+		expect(documentStatusKey('error', 'original_missing')).toBe('status.originalMissing');
+		expect(documentStatusKey('error', 'parse_failed')).toBe('status.failed');
+	});
 });
