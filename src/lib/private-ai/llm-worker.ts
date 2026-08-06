@@ -5,12 +5,18 @@
 
 import { expose } from 'comlink';
 import { CreateMLCEngine, type MLCEngineInterface, type InitProgressReport } from '@mlc-ai/web-llm';
+import { installStreamAsyncIterator } from '$lib/compat/stream-async-iterator';
 import { proxiedAppConfig } from './webllm-config';
 import {
 	webLlmGenerationParameters,
 	type GenerationOptions,
 	type GenerationResult
 } from './generation';
+
+// The completion stream below is consumed with `for await`, which WebKit
+// cannot do on its own (see the polyfill). Worker globals are separate, so
+// this has to be installed here too.
+installStreamAsyncIterator();
 
 let engine: MLCEngineInterface | null = null;
 let loadedModel: string | null = null;

@@ -224,6 +224,8 @@ export const fr: Record<keyof typeof en, string> = {
 	'status.splitting': 'Découpage',
 	'status.indexing': 'Préparation',
 	'status.failed': 'Échec',
+	// Pas un échec : l'index est intact, seule la copie source a disparu.
+	'status.originalMissing': 'Original absent',
 
 	// Pre-send review panel
 	'presend.title': 'Avant l’envoi',
@@ -400,6 +402,11 @@ export const fr: Record<keyof typeof en, string> = {
 	'sheet.stillIndexing': 'Indexation en cours',
 	'sheet.openChatAria': 'Ouvrir la discussion {title}',
 	'sheet.indexFailed': "Ce document n'a pas pu être indexé.",
+	// Ligne distincte de indexFailed : ce document répond toujours, seule sa
+	// copie source a disparu — la bonne demande est le fichier, pas un réimport.
+	'sheet.originalMissing': "Le fichier original n'est plus sur cet appareil.",
+	'sheet.originalMissingHint':
+		'Les réponses et les citations fonctionnent toujours. Utilisez Remplacer le fichier pour retrouver l’aperçu.',
 
 	// Pagination
 	'pagination.prev': 'Page précédente',

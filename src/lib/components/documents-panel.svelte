@@ -78,6 +78,7 @@
 				{@const status = ingest?.status ?? doc.status}
 				{@const ready = doc.status === 'ready'}
 				{@const errored = doc.status === 'error'}
+				{@const originalMissing = (ingest?.error ?? doc.error) === 'original_missing'}
 				{@const dimmed = ready && !doc.enabled}
 				<div class="flex items-start gap-3 border-b px-4 py-3">
 					<!-- The source toggle: excluded documents are dropped from answers. -->
@@ -120,7 +121,14 @@
 						<!-- Named ingest phases stay visible. Scanned pages reuse the normal
 					     Reading phase, so OCR remains an implementation detail. -->
 						<div class="mt-1.5 flex items-center gap-1.5 text-[11px]">
-							{#if errored}
+							{#if originalMissing}
+								<!-- The index is intact and this document still answers: a red
+								     dot here would report a failure that did not happen. -->
+								<span class="bg-muted-foreground size-1.5 rounded-full"></span>
+								<span class="text-muted-foreground">
+									{t(documentStatusKey('error', 'original_missing'))}
+								</span>
+							{:else if errored}
 								<span class="bg-destructive size-1.5 rounded-full"></span>
 								<span class="text-destructive">
 									{t(documentStatusKey(status, ingest?.error ?? doc.error))}

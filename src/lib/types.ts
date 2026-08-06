@@ -11,7 +11,15 @@ export type DocumentStatus =
 	| 'ocr' // OCR pass running
 	| 'error';
 
-export type IngestErrorCode = 'scanned_pdf' | 'unsupported_format' | 'parse_failed' | 'unknown';
+export type IngestErrorCode =
+	| 'scanned_pdf'
+	| 'unsupported_format'
+	| 'parse_failed'
+	/** The original bytes are no longer in OPFS: nothing to re-read, so nothing
+	 * was parsed. Distinct from parse_failed, which means the file was read and
+	 * refused; here the document is intact and only its source copy is gone. */
+	| 'original_missing'
+	| 'unknown';
 
 export interface LocalDocument {
 	id: string;

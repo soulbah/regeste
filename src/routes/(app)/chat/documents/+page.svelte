@@ -386,7 +386,9 @@
 													: ''} · {t('docsPage.added', {
 													date: new Date(doc.createdAt).toLocaleDateString()
 												})}
-												{#if st === 'error'}
+												{#if st === 'error' && (ingest?.error ?? doc.error) === 'original_missing'}
+													· {t(documentStatusKey(st, ingest?.error ?? doc.error))}
+												{:else if st === 'error'}
 													· {t('docsPage.error')}
 												{:else if st !== 'ready'}
 													· {t(documentStatusKey(st, ingest?.error ?? doc.error))}
