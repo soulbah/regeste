@@ -118,7 +118,11 @@
 
 		<div class="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4">
 			<!-- Keep named phases, while mapping scanned-page work to Reading. -->
-			{#if live.status === 'error' && (ingest?.error ?? live.error) === 'original_missing'}
+			<!-- Keyed on the error, not on the status: a re-index that finds no
+			     original leaves the stored status at `ready` when chunks already
+			     exist (the document still answers), so a status test would say
+			     nothing at all about the page view that just failed to open. -->
+			{#if (ingest?.error ?? live.error) === 'original_missing'}
 				<!-- Not the failure box: this document still answers. Only the page
 				     view is unavailable, and the fix is the file, not a re-import. -->
 				<div class="space-y-1 rounded-lg border p-3 text-sm">
