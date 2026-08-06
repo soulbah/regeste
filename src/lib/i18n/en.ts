@@ -233,6 +233,8 @@ export const en = {
 	'status.splitting': 'Splitting',
 	'status.indexing': 'Preparing',
 	'status.failed': 'Failed',
+	// Not a failure: the index is intact, only the source copy is gone.
+	'status.originalMissing': 'Original missing',
 
 	// Pre-send review panel
 	'presend.title': 'Before it leaves',
@@ -403,6 +405,11 @@ export const en = {
 	'sheet.stillIndexing': 'Still indexing',
 	'sheet.openChatAria': 'Open the chat {title}',
 	'sheet.indexFailed': "This document couldn't be indexed.",
+	// Separate line from indexFailed: this document answers fine, only its
+	// source copy is gone, so the honest ask is the file — not a re-import.
+	'sheet.originalMissing': 'The original file is no longer on this device.',
+	'sheet.originalMissingHint':
+		'Answers and citations still work. Use Replace file to restore the page view.',
 
 	// Pagination
 	'pagination.prev': 'Previous page',

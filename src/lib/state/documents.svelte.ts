@@ -126,8 +126,11 @@ async function mapRankingWorkers<T, R>(
 }
 
 async function storeOriginal(hash: string, data: ArrayBuffer): Promise<void> {
-	// Safari has no createWritable on the main thread; non-fatal for milestone 0
-	// (the original file is only needed for the citation viewer, spec 003).
+	// Every current engine has createWritable on the main thread: Safari 26
+	// (Sept. 2025) closed the last gap, so this is Baseline "newly available".
+	// Older Safari, private modes and a full disk still fail here, and that is
+	// survivable: the original is only needed for the citation viewer (spec 003)
+	// and for re-indexing, never for answering.
 	try {
 		const root = await navigator.storage.getDirectory();
 		const dir = await root.getDirectoryHandle('documents', { create: true });
@@ -352,8 +355,12 @@ class DocumentsStore {
 				if (this.processingIds.has(doc.id) || this.ocrAborts[doc.id]) continue;
 				const data = await readOriginal(doc.hash);
 				if (!data) {
-					await db.setDocumentStatus(doc.id, 'error', { error: 'parse_failed' });
-					this.setIngest(doc.id, { status: 'error', phaseProgress: 0, error: 'parse_failed' });
+					await db.setDocumentStatus(doc.id, 'error', { error: 'original_missing' });
+					this.setIngest(doc.id, {
+						status: 'error',
+						phaseProgress: 0,
+						error: 'original_missing'
+					});
 					continue;
 				}
 				await db.deleteChunks(doc.id);
@@ -1057,9 +1064,9 @@ class DocumentsStore {
 			existingChunkCount = await db.countChunks(id);
 			const data = await readOriginal(doc.hash);
 			if (!data) {
-				this.setIngest(id, { status: 'error', phaseProgress: 0, error: 'parse_failed' });
+				this.setIngest(id, { status: 'error', phaseProgress: 0, error: 'original_missing' });
 				if (existingChunkCount === 0) {
-					await db.setDocumentStatus(id, 'error', { error: 'parse_failed' });
+					await db.setDocumentStatus(id, 'error', { error: 'original_missing' });
 				}
 				return;
 			}
@@ -1132,8 +1139,8 @@ class DocumentsStore {
 		if (!doc) return;
 		const data = await readOriginal(doc.hash);
 		if (!data) {
-			await db.setDocumentStatus(id, 'error', { error: 'parse_failed' });
-			this.setIngest(id, { status: 'error', phaseProgress: 0, error: 'parse_failed' });
+			await db.setDocumentStatus(id, 'error', { error: 'original_missing' });
+			this.setIngest(id, { status: 'error', phaseProgress: 0, error: 'original_missing' });
 			await this.refreshLibrary();
 			return;
 		}

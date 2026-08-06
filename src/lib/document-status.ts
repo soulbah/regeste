@@ -10,6 +10,9 @@ export function documentStatusKey(
 	status: DocumentStatus,
 	error: IngestErrorCode | null | undefined = null
 ): MessageKey {
+	// A missing original is not a failure of this document: it still answers.
+	// Saying "Failed" here sends people to re-import a file that works.
+	if (error === 'original_missing') return 'status.originalMissing';
 	if (error || status === 'error') return 'status.failed';
 
 	switch (status) {
