@@ -182,12 +182,13 @@ export interface OrderScore {
 export function htmlToText(html: string): string {
 	return (
 		html
-			// `</script >` is a valid end tag: HTML allows whitespace before the
-			// closing bracket. A pattern that demands `</script>` exactly leaves the
-			// script body in the text, and the tag stripper below then turns code
-			// into words the benchmark scores as document content.
-			.replace(/<script[\s\S]*?<\/script\s*>/gi, ' ')
-			.replace(/<style[\s\S]*?<\/style\s*>/gi, ' ')
+			// An end tag is `</script` + anything that is not `>`, then `>`: the
+			// parser accepts `</script >` and even `</script\t\n bar>`. A pattern
+			// demanding `</script>` exactly leaves the script body in the text, and
+			// the tag stripper below then turns code into words the benchmark
+			// scores as document content.
+			.replace(/<script[\s\S]*?<\/script\b[^>]*>/gi, ' ')
+			.replace(/<style[\s\S]*?<\/style\b[^>]*>/gi, ' ')
 			.replace(/<[^>]+>/g, ' ')
 			// One pass over every entity, so a decoded `&` can never be re-read as
 			// the start of another entity: `&amp;lt;` is the literal text "&lt;",
