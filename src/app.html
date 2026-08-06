@@ -13,8 +13,14 @@
 		<meta name="theme-color" content="#1c1916" media="(prefers-color-scheme: dark)" />
 		<link rel="manifest" href="/manifest.webmanifest" />
 		<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+		<!-- The .ico is for the clients that never read this markup: RSS readers,
+		     chat unfurlers, crawlers and old bookmark bars all guess /favicon.ico
+		     at the origin root. Same for /apple-touch-icon.png, which iOS probes
+		     by convention when a page is added to the home screen. Both live at
+		     the root because that is the only place those clients look. -->
+		<link rel="icon" href="/favicon.ico" sizes="32x32" />
 		<link rel="icon" href="/icons/icon-192.png" type="image/png" sizes="192x192" />
-		<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 		<meta name="apple-mobile-web-app-title" content="Regeste" />
 		%sveltekit.head%
 	</head>
