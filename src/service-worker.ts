@@ -5,6 +5,7 @@
 
 import { build, files, version } from '$service-worker';
 import { MLCEngine, type MLCEngineInterface } from '@mlc-ai/web-llm';
+import { installStreamAsyncIterator } from '$lib/compat/stream-async-iterator';
 import { proxiedAppConfig } from '$lib/private-ai/webllm-config';
 import { isShellCache, shellCacheName } from '$lib/pwa/cache-names';
 import { APP_SCOPE, isAppNavigation, isMarketingAsset } from '$lib/pwa/sw-routing';
@@ -14,6 +15,10 @@ import {
 	type GenerationResult
 } from '$lib/private-ai/generation';
 import { ModelLoadCoordinator } from '$lib/private-ai/model-load-coordinator';
+
+// Streamed generation below uses `for await`, which WebKit cannot do on a
+// ReadableStream (see the polyfill). A service worker has its own global.
+installStreamAsyncIterator();
 
 const sw = self as unknown as ServiceWorkerGlobalScope;
 let engine: MLCEngineInterface | null = null;

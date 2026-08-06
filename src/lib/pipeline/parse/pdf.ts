@@ -9,12 +9,18 @@
 // all-or-nothing `scanned_pdf` throw that discarded the whole document.
 
 import type { ParsedDoc, ParsedBlock } from '$lib/types';
+import { installStreamAsyncIterator } from '$lib/compat/stream-async-iterator';
 import { layoutUncertain, splitByChrome, type LayoutRegion } from '../layout-model';
 import { orderPdfText, type ReconstructedLine } from './pdf-layout';
 import { normalizeFormMarks, type PositionedTextItem } from './pdf-form-marks';
 import { assessPdfTextLayer } from '../pdf-text-quality';
 import { isUntrustedScan, largestRasterCoverage, textCoverage, textLayerTooThin } from './pdf-scan';
 import { tableLinesByPage } from './pdf-markdown';
+
+// pdf.js reads its own text stream with `for await`, which WebKit cannot do
+// (see the polyfill). Install before pdf.js loads, or every PDF fails on
+// Safari with a TypeError thrown from inside the library.
+installStreamAsyncIterator();
 
 export function isLikelyPdfSectionHeading(line: string, nextLine = ''): boolean {
 	const text = line.trim();

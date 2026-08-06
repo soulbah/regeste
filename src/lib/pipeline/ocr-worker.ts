@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 
 import { expose } from 'comlink';
+import { installStreamAsyncIterator } from '$lib/compat/stream-async-iterator';
 import { OCR_DETECTION_MAX_SIDE, OCR_MODEL } from './ocr-model';
 import { shouldRetryOcr } from './ocr-quality';
 import { OCR_PADDING_HORIZONTAL, OCR_PADDING_VERTICAL, type OcrItem } from './ocr-boxes';
@@ -12,6 +13,11 @@ import {
 	regionsFromImage,
 	type LayoutRegion
 } from './layout-model';
+
+// A worker has its own global: the polyfill installed on the page is invisible
+// here. `nativePageItems` calls pdf.js's getTextContent, which iterates a
+// stream with `for await` — unsupported by WebKit (see the polyfill).
+installStreamAsyncIterator();
 
 export interface OcrPageResult {
 	text: string;
