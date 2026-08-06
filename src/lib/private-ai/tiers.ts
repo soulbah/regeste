@@ -19,7 +19,8 @@
 //    though it is the bigger model.
 
 export interface Tier {
-	id: 'xl' | 'large' | 'max' | 'plus' | 'mid' | 'small' | 'tiny' | 'small-f32' | 'lite';
+	id:
+		'xl' | 'large' | 'max' | 'plus' | 'mid' | 'small' | 'tiny' | 'small-f32' | 'cpu-plus' | 'lite';
 	engine: 'webllm' | 'wllama';
 	model: string;
 	downloadLabel: string; // shown to the user ("~2.4 GB")
@@ -131,12 +132,29 @@ export const TIERS: Tier[] = [
 		requiresF16: false
 	},
 	{
+		id: 'cpu-plus',
+		engine: 'wllama',
+		// The rung that removes the cliff. Without it, a machine web-llm cannot
+		// drive fell from 2.4 GB straight to 0.4 GB — that gap is the difference
+		// between a model that answers from a document and one that mostly
+		// cannot. Same family as the rung below, so stepping down changes the
+		// size, not the behaviour.
+		model: '/cdn/huggingface.co/unsloth/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q4_K_M.gguf',
+		downloadLabel: '~1.1 GB',
+		// Measured: content-length of the GGUF is 1_107_409_472 bytes.
+		downloadBytes: 1.11 * GB,
+		vramMB: 0,
+		largestTensorMB: 0,
+		requiresF16: false
+	},
+	{
 		id: 'lite',
 		engine: 'wllama',
 		// Same-origin proxy (see routes/cdn): a direct huggingface.co fetch fails
 		// under the cross-origin isolation Private mode requires.
 		model: '/cdn/huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_K_M.gguf',
 		downloadLabel: '~0.4 GB',
+		// Measured: content-length of the GGUF is 396_705_472 bytes.
 		downloadBytes: 0.4 * GB,
 		vramMB: 0,
 		largestTensorMB: 0,
@@ -146,6 +164,14 @@ export const TIERS: Tier[] = [
 
 export interface DeviceSignals {
 	hasWebGpu: boolean;
+	/** Whether web-llm's own `requestDevice` succeeds on this adapter, probed
+	 * rather than inferred (see capability.ts). WebGPU existing and web-llm
+	 * being able to start are different questions: an engine that caps storage
+	 * buffers at the spec default of eight has a perfectly real GPU that these
+	 * particular kernels cannot use, and that GPU still runs the embedding
+	 * model. Absent (undefined) means "not probed", which reads as "assume it
+	 * works" — a missing signal is never a refusal here. */
+	webllmCapable?: boolean;
 	hasF16: boolean;
 	/** `adapter.limits.maxBufferSize`. Specified, mandatory and uniform across
 	 * every WebGPU browser — unlike every other capability signal available. */
@@ -202,12 +228,19 @@ function fitsStorage(tier: Tier, signals: DeviceSignals): boolean {
  * actually hold. */
 export function eligibleTiers(signals: DeviceSignals): Tier[] {
 	const cpuCapable = signals.isolated && signals.hardwareConcurrency >= 4;
-	if (!signals.hasWebGpu) {
-		return cpuCapable ? TIERS.filter((tier) => tier.engine === 'wllama') : [];
+	// `webllmCapable === false` is a measured refusal; undefined is an unasked
+	// question, and an unasked question must not cost the user their GPU.
+	const mlcUsable = signals.hasWebGpu && signals.webllmCapable !== false;
+	if (!mlcUsable) {
+		return cpuCapable
+			? TIERS.filter((tier) => tier.engine === 'wllama' && fitsStorage(tier, signals))
+			: [];
 	}
 	const grant = grantedBufferMB(signals);
 	return TIERS.filter((tier) => {
-		if (tier.engine === 'wllama') return cpuCapable;
+		// A CPU rung still has to be storable: weights that cannot be kept are a
+		// download the user pays for twice.
+		if (tier.engine === 'wllama') return cpuCapable && fitsStorage(tier, signals);
 		if (tier.requiresF16 && !signals.hasF16) return false;
 		if (grant === 0 || tier.largestTensorMB > grant) return false;
 		return fitsStorage(tier, signals);

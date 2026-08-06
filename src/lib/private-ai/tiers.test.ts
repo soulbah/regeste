@@ -96,9 +96,31 @@ describe('pickTier', () => {
 	});
 
 	it('falls back to CPU inference only when it is worth attempting', () => {
-		expect(pickTier(signals({ hasWebGpu: false }))?.id).toBe('lite');
+		// The best CPU rung, not the smallest one. A machine without usable
+		// WebGPU used to drop from the 2.4 GB rung straight to 0.4 GB, and that
+		// gap is the difference between a model that answers from a document and
+		// one that mostly cannot.
+		expect(pickTier(signals({ hasWebGpu: false }))?.id).toBe('cpu-plus');
 		expect(pickTier(signals({ hasWebGpu: false, isolated: false }))).toBeNull();
 		expect(pickTier(signals({ hasWebGpu: false, hardwareConcurrency: 2 }))).toBeNull();
+		// A quota too small for the 1.1 GB rung still leaves the small one.
+		expect(
+			pickTier(signals({ hasWebGpu: false, storageQuotaBytes: 800_000_000, storageUsageBytes: 0 }))
+				?.id
+		).toBe('lite');
+	});
+
+	it('keeps a real GPU when only web-llm cannot use it', () => {
+		// WebGPU existing and web-llm being able to start are different
+		// questions. An engine capping storage buffers at the spec default of
+		// eight has a working adapter these kernels cannot use — that must cost
+		// the MLC rungs, not the whole GPU, and never the largest CPU rung.
+		const firefoxLike = nonChromium({ webllmCapable: false });
+		expect(eligibleTiers(firefoxLike).every((tier) => tier.engine === 'wllama')).toBe(true);
+		expect(pickTier(firefoxLike)?.id).toBe('cpu-plus');
+		// An unprobed signal is not a refusal: absent means "assume it works".
+		expect(pickTier(nonChromium())?.id).toBe('max');
+		expect(pickTier(nonChromium({ webllmCapable: true }))?.id).toBe('max');
 	});
 });
 
