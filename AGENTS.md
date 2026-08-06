@@ -72,6 +72,7 @@ Never batch-check tasks you did not verify. Never claim done with a failing or s
 - TypeScript strict; Svelte 5 runes (`$state`, `$derived`, `$props`) — no legacy stores in new code.
 - Formatting/lint: prettier + eslint (configs in repo). Tabs, single quotes, width 100.
 - Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`…). No AI attribution in commit messages.
+- Repo docs are English, including `PROGRESS.md`. The log is the first thing an outside reader opens, so an entry written in French is unreadable to most of them — French belongs in product copy (`src/lib/i18n/fr.ts`) and in `docs/internal/`. Quoting the owner verbatim in French inside an English entry is fine; the entry around it is not.
 - File naming: kebab-case for files, PascalCase Svelte components live in `src/lib/components/`.
 - Shared state: `.svelte.ts` rune modules in `src/lib/state/`; workers are plain TS (no runes) under `src/lib/workers/`.
 
