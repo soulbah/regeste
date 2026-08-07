@@ -67,7 +67,7 @@
 		"knip": "^6.25.0",
 		"mode-watcher": "^1.1.0",
 		"paneforge": "^1.0.2",
-		"playwright": "^1.60.0",
+		"playwright": "^1.62.1",
 		"ppu-doclayout": "^1.0.0",
 		"ppu-paddle-ocr": "^6.0.0",
 		"prettier": "^3.9.6",
