@@ -1,3 +1,10 @@
+# [0.2.0](https://github.com/soulbah/regeste/compare/v0.1.3...v0.2.0) (2026-08-08)
+
+
+### Features
+
+* **ui:** make the app usable on mobile ([#22](https://github.com/soulbah/regeste/issues/22)) ([bb85d7a](https://github.com/soulbah/regeste/commit/bb85d7aa23af56875b459127fb28163251b570f8))
+
 ## [0.1.3](https://github.com/soulbah/regeste/compare/v0.1.2...v0.1.3) (2026-08-08)
 
 
