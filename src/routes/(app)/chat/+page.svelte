@@ -229,7 +229,11 @@
 		>
 			{#if choosing || firstRun}
 				<div class="space-y-2.5 text-center">
-					<h2 class="font-display text-4xl tracking-tight text-balance">
+					<!-- 36px is a desktop display size. On a phone the same headline wrapped
+					     to two lines and pushed the first card's action to 358px of a 568px
+					     screen — reachable, but the screen read as a title with a hint of
+					     product under it. One step down below sm; desktop keeps text-4xl. -->
+					<h2 class="font-display text-3xl tracking-tight text-balance sm:text-4xl">
 						{choosing ? t('onboard.headline') : t('home.headline')}
 					</h2>
 					<!-- What the chosen mode actually does. A flat "everything runs on

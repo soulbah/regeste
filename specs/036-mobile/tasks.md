@@ -77,6 +77,40 @@ Check a task off ONLY after its Done-when commands pass. `[P]` = safe to run in 
       — sidebar 256→58→256 px on ⌘B, palette opens with 9 items, panel toggles
       [817,351]→[1176,0] on ⌘., zero page errors.
 
+- [x] 9. Dismissing the drawer. Owner feedback from a real iPhone: closing the
+      menu "takes too long". Three separate causes, all measured on an emulated
+      iPhone 13 before any code was written.
+      Done when: following a link inside the drawer leaves it closed; a swipe
+      towards the drawer's own edge dismisses it; a vertical drag inside it
+      still scrolls; at 1440 px the desktop sidebar is untouched by any of it.
+      Verified: (a) the drawer stayed open after navigating — the destination
+      was hidden behind the thing that led there — now `afterNavigate` closes
+      it, measured false after tapping a chat row; (b) the drawer covers 288 px
+      of a 390 px screen, leaving a 97 px strip of overlay as the only tap
+      target, so a swipe was added (`swipe-dismiss.ts`): closes in 647 ms on
+      real touch events dispatched through CDP, while a vertical drag and a
+      25 px horizontal wobble both leave it open; (c) desktop proven inert —
+      sidebar 256 px before navigation, 256 px after, 256 px after going back,
+      zero page errors, and `setOpenMobile` only writes the drawer's own state.
+
+- [x] 10. Three layout defects the owner circled on the phone.
+      Done when: the "03 Rédiger la réponse" node is centred in its room at
+      390 px; the two moment pills on the landing sit on the timeline rule
+      rather than under it; the onboarding headline does not dominate a phone
+      screen. Desktop unchanged in all three.
+      Verified: (a) the lane node's centring was scoped to `lg`, so at 390 px it
+      sat flush left with 164 px of empty room beside it — the exact shape its
+      own code comment rules out. Now `mx-auto`: 82 px on each side, and lanes
+      01/02 already centred at every width, so this one had been the odd one
+      out. (b) The rule was dropped at a hardcoded `top-[46px]`, which assumed
+      one-line labels; "Ce qui est conservé" wraps on a phone and the rule cut
+      through the words 10 px above the pills' centre. Centring it on the list
+      instead measures 0 px of offset on iPhone SE, iPhone 13 and iPad Mini,
+      and `items-stretch` makes both pills the same height. (c) The onboarding
+      headline was `text-4xl` at every width: 36 px wrapped to two lines and
+      spent 136 px of a 568 px screen before the cards. Now `text-3xl` with
+      `sm:text-4xl` — 30 px on phones, 36 px unchanged from `sm` up.
+
 Completion checklist (all required before the spec is closed):
 
 - [x] All tasks checked with their Done-when verified

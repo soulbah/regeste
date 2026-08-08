@@ -19,13 +19,28 @@
 	import Trash2Icon from '@lucide/svelte/icons/trash-2';
 	import BrandMark from '$lib/components/brand-mark.svelte';
 	import SearchIcon from '@lucide/svelte/icons/search';
-	import { goto } from '$app/navigation';
+	import { afterNavigate, goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { t } from '$lib/i18n/index.svelte';
 	import { chatsStore } from '$lib/state/chats.svelte';
 	import { searchStore } from '$lib/state/search.svelte';
 	import type { LocalChat } from '$lib/types';
+	import { useSidebar } from '$lib/components/ui/sidebar';
+
+	const sidebar = useSidebar();
+
+	// On a phone the sidebar is a drawer over the page, so following a link inside
+	// it leaves the destination hidden behind the thing that led there — the user
+	// then has to dismiss it by hand before seeing what they picked. Desktop has
+	// no such problem (the sidebar sits beside the page), and setOpenMobile only
+	// touches the drawer's own state, so this is inert there.
+	afterNavigate(() => sidebar.setOpenMobile(false));
+
+	/** Rows that act without navigating still have to yield the screen. */
+	function closeDrawer() {
+		sidebar.setOpenMobile(false);
+	}
 
 	let renameTarget = $state<LocalChat | null>(null);
 	let renameValue = $state('');
@@ -146,7 +161,10 @@
 			<Sidebar.MenuItem>
 				<Sidebar.MenuButton
 					tooltipContent={`${t('sidebar.search')} · ⌘K`}
-					onclick={() => searchStore.toggle()}
+					onclick={() => {
+						closeDrawer();
+						searchStore.toggle();
+					}}
 				>
 					<SearchIcon />
 					<span>{t('sidebar.search')}</span>

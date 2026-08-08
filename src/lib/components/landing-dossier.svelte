@@ -183,31 +183,43 @@
 			>
 				{moment === 'before' ? t('landing.deck.intact') : `${passages(2)} · ${kb(sentBytes)}`}
 			</p>
-			<div class="absolute inset-x-0 top-[46px] flex items-center" aria-hidden="true">
-				<span class="border-border flex-1 border-t"></span>
-				<span class="border-border w-1/2 border-t border-dashed"></span>
-				<span class="border-border flex-1 border-t"></span>
-			</div>
-			<Tabs.List
-				class="relative grid h-auto w-full grid-cols-2 bg-transparent p-0 group-data-horizontal/tabs:h-auto"
-			>
-				{#each MOMENTS as id (id)}
-					<Tabs.Trigger
-						value={id}
-						class="border-border data-[state=active]:bg-card data-[state=active]:border-foreground/25 hover:bg-card/70 bg-background mx-auto h-auto w-fit cursor-pointer gap-2.5 rounded-md border px-3.5 py-2 whitespace-normal data-[state=active]:shadow-sm"
-					>
-						<!-- Hollow reads as "not reached yet", which on a timeline is
+			<!-- The rule is centred on the pills themselves rather than dropped at a
+			     measured offset. `top-[46px]` was that offset: it assumed a one-line
+			     caption above and one-line labels inside, both of which stop being
+			     true on a phone. Measured at 390px, "Ce qui est conservé" wrapped to
+			     two lines and the rule crossed the pills 10px above their centre,
+			     cutting through the words instead of passing behind them. Centring on
+			     the list tracks whatever height the labels end up at. -->
+			<div class="relative">
+				<div
+					class="absolute inset-x-0 top-1/2 flex -translate-y-1/2 items-center"
+					aria-hidden="true"
+				>
+					<span class="border-border flex-1 border-t"></span>
+					<span class="border-border w-1/2 border-t border-dashed"></span>
+					<span class="border-border flex-1 border-t"></span>
+				</div>
+				<Tabs.List
+					class="relative grid h-auto w-full grid-cols-2 items-stretch bg-transparent p-0 group-data-horizontal/tabs:h-auto"
+				>
+					{#each MOMENTS as id (id)}
+						<Tabs.Trigger
+							value={id}
+							class="border-border data-[state=active]:bg-card data-[state=active]:border-foreground/25 hover:bg-card/70 bg-background mx-auto h-full w-fit cursor-pointer gap-2.5 rounded-md border px-3.5 py-2 whitespace-normal data-[state=active]:shadow-sm"
+						>
+							<!-- Hollow reads as "not reached yet", which on a timeline is
 						     exactly right. -->
-						<span
-							class="border-border size-[9px] shrink-0 rounded-full border-2 transition-colors {moment ===
-							id
-								? 'bg-foreground border-foreground'
-								: 'bg-background'}"
-						></span>
-						<span class="font-mono text-[11px] tracking-widest uppercase">{NAMES[id]}</span>
-					</Tabs.Trigger>
-				{/each}
-			</Tabs.List>
+							<span
+								class="border-border size-[9px] shrink-0 rounded-full border-2 transition-colors {moment ===
+								id
+									? 'bg-foreground border-foreground'
+									: 'bg-background'}"
+							></span>
+							<span class="font-mono text-[11px] tracking-widest uppercase">{NAMES[id]}</span>
+						</Tabs.Trigger>
+					{/each}
+				</Tabs.List>
+			</div>
 		</div>
 
 		<!-- The room. The floor is bg-muted/30 and the leaves are bg-card, which is
