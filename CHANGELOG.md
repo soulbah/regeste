@@ -1,3 +1,10 @@
+## [0.1.3](https://github.com/soulbah/regeste/compare/v0.1.2...v0.1.3) (2026-08-08)
+
+
+### Bug Fixes
+
+* **security:** send HSTS and hardening headers on prerendered pages ([#18](https://github.com/soulbah/regeste/issues/18)) ([11731d1](https://github.com/soulbah/regeste/commit/11731d1a6a436e3096318deb9790e09053ffa7c2))
+
 ## [0.1.2](https://github.com/soulbah/regeste/compare/v0.1.1...v0.1.2) (2026-08-06)
 
 
