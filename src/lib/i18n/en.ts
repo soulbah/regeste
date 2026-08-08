@@ -617,6 +617,7 @@ export const en = {
 	'settings.review.desc':
 		'Check the passages each time before they leave. Turn this off and remote answers send straight away.',
 	'settings.tabs.account': 'Account',
+	'settings.backToTabsAria': 'Back to the settings list',
 	'settings.defaultMode.title': 'Default mode for new chats',
 	'settings.deleteChats.title': 'Delete all chats',
 	'settings.deleteChats.desc':

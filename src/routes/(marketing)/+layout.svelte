@@ -113,7 +113,10 @@
 			: 'border-b border-transparent'}"
 	>
 		<div class="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
-			<a href={resolve('/')} class="font-display text-2xl tracking-tight">
+			<!-- touch-target: the wordmark is the way back on every marketing page,
+			     and 32px of text is under the thumb minimum. The class only paints a
+			     hit area on a coarse pointer; the lockup itself is untouched. -->
+			<a href={resolve('/')} class="font-display touch-target text-2xl tracking-tight">
 				<span class="text-accent-foreground">[</span>Regeste
 			</a>
 			<nav class="flex items-center gap-1">

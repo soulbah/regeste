@@ -624,6 +624,7 @@ export const fr: Record<keyof typeof en, string> = {
 	'settings.review.desc':
 		'Contrôlez les passages à chaque fois avant qu’ils partent. Désactivez et les réponses distantes partent directement.',
 	'settings.tabs.account': 'Compte',
+	'settings.backToTabsAria': 'Revenir à la liste des réglages',
 	'settings.defaultMode.title': 'Mode par défaut des nouvelles discussions',
 	'settings.deleteChats.title': 'Supprimer toutes les discussions',
 	'settings.deleteChats.desc':

@@ -14,7 +14,7 @@
 <Tooltip.Provider delayDuration={600}>
 	<Tooltip.Root>
 		<Tooltip.Trigger
-			class="bg-accent text-accent-foreground focus-visible:ring-ring mx-0.5 inline-flex h-4 min-w-4 cursor-pointer items-center justify-center rounded-[5px] px-1 align-super font-mono text-[10px] font-semibold focus-visible:ring-2 focus-visible:outline-none"
+			class="bg-accent text-accent-foreground focus-visible:ring-ring touch-target-inline mx-0.5 inline-flex h-4 min-w-4 cursor-pointer items-center justify-center rounded-[5px] px-1 align-super font-mono text-[10px] font-semibold focus-visible:ring-2 focus-visible:outline-none"
 			onclick={() => cite && viewerStore.openCitation(cite)}
 			aria-label={t('turn.openSourceAria', { n })}
 		>

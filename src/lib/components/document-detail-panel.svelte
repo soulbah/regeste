@@ -231,7 +231,7 @@
 							{live.hash.slice(0, 16)}…
 						</span>
 						<CopyIcon
-							class="text-muted-foreground size-3 opacity-0 transition-opacity group-hover/fp:opacity-100"
+							class="text-muted-foreground size-3 transition-opacity pointer-fine:opacity-0 group-hover/fp:opacity-100"
 						/>
 					</Button>
 					{#if detail?.versionCount}

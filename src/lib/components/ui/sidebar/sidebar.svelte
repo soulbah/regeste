@@ -4,6 +4,7 @@
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { SIDEBAR_WIDTH_MOBILE } from './constants.js';
 	import { useSidebar } from './context.svelte.js';
+	import { swipeDismiss } from './swipe-dismiss.js';
 
 	let {
 		ref = $bindable(null),
@@ -20,6 +21,24 @@
 	} = $props();
 
 	const sidebar = useSidebar();
+
+	// Swipe-to-dismiss, attached to the panel bits-ui rendered rather than to a
+	// wrapper: the drawer covers 288px of a 390px phone, so the overlay left to
+	// tap measured 97px and closing it meant aiming at a sliver. A swipe towards
+	// its own edge is the gesture the thumb is already making, and it is how the
+	// drawer closes on both mobile OSes.
+	//
+	// An effect rather than `use:`, because the element comes from a child
+	// component's binding and there is no tag here to put a directive on.
+	$effect(() => {
+		const node = ref;
+		if (!node || !sidebar.isMobile) return;
+		const handle = swipeDismiss(node, {
+			side,
+			onDismiss: () => sidebar.setOpenMobile(false)
+		});
+		return handle.destroy;
+	});
 </script>
 
 {#if collapsible === 'none'}
