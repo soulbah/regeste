@@ -45,28 +45,9 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: bunx commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
 
-  # Squash merge writes the PR title as the commit subject that lands on
-  # develop (squash_merge_commit_title: PR_TITLE), and that subject is what
-  # semantic-release reads once the release PR reaches main. The job above
-  # cannot see it: it lints the branch commits, which the squash discards.
-  # Same config as the commit lint, so there is exactly one vocabulary.
-  pr-title:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      # Pinned by commit SHA (OpenSSF Scorecard): tags move, history does not.
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
-        with:
-          bun-version: 1.2.22
-      - run: bun install --frozen-lockfile
-      - name: Lint the pull request title
-        env:
-          # Never interpolate the title into the script: it is attacker-
-          # controlled input on a public repo, and env is the safe channel.
-          PR_TITLE: ${{ github.event.pull_request.title }}
-        run: printf '%s\n' "$PR_TITLE" | bunx commitlint --verbose
+  # The pull request title is linted too — the squash subject semantic-release
+  # ends up reading — but from its own workflow (pr-title.yml), because that
+  # check has to rerun when the title is edited and this one must not.
 
   # The pre-public audit found real personal data in the private-phase fixtures
   # and history, and the history was rewritten to remove it. This gate keeps it

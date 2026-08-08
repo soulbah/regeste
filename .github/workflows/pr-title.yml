@@ -1,0 +1,58 @@
+name: PR title
+
+# Squash merge writes the pull request title as the commit subject that lands
+# on develop (squash_merge_commit_title: PR_TITLE), and that subject is what
+# semantic-release reads once the release pull request reaches main. The
+# `commits` job in ci.yml cannot see it: it lints the branch commits, which the
+# squash discards.
+#
+# This lives in its own workflow because of `edited`. The job reads the title
+# from the webhook payload, and the default activity types (opened,
+# synchronize, reopened) freeze that payload at the last code push — so
+# correcting a rejected title left the check red with no way to clear it.
+# Rerunning replays the original payload and fails again on the old title;
+# closing and reopening the pull request was the only fix (observed on #20).
+# Adding `edited` to ci.yml would have worked too, but it would also rerun the
+# full verify gate every time a description is touched, which is 2m40s of
+# runner time for a typo. One cheap workflow with its own trigger is the
+# smaller change.
+#
+# `synchronize` stays in the list even though a new commit cannot change the
+# title. A required status check is resolved against the head commit, so a
+# check that never reports on a new SHA leaves the pull request waiting for a
+# status that will never arrive — the same shape as the skipped-workflow case
+# GitHub documents. Twenty seconds per push is the price of the check staying
+# mergeable.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+# One run per pull request; a newer edit cancels the stale one. Keyed on the
+# pull request number rather than github.ref so this cannot collide with the
+# ci.yml group.
+concurrency:
+  group: pr-title-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # The job name is the required status check context in the develop ruleset.
+  # Renaming it silently drops the requirement, so it stays `pr-title`.
+  pr-title:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Pinned by commit SHA (OpenSSF Scorecard): tags move, history does not.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.2.22
+      - run: bun install --frozen-lockfile
+      - name: Lint the pull request title
+        env:
+          # Never interpolate the title into the script: it is attacker-
+          # controlled input on a public repo, and env is the safe channel.
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: printf '%s\n' "$PR_TITLE" | bunx commitlint --verbose
