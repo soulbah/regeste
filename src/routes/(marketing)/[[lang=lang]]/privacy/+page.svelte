@@ -60,7 +60,12 @@
 			     with no mail client registered, and on this page of all pages a dead
 			     end would be the wrong impression to leave. -->
 			<p class="mt-2">
-				<a href={`mailto:${CONTACT_EMAIL}`} class="text-accent-foreground font-mono text-sm">
+				<!-- touch-target: an 18px-tall line of type is the only way to reach us
+				     from this page, and a thumb cannot land on it reliably. -->
+				<a
+					href={`mailto:${CONTACT_EMAIL}`}
+					class="text-accent-foreground touch-target inline-block font-mono text-sm"
+				>
 					{CONTACT_EMAIL}
 				</a>
 			</p>

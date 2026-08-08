@@ -120,7 +120,12 @@
 {#snippet answerLane()}
 	<!-- Centred, not parked in the first column: this step is alone in its room,
 	     and a lone node hugging the left edge reads as a lane that got cut off
-	     rather than as a destination. -->
+	     rather than as a destination.
+	     The centring was scoped to lg, so the phone got exactly the shape the
+	     paragraph above rules out: measured at 390px, the node sat flush against
+	     the left wall with 164px of empty room to its right. Lanes 01 and 02
+	     centre their nodes at every width (flex-wrap justify-center), so this one
+	     was also the only lane that disagreed with its neighbours. -->
 	<div>
 		<p
 			class="text-muted-foreground mb-5 flex items-baseline justify-center gap-2.5 font-mono text-[10px] tracking-widest uppercase"
@@ -128,7 +133,7 @@
 			<span class="text-accent-foreground">03</span>
 			{t('hiw.lane.answer')}
 		</p>
-		<div class="hiw-node flex w-32 flex-col items-center gap-3 text-center lg:mx-auto lg:w-36">
+		<div class="hiw-node mx-auto flex w-32 flex-col items-center gap-3 text-center lg:w-36">
 			<span
 				class="flex size-11 items-center justify-center rounded-xl border {crosses
 					? 'border-amber-500/40 bg-amber-500/10'

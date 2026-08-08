@@ -250,6 +250,56 @@
    shout). Only theme tokens, so both light and dark follow automatically.
    --------------------------------------------------------------------- */
 @layer components {
+	/* Touch targets (spec 036). Apple asks for 44px, Android for 48dp, and the
+	   controls this app is built from are 28-36px because they were drawn for a
+	   mouse. Rather than inflate them everywhere — which would rewrite the
+	   density the whole interface is set in — the painted control keeps its size
+	   and an invisible ::after extends what a finger can hit.
+
+	   Gated on `pointer: coarse` rather than on a breakpoint: the question is
+	   what the person is pointing with, not how wide their screen is. A small
+	   laptop keeps its compact controls; a large tablet gets big ones.
+
+	   The pseudo-element is absolutely positioned and centred, so it adds
+	   nothing to layout and nothing reflows. This is the same trick the shadcn
+	   sidebar already uses for its row actions.
+
+	   `max()` rather than a fixed size: a control already larger than 44px keeps
+	   its own hit area instead of being shrunk to the minimum. */
+	@media (pointer: coarse) {
+		.touch-target {
+			position: relative;
+		}
+		.touch-target::after {
+			content: '';
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			width: max(100%, 44px);
+			height: max(100%, 44px);
+			translate: -50% -50%;
+		}
+		/* Inline markers inside a sentence — the citation chip. WCAG 2.2 (2.5.8)
+		   exempts targets whose size is constrained by the line-height of the text
+		   around them, and it is right to: a 44px box on a superscript chip covers
+		   the lines above and below, so tapping a word would open a source and
+		   dragging to select an excerpt would fail. The quote-reply feature
+		   depends on that selection working. 28px is comfortably past the 24px
+		   floor and stays inside the line box. */
+		.touch-target-inline {
+			position: relative;
+		}
+		.touch-target-inline::after {
+			content: '';
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			width: max(100%, 28px);
+			height: max(100%, 28px);
+			translate: -50% -50%;
+		}
+	}
+
 	.prose-answer > :first-child {
 		margin-top: 0;
 	}

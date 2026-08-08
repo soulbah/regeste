@@ -10,8 +10,12 @@
 					'bg-background hover:bg-foreground/7 hover:text-sidebar-foreground shadow-[0_0_0_1px_var(--sidebar-border)] hover:shadow-[0_0_0_1px_var(--sidebar-accent)]'
 			},
 			size: {
-				default: 'h-8 text-sm',
-				sm: 'h-7 text-xs',
+				// pointer-coarse raises the row to a 44px thumb target. The sidebar is
+				// a full-screen sheet on a phone, where these rows are the whole
+				// navigation, so the hit area is grown for real rather than faked with
+				// an overlay that would collide with the row's own action button.
+				default: 'h-8 pointer-coarse:h-11 text-sm',
+				sm: 'h-7 pointer-coarse:h-10 text-xs',
 				lg: 'h-14 px-3 text-sm group-data-[collapsible=icon]:p-0!'
 			}
 		},

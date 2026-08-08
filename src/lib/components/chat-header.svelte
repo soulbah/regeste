@@ -42,7 +42,7 @@
 	<div class="flex shrink-0 items-center gap-2">
 		<a
 			href={resolve('/chat/privacy')}
-			class="focus-visible:ring-ring rounded-full focus-visible:ring-2"
+			class="focus-visible:ring-ring touch-target inline-flex rounded-full focus-visible:ring-2"
 		>
 			{#if chatsStore.chatEgress && chatsStore.chatEgress.cloudRequests > 0}
 				<span

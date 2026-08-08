@@ -25,6 +25,7 @@
 	import SunIcon from '@lucide/svelte/icons/sun';
 	import MoonIcon from '@lucide/svelte/icons/moon';
 	import XIcon from '@lucide/svelte/icons/x';
+	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { version } from '$app/environment';
@@ -45,6 +46,16 @@
 
 	type Tab = 'general' | 'usage' | 'data' | 'ai' | 'account';
 	let tab = $state<Tab>('general');
+	// Below md the rail and the panel cannot share the width: at 390px the dialog
+	// is 358px and the 184px rail left 174px for the controls, every one of them
+	// cut off at the right edge. So on a phone it becomes two screens — the list,
+	// then the tab — which is the pattern iOS and Android settings both use. At
+	// md and up both are on screen and this flag is never read.
+	let mobilePane = $state<'tabs' | 'content'>('tabs');
+	// Reopening lands on the list rather than on whichever tab was last read.
+	$effect(() => {
+		if (uiStore.settingsOpen) mobilePane = 'tabs';
+	});
 	const tabs = [
 		{ id: 'general', label: 'settings.tabs.general', icon: SlidersHorizontalIcon },
 		{ id: 'data', label: 'settings.tabs.data', icon: DatabaseIcon },
@@ -166,14 +177,20 @@
 </script>
 
 {#snippet row(title: string, desc: string | null, control: import('svelte').Snippet)}
-	<div class="flex items-center justify-between gap-6 py-3.5">
-		<div class="min-w-0">
+	<!-- The row grammar (label + description left, control right) needs width to
+	     work. At 358px the control took half of it and the label wrapped to two
+	     words per line, which is not a row any more. Below sm it stacks: text,
+	     then the control under it, left-aligned. -->
+	<div
+		class="flex flex-col items-start gap-2 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:gap-6"
+	>
+		<div class="min-w-0 w-full sm:w-auto">
 			<p class="text-sm font-medium">{title}</p>
 			{#if desc}
 				<p class="text-muted-foreground mt-0.5 text-xs leading-relaxed">{desc}</p>
 			{/if}
 		</div>
-		<div class="shrink-0">
+		<div class="shrink-0 max-sm:w-full">
 			{@render control()}
 		</div>
 	</div>
@@ -220,21 +237,43 @@
 		<!-- The dialog mounts outside Sidebar.Provider, so it brings its own
 		     tooltip context. -->
 		<Tooltip.Provider delayDuration={300}>
-			<div class="grid h-[640px] max-h-[85svh] grid-cols-[11.5rem_1fr]">
+			<!-- One column on a phone (one pane at a time), the two-column rail from
+			     md up. Taller on a phone too: 85svh of a 358px-wide dialog is the
+			     only room the controls get. -->
+			<div class="grid h-[85svh] max-h-[85svh] grid-cols-1 md:h-[640px] md:grid-cols-[11.5rem_1fr]">
 				<!-- Rail: tinted like the sidebar, iconed tabs, green accent bar on the
 			     active one — the same signature as the ⌘K selection. -->
-				<nav class="bg-sidebar/60 flex flex-col border-r p-2">
-					<p class="font-display px-3 pt-2 pb-3 text-lg tracking-tight">{t('settings.title')}</p>
+				<nav
+					class="bg-sidebar/60 flex-col border-r p-2 md:flex {mobilePane === 'tabs'
+						? 'flex'
+						: 'hidden'}"
+				>
+					<div class="flex items-center justify-between gap-2 pt-2 pb-3 pl-3 md:pr-0">
+						<p class="font-display text-lg tracking-tight">{t('settings.title')}</p>
+						<!-- The panel header owns the close button from md up; on a phone
+						     the list is a screen of its own and needs its own way out. -->
+						<Dialog.Close class="md:hidden">
+							{#snippet child({ props })}
+								<Button {...props} variant="ghost" size="icon-sm">
+									<XIcon />
+									<span class="sr-only">{t('common.close')}</span>
+								</Button>
+							{/snippet}
+						</Dialog.Close>
+					</div>
 					<div class="flex flex-col gap-0.5">
 						{#each tabs as { id, label, icon: Icon } (id)}
 							<Button
 								variant="ghost"
 								size="sm"
-								class="relative justify-start gap-2.5 {tab === id
+								class="relative justify-start gap-2.5 max-md:h-11 {tab === id
 									? 'bg-foreground/7 text-foreground before:bg-ring before:absolute before:top-1/2 before:left-0 before:h-4 before:w-[3px] before:-translate-y-1/2 before:rounded-full'
 									: 'text-muted-foreground'}"
 								aria-current={tab === id ? 'page' : undefined}
-								onclick={() => (tab = id)}
+								onclick={() => {
+									tab = id;
+									mobilePane = 'content';
+								}}
 							>
 								<Icon class="size-4" />
 								{t(label)}
@@ -256,11 +295,26 @@
 						<Tooltip.Content side="right">{t('settings.versionLabel')}</Tooltip.Content>
 					</Tooltip.Root>
 				</nav>
-				<div class="flex min-h-0 flex-col">
+				<div
+					class="min-h-0 flex-col md:flex {mobilePane === 'content' ? 'flex' : 'hidden md:flex'}"
+				>
 					<!-- Fixed header: the close button lives here so it never rides over
 				     scrolled content. -->
-					<div class="flex h-12 shrink-0 items-center justify-between border-b pr-3 pl-6">
-						<p class="text-sm font-medium">{t(activeTab.label)}</p>
+					<div class="flex h-12 shrink-0 items-center justify-between border-b pr-3 pl-2 md:pl-6">
+						<div class="flex min-w-0 items-center gap-1">
+							<!-- On a phone the list is the screen behind this one, so the
+							     header carries the way back to it. -->
+							<Button
+								variant="ghost"
+								size="icon-sm"
+								class="md:hidden"
+								aria-label={t('settings.backToTabsAria')}
+								onclick={() => (mobilePane = 'tabs')}
+							>
+								<ArrowLeftIcon />
+							</Button>
+							<p class="truncate text-sm font-medium max-md:pl-1">{t(activeTab.label)}</p>
+						</div>
 						<Dialog.Close>
 							{#snippet child({ props })}
 								<Button {...props} variant="ghost" size="icon-sm">
