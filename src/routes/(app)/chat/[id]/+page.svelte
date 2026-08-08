@@ -335,7 +335,7 @@
 										<Button
 											variant="ghost"
 											size="icon"
-											class="size-6 opacity-0 group-hover:opacity-100"
+											class="size-6 pointer-fine:opacity-0 group-hover:opacity-100"
 											aria-label={t('chat.editAria')}
 											onclick={() => startEdit(message.id)}
 										>
@@ -487,7 +487,11 @@
 				{/if}
 			</div>
 
-			<div class="px-6 pb-6">
+			<!-- pb clears the home indicator on a notched phone; env() is 0px
+			     everywhere else, so the desktop spacing is untouched. Narrower
+			     side padding on a phone: 24px each side left the composer's own
+			     controls cramped on a 375px screen. -->
+			<div class="px-4 pb-[max(--spacing(4),env(safe-area-inset-bottom))] sm:px-6 sm:pb-6">
 				<Composer
 					mode={chatsStore.activeChat?.mode ?? 'private'}
 					disabled={chatsStore.sending}

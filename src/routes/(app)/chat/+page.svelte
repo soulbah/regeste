@@ -212,10 +212,10 @@
 	     tall enough (hero, drop zone, sample, setup line, composer) that the same
 	     shift pushed its headline under the header. -->
 	<div
-		class="min-h-0 flex-1 overflow-y-auto px-6 {choosing
-			? 'flex flex-col items-center justify-center pb-[10vh]'
+		class="min-h-0 flex-1 overflow-y-auto px-4 sm:px-6 {choosing
+			? 'flex flex-col items-center justify-center-safe pb-[10vh]'
 			: firstRun
-				? 'flex flex-col items-center justify-center py-6'
+				? 'flex flex-col items-center justify-center-safe py-6'
 				: 'flex flex-col items-center justify-end pb-4'}"
 	>
 		<!-- Every surface shares the composer's max-w-3xl so the drop zone, the
@@ -298,7 +298,10 @@
 	     send, and leaving it up put a second call to action, in the accent colour,
 	     on the one step whose entire purpose is the first one. -->
 	{#if !choosing}
-		<div class="px-6 pb-6">
+		<!-- Same rule as the chat thread's composer: clear the home indicator on a
+		     notched phone, and give the controls their width back on a narrow one.
+		     env() is 0px elsewhere, so desktop spacing is unchanged. -->
+		<div class="px-4 pb-[max(--spacing(4),env(safe-area-inset-bottom))] sm:px-6 sm:pb-6">
 			<Composer
 				{mode}
 				onsend={handleSend}

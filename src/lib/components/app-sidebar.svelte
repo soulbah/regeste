@@ -95,7 +95,7 @@
 		<div class="flex items-center justify-between group-data-[collapsible=icon]:justify-center">
 			<a
 				href={resolve('/chat')}
-				class="flex min-w-0 items-center gap-2 px-2 py-1.5 group-data-[collapsible=icon]:hidden"
+				class="touch-target flex min-w-0 items-center gap-2 px-2 py-1.5 group-data-[collapsible=icon]:hidden"
 			>
 				<!-- The lockup is typographic: the accent bracket opens the name, the
 				     same glyph the mark and favicon are built from. No pictogram. -->

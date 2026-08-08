@@ -95,8 +95,13 @@
 </script>
 
 <!-- Two columns self-hosted, three when this build offers Assisted. Written
-     out because Tailwind only emits classes it can see in the source. -->
-<div class="grid gap-4 sm:gap-5 {MODE_IDS.length === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}">
+     out because Tailwind only emits classes it can see in the source.
+
+     The row forms at lg, not sm. Three cards need about 1024px: at 768px the
+     sm rule gave them 130px each, which clipped the "Best for this device"
+     badge mid-word and wrapped every description to one word per line. A card
+     whose job is to carry the facts a decision turns on cannot be 130px wide. -->
+<div class="grid gap-4 sm:gap-5 {MODE_IDS.length === 3 ? 'lg:grid-cols-3' : 'sm:grid-cols-2'}">
 	{#each cards as card, index (card.id)}
 		<div
 			class="onboard-card border-border bg-card/40 hover:border-foreground/20 relative flex flex-col gap-5 overflow-hidden rounded-2xl border p-6 text-left transition-[transform,border-color] duration-300 hover:-translate-y-0.5 sm:p-7 {card.blocked
