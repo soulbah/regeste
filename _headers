@@ -2,6 +2,35 @@
 # serves — including bundled worker scripts under /_app — so SharedArrayBuffer
 # (wllama multithreading) is available. Pages get the same headers from
 # hooks.server.ts; this file covers the static assets binding.
+#
+# The three headers below were already on every Worker-served response
+# (withSecurityHeaders in hooks.server.ts) and on none of the prerendered ones,
+# which is most of the public site. A prerendered page is a file: the asset
+# store answers for it and the Worker never runs, so that function never applied
+# to the landing page, the guides or the privacy page. Measured before this
+# change: `curl -sI https://regeste.com/` carried no Strict-Transport-Security,
+# `curl -sI https://regeste.com/api/health` did.
+#
+# HSTS is the one that matters. canonicalRedirect() upgrades http to https, but
+# it lives in that same unreachable Worker code, so http://regeste.com/ answers
+# 200 in cleartext while http://regeste.com/auth correctly 301s. This header is
+# what makes the browser stop asking: the first https answer pins the origin for
+# a year, and every later visit starts encrypted whatever the visitor typed.
+#
+# `/*` rather than the production host. Absolute-URL rules would let us name
+# regeste.com, but they "ignore the incoming request's port and protocol when
+# matching" (Workers static-assets docs), so they cannot express "https only"
+# either — and hardcoding the host would leave every self-hosted deployment
+# without HSTS. RFC 6797 §7.2 says not to send the header over cleartext and
+# §8.1 says user agents must ignore it when they do, so the http case is inert
+# rather than harmful. Turning on Always Use HTTPS at the zone removes that case
+# outright, since the edge then redirects before the asset store is reached.
+#
+# No `preload`: that submits the domain to a list browsers ship compiled in,
+# which is not reversible on our timetable and is the owner's call to make.
 /*
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Embedder-Policy: credentialless
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin

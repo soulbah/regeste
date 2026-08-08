@@ -1,6 +1,10 @@
 version: 2
 updates:
-  - package-ecosystem: npm
+  # `bun`, not `npm`: the npm updater bumps package.json but leaves bun.lock
+  # untouched roughly one time out of two (dependabot-core#11602), and CI runs
+  # `bun install --frozen-lockfile`, so those PRs land red and need a manual
+  # lockfile commit. The bun updater has been GA since February 2025.
+  - package-ecosystem: bun
     directory: /
     schedule:
       interval: weekly
