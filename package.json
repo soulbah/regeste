@@ -38,7 +38,7 @@
 		"@commitlint/cli": "^21.2.1",
 		"@commitlint/config-conventional": "^21.2.0",
 		"@eslint/js": "^10.0.1",
-		"@fontsource-variable/geist": "^5.2.9",
+		"@fontsource-variable/geist": "^5.3.0",
 		"@fontsource-variable/geist-mono": "^5.2.8",
 		"@fontsource-variable/newsreader": "^5.2.10",
 		"@internationalized/date": "^3.12.2",
