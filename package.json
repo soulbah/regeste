@@ -61,7 +61,7 @@
 		"drizzle-kit": "^0.31.10",
 		"eslint": "^10.8.0",
 		"eslint-config-prettier": "^10.1.8",
-		"eslint-plugin-svelte": "^3.19.0",
+		"eslint-plugin-svelte": "^3.22.0",
 		"file-type": "^22.0.1",
 		"globals": "^17.6.0",
 		"knip": "^6.25.0",
